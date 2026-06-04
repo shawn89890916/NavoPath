@@ -1,18 +1,30 @@
-# 升学目标日历
+# NavoPath
 
-Windows 桌面日历应用，左侧今日待办，中间日历，右侧 DeepSeek AI 对话窗口。
+NavoPath helps students choose the tasks worth advancing from long-term plans, schedule them into a daily timeline, and clarify the next concrete action.
 
-## 使用
-
-- 直接运行 `release/升学目标日历-1.0.0.exe`。
-- 首次打开会导入内置升学时间线，并自动检测当前工作区的升学指导报告。
-- 在右上角设置 DeepSeek API Key 后，可以在右侧对话窗口让 AI 拆分任务、调整行程或记录想法。
-- 数据保存在 Windows 应用数据目录，不会写入原始升学指导报告。
-
-## 开发
+## Development
 
 ```powershell
 npm install
 npm run dev
-npm run dist
 ```
+
+## Web Build
+
+```powershell
+npm run build
+```
+
+Cloudflare Pages settings:
+
+- Build command: `npm run build`
+- Build output directory: `dist`
+
+Required environment variables for the public web app:
+
+```text
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+Without these variables, the app runs in local browser preview mode.
