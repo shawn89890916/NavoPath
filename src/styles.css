@@ -8316,7 +8316,7 @@ body.df-resizing * {
 /* END INTERACTION LAYER */
 
 /* ================================================================
-   3DAY VIEW — 左时间标尺 + 顶部固定日期 + 三列居中
+   3DAY VIEW
 ================================================================ */
 
 .df-timeline-3day {
@@ -8326,22 +8326,16 @@ body.df-resizing * {
   overflow: hidden;
 }
 
-/* ── 顶部固定日期栏 ── */
+/* ── 日期头 ── */
 .df-timeline-3day-top {
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(148, 163, 184, .14);
 }
 
 .df-timeline-3day-ruler-spacer {
-  width: 48px;
+  width: 52px;
   flex-shrink: 0;
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
 }
 
 .df-timeline-3day-dates {
@@ -8349,122 +8343,99 @@ body.df-resizing * {
   display: flex;
   justify-content: center;
   gap: 0;
-  padding: 0 16px;
+  padding: 0 20px;
 }
 
 .df-timeline-3day-date {
-  width: 220px;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 6px;
-  padding: 18px 0 10px;
+  flex: 0 0 224px;
+  text-align: center;
+  padding: 14px 0 8px;
 }
 
 .df-timeline-3day-date-num {
-  font-size: 26px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 700;
   color: rgba(17, 24, 39, .80);
   line-height: 1;
 }
 
 .df-timeline-3day-date-wd {
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(17, 24, 39, .45);
-  text-transform: uppercase;
-  letter-spacing: .03em;
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(17, 24, 39, .36);
+  margin-top: 2px;
 }
 
-.df-timeline-3day-date.today .df-timeline-3day-date-num {
-  color: #C69CF9;
-}
+.df-timeline-3day-date.today .df-timeline-3day-date-num,
 .df-timeline-3day-date.today .df-timeline-3day-date-wd {
   color: #C69CF9;
-  font-weight: 600;
 }
 
-/* ── 固定 All Day 栏 ── */
+/* ── All Day ── */
 .df-timeline-3day-allday {
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
   flex-shrink: 0;
-  min-height: 34px;
-  background: rgba(251, 247, 255, .45);
-  border-bottom: 1px solid rgba(148, 163, 184, .12);
+  min-height: 28px;
+  border-bottom: 1px solid rgba(148, 163, 184, .10);
 }
 
 .df-timeline-3day-allday-label {
+  display: block;
   font-size: 10px;
-  font-weight: 500;
-  color: rgba(17, 24, 39, .48);
-  white-space: nowrap;
-  padding: 0 8px 8px 0;
-  line-height: 1;
+  color: rgba(17, 24, 39, .32);
+  padding: 6px 6px 0 0;
+  text-align: right;
 }
 
 .df-timeline-3day-allday-cell {
-  width: 220px;
-  padding: 5px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  border-right: 1px solid rgba(148, 163, 184, .08);
+  flex: 0 0 224px;
+  padding: 3px 8px 4px;
+  border-right: 1px solid rgba(148, 163, 184, .06);
 }
 .df-timeline-3day-allday-cell:last-child {
   border-right: none;
 }
 
 .df-timeline-3day-allday .df-day-all-day-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
+  font-size: 11px;
+  color: rgba(17, 24, 39, .42);
+  padding: 1px 6px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
-  color: rgba(17, 24, 39, .50);
-  transition: background .12s ease;
 }
-
 .df-timeline-3day-allday .df-day-all-day-item:hover {
-  background: rgba(198, 156, 249, .08);
+  background: rgba(198, 156, 249, .06);
 }
-
 .df-timeline-3day-allday .df-day-all-day-dot {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: rgba(198, 156, 249, .35);
-  flex-shrink: 0;
+  background: rgba(198, 156, 249, .30);
 }
 
-/* ── 滚动区域 ── */
+/* ── 滚动 ── */
 .df-timeline-3day-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(198, 156, 249, .18) transparent;
 }
 
-/* ── Grid：左标尺 + 右三列 ── */
+/* ── Grid ── */
 .df-timeline-3day-grid {
   display: flex;
-  flex-direction: row;
   min-height: 100%;
 }
 
-/* ── 左侧时间标尺 ── */
+/* ── 时间标尺 ── */
 .df-timeline-3day-ruler {
   flex-shrink: 0;
-  width: 48px;
+  width: 52px;
   position: sticky;
   left: 0;
   z-index: 2;
-  background: rgba(255, 255, 255, .92);
-  border-right: 1px solid rgba(148, 163, 184, .12);
+  background: #fff;
+  border-right: 1px solid rgba(148, 163, 184, .10);
 }
 
 .df-slot-ruler {
@@ -8475,128 +8446,107 @@ body.df-resizing * {
   pointer-events: none;
 }
 .df-slot-ruler.hour {
-  border-top: 1px solid rgba(148, 163, 184, .14);
+  border-top: 1px solid rgba(148, 163, 184, .10);
 }
 .df-slot-ruler.major {
-  border-top-color: rgba(148, 163, 184, .22);
+  border-top-color: rgba(148, 163, 184, .20);
 }
 .df-slot-ruler span {
   position: absolute;
   top: -9px;
-  right: 8px;
+  right: 6px;
   font-size: 10px;
-  font-weight: 500;
-  color: rgba(17, 24, 39, .42);
+  color: rgba(17, 24, 39, .35);
   white-space: nowrap;
 }
 .df-slot-ruler.major span {
-  font-weight: 700;
-  font-size: 11px;
-  color: rgba(17, 24, 39, .65);
+  font-weight: 600;
+  color: rgba(17, 24, 39, .55);
 }
 
-/* ── 三列容器 ── */
+/* ── 三列 ── */
 .df-timeline-3day-cols {
   flex: 1;
   display: flex;
   justify-content: center;
   gap: 0;
-  padding: 0 16px 80px;
+  padding: 0 20px 80px;
 }
 
-/* ── 每一列 ── */
 .df-day-col {
-  flex: 0 0 auto;
-  width: 220px;
+  flex: 0 0 224px;
   position: relative;
-  padding: 0;
-  border-right: 1px solid rgba(148, 163, 184, .10);
+  border-right: 1px solid rgba(148, 163, 184, .08);
 }
 .df-day-col:last-child {
   border-right: none;
 }
-.df-day-col.is-today .df-day-col-canvas {
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(198, 156, 249, .025) 0,
-      rgba(198, 156, 249, .025) calc(4 * 20px),
-      transparent calc(4 * 20px),
-      transparent calc(8 * 20px)
-    );
-}
 
-/* ── 列内 canvas ── */
+/* ── 列 canvas ── */
 .df-day-col-canvas {
   width: 100% !important;
   margin: 0 !important;
   border-left: none !important;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(148, 163, 184, .028) 0,
-      rgba(148, 163, 184, .028) calc(4 * 20px),
-      transparent calc(4 * 20px),
-      transparent calc(8 * 20px)
-    );
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(148, 163, 184, .024) 0,
+    rgba(148, 163, 184, .024) calc(4 * 20px),
+    transparent calc(4 * 20px),
+    transparent calc(8 * 20px)
+  );
 }
 
-/* 列内 time slot（不显示文字标签） */
 .df-day-col .df-slot.hour {
-  border-top: 1px solid rgba(148, 163, 184, .08);
+  border-top: 1px solid rgba(148, 163, 184, .06);
 }
 .df-day-col .df-slot.major {
-  border-top-color: rgba(148, 163, 184, .14);
+  border-top-color: rgba(148, 163, 184, .12);
 }
 .df-day-col .df-slot span {
   display: none;
 }
 
-/* ── 3Day 列内时间块：轻盈化，去卡片感 ── */
+/* ── 时间块 ── */
 .df-day-col .df-time-block {
   background: transparent;
   border: none;
   box-shadow: none;
-  border-radius: 8px;
-  padding-left: 10px;
-  transition: background .12s ease;
+  border-radius: 6px;
+  padding: 4px 6px 4px 10px;
 }
 .df-day-col .df-time-block:hover {
-  background: rgba(198, 156, 249, .08);
-  transform: none;
-  box-shadow: none;
+  background: rgba(198, 156, 249, .06);
 }
 .df-day-col .df-time-block .df-category-strip {
   left: 0;
-  top: 4px;
-  bottom: 4px;
+  top: 2px;
+  bottom: 2px;
   width: 3px;
   border-radius: 0 3px 3px 0;
 }
 .df-day-col .df-time-block.completed {
-  opacity: .48;
+  opacity: .45;
 }
 .df-day-col .df-time-block.completed .df-category-strip {
-  background: rgba(148, 163, 184, .4);
+  background: rgba(148, 163, 184, .40);
 }
 .df-day-col .df-time-block strong {
   font-size: 12px;
-}
-.df-day-col .df-time-block .df-block-check {
-  width: 16px;
-  height: 16px;
-  border-width: 1.5px;
+  font-weight: 500;
 }
 .df-day-col .df-time-block .df-block-time {
   font-size: 10px;
-  margin-bottom: 2px;
+}
+.df-day-col .df-time-block .df-block-check {
+  width: 14px;
+  height: 14px;
 }
 
-/* empty 占位 */
 .df-timeline-empty.small {
   font-size: 11px;
-  opacity: .32;
+  opacity: .28;
   margin-top: 60px;
+  text-align: center;
 }
 
 .blob-accent,

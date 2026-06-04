@@ -1157,7 +1157,7 @@ function App() {
                   <div className="df-timeline-3day-scroll" ref={timelineRef}>
                     <div className="df-timeline-3day-grid">
                       <div className="df-timeline-3day-ruler">
-                        <div className="df-timeline-canvas" style={{ height: `${canvasHeight}px`, width: "56px", margin: 0, borderLeft: "none", background: "transparent" }}>
+                        <div className="df-timeline-canvas" style={{ height: `${canvasHeight}px`, width: "52px", margin: 0, borderLeft: "none", background: "transparent" }}>
                           {Array.from({ length: slotCount }).map((_, index) => {
                             const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
                             const isHour = minutes % 60 === 0;
