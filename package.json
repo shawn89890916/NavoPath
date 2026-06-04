@@ -1,0 +1,49 @@
+{
+  "name": "admission-goal-calendar",
+  "version": "1.0.0",
+  "description": "NavoPath",
+  "main": "electron/main.cjs",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && set VITE_DEV_SERVER_URL=http://127.0.0.1:5173&& electron .\"",
+    "build": "tsc && vite build",
+    "dist": "npm run build && electron-builder --win portable",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "build": {
+    "appId": "com.local.admission.goal.calendar",
+    "productName": "NavoPath",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false,
+      "target": [
+        "portable"
+      ],
+      "artifactName": "NavoPath-${version}.exe"
+    }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.107.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "concurrently": "^9.1.2",
+    "electron": "^37.0.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  }
+}
