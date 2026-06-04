@@ -6569,9 +6569,9 @@ input[type="range"] {
   flex-shrink: 0;
   width: 44px;
   text-align: right;
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(17, 24, 39, .35);
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(17, 24, 39, .45);
   padding-right: 12px;
   margin-top: 2px;
 }
@@ -8336,9 +8336,12 @@ body.df-resizing * {
 }
 
 .df-timeline-3day-ruler-spacer {
-  width: 40px;
+  width: 48px;
   flex-shrink: 0;
   position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .df-timeline-3day-dates {
@@ -8387,18 +8390,18 @@ body.df-resizing * {
   flex-direction: row;
   align-items: stretch;
   flex-shrink: 0;
-  min-height: 32px;
-  border-bottom: 1px solid rgba(148, 163, 184, .10);
+  min-height: 34px;
+  background: rgba(251, 247, 255, .45);
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
 }
 
 .df-timeline-3day-allday-label {
-  position: absolute;
-  bottom: 8px;
-  right: 10px;
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(17, 24, 39, .35);
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(17, 24, 39, .48);
   white-space: nowrap;
+  padding: 0 8px 8px 0;
+  line-height: 1;
 }
 
 .df-timeline-3day-allday-cell {
@@ -8456,7 +8459,7 @@ body.df-resizing * {
 /* ── 左侧时间标尺 ── */
 .df-timeline-3day-ruler {
   flex-shrink: 0;
-  width: 40px;
+  width: 48px;
   position: sticky;
   left: 0;
   z-index: 2;
@@ -8480,15 +8483,15 @@ body.df-resizing * {
 .df-slot-ruler span {
   position: absolute;
   top: -9px;
-  right: 10px;
-  font-size: 11px;
+  right: 8px;
+  font-size: 10px;
   font-weight: 500;
   color: rgba(17, 24, 39, .42);
   white-space: nowrap;
 }
 .df-slot-ruler.major span {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(17, 24, 39, .65);
 }
 
@@ -8547,6 +8550,46 @@ body.df-resizing * {
 }
 .df-day-col .df-slot span {
   display: none;
+}
+
+/* ── 3Day 列内时间块：轻盈化，去卡片感 ── */
+.df-day-col .df-time-block {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 8px;
+  padding-left: 10px;
+  transition: background .12s ease;
+}
+.df-day-col .df-time-block:hover {
+  background: rgba(198, 156, 249, .08);
+  transform: none;
+  box-shadow: none;
+}
+.df-day-col .df-time-block .df-category-strip {
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+}
+.df-day-col .df-time-block.completed {
+  opacity: .48;
+}
+.df-day-col .df-time-block.completed .df-category-strip {
+  background: rgba(148, 163, 184, .4);
+}
+.df-day-col .df-time-block strong {
+  font-size: 12px;
+}
+.df-day-col .df-time-block .df-block-check {
+  width: 16px;
+  height: 16px;
+  border-width: 1.5px;
+}
+.df-day-col .df-time-block .df-block-time {
+  font-size: 10px;
+  margin-bottom: 2px;
 }
 
 /* empty 占位 */
