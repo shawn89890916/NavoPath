@@ -1135,7 +1135,9 @@ function App() {
                     </div>
                   </div>
                   <div className="df-timeline-3day-allday">
-                    <div className="df-timeline-3day-ruler-spacer" />
+                    <div className="df-timeline-3day-ruler-spacer">
+                      <span className="df-timeline-3day-allday-label">all-day</span>
+                    </div>
                     <div className="df-timeline-3day-dates">
                       {threeDates.map((colDate) => {
                         const adTasks = tasks.filter((task) => (task.plannedForDate === colDate || task.scheduledDate === colDate) && !task.scheduledStart && !task.completed);
@@ -1213,6 +1215,17 @@ function App() {
             })() : (
               <>
                 <div className="df-date-title">{displayDateTitle(timelineDate)}</div>
+                <div className="df-timeline-allday">
+                  <span className="df-timeline-allday-label">all-day</span>
+                  <div className="df-timeline-allday-content">
+                    {tasks.filter((task) => (task.plannedForDate === timelineDate || task.scheduledDate === timelineDate) && !task.scheduledStart && !task.completed).map((task) => (
+                      <div key={task.id} className="df-day-all-day-item" onClick={() => openTaskEdit(task)}>
+                        <span className="df-day-all-day-dot" />
+                        <span className="df-day-all-day-title">{task.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
                   event.preventDefault();
                   setHoverSlot(slotFromPointer(event.clientY));
@@ -1325,7 +1338,6 @@ function TaskCard({ task, projects, focusDate, projectName, onQuickDuration, onP
   const overdue = task.dueDate < focusDate ? dateDiff(task.dueDate, focusDate) : 0;
   const status = overdue > 0 ? `逾期 ${overdue} 天` : task.plannedForDate === focusDate ? (focusDate === todayIso() ? "今日" : "当日") : "本周";
   const stop = (event: React.MouseEvent) => event.stopPropagation();
-  const expanded = quickOpen !== null;
   return (
     <article className={`df-task-card ${overdue > 0 ? "overdue" : ""}`} draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onClick}>
       <div className="df-card-strip" style={{ background: categories[task.category].color }} />
@@ -1335,16 +1347,16 @@ function TaskCard({ task, projects, focusDate, projectName, onQuickDuration, onP
           onToggleDone();
         }}>{task.completed ? "✓" : ""}</button>
         <strong className="df-candidate-title">{task.title}</strong>
-        <button className={`df-duration-pill ${expanded ? "project-mode" : ""}`} title={expanded ? "移动到项目" : "修改时长"} onClick={(event) => {
+        <button className={`df-duration-pill ${quickOpen === "note" || quickOpen === "project" ? "project-mode" : ""}`} title={quickOpen === "note" || quickOpen === "project" ? "移动到项目" : "修改时长"} onClick={(event) => {
           event.stopPropagation();
-          setQuickOpen(expanded ? (quickOpen === "project" ? null : "project") : (quickOpen === "duration" ? null : "duration"));
-        }}>{expanded ? "#" : formatDuration(task.estimatedHours || 0.5)}</button>
-        <button className={`df-icon-button ${expanded ? "icon-trash" : "icon-info"}`} title={expanded ? "删除任务" : "更多信息"} onClick={(event) => {
-          event.stopPropagation();
-          if (expanded) {
-            onDelete();
-            return;
+          if (quickOpen === "note" || quickOpen === "project") {
+            setQuickOpen(quickOpen === "project" ? "note" : "project");
+          } else {
+            setQuickOpen(quickOpen === "duration" ? null : "duration");
           }
+        }}>{quickOpen === "note" || quickOpen === "project" ? "#" : formatDuration(task.estimatedHours || 0.5)}</button>
+        <button className={`df-icon-button ${quickOpen === "info" ? "icon-collapse" : "icon-info"}`} title={quickOpen === "info" ? "收起" : "更多信息"} onClick={(event) => {
+          event.stopPropagation();
           setQuickOpen(quickOpen === "info" ? null : "info");
         }} />
         <button className="df-icon-button icon-note" title="展开备注" onClick={(event) => {

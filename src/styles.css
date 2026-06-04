@@ -6393,6 +6393,13 @@ input[type="range"] {
   border-radius: 999px;
   background: rgba(239, 68, 68, .72);
 }
+.icon-collapse::before {
+  width: 10px;
+  height: 10px;
+  border-left: 2px solid rgba(139, 92, 246, .50);
+  border-top: 2px solid rgba(139, 92, 246, .50);
+  transform: translate(-50%, -35%) rotate(45deg);
+}
 .df-card-popover.duration-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -6516,17 +6523,17 @@ input[type="range"] {
   top: 54%;
   transform: translateY(-50%);
   z-index: 12;
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 32px;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   color: #8B5CF6 !important;
-  font-size: 42px;
+  font-size: 22px;
   line-height: 1;
 }
-.df-date-arrow.left { left: 30px; }
-.df-date-arrow.right { right: 30px; }
+.df-date-arrow.left { left: 8px; }
+.df-date-arrow.right { right: 8px; }
 .df-date-arrow:hover {
   color: #5B21B6 !important;
   text-shadow: 0 6px 18px rgba(139, 92, 246, .24);
@@ -6546,6 +6553,55 @@ input[type="range"] {
   color: rgba(17,24,39,.86);
   font-size: 22px;
   font-weight: 500;
+}
+
+/* ── Daily All Day 栏 ── */
+.df-timeline-allday {
+  width: min(640px, 68%);
+  margin: 0 auto;
+  padding: 4px 64px 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, .10);
+}
+.df-timeline-allday-label {
+  flex-shrink: 0;
+  width: 44px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(17, 24, 39, .35);
+  padding-right: 12px;
+  margin-top: 2px;
+}
+.df-timeline-allday-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.df-timeline-allday .df-day-all-day-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: rgba(17, 24, 39, .50);
+  transition: background .12s ease;
+}
+.df-timeline-allday .df-day-all-day-item:hover {
+  background: rgba(198, 156, 249, .08);
+}
+.df-timeline-allday .df-day-all-day-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(198, 156, 249, .35);
+  flex-shrink: 0;
 }
 .df-ai-planner {
   position: relative;
@@ -8276,53 +8332,109 @@ body.df-resizing * {
   flex-direction: row;
   align-items: stretch;
   flex-shrink: 0;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(148, 163, 184, .16);
+  border-bottom: 1px solid rgba(148, 163, 184, .14);
 }
 
 .df-timeline-3day-ruler-spacer {
-  width: 64px;
+  width: 40px;
   flex-shrink: 0;
+  position: relative;
 }
 
 .df-timeline-3day-dates {
   flex: 1;
   display: flex;
   justify-content: center;
-  gap: 4px;
-  padding: 0 20px;
+  gap: 0;
+  padding: 0 16px;
 }
 
 .df-timeline-3day-date {
-  width: 280px;
+  width: 220px;
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 8px;
-  padding: 16px 0 12px;
+  gap: 6px;
+  padding: 18px 0 10px;
 }
 
 .df-timeline-3day-date-num {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
-  color: rgba(17, 24, 39, .82);
+  color: rgba(17, 24, 39, .80);
   line-height: 1;
 }
 
 .df-timeline-3day-date-wd {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: rgba(17, 24, 39, .48);
+  color: rgba(17, 24, 39, .45);
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
 }
 
 .df-timeline-3day-date.today .df-timeline-3day-date-num {
-  color: #F97316;
+  color: #C69CF9;
 }
 .df-timeline-3day-date.today .df-timeline-3day-date-wd {
-  color: #F97316;
-  font-weight: 700;
+  color: #C69CF9;
+  font-weight: 600;
+}
+
+/* ── 固定 All Day 栏 ── */
+.df-timeline-3day-allday {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-height: 32px;
+  border-bottom: 1px solid rgba(148, 163, 184, .10);
+}
+
+.df-timeline-3day-allday-label {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(17, 24, 39, .35);
+  white-space: nowrap;
+}
+
+.df-timeline-3day-allday-cell {
+  width: 220px;
+  padding: 5px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-right: 1px solid rgba(148, 163, 184, .08);
+}
+.df-timeline-3day-allday-cell:last-child {
+  border-right: none;
+}
+
+.df-timeline-3day-allday .df-day-all-day-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: rgba(17, 24, 39, .50);
+  transition: background .12s ease;
+}
+
+.df-timeline-3day-allday .df-day-all-day-item:hover {
+  background: rgba(198, 156, 249, .08);
+}
+
+.df-timeline-3day-allday .df-day-all-day-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(198, 156, 249, .35);
+  flex-shrink: 0;
 }
 
 /* ── 滚动区域 ── */
@@ -8331,7 +8443,7 @@ body.df-resizing * {
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
-  scrollbar-color: rgba(139, 92, 246, .20) transparent;
+  scrollbar-color: rgba(198, 156, 249, .18) transparent;
 }
 
 /* ── Grid：左标尺 + 右三列 ── */
@@ -8344,12 +8456,12 @@ body.df-resizing * {
 /* ── 左侧时间标尺 ── */
 .df-timeline-3day-ruler {
   flex-shrink: 0;
-  width: 64px;
+  width: 40px;
   position: sticky;
   left: 0;
   z-index: 2;
-  background: rgba(251, 247, 255, .92);
-  border-right: 1px solid rgba(139, 92, 246, .08);
+  background: rgba(255, 255, 255, .92);
+  border-right: 1px solid rgba(148, 163, 184, .12);
 }
 
 .df-slot-ruler {
@@ -8360,86 +8472,56 @@ body.df-resizing * {
   pointer-events: none;
 }
 .df-slot-ruler.hour {
-  border-top: 1px solid rgba(148, 163, 184, .18);
+  border-top: 1px solid rgba(148, 163, 184, .14);
 }
 .df-slot-ruler.major {
-  border-top-color: rgba(148, 163, 184, .28);
+  border-top-color: rgba(148, 163, 184, .22);
 }
 .df-slot-ruler span {
   position: absolute;
   top: -9px;
-  right: 8px;
-  font-size: 10.5px;
+  right: 10px;
+  font-size: 11px;
   font-weight: 500;
-  color: rgba(17, 24, 39, .55);
+  color: rgba(17, 24, 39, .42);
   white-space: nowrap;
 }
 .df-slot-ruler.major span {
   font-weight: 700;
-  color: rgba(17, 24, 39, .72);
+  font-size: 12px;
+  color: rgba(17, 24, 39, .65);
 }
 
-/* ── 三列容器（居中） ── */
+/* ── 三列容器 ── */
 .df-timeline-3day-cols {
   flex: 1;
   display: flex;
   justify-content: center;
-  gap: 4px;
-  padding: 8px 20px 80px;
+  gap: 0;
+  padding: 0 16px 80px;
 }
 
 /* ── 每一列 ── */
 .df-day-col {
   flex: 0 0 auto;
-  width: 280px;
+  width: 220px;
   position: relative;
-  padding: 4px 8px 8px;
+  padding: 0;
+  border-right: 1px solid rgba(148, 163, 184, .10);
 }
-
-/* ── 固定 All Day 栏（日期下方，不随滚动） ── */
-.df-timeline-3day-allday {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  flex-shrink: 0;
-  min-height: 0;
-  background: rgba(251, 247, 255, .40);
-  border-bottom: 1px solid rgba(148, 163, 184, .10);
+.df-day-col:last-child {
+  border-right: none;
 }
-
-.df-timeline-3day-allday-cell {
-  width: 280px;
-  padding: 4px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.df-day-col.is-today .df-day-col-canvas {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(198, 156, 249, .025) 0,
+      rgba(198, 156, 249, .025) calc(4 * 20px),
+      transparent calc(4 * 20px),
+      transparent calc(8 * 20px)
+    );
 }
-
-.df-timeline-3day-allday .df-day-all-day-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-  color: rgba(17, 24, 39, .55);
-  transition: background .12s ease;
-}
-
-.df-timeline-3day-allday .df-day-all-day-item:hover {
-  background: rgba(139, 92, 246, .06);
-}
-
-.df-timeline-3day-allday .df-day-all-day-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(139, 92, 246, .32);
-  flex-shrink: 0;
-}
-
-/* ── 列内样式（不再有 all-day 区域） ── */
 
 /* ── 列内 canvas ── */
 .df-day-col-canvas {
@@ -8449,8 +8531,8 @@ body.df-resizing * {
   background:
     repeating-linear-gradient(
       to bottom,
-      rgba(148, 163, 184, .030) 0,
-      rgba(148, 163, 184, .030) calc(4 * 20px),
+      rgba(148, 163, 184, .028) 0,
+      rgba(148, 163, 184, .028) calc(4 * 20px),
       transparent calc(4 * 20px),
       transparent calc(8 * 20px)
     );
@@ -8458,10 +8540,10 @@ body.df-resizing * {
 
 /* 列内 time slot（不显示文字标签） */
 .df-day-col .df-slot.hour {
-  border-top: 1px solid rgba(148, 163, 184, .10);
+  border-top: 1px solid rgba(148, 163, 184, .08);
 }
 .df-day-col .df-slot.major {
-  border-top-color: rgba(148, 163, 184, .18);
+  border-top-color: rgba(148, 163, 184, .14);
 }
 .df-day-col .df-slot span {
   display: none;
@@ -8470,7 +8552,7 @@ body.df-resizing * {
 /* empty 占位 */
 .df-timeline-empty.small {
   font-size: 11px;
-  opacity: .38;
+  opacity: .32;
   margin-top: 60px;
 }
 
