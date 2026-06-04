@@ -79,6 +79,7 @@ function normalizePlannerData(data) {
     projects: Array.isArray(data.projects)
       ? data.projects.map((project) => ({
           ...project,
+          color: project.color || "#C69CF9",
           importance: project.importance || "high",
           urgency: project.urgency || "low"
         }))
@@ -308,6 +309,9 @@ function getSettings() {
     weekStartsOn: raw.weekStartsOn === 1 ? 1 : 0,
     theme: raw.theme || "light",
     accentColor: raw.accentColor || "#175cd3",
+    executeAccentColor: raw.executeAccentColor || "#C69CF9",
+    planningAccentColor: raw.planningAccentColor || "#CAFF72",
+    themeGradientEnabled: typeof raw.themeGradientEnabled === "boolean" ? raw.themeGradientEnabled : true,
     aiTone: raw.aiTone || "direct",
     hideCompleted: Boolean(raw.hideCompleted),
     reminderLeadDays: Number.isFinite(raw.reminderLeadDays) ? raw.reminderLeadDays : 7,
@@ -344,6 +348,9 @@ function saveSettings(settings) {
     weekStartsOn: typeof settings.weekStartsOn === "number" ? (settings.weekStartsOn === 1 ? 1 : 0) : existing.weekStartsOn === 1 ? 1 : 0,
     theme: settings.theme || existing.theme || "light",
     accentColor: settings.accentColor || existing.accentColor || "#175cd3",
+    executeAccentColor: settings.executeAccentColor || existing.executeAccentColor || "#C69CF9",
+    planningAccentColor: settings.planningAccentColor || existing.planningAccentColor || "#CAFF72",
+    themeGradientEnabled: typeof settings.themeGradientEnabled === "boolean" ? settings.themeGradientEnabled : existing.themeGradientEnabled !== false,
     aiTone: settings.aiTone || existing.aiTone || "direct",
     hideCompleted: typeof settings.hideCompleted === "boolean" ? settings.hideCompleted : Boolean(existing.hideCompleted),
     reminderLeadDays: Number.isFinite(settings.reminderLeadDays) ? settings.reminderLeadDays : existing.reminderLeadDays || 7,

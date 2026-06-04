@@ -15,6 +15,7 @@ export interface Project {
   category: Category;
   notes: string;
   completed: boolean;
+  color?: string;
   importance?: Priority;
   urgency?: Priority;
   createdAt: string;
@@ -152,6 +153,9 @@ export interface Settings {
   weekStartsOn: 0 | 1;
   theme: "light" | "calm" | "focus" | "dark";
   accentColor: string;
+  executeAccentColor: string;
+  planningAccentColor: string;
+  themeGradientEnabled: boolean;
   aiTone: "direct" | "gentle" | "strict";
   hideCompleted: boolean;
   reminderLeadDays: number;

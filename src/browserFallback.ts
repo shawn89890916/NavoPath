@@ -9,10 +9,26 @@ function now() {
 }
 
 export function normalizeData(data: PlannerData): PlannerData {
+  const isDefaultSeedTask = (task: any) => {
+    const title = String(task?.title || "");
+    return (
+      task?.goalId === "goal_admission" &&
+      !task?.projectId &&
+      !task?.notes &&
+      (
+        title.includes("ESAT/TARA") ||
+        title.includes("启动 ESAT") ||
+        title.includes("训练计划") ||
+        title.includes("英国 PS") ||
+        title.includes("PS 第一版")
+      )
+    );
+  };
   return {
     ...data,
     projects: (data.projects || []).map((project) => ({
       ...project,
+      color: project.color || "#C69CF9",
       importance: project.importance || "high",
       urgency: project.urgency || "low"
     })),
@@ -30,19 +46,21 @@ export function normalizeData(data: PlannerData): PlannerData {
       endTime: event.endTime || ""
     })),
     taskLayouts: data.taskLayouts || {},
-    tasks: data.tasks.map((task) => ({
-      ...task,
-      subtasks: (task.subtasks || []).map((subtask: any, index: number) => ({
-        ...subtask,
-        id: subtask.id || uid("sub"),
-        title: subtask.title || "",
-        completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
-        done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
-        order: typeof subtask.order === "number" ? subtask.order : index,
-        createdAt: subtask.createdAt || now()
-      })),
-      notes: task.notes || ""
-    }))
+    tasks: data.tasks
+      .filter((task) => !isDefaultSeedTask(task))
+      .map((task) => ({
+        ...task,
+        subtasks: (task.subtasks || []).map((subtask: any, index: number) => ({
+          ...subtask,
+          id: subtask.id || uid("sub"),
+          title: subtask.title || "",
+          completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
+          done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
+          order: typeof subtask.order === "number" ? subtask.order : index,
+          createdAt: subtask.createdAt || now()
+        })),
+        notes: task.notes || ""
+      }))
   };
 }
 
@@ -61,10 +79,7 @@ export function fallbackData(): PlannerData {
       }
     ],
     projects: [],
-    tasks: [
-      { id: uid("task"), title: "启动 ESAT/TARA 训练计划", dueDate: "2026-06-20", category: "exam", priority: "high", notes: "", goalId: "goal_admission", completed: false, createdAt: now(), updatedAt: now() },
-      { id: uid("task"), title: "英国 PS 第一版", dueDate: "2026-08-20", category: "essay", priority: "high", notes: "", goalId: "goal_admission", completed: false, createdAt: now(), updatedAt: now() }
-    ],
+    tasks: [],
     longTasks: [],
     events: [
       { id: uid("event"), title: "ESAT", date: "2026-10-12", category: "exam", details: "中国/港澳 October sitting: 10 月 12-13 日。", imported: true, createdAt: now() },
@@ -122,6 +137,9 @@ export function installBrowserFallback() {
     weekStartsOn: 0 as 0 | 1,
     theme: "light" as const,
     accentColor: "#175cd3",
+    executeAccentColor: "#C69CF9",
+    planningAccentColor: "#CAFF72",
+    themeGradientEnabled: true,
     aiTone: "direct" as const,
     hideCompleted: false,
     reminderLeadDays: 7,

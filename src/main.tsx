@@ -12,6 +12,9 @@ const TIMELINE_END = 24;
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
+const PROJECT_COLOR_PRESETS = ["#C69CF9", "#8B5CF6", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444", "#64748B"];
+const EXECUTE_THEME_PRESETS = ["#C69CF9", "#8B5CF6", "#EC4899", "#38BDF8", "#F59E0B", "#64748B"];
+const PLANNING_THEME_PRESETS = ["#CAFF72", "#84CC16", "#22C55E", "#38BDF8", "#C69CF9", "#F59E0B"];
 const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
   return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
 });
@@ -32,6 +35,49 @@ type AddType = "task" | "project" | "event";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
 type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "simple" | "priority" | "deadline" };
 type DragState = { taskId: string; kind: "candidate" | "block"; duration: number; offsetMinutes?: number; pointer?: { x: number; y: number }; outsideTimeline?: boolean } | null;
+
+function normalizeHexColor(value: string, fallback: string) {
+  const input = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(input)) return input;
+  if (/^#[0-9a-f]{3}$/i.test(input)) return `#${input.slice(1).split("").map((ch) => ch + ch).join("")}`;
+  return fallback;
+}
+
+function hexToRgb(value: string) {
+  const hex = normalizeHexColor(value, "#C69CF9").slice(1);
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16)
+  };
+}
+
+function mixHex(a: string, b: string, amount: number) {
+  const c1 = hexToRgb(a);
+  const c2 = hexToRgb(b);
+  const mix = (x: number, y: number) => Math.round(x * (1 - amount) + y * amount).toString(16).padStart(2, "0");
+  return `#${mix(c1.r, c2.r)}${mix(c1.g, c2.g)}${mix(c1.b, c2.b)}`;
+}
+
+function isLightColor(value: string) {
+  const { r, g, b } = hexToRgb(value);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 174;
+}
+
+function themeVars(settings: Settings) {
+  const execute = normalizeHexColor(settings.executeAccentColor || "#C69CF9", "#C69CF9");
+  const planning = normalizeHexColor(settings.planningAccentColor || "#CAFF72", "#CAFF72");
+  const executeLight = isLightColor(execute);
+  const planningLight = isLightColor(planning);
+  return {
+    "--execute-primary": execute,
+    "--execute-primary-strong": executeLight ? mixHex(execute, "#111827", execute === "#ffffff" || execute === "#FFFFFF" ? 0.10 : 0.22) : mixHex(execute, "#000000", 0.14),
+    "--execute-on-primary": executeLight ? "#111827" : "#FFFFFF",
+    "--planning-primary": planning,
+    "--planning-primary-strong": planningLight ? mixHex(planning, "#111827", planning === "#ffffff" || planning === "#FFFFFF" ? 0.10 : 0.24) : mixHex(planning, "#000000", 0.14),
+    "--planning-on-primary": planningLight ? "#111827" : "#FFFFFF"
+  } as CSSProperties;
+}
 type ResizePreview = { taskId: string; start: string; end: string } | null;
 type ScheduleSuggestion = { id: string; taskId: string; startTime: string; endTime: string; reason: string; nextAction?: string; ignored?: boolean };
 type QuickSchedule = { startTime: string; title: string; projectId: string } | null;
@@ -40,6 +86,7 @@ type AuthState = { mode: "local" | "cloud"; user: { id: string; email?: string }
 type FormState = {
   title: string;
   projectId: string;
+  projectColor: string;
   dueDate: string;
   dueTime: string;
   endDate: string;
@@ -63,6 +110,34 @@ function addDays(iso: string, days: number) {
   const date = new Date(`${iso}T00:00:00`);
   date.setDate(date.getDate() + days);
   return localIso(date);
+}
+
+function addMonths(iso: string, months: number) {
+  const date = new Date(`${iso}T00:00:00`);
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + months);
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, last));
+  return localIso(date);
+}
+
+function startOfWeekIso(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() - date.getDay());
+  return localIso(date);
+}
+
+function startOfMonthGridIso(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(1);
+  date.setDate(date.getDate() - date.getDay());
+  return localIso(date);
+}
+
+function monthTitle(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  return date.toLocaleString("en-US", { month: "long", year: "numeric" });
 }
 
 function displayDateTitle(iso: string) {
@@ -155,6 +230,7 @@ function defaultForm(type: AddType = "task"): FormState {
   return {
     title: "",
     projectId: "",
+    projectColor: "#C69CF9",
     dueDate: today,
     dueTime: "",
     endDate: today,
@@ -182,7 +258,7 @@ function makeTask(form: FormState): Task {
     projectId: form.projectId || undefined,
     importance: form.importance,
     urgency: form.urgency,
-    estimatedHours: form.estimatedHours || undefined,
+    estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
     plannedForDate: form.dueDate === todayIso() ? todayIso() : undefined,
     order: Date.now(),
     subtasks: [],
@@ -199,6 +275,7 @@ function makeProject(form: FormState): Project {
     category: form.category,
     notes: form.details,
     completed: false,
+    color: form.projectColor || categories[form.category].color,
     importance: form.importance,
     urgency: form.urgency,
     createdAt: now,
@@ -224,7 +301,7 @@ function makeEvent(form: FormState): CalendarEvent {
 function ProductIcon({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`dayflow-icon ${compact ? "compact" : ""}`} aria-hidden="true">
-      <img src="/dayflow-icon.png" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+      <img src="/navopath-icon.png" alt="" />
     </div>
   );
 }
@@ -298,12 +375,16 @@ function App() {
   const [quickSchedule, setQuickSchedule] = useState<QuickSchedule>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
   const [planningPickMode, setPlanningPickMode] = useState(false);
   const [planningPicks, setPlanningPicks] = useState<Record<string, PlanPickPriority>>({});
   const [toast, setToast] = useState("");
   const [showCompletedCandidates, setShowCompletedCandidates] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProjectId, setQuickProjectId] = useState("");
+  const [quickProjectOpen, setQuickProjectOpen] = useState(false);
+  const [quickProjectTitle, setQuickProjectTitle] = useState("");
+  const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -425,11 +506,11 @@ function App() {
     return projects.find((project) => String(project.id) === String(task.projectId || ""))?.title || "未归属";
   }
 
-  function projectSnapshot(list: Project[], title: string) {
+  function projectSnapshot(list: Project[], title: string, color = PROJECT_COLOR_PRESETS[0]) {
     const cleanTitle = title.trim();
     const existing = list.find((project) => project.title.toLowerCase() === cleanTitle.toLowerCase());
     if (existing) return { projectId: existing.id, projects: list, created: false };
-    const project = makeProject({ ...defaultForm("project"), title: cleanTitle });
+    const project = makeProject({ ...defaultForm("project"), title: cleanTitle, projectColor: color });
     return { projectId: project.id, projects: [...list, project], created: true };
   }
 
@@ -438,6 +519,14 @@ function App() {
     void saveData({
       ...data,
       tasks: data.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
+    });
+  }
+
+  function updateProject(projectId: string, patch: Partial<Project>) {
+    if (!data) return;
+    void saveData({
+      ...data,
+      projects: data.projects.map((project) => project.id === projectId ? { ...project, ...patch, updatedAt: new Date().toISOString() } : project)
     });
   }
 
@@ -507,6 +596,15 @@ function App() {
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: today, order: Date.now() }] });
     setQuickTitle("");
     showToast("已加入今日候选");
+  }
+
+  function createQuickProject() {
+    if (!data || !quickProjectTitle.trim()) return;
+    const snapshot = projectSnapshot(data.projects, quickProjectTitle, quickProjectColor);
+    if (snapshot.created) void saveData({ ...data, projects: snapshot.projects });
+    setQuickProjectId(snapshot.projectId);
+    setQuickProjectTitle("");
+    setQuickProjectOpen(false);
   }
 
   function quickCreateProject(title: string) {
@@ -787,6 +885,7 @@ function App() {
     setForm({
       title: task.title,
       projectId: task.projectId || "",
+      projectColor: "#C69CF9",
       dueDate: task.dueDate || today,
       dueTime: "",
       endDate: task.dueDate || today,
@@ -804,7 +903,7 @@ function App() {
   function openProjectEdit(project: Project) {
     setAddType("project");
     setEditingId(project.id);
-    setForm({ ...defaultForm("project"), title: project.title, category: project.category, details: project.notes, importance: project.importance || "high", urgency: project.urgency || "low" });
+    setForm({ ...defaultForm("project"), title: project.title, category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance || "high", urgency: project.urgency || "low" });
     setDrawerOpen(true);
   }
 
@@ -829,7 +928,7 @@ function App() {
             category: form.category,
             priority: form.priority,
             projectId: form.projectId || undefined,
-            estimatedHours: form.estimatedHours || undefined,
+            estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
             importance: form.importance,
             urgency: form.urgency,
             notes: form.details,
@@ -837,7 +936,7 @@ function App() {
           } : task)
         });
       } else if (addType === "project") {
-        void saveData({ ...data, projects: data.projects.map((project) => project.id === editingId ? { ...project, title: form.title.trim(), category: form.category, notes: form.details, importance: form.importance, urgency: form.urgency, updatedAt: now } : project) });
+        void saveData({ ...data, projects: data.projects.map((project) => project.id === editingId ? { ...project, title: form.title.trim(), category: form.category, color: form.projectColor || categories[form.category].color, notes: form.details, importance: form.importance, urgency: form.urgency, updatedAt: now } : project) });
       } else {
         void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details } : event) });
       }
@@ -992,6 +1091,15 @@ function App() {
     setSuggestions((current) => current.filter((item) => item.id !== id));
   }
 
+  function shiftTimeline(direction: -1 | 1) {
+    setSelectedDate((date) => {
+      if (timelineView === "3day") return addDays(date, direction * 3);
+      if (timelineView === "weekly") return addDays(date, direction * 7);
+      if (timelineView === "month") return addMonths(date, direction);
+      return addDays(date, direction);
+    });
+  }
+
   if (authState?.mode === "cloud" && !authState.user) {
     return <AuthGate busy={authBusy} error={authError} onSubmit={handleAuthSubmit} />;
   }
@@ -999,7 +1107,7 @@ function App() {
   if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 加载中...</div>;
 
   return (
-    <div className={`df-app mode-${mode}`}>
+    <div className={`df-app mode-${mode} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings)}>
       <header className="df-header">
         <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
         <nav className="df-tabs">
@@ -1007,6 +1115,18 @@ function App() {
           <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>规划</button>
         </nav>
         <div className="df-header-right">
+          {mode === "execute" && <div className="df-top-view-switch" aria-label="timeline views">
+            {([
+              ["daily", "DAILY"],
+              ["3day", "3 DAY"],
+              ["weekly", "WEEKLY"],
+              ["month", "MONTH"]
+            ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
+          </div>}
+          <nav className="df-tabs df-tabs-right">
+            <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>执行</button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>规划</button>
+          </nav>
           <button className="df-user-avatar" onClick={() => setUserMenuOpen((v) => !v)} aria-label="用户菜单">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
           </button>
@@ -1022,11 +1142,11 @@ function App() {
                 </div>
               </div>
               <div className="df-user-menu-divider" />
-              <button className="df-user-menu-item" onClick={() => { setUserMenuOpen(false); /* TODO: open settings */ }}>
+              <button className="df-user-menu-item" onClick={() => { setUserMenuOpen(false); setUtilityPanel("settings"); }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                 设置
               </button>
-              <button className="df-user-menu-item" onClick={() => { setUserMenuOpen(false); /* TODO: open about */ }}>
+              <button className="df-user-menu-item" onClick={() => { setUserMenuOpen(false); setUtilityPanel("about"); }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                 关于 NavoPath
               </button>
@@ -1077,17 +1197,26 @@ function App() {
               quickAddTask();
             }}>
               <input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="New task #project" />
-              <select value={quickProjectId} onChange={(event) => setQuickProjectId(event.target.value)} aria-label="选择项目">
-                <option value="">#</option>
-                {projects.map((project) => <option value={project.id} key={project.id}>#{project.title}</option>)}
-              </select>
-              <button type="submit" disabled={!quickTitle.trim()}>ADD</button>
+              <QuickProjectPicker
+                projects={projects}
+                value={quickProjectId}
+                open={quickProjectOpen}
+                newTitle={quickProjectTitle}
+                newColor={quickProjectColor}
+                onOpenChange={setQuickProjectOpen}
+                onChange={setQuickProjectId}
+                onTitleChange={setQuickProjectTitle}
+                onColorChange={setQuickProjectColor}
+                onProjectColorChange={(projectId, color) => updateProject(projectId, { color })}
+                onCreate={createQuickProject}
+              />
+              <button className="df-quick-add-submit" type="submit" disabled={!quickTitle.trim()}>ADD</button>
             </form>
           </section>
 
           <section className="df-timeline-panel">
-            <button className="df-date-arrow left" aria-label="前一天" onClick={() => setSelectedDate((date) => addDays(date, -1))}>‹</button>
-            <button className="df-date-arrow right" aria-label="后一天" onClick={() => setSelectedDate((date) => addDays(date, 1))}>›</button>
+            <button className="df-date-arrow left" aria-label="前一段" onClick={() => shiftTimeline(-1)}>‹</button>
+            <button className="df-date-arrow right" aria-label="后一段" onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
               <div className="df-ai-planner">
                     <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip="AI 规划今天" aria-label="AI 规划今天" disabled={aiPlanning} onClick={() => void planMyDay()}>{aiPlanning ? <><i />ANALYZING TASKS...</> : "PLAN MY DAY"}</button>
@@ -1112,13 +1241,15 @@ function App() {
                 </div>
               </div>
             </div>
-            {timelineView === "3day" ? (() => {
-              const threeDates = [addDays(timelineDate, 0), addDays(timelineDate, 1), addDays(timelineDate, 2)];
+            {(timelineView === "3day" || timelineView === "weekly") ? (() => {
+              const rangeStart = timelineView === "weekly" ? startOfWeekIso(timelineDate) : timelineDate;
+              const rangeLength = timelineView === "weekly" ? 7 : 3;
+              const threeDates = Array.from({ length: rangeLength }, (_, index) => addDays(rangeStart, index));
               const weekdayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
               const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
               const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
               return (
-                <div className="df-timeline-3day">
+                <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`}>
                   <div className="df-timeline-3day-top">
                     <div className="df-timeline-3day-ruler-spacer" />
                     <div className="df-timeline-3day-dates">
@@ -1140,14 +1271,19 @@ function App() {
                     </div>
                     <div className="df-timeline-3day-dates">
                       {threeDates.map((colDate) => {
-                        const adTasks = tasks.filter((task) => (task.plannedForDate === colDate || task.scheduledDate === colDate) && !task.scheduledStart && !task.completed);
+                        const adTasks = tasks.filter((task) => task.scheduledDate === colDate && !task.scheduledStart && !task.completed);
                         return (
-                          <div key={colDate} className="df-timeline-3day-allday-cell">
+                          <div key={colDate} className="df-timeline-3day-allday-cell" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+                            event.preventDefault();
+                            const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                            if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: colDate, scheduledStart: undefined, scheduledEnd: undefined });
+                            setDrag(null);
+                          }}>
                             {adTasks.map((task) => (
-                              <div key={task.id} className="df-day-all-day-item" onClick={() => openTaskEdit(task)}>
-                                <span className="df-day-all-day-dot" />
-                                <span className="df-day-all-day-title">{task.title}</span>
-                              </div>
+                              <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                                event.dataTransfer.setData("taskId", task.id);
+                                setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                              }} onDragEnd={() => setDrag(null)} />
                             ))}
                           </div>
                         );
@@ -1199,7 +1335,7 @@ function App() {
                                 {colTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
                                   <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
                                     if (!suppressBlockClickRef.current) openTaskEdit(task);
-                                  }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onCreateProject={(title) => {
+                                  }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                     createProjectForTask(task.id, title);
                                   }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
                                 ))}
@@ -1212,17 +1348,56 @@ function App() {
                   </div>
                 </div>
               );
+            })() : timelineView === "month" ? (() => {
+              const monthStart = startOfMonthGridIso(timelineDate);
+              const monthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
+              const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
+              return (
+                <div className="df-month-view">
+                  <div className="df-month-title">{monthTitle(timelineDate)}</div>
+                  <div className="df-month-weekdays">{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <span key={day}>{day}</span>)}</div>
+                  <div className="df-month-grid">
+                    {monthDays.map((day) => {
+                      const dateObj = new Date(`${day}T00:00:00`);
+                      const dayTasks = tasks.filter((task) => !task.completed && (task.scheduledDate === day || task.plannedForDate === day || task.dueDate === day)).slice(0, 5);
+                      return (
+                        <div key={day} className={`df-month-cell ${dateObj.getMonth() !== activeMonth ? "muted" : ""} ${day === today ? "today" : ""}`}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                            if (taskId) updateTask(taskId, { plannedForDate: day, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined });
+                            setDrag(null);
+                          }}
+                        >
+                          <strong>{dateObj.getDate()}</strong>
+                          {dayTasks.map((task) => (
+                            <button key={task.id} className="df-month-task" style={{ "--cat": projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color } as CSSProperties} onClick={() => openTaskEdit(task)}>
+                              <span />{task.title}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
             })() : (
               <>
                 <div className="df-date-title">{displayDateTitle(timelineDate)}</div>
                 <div className="df-timeline-allday">
                   <span className="df-timeline-allday-label">all-day</span>
-                  <div className="df-timeline-allday-content">
-                    {tasks.filter((task) => (task.plannedForDate === timelineDate || task.scheduledDate === timelineDate) && !task.scheduledStart && !task.completed).map((task) => (
-                      <div key={task.id} className="df-day-all-day-item" onClick={() => openTaskEdit(task)}>
-                        <span className="df-day-all-day-dot" />
-                        <span className="df-day-all-day-title">{task.title}</span>
-                      </div>
+                  <div className="df-timeline-allday-content" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+                    event.preventDefault();
+                    const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                    if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: timelineDate, scheduledStart: undefined, scheduledEnd: undefined });
+                    setDrag(null);
+                  }}>
+                    {tasks.filter((task) => task.scheduledDate === timelineDate && !task.scheduledStart && !task.completed).map((task) => (
+                      <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                        event.dataTransfer.setData("taskId", task.id);
+                        setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                      }} onDragEnd={() => setDrag(null)} />
                     ))}
                   </div>
                 </div>
@@ -1257,7 +1432,7 @@ function App() {
                     {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
                       <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
                         if (!suppressBlockClickRef.current) openTaskEdit(task);
-                      }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onCreateProject={(title) => {
+                      }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                         createProjectForTask(task.id, title);
                       }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
                     ))}
@@ -1277,8 +1452,9 @@ function App() {
       <button className="df-ai-fab df-icon-action i-ai" data-tip="问 AI" aria-label="问 AI" onClick={() => setAiOpen((open) => !open)} />
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => setDrawerOpen(false)} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} />}
       {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} reply={aiReply} busy={aiBusy} onSend={() => void sendAi()} onClose={() => setAiOpen(false)} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={tasks.find((task) => task.id === drag.taskId)} pointer={drag.pointer} />}
       {toast && <div className="df-toast">{toast}</div>}
     </div>
@@ -1421,7 +1597,7 @@ function formatDuration(hours: number) {
   return formatMinutes(Math.round(hours * 60));
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onCreateProject, onDragStart, onResizeStart }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const start = preview?.start || task.scheduledStart || "09:00";
@@ -1429,8 +1605,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const top = ((timeToMinutes(start) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
   const height = Math.max(((timeToMinutes(end) - timeToMinutes(start)) / SLOT_MINUTES) * SLOT_HEIGHT, 38);
   const next = extractNextAction(task.notes);
+  const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   return (
-    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""}`} style={{ top, height, "--cat": categories[task.category].color } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""}`} style={{ top, height, "--cat": stripeColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
       setProjectOpen(false);
     }} onMouseDown={onDragStart} onClick={onEdit} onDoubleClick={onEdit}>
@@ -1446,7 +1623,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
           <button className="df-block-project" onClick={() => setProjectOpen((open) => !open)}># {projectName}</button>
           {projectOpen && <div className="df-project-popover">
             <button onClick={() => { onProjectChange(""); setProjectOpen(false); }}># 未归属</button>
-            {projects.map((project) => <button key={project.id} onClick={() => { onProjectChange(project.id); setProjectOpen(false); }}># {project.title}</button>)}
+            {projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { onProjectChange(project.id); setProjectOpen(false); }} onColorChange={(color) => onProjectColorChange(project.id, color)} />)}
             <div className="df-project-create-line"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={() => { onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); }}>✓</button></div>
           </div>}
         </span>}
@@ -1475,6 +1652,90 @@ function SuggestionBlock({ suggestion, task, conflict, onApply, onIgnore }: { su
   </div>;
 }
 
+function ProjectColorPicker({ value, onChange, compact = false, presets = PROJECT_COLOR_PRESETS }: { value: string; onChange: (color: string) => void; compact?: boolean; presets?: string[] }) {
+  return (
+    <div className={`df-project-color-picker ${compact ? "compact" : ""}`}>
+      {presets.map((color) => <button key={color} type="button" className={value === color ? "active" : ""} style={{ "--project-color": color } as CSSProperties} aria-label={color} onClick={() => onChange(color)} />)}
+      <label className="df-project-color-custom" style={{ "--project-color": value } as CSSProperties}>
+        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
+        <span />
+      </label>
+    </div>
+  );
+}
+
+function ProjectChoice({ project, onChoose, onColorChange }: { project: Project; onChoose: () => void; onColorChange: (color: string) => void }) {
+  const [colorOpen, setColorOpen] = useState(false);
+  const color = project.color || categories[project.category].color;
+  return (
+    <div className="df-project-choice">
+      <button type="button" onClick={onChoose}><span className="df-project-color-dot" style={{ "--project-color": color } as CSSProperties} /># {project.title}</button>
+      <span className="df-project-color-menu" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="df-project-color-dot-button" aria-label={`${project.title} color`} onClick={() => setColorOpen((open) => !open)}><span className="df-project-color-dot" style={{ "--project-color": color } as CSSProperties} /></button>
+        {colorOpen && <ProjectColorPicker value={color} onChange={(nextColor) => { onColorChange(nextColor); setColorOpen(false); }} compact />}
+      </span>
+    </div>
+  );
+}
+
+function QuickProjectPicker(props: {
+  projects: Project[];
+  value: string;
+  open: boolean;
+  newTitle: string;
+  newColor: string;
+  onOpenChange: (open: boolean) => void;
+  onChange: (projectId: string) => void;
+  onTitleChange: (title: string) => void;
+  onColorChange: (color: string) => void;
+  onProjectColorChange: (projectId: string, color: string) => void;
+  onCreate: () => void;
+}) {
+  const selected = props.projects.find((project) => String(project.id) === String(props.value));
+  const selectedColor = selected?.color || PROJECT_COLOR_PRESETS[0];
+  return (
+    <div className="df-quick-project-picker" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+      <button type="button" className="df-quick-project-trigger" onClick={() => props.onOpenChange(!props.open)}>
+        <span className="df-project-color-dot" style={{ "--project-color": selectedColor } as CSSProperties} />
+        <span>{selected ? `# ${selected.title}` : "#"}</span>
+      </button>
+      {props.open && <div className="df-project-popover df-quick-project-popover up">
+        <button type="button" onClick={() => { props.onChange(""); props.onOpenChange(false); }}># 未归属</button>
+        {props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { props.onChange(project.id); props.onOpenChange(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}
+        <div className="df-project-create-line df-project-create-with-color">
+          <input value={props.newTitle} placeholder="新项目名" onChange={(event) => props.onTitleChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); props.onCreate(); } }} />
+          <ProjectColorPicker value={props.newColor} onChange={props.onColorChange} compact />
+          <button type="button" onClick={props.onCreate}>✓</button>
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onDragEnd }: { task: Task; projectName: string; projects: Project[]; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.DragEvent) => void; onDragEnd: () => void }) {
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
+  return (
+    <article className={`df-all-day-block ${task.completed ? "completed" : ""} ${projectOpen ? "project-open" : ""}`} draggable style={{ "--cat": stripeColor } as CSSProperties} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onEdit} onMouseLeave={() => setProjectOpen(false)}>
+      <div className="df-category-strip" />
+      <button className="df-block-check" onClick={(event) => {
+        event.stopPropagation();
+        onToggleDone();
+      }}>{task.completed ? "✓" : ""}</button>
+      <strong>{task.title}</strong>
+      <span className="df-block-project-wrap" onClick={(event) => event.stopPropagation()}>
+        <button className="df-block-project" onClick={() => setProjectOpen((open) => !open)}># {projectName}</button>
+        {projectOpen && <div className="df-project-popover">
+          <button onClick={() => { onProjectChange(""); setProjectOpen(false); }}># 未归属</button>
+          {projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { onProjectChange(project.id); setProjectOpen(false); }} onColorChange={(color) => onProjectColorChange(project.id, color)} />)}
+          <div className="df-project-create-line"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={() => { onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); }}>✓</button></div>
+        </div>}
+      </span>
+    </article>
+  );
+}
+
 function NowLine() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -1488,7 +1749,7 @@ function NowLine() {
 }
 
 function EditDrawer(props: {
-  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
+  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
 }) {
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -1503,6 +1764,14 @@ function EditDrawer(props: {
     set("projectId", id);
     setNewProjectTitle("");
     setProjectPickerOpen(false);
+  }
+  function setDurationMinutes(minutes: number) {
+    const safeMinutes = Math.max(minutes, SLOT_MINUTES);
+    set("estimatedHours", safeMinutes / 60);
+    if (!props.editing || props.type !== "task" || !props.task) return;
+    const patch: Partial<Task> = { estimatedHours: safeMinutes / 60 };
+    if (props.task.scheduledStart) patch.scheduledEnd = addMinutes(props.task.scheduledStart, safeMinutes);
+    props.onTaskUpdate(props.task.id, patch);
   }
   function addSubtask() {
     if (!props.task) return;
@@ -1544,12 +1813,12 @@ function EditDrawer(props: {
         </section>
         <section className="df-detail-section">
           <h3>安排</h3>
-          <div className="df-detail-grid"><label>日期<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>时间<input type="time" value={props.task.scheduledStart || ""} onChange={(event) => props.onTaskUpdate(props.task!.id, { scheduledDate: f.dueDate || props.today, scheduledStart: event.target.value, scheduledEnd: event.target.value ? addMinutes(event.target.value, Math.round((f.estimatedHours || 0.5) * 60)) : undefined })} /></label><label>时长<select value={Math.round((f.estimatedHours || 0.5) * 60)} onChange={(event) => set("estimatedHours", Number(event.target.value) / 60)}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label><label>重复<select><option>不重复</option></select></label></div>
+          <div className="df-detail-grid"><label>日期<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>时间<input type="time" value={props.task.scheduledStart || ""} onChange={(event) => props.onTaskUpdate(props.task!.id, { scheduledDate: f.dueDate || props.today, scheduledStart: event.target.value, scheduledEnd: event.target.value ? addMinutes(event.target.value, Math.round(Math.max(f.estimatedHours || 0.25, 0.25) * 60)) : undefined })} /></label><label>时长<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label><label>重复<select><option>不重复</option></select></label></div>
           <div className="df-detail-chips"><button onClick={() => set("dueDate", props.today)}>今天</button><button onClick={() => set("dueDate", addDays(props.today, 1))}>明天</button><button onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: props.today, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined })}>本周</button><button onClick={() => props.onTaskUpdate(props.task!.id, { scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined })}>清除时间</button></div>
         </section>
         <section className="df-detail-section">
           <h3>归属</h3>
-          <div className="df-detail-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}>项目：{selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 未归属</button>{props.projects.map((project) => <button key={project.id} onClick={() => { set("projectId", project.id); setProjectPickerOpen(false); }}># {project.title}</button>)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div>
+          <div className="df-detail-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}>项目：{selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 未归属</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div>
           <div className="df-detail-meta"><span>来源：规划树 / {selectedProjectTitle}</span><label>优先级<select value={f.priority} onChange={(event) => set("priority", event.target.value as Priority)}><option value="high">必须做</option><option value="medium">应该做</option><option value="low">有空做</option></select></label><label>标签<input value={categories[f.category].label} readOnly /></label></div>
         </section>
         <section className="df-detail-section">
@@ -1571,11 +1840,11 @@ function EditDrawer(props: {
       <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} onClick={() => props.setType(type)}>{type === "task" ? "任务" : type === "project" ? "项目" : "事件"}</button>)}</div>
       {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />已完成</label>}
       <label>名称<input value={f.title} onChange={(event) => set("title", event.target.value)} /></label>
-      {props.type === "task" && <><label>项目<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 未归属</button>{props.projects.map((project) => <button key={project.id} onClick={() => { set("projectId", project.id); setProjectPickerOpen(false); }}># {project.title}</button>)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label><label>日期<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label></>}
-      {props.type === "project" && <label>项目说明<textarea rows={3} value={f.details} onChange={(event) => set("details", event.target.value)} /></label>}
+      {props.type === "task" && <><label>项目<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 未归属</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label><label>日期<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label></>}
+      {props.type === "project" && <><label>项目说明<textarea rows={3} value={f.details} onChange={(event) => set("details", event.target.value)} /></label><label>颜色<input type="color" value={f.projectColor} onChange={(event) => set("projectColor", event.target.value)} /></label></>}
       {props.type === "event" && <div className="df-grid2"><label>开始日期<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>开始时间<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>结束日期<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>结束时间<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div>}
       <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? "收起高级" : "展开高级"}</button>
-      {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <label>预计用时<select value={Math.round((f.estimatedHours || 0.5) * 60)} onChange={(event) => set("estimatedHours", Number(event.target.value) / 60)}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>}<label>备注<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
+      {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <label>预计用时<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>}<label>备注<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
       <div className="df-drawer-actions">{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip="删除" aria-label="删除" onClick={props.onDelete} />}{props.type === "task" && <button className="df-icon-action i-next" data-tip="明确下一步" aria-label="明确下一步" onClick={props.onNextAction} />}<button className="primary" onClick={props.onSave}>{props.editing ? "保存修改" : "添加"}</button></div>
     </aside>
   );
@@ -1583,6 +1852,54 @@ function EditDrawer(props: {
 
 function AiPanel({ input, setInput, reply, busy, onSend, onClose }: { input: string; setInput: (v: string) => void; reply: string; busy: boolean; onSend: () => void; onClose: () => void }) {
   return <aside className="df-ai-panel"><div><strong>NavoPath AI</strong><button className="df-icon-action i-close" data-tip="关闭" aria-label="关闭" onClick={onClose} /></div><textarea value={input} onChange={(event) => setInput(event.target.value)} /><button className="df-icon-action i-send" data-tip={busy ? "思考中" : "发送"} aria-label={busy ? "思考中" : "发送"} onClick={onSend} disabled={busy || !input.trim()} />{reply && <pre>{reply}</pre>}</aside>;
+}
+
+function UtilityPanel({ kind, settings, authEmail, onClose, onSave }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void }) {
+  return (
+    <>
+      <div className="df-utility-backdrop" onMouseDown={onClose} />
+      <aside className="df-utility-panel">
+        <div className="df-utility-head">
+          <h2>{kind === "settings" ? "设置" : "关于 NavoPath"}</h2>
+          <button className="df-icon-action i-close" aria-label="关闭" onClick={onClose} />
+        </div>
+        {kind === "settings" ? (
+          <div className="df-utility-body">
+            <ThemeColorSetting label="执行页主色" presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
+            <ThemeColorSetting label="规划页主色" presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />开启自动高级渐变</label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />隐藏已完成任务</label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />允许 AI 使用任务上下文</label>
+            {authEmail && <p>当前账号：{authEmail}</p>}
+          </div>
+        ) : (
+          <div className="df-utility-body">
+            <strong>NavoPath v0.4.0</strong>
+            <p>从长期项目里选出今天要推进的事，排进时间轴，并明确下一步怎么做。</p>
+            <small>最新版本时间：2026-06-04</small>
+            <ul>
+              <li>执行页支持 Daily / 3 Day / Weekly / Month 时间视图。</li>
+              <li>规划页支持从项目树选择任务加入执行。</li>
+              <li>项目颜色会联动时间轴任务色条。</li>
+              <li>GitHub Actions 自动部署到 Cloudflare Pages。</li>
+            </ul>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+
+function ThemeColorSetting({ label, presets, value, onChange }: { label: string; presets: string[]; value: string; onChange: (color: string) => void }) {
+  return (
+    <section className="df-theme-setting">
+      <div>
+        <strong>{label}</strong>
+        <span style={{ "--project-color": value } as CSSProperties} />
+      </div>
+      <ProjectColorPicker presets={presets} value={value} onChange={onChange} />
+    </section>
+  );
 }
 
 function SourceModal({ tasks, projects, today, onClose, onJoin }: { tasks: Task[]; projects: Project[]; today: string; onClose: () => void; onJoin: (taskIds: string[]) => void }) {
