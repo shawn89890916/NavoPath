@@ -1,4 +1,4 @@
-import React, { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
 import { installBrowserFallback } from "./browserFallback";
@@ -15,6 +15,12 @@ const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 
 const PROJECT_COLOR_PRESETS = ["#C69CF9", "#8B5CF6", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444", "#64748B"];
 const EXECUTE_THEME_PRESETS = ["#C69CF9", "#8B5CF6", "#EC4899", "#38BDF8", "#F59E0B", "#64748B"];
 const PLANNING_THEME_PRESETS = ["#CAFF72", "#84CC16", "#22C55E", "#38BDF8", "#C69CF9", "#F59E0B"];
+const RELEASE_NOTES = [
+  { date: "2026-06-05", summary: "统一执行页与规划页的主题色联动，补齐项目颜色对时间轴色条的映射。" },
+  { date: "2026-06-05", summary: "加入 3天 / 周 / 月视图，并持续修正多日时间轴的拖拽与布局对齐。" },
+  { date: "2026-06-04", summary: "规划树支持候选挑选模式，任务可从长期项目流入今日执行。" },
+  { date: "2026-06-04", summary: "任务详情侧栏、快速项目归属与 AI 下一步编辑流程完成收口。" }
+] as const;
 const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
   return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
 });
@@ -374,7 +380,6 @@ function App() {
   const [timelineView, setTimelineView] = useState<TimelineView>("daily");
   const [quickSchedule, setQuickSchedule] = useState<QuickSchedule>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
   const [planningPickMode, setPlanningPickMode] = useState(false);
   const [planningPicks, setPlanningPicks] = useState<Record<string, PlanPickPriority>>({});
@@ -389,6 +394,7 @@ function App() {
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
   const suppressBlockClickRef = useRef(false);
+  const lastTimelineAutoScrollKeyRef = useRef("");
 
   async function loadInitial() {
     const api = await waitForPlannerApi();
@@ -440,6 +446,9 @@ function App() {
 
   useEffect(() => {
     if (mode !== "execute" || !data || !timelineRef.current) return;
+    const autoScrollKey = `${timelineView}:${selectedDate}`;
+    if (lastTimelineAutoScrollKeyRef.current === autoScrollKey) return;
+    lastTimelineAutoScrollKeyRef.current = autoScrollKey;
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const fallbackMinutes = 9 * 60;
@@ -449,7 +458,7 @@ function App() {
     const targetTop = ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
     const container = timelineRef.current;
     container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
-  }, [mode, data, selectedDate]);
+  }, [mode, data, selectedDate, timelineView]);
 
   useEffect(() => {
     if (!quickSchedule) return;
@@ -1110,58 +1119,22 @@ function App() {
     <div className={`df-app mode-${mode} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings)}>
       <header className="df-header">
         <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
-        <nav className="df-tabs">
-          <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>执行</button>
-          <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>规划</button>
-        </nav>
         <div className="df-header-right">
           {mode === "execute" && <div className="df-top-view-switch" aria-label="timeline views">
             {([
-              ["daily", "DAILY"],
-              ["3day", "3 DAY"],
-              ["weekly", "WEEKLY"],
-              ["month", "MONTH"]
+              ["daily", "天"],
+              ["3day", "3天"],
+              ["weekly", "周"],
+              ["month", "月"]
             ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
           </div>}
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>执行</button>
             <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>规划</button>
           </nav>
-          <button className="df-user-avatar" onClick={() => setUserMenuOpen((v) => !v)} aria-label="用户菜单">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+          <button className="df-user-avatar" onClick={() => setUtilityPanel("settings")} aria-label="设置">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
-          {userMenuOpen && (
-            <div className="df-user-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="df-user-menu-head">
-                <div className="df-user-menu-avatar">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
-                </div>
-                <div>
-                  <div className="df-user-menu-name">{authState?.user?.email || "NavoPath User"}</div>
-                  <div className="df-user-menu-plan">Free Plan</div>
-                </div>
-              </div>
-              <div className="df-user-menu-divider" />
-              <button className="df-user-menu-item" onClick={() => { setUserMenuOpen(false); setUtilityPanel("settings"); }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                设置
-              </button>
-              <button className="df-user-menu-item" onClick={() => { setUserMenuOpen(false); setUtilityPanel("about"); }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                关于 NavoPath
-              </button>
-              {authState?.mode === "cloud" && authState.user && (
-                <>
-                  <div className="df-user-menu-divider" />
-                  <button className="df-user-menu-item danger" onClick={() => { void handleSignOut(); setUserMenuOpen(false); }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-                    退出登录
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          {(userMenuOpen) && <div className="df-user-menu-backdrop" onClick={() => setUserMenuOpen(false)} />}
         </div>
       </header>
 
@@ -1225,18 +1198,18 @@ function App() {
                   setAiPlanMenuOpen((open) => !open);
                 }}>⌄</button>
                 {aiPlanMenuOpen && <span className="df-ai-plan-menu open" onClick={(event) => event.stopPropagation()}>
-                  <label>Select tasks to schedule<select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">今日候选</option><option value="all">全部未完成</option></select></label>
-                  <label>Select scheduling scope<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">Day</option><option value="3day">3 Day</option></select></label>
-                  <label>Select planning strategy<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="simple">Simple (Sequential)</option><option value="priority">Priority First</option><option value="deadline">Deadline First</option></select></label>
+                  <label>任务来源<select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">今日候选</option><option value="all">全部未完成</option></select></label>
+                  <label>安排范围<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">天</option><option value="3day">3天</option></select></label>
+                  <label>规划策略<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="simple">顺序安排</option><option value="priority">优先级优先</option><option value="deadline">截止日优先</option></select></label>
                 </span>}
               </div>
               <div className="df-timeline-actions">
                 <div className="df-view-switch" aria-label="切换时间视图">
                   {([
-                    ["daily", "Daily"],
-                    ["3day", "3Day"],
-                    ["weekly", "Weekly"],
-                    ["month", "Month"]
+                    ["daily", "天"],
+                    ["3day", "3天"],
+                    ["weekly", "周"],
+                    ["month", "月"]
                   ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
                 </div>
               </div>
@@ -1249,7 +1222,7 @@ function App() {
               const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
               const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
               return (
-                <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`}>
+                <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(rangeLength) } as CSSProperties}>
                   <div className="df-timeline-3day-top">
                     <div className="df-timeline-3day-ruler-spacer" />
                     <div className="df-timeline-3day-dates">
@@ -1449,12 +1422,12 @@ function App() {
       )}
 
       <button className="df-add-fab df-icon-action i-plus" data-tip="添加" aria-label="添加" onClick={() => openAdd("task")} />
-      <button className="df-ai-fab df-icon-action i-ai" data-tip="问 AI" aria-label="问 AI" onClick={() => setAiOpen((open) => !open)} />
+      <button className="df-ai-fab df-icon-action i-ai" data-tip="问Navo" aria-label="问Navo" onClick={() => setAiOpen((open) => !open)} />
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => setDrawerOpen(false)} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} />}
       {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} reply={aiReply} busy={aiBusy} onSend={() => void sendAi()} onClose={() => setAiOpen(false)} />}
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={tasks.find((task) => task.id === drag.taskId)} pointer={drag.pointer} />}
       {toast && <div className="df-toast">{toast}</div>}
     </div>
@@ -1854,7 +1827,8 @@ function AiPanel({ input, setInput, reply, busy, onSend, onClose }: { input: str
   return <aside className="df-ai-panel"><div><strong>NavoPath AI</strong><button className="df-icon-action i-close" data-tip="关闭" aria-label="关闭" onClick={onClose} /></div><textarea value={input} onChange={(event) => setInput(event.target.value)} /><button className="df-icon-action i-send" data-tip={busy ? "思考中" : "发送"} aria-label={busy ? "思考中" : "发送"} onClick={onSend} disabled={busy || !input.trim()} />{reply && <pre>{reply}</pre>}</aside>;
 }
 
-function UtilityPanel({ kind, settings, authEmail, onClose, onSave }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void }) {
+function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout, onSignOut }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onShowAbout: () => void; onSignOut?: () => void }) {
+  const userName = settings.displayName?.trim() || authEmail || "NavoPath User";
   return (
     <>
       <div className="df-utility-backdrop" onMouseDown={onClose} />
@@ -1865,24 +1839,40 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave }: { kind: "s
         </div>
         {kind === "settings" ? (
           <div className="df-utility-body">
+            <section className="df-settings-profile">
+              <div className="df-settings-avatar">N</div>
+              <div>
+                <strong>{userName}</strong>
+                <small>免费版</small>
+              </div>
+            </section>
             <ThemeColorSetting label="执行页主色" presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
             <ThemeColorSetting label="规划页主色" presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
-            <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />开启自动高级渐变</label>
+            <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />突出显示</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />隐藏已完成任务</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />允许 AI 使用任务上下文</label>
             {authEmail && <p>当前账号：{authEmail}</p>}
+            <div className="df-settings-footer">
+              <button className="df-settings-about" onClick={onShowAbout}>
+                <span className="df-settings-about-icon">i</span>
+                <span>关于NavoPath</span>
+              </button>
+              {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>退出登录</button>}
+            </div>
           </div>
         ) : (
           <div className="df-utility-body">
-            <strong>NavoPath v0.4.0</strong>
+            <strong>NavoPath v0.4.1</strong>
             <p>从长期项目里选出今天要推进的事，排进时间轴，并明确下一步怎么做。</p>
-            <small>最新版本时间：2026-06-04</small>
-            <ul>
-              <li>执行页支持 Daily / 3 Day / Weekly / Month 时间视图。</li>
-              <li>规划页支持从项目树选择任务加入执行。</li>
-              <li>项目颜色会联动时间轴任务色条。</li>
-              <li>GitHub Actions 自动部署到 Cloudflare Pages。</li>
-            </ul>
+            <small>最新版本时间：2026-06-05</small>
+            <div className="df-release-list">
+              {RELEASE_NOTES.map((item) => (
+                <article key={`${item.date}-${item.summary}`} className="df-release-item">
+                  <strong>{item.date}</strong>
+                  <span>{item.summary}</span>
+                </article>
+              ))}
+            </div>
           </div>
         )}
       </aside>
@@ -2040,7 +2030,7 @@ function PlanningView(props: {
                 <button className="df-collapse" onClick={() => props.setCollapsed((current) => ({ ...current, [project.id]: !current[project.id] }))}>{props.collapsed[project.id] ? "+" : "-"}</button>
                 <PlanningProjectNode title={project.title} onOpen={() => props.onProjectEdit(project)} onAddTask={() => props.onTaskCreate(project.id)} />
                 {!props.collapsed[project.id] && <div className="df-project-list"><div className="df-task-branch">{projectTasks.map((task) => (
-                  <PlanningTaskNode key={task.id} task={task} projectName={project.title} picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onStar={() => props.onTaskUpdate(task.id, { priority: "high", importance: "high" })} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
+                  <PlanningTaskNode key={task.id} task={task} projectName={project.title} picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
                 ))}</div></div>}
               </div>
             );
@@ -2050,7 +2040,7 @@ function PlanningView(props: {
               <button className="df-collapse" onClick={() => props.setCollapsed((current) => ({ ...current, unassigned: !current.unassigned }))}>{props.collapsed.unassigned ? "+" : "-"}</button>
               <PlanningProjectNode title="未归属任务" onAddTask={() => props.onTaskCreate("")} />
               {!props.collapsed.unassigned && <div className="df-project-list"><div className="df-task-branch">{unassigned.map((task) => (
-                <PlanningTaskNode key={task.id} task={task} projectName="未归属" picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onStar={() => props.onTaskUpdate(task.id, { priority: "high", importance: "high" })} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
+                <PlanningTaskNode key={task.id} task={task} projectName="未归属" picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
               ))}</div></div>}
             </div>
           )}
@@ -2088,7 +2078,6 @@ function PlanningTaskNode(props: {
   picked: boolean;
   onOpen: () => void;
   onAdd: () => void;
-  onStar: () => void;
   onRename: () => void;
   onAddSubtask: () => void;
   onSetDate: () => void;
@@ -2104,8 +2093,7 @@ function PlanningTaskNode(props: {
         {props.picked && <em>已选</em>}
       </button>
       <div className="df-plan-node-actions">
-        <button title="加入候选" onClick={props.onAdd}>+</button>
-        <button title="标为重点" onClick={props.onStar}>☆</button>
+        <button title="加入候选" onClick={props.onAdd}>→</button>
         <button title="更多" onClick={() => setMenuOpen((open) => !open)}>⋯</button>
       </div>
       {menuOpen && <div className="df-plan-more">

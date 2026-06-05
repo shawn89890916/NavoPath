@@ -1,0 +1,2321 @@
+import React, { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
+import { installBrowserFallback } from "./browserFallback";
+import "./styles.css";
+
+installBrowserFallback();
+
+const todayIso = () => localIso(new Date());
+const TIMELINE_START = 0;
+const TIMELINE_END = 24;
+const SLOT_MINUTES = 15;
+const SLOT_HEIGHT = 20;
+const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
+const PROJECT_COLOR_PRESETS = ["#6366F1", "#3B82F6", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#64748B", "#1E293B", "#FFFFFF"];
+const EXECUTE_THEME_PRESETS = ["#C69CF9", "#6366F1", "#3B82F6", "#0EA5E9", "#64748B", "#1E293B", "#FFFFFF"];
+const PLANNING_THEME_PRESETS = ["#CAFF72", "#10B981", "#3B82F6", "#0EA5E9", "#64748B", "#1E293B", "#FFFFFF"];
+const RELEASE_NOTES = [
+  { date: "2026-06-05", title: "婵犵數濮烽弫鍛婃叏娴兼潙鍨傚┑鍌滎焾閺勩儵鏌″鍐ㄥ闁崇懓绉电换娑橆啅椤旂粯鍊ｇ紓鍌氱У閻楃娀骞冨Δ鍛櫜閹肩补鍓濋悘鍫ユ⒑缂佹ê濮囬柨鏇ㄤ邯瀵鏁愭径濠勭杸闂傚倸鐗婄粙鎴︼綖閳哄懏鈷戦柟鎯板Г閺佽鲸淇婇銏犳殻妤犵偛鍟伴幑鍕偘閳╁喚娼旀繝纰樻閸ㄧ敻宕戦幇鏉跨妞ゆ牜鍋為埛?, summary: "闂傚倸鍊峰ù鍥х暦閻㈢纾婚柣鎰暩閻瑩鐓崶銊р槈缁炬儳娼￠弻锝夊閵忊剝姣勭紓浣插亾濠电姴娲﹂悡鏇熴亜閹扳晛鈧洟寮告惔锝囩＜闁告挷绀佹禒閬嶆煛鐏炵晫效闁诡喚鍏橀獮宥夘敊閻ｅ本顓婚梻?婵犵數濮烽弫鍛婃叏娴兼潙鍨傜憸鐗堝笚閸婂爼鏌涢鐘插姎婵☆偅锕㈤弻娑樼暆閳ь剟宕戝☉銏″€块柛顭戝亖娴滄粓鏌熸潏鍓хɑ缁绢叀鍩栭妵鍕晜閼测晝鏆ら梺鍝勭灱閸犳牕鐣峰鈧畷锝嗗緞濡紮绱楁繝鐢靛Х椤ｄ粙鍩€椤掆偓绾绢參骞楅悩缁樼厵鐎瑰嫮澧楅崳浠嬫煙閸欏灏︾€规洜鍠栭、姗€鎮╅搹顐晠闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟径鍫濆壔婵炴垶顭傞弮鍫濈劦妞ゆ帒瀚粻鎺撶節濞堝灝鏋熼柕鍥ㄧ洴瀹曟垿骞樼紒妯煎幐婵炶揪绲介幗婊嗗€村┑鐐差嚟婵绮婚幘璇茬畺婵炲棙鎼╅弫鍡椕归敐鍫殐闁哥偛鐖煎濠氬磼濞嗘埈妲紓鍌氱Т閿曨亜顕ｉ弻銉ヨ摕闁靛绠戦埀顒€娼￠弻銊╁籍閸喐娈伴梺绋款儐閹告悂锝炲┑瀣垫晢濠㈣泛锕ゆ竟搴繆閵堝洤啸闁稿绋撻幑銏狀潨閳ь剟鐛繝鍥ㄥ€烽柛婵嗗珋閵娾晜鐓忓璇″灠閹冲繘宕抽幍顔剧＝闁稿本鑹鹃埀顒勵棑缁牊绗熼埀顒勩€侀弽顓炲窛闁圭⒈鍘介弲鐐烘⒑閸涘﹤濮﹂柛鐘崇墵閹偤宕归鐘辩盎闂佺鎻徊鍓ф兜閼哥偣浜滈柨鏃囧亹閻ｇ敻鏌＄仦鍓р槈闁宠姘︾粻娑㈠即閻欌偓閸炲綊鏌ｆ惔锛勪粵婵犮垺顭囬埀顒佺煯閸楀啿鐣峰ú顏呮櫢闁绘灏欓崝锕€顪冮妶鍡楃瑨閻庢凹鍓涚划濠氬蓟閵夛妇鍘棅顐㈡搐椤戝懘鍩€椤掍焦绀堢紒顔肩墛瀵板嫰骞囬鐘插笚闂備線娼чˇ顓㈠礉瀹ュ鍋熸い蹇撶墛閸婂灚鎱ㄥ鍡楀箻闁告瑢鍋撻梻浣虹帛閹尖晠宕戞繝鍌滄殾闁告挷鐒﹀畷澶愬级閻愬瓨绶查柡瀣墦濮婄粯绗熼埀顒勫焵椤掑倸浠滈柤娲诲灡閺呰埖瀵肩€涙鍘遍梺缁樏崯鎸庢叏瀹ュ洠鍋撶憴鍕闁硅绱曢幑銏犫攽鐎ｎ亞鍊為悷婊冪箻钘濇い鏇楀亾婵﹨娅ｇ槐鎺戭潨閸粎杩旈梻浣告憸婵數鏁垾宕囨殾? },
+  { date: "2026-06-05", title: "闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁瑰濮崑鎾绘晲鎼粹€茬敖闂佸憡鏌ㄩ悘姘辨崲濠靛顫呴柨婵嗘閵嗘劕顪冮妶鍡楃仴闁硅櫕锕㈤妴渚€寮崼婢劑鏌ㄩ弮鍥ㄧ《缂佺姵鑹鹃—鍐Χ閸℃瑥顫ч梺闈涙处閻╊垰鐣烽幋锕€绠荤€规洖娲﹀▓楣冩⒑閹肩偛鍔楅柡鍛櫊瀵?, summary: "婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌℃径瀣劸婵炲皷鏅犻弻銊╁即閻愯弓鍠婄紓鍌氱У閻楁洟鈥﹂崸妤佸殝闂傚牊绋戦～宀€绱撴担鎻掍壕闂佺硶鍓濈粙鎺楁偂濞嗘挻鐓熼柟瀵稿€栭幋鐘辩剨闁汇垹鎲￠悡鏇㈡煃閸濆嫬鈧憡鎱ㄥ澶嬬厸鐎光偓閳ь剟宕伴弽褏鏆﹂柕濠忓缁♀偓闂佺鏈划鍫㈡濠靛鈷掑〒姘ｅ亾闁逞屽墰閸嬫盯鎳熼娑欐珷妞ゆ柨顫曟禍婊堟煥閺冨浂鍤欐繛鍛У椤ㄣ儵鎮欓弶鎴犱紝婵犳鍠掗崑鎾绘⒑闂堟稓澧曢柟铏姍钘濇い鏇楀亾婵﹨娅ｉ埀顒€婀辨慨鐢杆夋径鎰厵闁惧浚鍋勬慨澶岀磼椤旇偐澧涚€垫澘瀚伴獮鍥敇閻樻彃绠伴梻鍌欑窔閳ь剛鍋涢懟顖涙櫠鐎涙﹩娈介柣鎰级椤モ剝銇勯敃浣哥毢闁逞屽墯椤旀牠宕板Δ浣虹濠电姴娲ら拑鐔哥箾閹寸偟鎳呯紒鈾€鍋撻梻浣告啞閸旓附绂嶅┑瀣棷濞寸厧鐡ㄩ埛鎴︽⒑椤愩倕浠滈柤娲诲灡閺呭爼顢欐慨鎰盎闂佹寧妫侀褔鎮橀敐鍚ょ懓顭ㄩ崟顒€鈧劖銇勯姀锛勬创闁诡喗鐟╅幊鐘电磽鎼淬垺绀嬮柡宀€鍠栭幊鏍煛閸曞﹤顦甸弻宥堫檨闁告挻绻傞埢宥夊即閻愨晜鐎洪梺鍛婂姦閸犳鍩涢幋锔界厱婵炴垶锕弨濠氭煃闁垮绗掗柍瑙勫灴椤㈡瑩鎳為妷銉ユ敪闁诲氦顫夊ú鈺冪礊娴ｅ摜鏆﹂柛妤冨€ｉ悢鍝勬瀳閺夊牄鍔庨妶顐ｇ節閻㈤潧啸闁轰礁鎲￠幈銊╁箻椤旇偐鏌堝銈嗙墱閸嬬偤寮查鈧…鍧楁嚋闂堟稑顫嶉梺缁樻尰閻熝呮閹烘嚦鏃€鎷呯悰鈩冾潔婵犵妲呴崑鎺楀矗閸愵煈鍤曢柕濠忓椤╃兘鎮楅敐搴′簽闁告鏁婚弻锝嗘償閵忊懇濮囧銈庡幖濞诧箓寮查崼鏇ㄦ晢濞达綀娅ｉ惁鍫ユ⒑闁偛鑻晶顖炴倵闂堟稏鍋㈢€殿喖鐖奸獮瀣攽閸垹鏄ラ梻鍌氬€风欢姘焽瑜旈垾锕傤敆閸曨剙浜楅梺鍓插亖閸庤京鎲撮敃鍌涚厓鐟滄粓宕滈悢濂夋綎婵炲樊浜滃婵嗏攽閻樻彃鈧鎮烽弻銉︾厽闁靛繆鏅涢悘鐘崇箾瀹割喖寮€规洘妞介崺鈧? },
+  { date: "2026-06-05", title: "婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂┑鐐叉▕娴滄繈宕戠€ｎ喗鐓曟い鎰靛亜婢т即鏌ｉ鐕佹當闁宠鍨块幃鈺冩嫚瑜嶆导鎰攽閳藉棗浜濇い銊ワ龚濡垽妫呴銏″缂佸甯￠幃锟犳偐鐠囪尙楠囬梺鍓插亝缁嬫垶淇婃禒瀣厽闁规儳宕崝姘舵煃?, summary: "婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂┑鐐叉▕娴滄繈宕戠€ｎ喗鐓曟い鎰靛亜婢т即鏌ｉ鐕佹當闁宠鍨块幃鈺冩嫚瑜嶆导鎰攽閳藉棗浜濇い銊ワ龚濡垽妫呴銏″缂佸甯￠幃锟犲即閻旇櫣顔曢梺绯曞墲閳笺倝顢旈崼鐔封偓鍫曟煟濡櫣锛嶇紒鈾€鍋撻梻渚€鈧偛鑻晶瀛樸亜閵忊剝顥堢€规洜鍘ч埞鎴﹀醇椤掑倷瑕嗘繝鐢靛Х閺佹悂宕戝☉妯滄稑鈻庨幘宕囶唶闂佸湱铏庨崰鏍婵犳碍鐓欓柣鎰靛墯缂嶆垹绱掗崜浣镐槐闁哄本鐩、鏇㈡晲閸繍妫熷┑鐐茬摠缁秹宕曢幎鑺ョ畳闂備焦瀵х换鍌炴偋濠婂喚鐒介柟閭﹀幑娴滄粓鏁庢繝姘倞闁靛鍨虹€氫粙姊绘担渚劸闁哄牜鍓涢崚鎺楁偐閸欏倹绋掗幆鏃堝Ω閿旇瀚煎┑鐐殿棎閸嬫劗鎹㈠┑瀣疅闁诡垎鈧弨浠嬫煃閵夈儳锛嶉柟鐣屽Х缁辨帒螖閸愩劍鐏堥梺绯曟杹閸嬫挸顪冮妶鍡楃瑨閻庢凹鍓濈换姘舵煟鎼达紕鐣柛搴ㄤ憾钘濆ù鍏兼綑绾惧潡骞栭幖顓熷▏濞存粍绮撻弻锟犲炊椤垶鐣舵繛瀛樼矒缁犳牕顫忓ú顏呯劵闁绘劘灏€氭澘顭胯閸犳濡甸崟顖涙櫆闁芥ê顦藉Λ鍡涙⒑闁偛鑻晶顖炴煕濠靛棝鍙勭€规洘绻堥獮瀣攽閸喐顔曢梻浣筋潐閸庣厧螞閸曨剙鍔旈梻鍌欑窔濞佳嚶ㄩ埀顒傜磼閻樺啿鐏存い銏℃椤㈡盯鎮欑€电骞楅梻浣虹帛椤牊绂嶉鍕婂洭鏁冮埀顒勨€﹂懗顖ｆШ缂備緡鍠楅悷鈺呯嵁閸愵喖閿ゆ俊銈傚亾妤犵偑鍨烘穱濠囶敍濮樿鲸鐧侀梺鍝勵儐閻楁洟鈥旈崘顔嘉ч柛鈩兠弳妤佺節濞堝灝鏋ら柛蹇斆悾宄懊洪鍛汗濠电偞娼欓鍡涳綖瀹ュ鈷戦柛锔诲弨濡炬悂鏌涢妸褍顣肩紒鍌氱Ч瀹曟粏顦寸痪鎹愭闇夐柨婵嗘噺閹牊銇勬惔銏″暗缂佽鲸甯楀蹇涘Ω閿旂虎妲规俊銈囧Х閸嬫盯宕婊勫床婵犻潧顑呴悙濠囨煃鏉炴媽鍏岄柕鍫畵濮婄粯鎷呯粵瀣異闂佹悶鍔岄悥濂稿Υ閸岀偞鏅滈柟顖嗗啰浜伴梻浣烘嚀婢х晫鍒掗鐐村亗闁哄洢鍨洪悡娑㈡煕鐏炲墽绠ラ柛銈嗙懃閳规垿顢欓悷棰佸濠电姷鏁告慨浼村垂婵犳艾绠犻柟鍓х帛閺呮繃銇勮箛鎾愁伌闁搞倖娲熼弻銈夊箹娴ｈ閿紓浣哄Х婵炩偓婵? },
+  { date: "2026-06-05", title: "婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻纾嬵唹闁逞屽墾缁犳捇骞冨鍕弿闁硅埇鍔屾禍楣冩煕瀹€鈧崑鐐哄吹瀹ュ鐓忓璇″灙閸嬫捇鏌＄€ｎ偆澧甸柡宀€鍠栧畷妤呮嚃閳哄倹顔冮梻浣规偠閸斿海鍒掗婊呭崥闁绘梻顭堢欢鐐烘倶閻愭鐒惧ù?, summary: "闂傚倸鍊搁崐宄懊归崶顒€违闁逞屽墴閺屾稓鈧綆鍋呯亸浼存煏閸パ冾伃鐎殿喕绮欐俊姝岊槷婵℃彃鐗撳鐑樺濞嗗繒妲ｉ梺闈╃秶缂嶄礁顕ｆ繝姘亜闁惧繐婀遍悾璺衡攽閻愭潙鐏﹂拑閬嶆煥濞戞效闁哄矉绻濋崺鈧?闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁瑰濮崑鎾绘晲鎼粹€茬盎婵炲瓨绮庨崢褔鈥旈崘顔嘉ч柛鈩冾殘閻熴劑姊虹粙鍖℃敾婵″弶甯℃俊鐢稿箛椤旂粯鍕冮柣鐔哥懕缁查箖锝炲澶嬧拺閻熸瑥瀚崝銈夋煟鎺抽崝鎴︽晲閻愬弬鏃堝焵椤掑嫧鈧箓宕稿Δ浣镐画闁汇埄鍨奸崰娑㈠触椤愶絿绡€缁剧増菤閸嬫挸鐣烽崶銊﹀枛闂備胶鎳撻崲鏌ュ箠濡櫣鏆︽い鎰剁畱缁€瀣亜閹板墎鎮兼俊宸邯濮婂宕掑▎鎰偘闂佺顑嗛崝娆撳Υ娴ｅ湱绡€闁稿被鍊曞▓銊╂⒑鐟欏嫬鍔ゅ褍娴风划濠氬籍閸喎鈧爼鏌ｉ幇顒佲枙婵炶偐鍠栭弻宥堫檨闁告挻姘ㄩ弫顕€鏁撻悩闈涚ウ闂佹悶鍎洪崜锕傚极閸℃稒鐓冪憸婊堝礈濞戞碍顫曢柣鎰嚟閻熷綊鏌嶈閸撶喎顕ｇ拠娴嬫闁靛繒濮烽濠囨⒑閻熼偊鍤熼柛瀣洴钘濋柍鍝勬噺閸婄敻鎮峰▎蹇擃仾缂佲偓閸愵喗鐓熼柟鍨缁♀偓閻庢鍣崑鍕敇婵傜鐐婇柨鏃囨婵即姊婚崒姘偓鎼佸磹閹间緡鏁嬫い鎾卞灪椤ュ鈧箍鍎遍ˇ浼村煕?Gradient / Neumorphic 婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌涢锝嗙缁炬儳缍婇弻锟犲炊閼搁潧鈻忛梺閫炲苯澧柛鐕佸亰閳ワ箓濡搁埡渚€鍞堕梺缁樻濞撳綊骞冮敐澶嬬厽閹肩补鈧啿杈呴梺绋款儐閹瑰洭寮诲☉銏犲嵆闁靛鍎遍～顏堟⒑闂堟稒顥滈柛鐕佸灡缁岃鲸绻濋崶銊モ偓椋庘偓鐟板閸犳牠宕滄导瀛樼厽閹兼番鍨婚埢鎾绘煛閸涱垰鈻堟鐐插暢椤﹁顨ラ悙瀵稿闁瑰嘲鎳橀幊? }
+] as const;
+const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
+  return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
+});
+const categories: Record<Category, { label: string; color: string }> = {
+  exam: { label: "闂傚倸鍊搁崐椋庣矆娓氣偓瀹曘儳鈧綆浜堕悢鍡樻叏濡炶浜鹃悗瑙勬处閸ㄥ爼鐛惔銊﹀殟闁靛鍎辨晶?, color: "#8B5CF6" },
+  uk: { label: "闂傚倸鍊搁崐宄懊归崶銊х彾闁割偁鍎洪弫瀣喐瀹ュ鍋╅柣鎴犵摂閺佸棝鏌嶈閸撶喎锕㈡担绯曟斀閹烘娊宕愰弴銏犵疇闊洦绋戠壕濠氭煏婵炵偓娅嗛柛濠勬暬閺屾盯鏁傜拠鎻掔濡炪倕楠搁惌鍌炲蓟?, color: "#C69CF9" },
+  us: { label: "缂傚倸鍊搁崐鎼佸磹閹间礁纾圭紒瀣紩濞差亜围闁糕檧鏅滈鏃傜磽娴ｅ壊鍎愰柨娑欐礋閹兘骞忛弮鈧Λ鍐ㄧ暦閵娾晩鏁婇梻鍌氼嚟缁憋箓姊绘担绛嬪殭濡ょ姷顭堥敃銏℃綇閵娿儱鐏佸銈嗘尪閸ㄥ綊宕?, color: "#7C3AED" },
+  essay: { label: "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕鍦磼鐎ｎ偓绱╂繛宸簼閺呮彃顭跨捄鐚村姛妞?, color: "#EC4899" },
+  materials: { label: "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曚綅閸ャ劌顕遍柡澶嬪灩椤︻噣姊洪崫鍕枆闁告ê銈稿畷?, color: "#22C55E" },
+  project: { label: "婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂?, color: "#CAFF72" },
+  personal: { label: "婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犲綊鏌嶉崫鍕偓濠氥€呴崣澶岀闁糕剝顨夐?, color: "#64748B" }
+};
+const priorityLabel: Record<Priority, string> = { high: "婵?, medium: "婵?, low: "婵? };
+const categoryOrder: Category[] = ["exam", "project", "essay", "materials", "uk", "us", "personal"];
+
+type Mode = "execute" | "planning";
+type AddType = "task" | "project" | "event";
+type TimelineView = "daily" | "3day" | "weekly" | "month";
+type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "simple" | "priority" | "deadline" };
+type DragState = { taskId: string; kind: "candidate" | "block"; duration: number; offsetMinutes?: number; pointer?: { x: number; y: number }; outsideTimeline?: boolean; targetDate?: string; targetAllDay?: boolean } | null;
+
+function normalizeHexColor(value: string, fallback: string) {
+  const input = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(input)) return input;
+  if (/^#[0-9a-f]{3}$/i.test(input)) return `#${input.slice(1).split("").map((ch) => ch + ch).join("")}`;
+  return fallback;
+}
+
+function hexToRgb(value: string) {
+  const hex = normalizeHexColor(value, "#C69CF9").slice(1);
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16)
+  };
+}
+
+function mixHex(a: string, b: string, amount: number) {
+  const c1 = hexToRgb(a);
+  const c2 = hexToRgb(b);
+  const mix = (x: number, y: number) => Math.round(x * (1 - amount) + y * amount).toString(16).padStart(2, "0");
+  return `#${mix(c1.r, c2.r)}${mix(c1.g, c2.g)}${mix(c1.b, c2.b)}`;
+}
+
+function isLightColor(value: string) {
+  const { r, g, b } = hexToRgb(value);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 174;
+}
+
+function adaptiveStrongMix(primaryLum: number) {
+  if (primaryLum > 210) return 0.68;
+  if (primaryLum > 180) return 0.55;
+  if (primaryLum > 150) return 0.40;
+  if (primaryLum > 120) return 0.28;
+  return 0.16;
+}
+
+function themeVars(settings: Settings) {
+  const execute = normalizeHexColor(settings.executeAccentColor || "#C69CF9", "#C69CF9");
+  const planning = normalizeHexColor(settings.planningAccentColor || "#CAFF72", "#CAFF72");
+  const execLum = (() => { const { r, g, b } = hexToRgb(execute); return 0.299 * r + 0.587 * g + 0.114 * b; })();
+  const planLum = (() => { const { r, g, b } = hexToRgb(planning); return 0.299 * r + 0.587 * g + 0.114 * b; })();
+  // header 闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鑼唶闂佸憡绺块崕鎶芥儗閹剧粯鈷掗柛顐ゅ枔閳绘捇鏌?闂傚倸鍊搁崐鐑芥嚄閸洖鍌ㄧ憸鏂跨暦椤栫偛閿ゆ俊銈傚亾閻庢艾顦伴妵鍕箳閸℃ぞ澹曢梻浣哥枃椤曆呯矓閹绢喖鐓濋幖娣妼缁犲鎮楀☉娅虫垿鎮甸锝囩瘈婵炲牆鐏濋弸鐔兼煥閺囨娅婄€规洘鍨垮畷鐔碱敍濞戞ê澧炬繝鐢靛Т閿曘倝宕ュΟ琛℃闁靛繆鈧厖缃曢梻浣稿閸嬫帡宕戦崱娑樼闁告稑锕︾弧鈧梺闈涚箞閸ㄦ椽宕甸埀顒勬⒑閹稿孩纾搁柛搴ㄤ憾閳ワ箓宕堕妸褏鐦堝┑顔斤供閸撴盯宕愰悙鐑樷拺闂傚牊涓瑰☉娆愬闂傗偓閹邦剦妫滈梻?header 闂傚倸鍊搁崐鐑芥倿閿曗偓椤啴宕归鍛姺闂佺鍕垫當缂佲偓婢跺备鍋撻獮鍨姎婵炲眰鍔戦幆宀勫醇閻旂繝绨婚梺鐟版惈缁夊爼宕濆澶嬬厱閹艰揪绲介弸娑㈡煛瀹€瀣瘈鐎规洖鐖奸崺鈩冩媴閸︻厺绨寸紓鍌氬€烽懗鑸垫叏閻㈠灚鏆滈柨鐔哄Т缁犳牗淇婇妶鍌氫壕闂佸疇妫勯ˇ顖炲煝鎼粹垾鐔访虹拠鍙夊€涚紓鍌氬€搁崐宄懊归崶銊ｄ粓闁归棿鐒﹂崑锛勬喐閺冨牆绠氶柍褜鍓氶妵鍕疀閹捐泛鈷堥梺杞扮缁夌數鎹㈠┑鍥╃瘈闁稿本鍑规导灞剧箾鐎电鞋濡炴潙鎲＄粚杈ㄧ節閸ャ劌鈧鈧懓澹婇崰鏍礈娴煎瓨鐓熼幖娣灮閳绘捇鏌￠崨顖氣枅妤犵偛鍟抽ˇ瑙勵殽閻愬澧柟宄版噽閹叉挳宕熼鍌氬缓濠电姷鏁告慨浼村垂婵傜鏄ラ柡宥庡亞閻瑩鏌熼幆褍顣抽柣顓炴椤法鎹勬笟顖滀紙闁瑰吋鐣崝宀勬倷婵犲洦鐓忓┑鐐戝啯鍣介柡鍡╁亰濮婅櫣鎷犻弻銉偓妤呮煟韫囨棁澹橀摶鐐烘煕閹扮數鍘涢柛銈嗘礃閵囧嫰骞囬埡浣插亾濡ゅ啰鐭嗛柛鏇ㄥ灡閻撶喐淇婇姘倯闁哄棌鏅涢～銏ゅ炊瑜夐弨浠嬫煥濞戞ê顏╁ù婊冦偢閺屾稒绻濋崘鐐杹閻庢鍣崑鍡涘箯閻樺樊鍟呮い鏃€鍎虫慨娲⒒娴ｈ櫣甯涙い銊ユ嚇閹嗙疀濞戞鍘洪梺鍝勫暙閻楀﹪鎮￠崘顏呭枑婵犲﹤鐗嗙粈鍫ユ煟閺冨倸甯剁紒?  const execHeaderLight = execLum > 195;
+  const planHeaderLight = planLum > 195;
+  const execHeaderFg  = execHeaderLight ? "#1e293b"            : "#ffffff";
+  const execHeaderFgM = execHeaderLight ? "rgba(30,41,59,.55)" : "rgba(255,255,255,.72)";
+  // 濠电姷鏁告慨鐑藉极閹间礁纾婚柣鎰▕閻掕姤绻涢崱妯诲碍缂佺姷濞€閺岀喖骞嗚閸ょ喖鏌ｅ┑濠冪【闁宠鍨块幃鈺呭箵閹烘挻顔嶉梻浣哥－缁垶寮婚妸鈺佺厴闁硅揪闄勯崑鎰版煕閹邦厼绲绘慨锝呯墦濮婃椽宕崟顒婄礊闂佹悶鍔岄悥鐓庮嚕婵犳艾惟闁靛鍨洪～宥呪攽閻愬弶顥為柨姘攽閿涘嫨浠廰der 闂傚倸鍊搁崐鐑芥倿閿曗偓椤啴宕归鍛姺闂佺鍕垫當缂佲偓婢舵劕绠圭紒顔款潐椤庡棝鏌＄€ｎ亞肖闁规彃鎲￠幆鏃堝Ω閵壯呮毎闂備礁鎼崯顐︽偋閸℃稑纭€闁惧浚鍋佹禍婊堢叓閸ャ劍灏版い銉уУ閵囧嫰鏁傜憴鍕彆缂備胶绮惄顖炵嵁鐎ｎ喗鍊烽柡澶嬪灩椤ｆ煡姊婚崒娆戭槮閹煎瓨绮庣槐鐐存媴闁稓绠氶柣搴㈢⊕閿氱紒鍓佸仱閺岀喖鏌囬敃鈧鐐繆椤愩垹鏆ｆ慨濠冩そ濡啫鈽夐姀銏犳そ缂傚倷鐒﹁ぐ鍐焽閿熺姴鏄ラ柍褜鍓氶妵鍕箳瀹ュ洤濡介梺闈涙处缁诲嫰鍩€椤掑喚娼愭繛鎻掔箻瀹曟洟妫冨☉姘婵犻潧鍊告竟濠囧极閸℃稒鐓曢悘鐐插⒔閻倖淇婇崣澶嬪唉婵﹦绮幏鍛存偡闁箑娈濈紓鍌欑椤戝棝宕归崸妤€绠犻柣鏃傗拡閺佸秵绻濇繝鍌涱棞鐏忓繘姊绘担绛嬫綈闁稿骸鍚嬮幈銊╁Χ婢跺鈧灝螖閿濆懎鏆為柣鎾崇箰閳规垿鎮欓懠顑胯檸闂佸憡姊圭喊宥夊Φ閸曨垼鏁冩い鎺戝€昏摫缂傚倷鑳剁划顖炴儎椤栫偛鏋佺€广儱顧€缂嶆牗銇勯幒鍡椾壕闂侀€炲苯澧繛鑼枙濡垽妫呴銏″缂佸甯￠幃锟犲即閵忥紕鍘甸梺缁樺灦閿氶柣蹇ラ檮閵囧嫰濡烽敂鍓х厐濡炪値鍘煎锟犲箖妞嬪孩鏆滄い鏃傚帶椤娀姊绘担鍦菇闁稿海鍎ょ粋宥夘敂閸曨厽娈鹃梺缁橆焽缁垶寮查鍕厱闁哄洢鍔屾禍顖炴煃瑜滈崜娆撴倶濠靛鐓橀柟杈鹃檮閸婂鏌涢妷銏℃珖鐞氾絿绱撻崒娆戣窗闁哥姵宀稿畷鎴﹀箻閸撲礁宕ラ梺缁樻煥閹芥粎寮ч埀顒勬⒑閸涘﹤濮﹀ù婊勭墵瀵悂寮介妸褏鐦堥梺姹囧灲濞佳勭墡闂備礁鎲￠崹鐢电礊婵犲偆鍤曢柟鍓佺摂閺佸秹鏌ｉ幇顒夊殶闁告瑥妫楅埞鎴︽倷閺夋垹浠搁梺鑽ゅ櫐缁犳捇骞嗛崘顔肩闁绘劗鏁搁鏇㈡⒑閹稿海绠撳Δ鐘殿焾閳诲秴顓奸崱鈺傤啍?primary-strong 濠电姷鏁告慨鐑藉极閹间礁纾婚柣鎰惈缁犳澘鈹戦悩瀹犲缂佲偓婢舵劖鐓涢柛銈呯埣椤ｏ箑效?  const execHeaderBg  = execHeaderLight
+    ? `#ffffff`
+    : `linear-gradient(90deg, color-mix(in srgb, var(--execute-primary-strong) 85%, #111827) 0%, color-mix(in srgb, var(--execute-primary-strong) 50%, var(--execute-primary)) 45%, var(--execute-primary-strong) 100%)`;
+  const planHeaderFg  = planHeaderLight ? "#1e293b"            : "#ffffff";
+  const planHeaderFgM = planHeaderLight ? "rgba(30,41,59,.55)" : "rgba(255,255,255,.72)";
+  const planHeaderBg  = planHeaderLight
+    ? `#ffffff`
+    : `linear-gradient(90deg, color-mix(in srgb, var(--planning-primary-strong) 85%, #111827) 0%, color-mix(in srgb, var(--planning-primary-strong) 50%, var(--planning-primary)) 45%, var(--planning-primary-strong) 100%)`;
+  return {
+    "--execute-primary": execute,
+    "--execute-primary-strong": mixHex(execute, "#111827", adaptiveStrongMix(execLum)),
+    "--execute-on-primary": "#FFFFFF",
+    "--execute-header-fg":  execHeaderFg,
+    "--execute-header-fg-muted": execHeaderFgM,
+    "--execute-header-bg":  execHeaderBg,
+    "--planning-primary": planning,
+    "--planning-primary-strong": mixHex(planning, "#111827", adaptiveStrongMix(planLum)),
+    "--planning-on-primary": "#FFFFFF",
+    "--planning-header-fg":  planHeaderFg,
+    "--planning-header-fg-muted": planHeaderFgM,
+    "--planning-header-bg":  planHeaderBg,
+  } as CSSProperties;
+}
+type ResizePreview = { taskId: string; start: string; end: string } | null;
+type ScheduleSuggestion = { id: string; taskId: string; startTime: string; endTime: string; reason: string; nextAction?: string; ignored?: boolean };
+type QuickSchedule = { startTime: string; scheduledDate: string; title: string; projectId: string } | null;
+type PlanPickPriority = "must" | "should" | "could";
+type AuthState = { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
+type FormState = {
+  title: string;
+  projectId: string;
+  projectColor: string;
+  dueDate: string;
+  dueTime: string;
+  endDate: string;
+  endTime: string;
+  category: Category;
+  priority: Priority;
+  importance: Priority;
+  urgency: Priority;
+  estimatedHours: number;
+  details: string;
+};
+
+function localIso(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(iso: string, days: number) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return localIso(date);
+}
+
+function addMonths(iso: string, months: number) {
+  const date = new Date(`${iso}T00:00:00`);
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + months);
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, last));
+  return localIso(date);
+}
+
+function startOfWeekIso(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() - date.getDay());
+  return localIso(date);
+}
+
+function startOfMonthGridIso(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(1);
+  date.setDate(date.getDate() - date.getDay());
+  return localIso(date);
+}
+
+function monthTitle(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  return date.toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
+function displayDateTitle(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][date.getDay()];
+  return `${date.getDate()} ${weekday}`;
+}
+
+function uid(prefix: string) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function minutesToTime(minutes: number) {
+  const normalized = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function hourLabel(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  if (h === 24) return "";
+  if (h === 0) return "12am";
+  if (h < 12) return `${h}am`;
+  if (h === 12) return "12pm";
+  return `${h - 12}pm`;
+}
+
+function timeToMinutes(time = "09:00") {
+  const [h, m] = time.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function clampSlot(minutes: number) {
+  const min = TIMELINE_START * 60;
+  const max = TIMELINE_END * 60 - SLOT_MINUTES;
+  const clamped = Math.min(Math.max(minutes, min), max);
+  return Math.round(clamped / SLOT_MINUTES) * SLOT_MINUTES;
+}
+
+function addMinutes(time: string, minutes: number) {
+  return minutesToTime(timeToMinutes(time) + minutes);
+}
+
+function shortDate(date: string) {
+  if (!date) return "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊绘晶娑㈡煕?;
+  const [, month, day] = date.split("-");
+  return `${Number(month)}.${Number(day)}`;
+}
+
+function dateDiff(a: string, b: string) {
+  return Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
+}
+
+function taskDuration(task: Task) {
+  if (task.scheduledStart && task.scheduledEnd) {
+    return Math.max(timeToMinutes(task.scheduledEnd) - timeToMinutes(task.scheduledStart), SLOT_MINUTES);
+  }
+  return Math.max(Math.round((task.estimatedHours || 0.5) * 60), SLOT_MINUTES);
+}
+
+function extractNextAction(notes = "") {
+  const match = notes.match(/婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑㈠即閵娿儱绠婚梺鍛婎殕瀹€鎼佸蓟閳╁啫绶為悗锝庝簽閸旂鈹戦悙璺轰汗濠⒀勵殜婵?闂傚倸鍊搁崐鐑芥倿閿旈敮鍋撶粭娑樻噽閻瑩鏌熼悜姗嗘畷闁稿鍊栭妵鍕檨闁哄棌鍋?(.+?)(?:\n|$)/);
+  return match?.[1]?.trim() || "";
+}
+
+function replaceNextAction(notes: string, nextAction: string) {
+  const line = `婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑㈠即閵娿儱绠婚梺鍛婎殕瀹€鎼佸蓟閳╁啫绶為悗锝庝簽閸旂鈹戦悙鐑橈紵闁告濞婂濠氬即閻旈绐炲┑鈽嗗灥濞咃絾绂掗婊呯＝?{nextAction.trim()}`;
+  if (/婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑㈠即閵娿儱绠婚梺鍛婎殕瀹€鎼佸蓟閳╁啫绶為悗锝庝簽閸旂鈹戦悙璺轰汗濠⒀勵殜婵?闂傚倸鍊搁崐鐑芥倿閿旈敮鍋撶粭娑樻噽閻瑩鏌熼悜姗嗘畷闁?.test(notes)) return notes.replace(/婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑㈠即閵娿儱绠婚梺鍛婎殕瀹€鎼佸蓟閳╁啫绶為悗锝庝簽閸旂鈹戦悙璺轰汗濠⒀勵殜婵?闂傚倸鍊搁崐鐑芥倿閿旈敮鍋撶粭娑樻噽閻瑩鏌熼悜姗嗘畷闁?*(?:\n|$)/, `${line}\n`).trim();
+  return [line, notes].filter(Boolean).join("\n");
+}
+
+function waitForPlannerApi() {
+  return new Promise<PlannerApi>((resolve) => {
+    if (window.plannerApi) {
+      resolve(window.plannerApi);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      if (window.plannerApi) {
+        window.clearInterval(timer);
+        resolve(window.plannerApi);
+      }
+    }, 20);
+  });
+}
+
+function defaultForm(type: AddType = "task"): FormState {
+  const today = todayIso();
+  return {
+    title: "",
+    projectId: "",
+    projectColor: "#C69CF9",
+    dueDate: today,
+    dueTime: "",
+    endDate: today,
+    endTime: "",
+    category: type === "project" ? "project" : "personal",
+    priority: "medium",
+    importance: "high",
+    urgency: "low",
+    estimatedHours: 0.5,
+    details: ""
+  };
+}
+
+function makeTask(form: FormState): Task {
+  const now = new Date().toISOString();
+  return {
+    id: uid("task"),
+    title: form.title.trim(),
+    dueDate: form.dueDate || todayIso(),
+    category: form.category,
+    priority: form.priority,
+    notes: form.details,
+    goalId: "goal_admission",
+    completed: false,
+    projectId: form.projectId || undefined,
+    importance: form.importance,
+    urgency: form.urgency,
+    estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
+    plannedForDate: form.dueDate === todayIso() ? todayIso() : undefined,
+    order: Date.now(),
+    subtasks: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function makeProject(form: FormState): Project {
+  const now = new Date().toISOString();
+  return {
+    id: uid("project"),
+    title: form.title.trim(),
+    category: form.category,
+    notes: form.details,
+    completed: false,
+    color: form.projectColor || categories[form.category].color,
+    importance: form.importance,
+    urgency: form.urgency,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function makeEvent(form: FormState): CalendarEvent {
+  return {
+    id: uid("event"),
+    title: form.title.trim(),
+    date: form.dueDate || todayIso(),
+    startDate: form.dueDate || todayIso(),
+    endDate: form.endDate || form.dueDate || todayIso(),
+    startTime: form.dueTime,
+    endTime: form.endTime,
+    category: form.category,
+    details: form.details,
+    createdAt: new Date().toISOString()
+  };
+}
+
+function ProductIcon({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`dayflow-icon ${compact ? "compact" : ""}`} aria-hidden="true">
+      <img src="/navopath-icon.png" alt="" />
+    </div>
+  );
+}
+
+function AuthGate(props: {
+  busy: boolean;
+  error: string;
+  onSubmit: (email: string, password: string, intent: "signin" | "signup") => Promise<void>;
+}) {
+  const [intent, setIntent] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  return (
+    <main className="df-auth-shell">
+      <section className="df-auth-card">
+        <div className="df-auth-brand">
+          <ProductIcon />
+          <div>
+            <strong>NavoPath</strong>
+            <span>闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦柋鍥煟閺冨牜妫戦柨娑樼箲娣囧﹪鎮欓鍕ㄥ亾閺嶎厽鍋嬫俊銈傚亾妞ゎ偅绻堟俊姝岊槾闁绘粌顭烽弻锝夊箛椤旂厧濡洪梺缁樻尪閸庤尙鎹㈠☉銏犵闁绘劕妫欓崹鐢告晝閵忋倕绾ф繛鍡楀⒔閸炵敻鎮峰鍐鐎殿喗鐓￠、鏇㈡晝閳ь剛绮婚弽顓熺厵婵炲牆鐏濋弸娆愮箾瀹€濠侀偗闁哄被鍊曢湁閻庯綆鍋呴悵鏍⒑缂佹ɑ灏紒缁樺灩閹广垹鈹戠€ｎ亶娼婇梺缁樏崥鈧梺顓у灦濮婃椽宕崟顐熷亾閹间礁纾归柛褎顨呴弰銉╂煃?/span>
+          </div>
+        </div>
+        <div className="df-auth-tabs">
+          <button className={intent === "signin" ? "active" : ""} onClick={() => setIntent("signin")}>闂傚倸鍊搁崐宄懊归崶顒佸剭妞ゆ劧绠戦獮銏ゆ煃鏉炴壆鍔嶆い鏂垮缁?/button>
+          <button className={intent === "signup" ? "active" : ""} onClick={() => setIntent("signup")}>濠电姷鏁告慨鐑藉极閹间礁纾绘繛鎴旀嚍閸ヮ剦鏁囬柕蹇曞Х椤︻噣鎮楅崗澶婁壕闂佸憡娲﹂崑澶愬春?/button>
+        </div>
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          void props.onSubmit(email.trim(), password, intent);
+        }}>
+          <label>闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т閻骞栧ǎ顒€濡肩紒鎰殕閹便劌顫滈埀顒劼烽崒鐐叉瀬?input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
+          <label>闂傚倸鍊峰ù鍥敋瑜旈弻濠囨晲閸滀胶鍔烽悷婊冪Х閻忓鈹戦悙鏉戠仧闁搞劍妞藉畷?input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={intent === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
+          {props.error && <p className="df-auth-error">{props.error}</p>}
+          <button className="df-auth-submit" type="submit" disabled={props.busy || !email.trim() || password.length < 6}>
+            {props.busy ? "婵犵數濮烽弫鍛婃叏娴兼潙鍨傞柣鎾崇岸閺嬫牗绻涢幋鐐茬劰闁稿鎸搁～婵嬫偂鎼淬垻褰庢俊銈囧Х閸嬫盯宕婊勫床婵犻潧顑呯粈鍐┿亜韫囧海鍔嶉柣?.." : intent === "signin" ? "闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌涘櫧闁活厽鐟╅弻鐔告綇閸撗呮殸闂?NavoPath" : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顒佹濠德板€曢崯浼存儗濞嗘挻鐓欓悗鐢殿焾鍟哥紒鎯у綖缁瑩寮婚悢鐓庣闁归偊鍓涢崢顐︽煟鎼淬垼澹樻い顓犲厴瀵濡搁埡浣稿祮濠德板€愰崑鎾趁瑰鍫㈢暫闁?}
+          </button>
+        </form>
+        <p className="df-auth-note">濠电姷鏁告慨鐢割敊閺嶎厼闂い鏍ㄧ矊缁躲倝鏌ｉ敐鍛拱鐎规洘鐓￠幃妤呮晲鎼粹剝鐏嶉梺缁樻尭閸婂湱鎹㈠┑鍥╃瘈闁稿本绋戝▍銈夋煟鎼淬垼澹樻い顓犲厴瀵濡搁埡浣稿祮濠德板€愰崑鎾趁瑰鍫㈢暫闁诡喖鍢查…銊╁礋椤掑倸鍤掓繝鐢靛仧閵嗗鎹㈠┑瀣祦闁糕剝绋戠粈鍐┿亜閺冨洤浜规い锔芥緲椤啴濡堕崱妤冪憪闂佺粯甯粻鎾汇€佸▎蹇ｅ悑濠㈣泛顑傞幏铏圭磼缂併垹骞栭柟宄邦儔瀹曠敻宕橀鐣屽幈闂佺粯顭堝▍鏇㈡儍閹达附鐓冪憸婊堝礈濮樿泛绀勭憸鐗堝笒閸屻劑鏌涢幘妤€鍟悘濠囨⒑閸愬弶鎯堥柛鐔哄█瀹曟垿骞樼紒妯绘珳闂佺鏈粙鎺楁偟閺嶎偆纾藉ù锝呮惈灏忕紓渚囧枟閻熲晠鐛崘銊庢棃鍩€椤掑嫬鐓″璺号堥弸宥夊级閸稑濡块柣顓熷浮閺屾盯鍩為幆褌澹曞┑锛勫亼閸婃牕顔忔繝姘；闁瑰墽绮悡鏇炩攽閻樻彃鏆為柛濠冨姉閳ь剝顫夊ú姗€鎮烽埡鍛瀭濡わ絽鍟Λ姗€鏌曟径娑橆洭濞存粍鐟╁缁樼瑹閳ь剙顭囪閳ワ箓宕奸妷銉э紵闂備緡鍓欑粔鏉懳涘鈧弻宥堫檨闁告挾鍠栧濠氬焺閸愩劎绐為梺绯曞墲钃遍柣婵囨煥閳规垿鎮欑€垫悶鍋為梺鍝勬噽婵炩偓闁靛棔绀侀～婵囷紣濠靛洦娅岄梻浣告啞濞诧箓宕滃▎鎾崇妞ゆ洍鍋撻柡宀嬬稻閹棃濮€閳垛晛顫岄梻浣瑰閼归箖鈥︾捄銊﹀磯闁惧繐澧ｈ閺屸€崇暆鐎ｎ剛袣濡炪倧绠掗崺鏍Φ閸曨垰鍗抽柛鈩冾殕閸ｇ晫绱掗埀顒佺節閸曘劌浜炬鐐茬仢閸旀碍銇勯敂鍨祮鐎殿喗鐓￠、妤佹媴閾忚鍟庨梻浣烘嚀椤曨參宕戦悢鍏煎剹鐎光偓閳ь剛妲愰幒妤佸亹闁圭粯宸婚幐鍐磽娴ｄ粙鍝洪柟姝屽吹缁參鎮㈤悡搴ｅ€為悷婊冪Ф缁煤椤忓應鎷洪柡澶屽仦婵粙宕楀畝鍕厱閻庯絻鍔岄埀顒佹礋閹儳鐣￠幏鏃傚枛濮婅崵鈧稒锚婵即姊绘担绋挎倯缂佷焦鎸冲鎻掆攽鐎ｎ偄浠掗梺闈涱槴閺呮粓鎮￠悢鍏肩厽闁哄倹瀵ч幉鎼佹煙閾忣偅绀堢紒杈ㄥ浮閹晠宕橀懠顑跨礃闂備線娼уú锕傚礉濞嗗繒鏆﹂柟鐑橆殕閸婄兘鎮楅悽娈跨劸濠殿喚鍎ゆ穱濠囨倷椤忓嫧鍋撻弽褜娼栭柤濮愬€曢崹婵囥亜閺嶎偄鍓遍柡浣稿暙闇夐柣妯烘▕閸庢劙鏌涙繝鍕毈闁哄矉缍侀幃銏ゆ偂鎼存繂鏋堟繝纰樷偓鍐茬骇闁诡喖鍊垮璇测槈濡攱鐎婚棅顐㈡处濞叉粓顢欓幒鎴旀斀妞ゆ梻銆嬪妤冪磼椤旂晫鎳囬柣娑卞櫍瀹曞爼顢楁径瀣珝闂備胶绮敃鈺呭窗閺嶃劎顩插ù鐓庣摠閳锋帒銆掑锝呬壕濠电偘鍖犻崗鐐☉铻栭柛娑卞幘閿涙瑩姊鸿ぐ鎺擄紵缂佲偓娓氣偓閹苯螖閸涱喚鍘搁梺鎼炲劗閺呮盯宕滈柆宥嗙厱闁靛牆妫欑粈瀣煛鐏炵晫啸妞ぱ傜窔閺屾盯骞樼€垫悶鈧帗淇婇崣澶婂鐎殿噮鍣ｅ畷鐓庘攽閸偄鎮堥梻鍌欑劍鐎笛兾涙笟鈧俊鎾焵椤掑嫭鐓曢悗锝庡亝鐏忔壆鈧灚婢樼€氫即鐛崶顒夋晣闁绘劖澹嗙紞宥夋⒒閸屾瑧顦﹀鐟帮躬瀹曟垿宕ㄩ姘亰闁瑰吋鐣崝宥夊磻閳╁啰绡€闂傚牊绋掗悘鈺冩喐閻楀牆绗掔紒鈧崒鐐寸厾婵炴潙顑嗗▍鍥煕濞嗘劗绠樼紒杈ㄦ尰閹峰懘鎼归悷鎵偧婵犳鍠楄彠闁告梹鍨垮畷娲焵椤掍降浜滈柟鍝勭Х閸忓矂鏌嶉娑欑闁诡垰娲﹀鍕箛椤撴稒瀚奸梻浣告啞閻熴儵藝闁秵鍎楅悗锝庡墰绾?AI API Key闂?/p>
+      </section>
+    </main>
+  );
+}
+
+function App() {
+  const [data, setData] = useState<PlannerData | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [authState, setAuthState] = useState<AuthState | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [mode, setModeState] = useState<Mode>("execute");
+  const [selectedDate, setSelectedDate] = useState(todayIso());
+  const [drag, setDrag] = useState<DragState>(null);
+  const [resizePreview, setResizePreview] = useState<ResizePreview>(null);
+  const [hoverSlot, setHoverSlot] = useState<string>("");
+  const [hoveredBlock, setHoveredBlock] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addType, setAddType] = useState<AddType>("task");
+  const [editingId, setEditingId] = useState("");
+  const [form, setForm] = useState<FormState>(defaultForm());
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [referencedTaskId, setReferencedTaskId] = useState("");
+  const [aiInput, setAiInput] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiReply, setAiReply] = useState("");
+  const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([]);
+  const [aiPlanning, setAiPlanning] = useState(false);
+  const [aiPlanMenuOpen, setAiPlanMenuOpen] = useState(false);
+  const [aiPlanPrefs, setAiPlanPrefs] = useState<AiPlanPrefs>({ source: "today", scope: "day", strategy: "simple" });
+  const [timelineView, setTimelineView] = useState<TimelineView>("daily");
+  const [quickSchedule, setQuickSchedule] = useState<QuickSchedule>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
+  const [planningPickMode, setPlanningPickMode] = useState(false);
+  const [planningPicks, setPlanningPicks] = useState<Record<string, PlanPickPriority>>({});
+  const [toast, setToast] = useState("");
+  const [showCompletedCandidates, setShowCompletedCandidates] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickProjectId, setQuickProjectId] = useState("");
+  const [quickProjectOpen, setQuickProjectOpen] = useState(false);
+  const [quickProjectTitle, setQuickProjectTitle] = useState("");
+  const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
+  const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
+  const suppressBlockClickRef = useRef(false);
+
+  async function loadInitial() {
+    const api = await waitForPlannerApi();
+    const nextAuth = await api.getAuthState?.();
+    const resolvedAuth = nextAuth || { mode: "local" as const, user: null, configured: false };
+    setAuthState(resolvedAuth);
+    if (resolvedAuth.mode === "cloud" && !resolvedAuth.user) {
+      setData(null);
+      setSettings(null);
+      return;
+    }
+    const [nextData, nextSettings] = await Promise.all([api.getData(), api.getSettings()]);
+    setData(nextData);
+    setSettings(nextSettings);
+    setModeState((nextSettings.activeMode as Mode) || "execute");
+    setAdvancedOpen(Boolean(nextSettings.addAdvancedOpen));
+  }
+
+  useEffect(() => {
+    void loadInitial().catch((error) => {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    });
+  }, []);
+
+  async function handleAuthSubmit(email: string, password: string, intent: "signin" | "signup") {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const api = await waitForPlannerApi();
+      const response = intent === "signup"
+        ? await api.signUp?.(email, password)
+        : await api.signIn?.(email, password);
+      await loadInitial();
+      if (response && "message" in response && typeof response.message === "string") setAuthError(response.message);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleSignOut() {
+    const api = await waitForPlannerApi();
+    await api.signOut?.();
+    setData(null);
+    setSettings(null);
+    await loadInitial();
+  }
+
+  useEffect(() => {
+    if (mode !== "execute" || !data || !timelineRef.current) return;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const fallbackMinutes = 9 * 60;
+    const targetMinutes = selectedDate === todayIso() && currentMinutes >= TIMELINE_START * 60 && currentMinutes <= TIMELINE_END * 60
+      ? currentMinutes
+      : fallbackMinutes;
+    const targetTop = ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+    const container = timelineRef.current;
+    container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
+  }, [mode, selectedDate, timelineView, Boolean(data)]);
+
+  useEffect(() => {
+    if (!quickSchedule) return;
+    const cancelQuickSchedule = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(".df-quick-schedule") || target.closest(".df-timeline-canvas")) return;
+      setQuickSchedule(null);
+    };
+    document.addEventListener("mousedown", cancelQuickSchedule);
+    return () => document.removeEventListener("mousedown", cancelQuickSchedule);
+  }, [quickSchedule]);
+
+  async function saveData(next: PlannerData) {
+    const saved = await window.plannerApi.saveData(next);
+    setData(saved);
+  }
+
+  async function saveSettings(patch: Partial<Settings>) {
+    const saved = await window.plannerApi.saveSettings(patch);
+    setSettings(saved);
+    if (patch.activeMode) setModeState(patch.activeMode as Mode);
+  }
+
+  const today = todayIso();
+  const timelineDate = selectedDate;
+  const isViewingToday = timelineDate === today;
+  const projects = data?.projects || [];
+  const tasks = data?.tasks || [];
+  const scheduledTasks = useMemo(
+    () => tasks.filter((task) => task.scheduledDate === timelineDate && task.scheduledStart).sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
+    [tasks, timelineDate]
+  );
+  const todayCandidates = useMemo(
+    () => tasks.filter((task) => {
+      if (task.completed || task.scheduledDate) return false;
+      return task.plannedForDate === today || Boolean(task.plannedForDate && task.plannedForDate < today);
+    }).sort((a, b) => (a.order || 0) - (b.order || 0)),
+    [tasks, today]
+  );
+  const completedCandidates = useMemo(
+    () => tasks.filter((task) => task.completed && task.plannedForDate === today && !task.scheduledDate).sort((a, b) => (a.order || 0) - (b.order || 0)),
+    [tasks, today]
+  );
+  const visibleCandidates = showCompletedCandidates ? [...todayCandidates, ...completedCandidates] : todayCandidates;
+  const executeStats = useMemo(() => {
+    const planned = tasks.filter((task) => !task.completed && task.plannedForDate === today);
+    const scheduled = planned.filter((task) => task.scheduledDate === today && task.scheduledStart);
+    const scheduledHours = scheduled.reduce((sum, task) => sum + taskDuration(task) / 60, 0);
+    const totalHours = planned.reduce((sum, task) => sum + (task.estimatedHours || 0.5), 0);
+    return { planned, scheduled, scheduledHours, totalHours };
+  }, [tasks, today]);
+
+  function projectName(task: Task) {
+    return projects.find((project) => String(project.id) === String(task.projectId || ""))?.title || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?;
+  }
+
+  function projectSnapshot(list: Project[], title: string, color = PROJECT_COLOR_PRESETS[0]) {
+    const cleanTitle = title.trim();
+    const existing = list.find((project) => project.title.toLowerCase() === cleanTitle.toLowerCase());
+    if (existing) return { projectId: existing.id, projects: list, created: false };
+    const project = makeProject({ ...defaultForm("project"), title: cleanTitle, projectColor: color });
+    return { projectId: project.id, projects: [...list, project], created: true };
+  }
+
+  function updateTask(taskId: string, patch: Partial<Task>) {
+    if (!data) return;
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
+    });
+  }
+
+  function updateProject(projectId: string, patch: Partial<Project>) {
+    if (!data) return;
+    void saveData({
+      ...data,
+      projects: data.projects.map((project) => project.id === projectId ? { ...project, ...patch, updatedAt: new Date().toISOString() } : project)
+    });
+  }
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast((current) => current === message ? "" : current), 2600);
+  }
+
+  function openPlanningPicker() {
+    setPlanningPickMode(true);
+    void saveSettings({ activeMode: "planning" });
+  }
+
+  function addPlanningPick(taskId: string) {
+    setPlanningPicks((current) => current[taskId] ? current : { ...current, [taskId]: "should" });
+  }
+
+  function updatePlanningPick(taskId: string, priority: PlanPickPriority) {
+    setPlanningPicks((current) => ({ ...current, [taskId]: priority }));
+  }
+
+  function removePlanningPick(taskId: string) {
+    setPlanningPicks((current) => {
+      const next = { ...current };
+      delete next[taskId];
+      return next;
+    });
+  }
+
+  function clearPlanningPicks() {
+    setPlanningPicks({});
+  }
+
+  function applyPlanningPicks(scope: "today" | "week") {
+    if (!data) return;
+    const ids = Object.keys(planningPicks);
+    if (ids.length === 0) return;
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => {
+        if (!ids.includes(task.id)) return task;
+        const picked = planningPicks[task.id];
+        return {
+          ...task,
+          priority: picked === "must" ? "high" : picked === "could" ? "low" : task.priority,
+          plannedForDate: scope === "today" ? today : undefined,
+          scheduledDate: undefined,
+          scheduledStart: undefined,
+          scheduledEnd: undefined,
+          updatedAt: new Date().toISOString()
+        };
+      })
+    });
+    setPlanningPicks({});
+    if (scope === "today") void saveSettings({ activeMode: "execute" });
+    showToast(scope === "today" ? "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐煃閸濆嫬鈧顕ｉ崸妤佲拺缂備焦锚婵洭鏌熺喊鍗炰簽缂侇喖鐗撳畷鎺楁倷鐎电甯惧┑鐘灱濞夋盯鎮ч崱娑樼劦妞ゆ帊绶″▓婊堟煙椤栨氨鐒哥€殿喗鎸虫慨鈧柨娑樺楠炴劙姊绘担鍛婂暈闁告枮鍛笉闁硅揪绠戠粈澶嬬節婵犲倸鏋ら柣鏂挎閹叉瓕绠涘☉妯兼煣濡炪倖鍔х粻鎴犵不? : "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐煃閸濆嫬鈧顕ｉ崸妤佲拺缂備焦锚婵洭鏌熺喊鍗炰簽缂侇喖鐗撳畷鎺楁倷鐎电甯惧┑鐘灱閸╂牠鎯勯姘肩€舵い鏇楀亾闁哄瞼鍠栭幃婊堝箣閹烘挸鏋ら梻浣告惈閺堫剛绮欓幋锕€鐓″鑸靛姇閸愨偓閻熸粌绉归敐鐐哄川椤撗勫瘜闂侀潧鐗嗗Λ娆戜焊娴煎瓨鐓欐い鏃傚帶閳ь剚鎮傞幃?);
+  }
+
+  function quickAddTask() {
+    if (!data || !quickTitle.trim()) return;
+    const task = makeTask({
+      ...defaultForm("task"),
+      title: quickTitle,
+      projectId: quickProjectId,
+      dueDate: today
+    });
+    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: today, order: Date.now() }] });
+    setQuickTitle("");
+    showToast("闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐煃閸濆嫬鈧顕ｉ崸妤佲拺缂備焦锚婵洭鏌熺喊鍗炰簽缂侇喖鐗撳畷鎺楁倷鐎电甯惧┑鐘灱濞夋盯鎮ч崱娑樼劦妞ゆ帊绶″▓婊堟煙椤栨氨鐒哥€殿喗鎸虫慨鈧柨娑樺楠炴劙姊绘担鍛婂暈闁告枮鍛笉闁硅揪绠戠粈澶嬫叏濡灝鐓愰柣鎾冲暟閹茬顭ㄩ崼婵堫槶濠殿喗顭堥崺鏍磻閿熺姵鐓冮柛婵嗗閸ｅ綊鏌?);
+  }
+
+  function createQuickProject() {
+    if (!data || !quickProjectTitle.trim()) return;
+    const snapshot = projectSnapshot(data.projects, quickProjectTitle, quickProjectColor);
+    if (snapshot.created) void saveData({ ...data, projects: snapshot.projects });
+    setQuickProjectId(snapshot.projectId);
+    setQuickProjectTitle("");
+    setQuickProjectOpen(false);
+  }
+
+  function quickCreateProject(title: string) {
+    if (!data || !title.trim()) return "";
+    const snapshot = projectSnapshot(data.projects, title, form.projectColor || quickProjectColor || PROJECT_COLOR_PRESETS[0]);
+    if (snapshot.created) void saveData({ ...data, projects: snapshot.projects });
+    setForm((current) => ({ ...current, projectId: snapshot.projectId }));
+    showToast(snapshot.created ? "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺冨倸甯堕柣搴弮濮婃椽宕ㄦ繝搴㈢暭闂佺瀛╅崝娆忕暦閻㈢閱囬柣鏃囨椤旀洟鎮楅悷鏉款棌闁哥姵娲滈懞閬嶆偨閸涘﹦鍘撻悷婊勭矒瀹曟粌鈻庨幋鐘电厠閻熸粎澧楃敮鎺旂不? : "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖鏌ㄩ悢鍝勑ｉ柛瀣€块弻銊╂偄閸濆嫅銏ゆ煟閹烘垹浠涢柕鍥у楠炴帡宕卞鎯ь棜濠碉紕鍋戦崐褔姊介崟顒傜彾闁糕剝绋戦悞鍨亜閹哄秶顦﹂柟鍏兼倐閺屾盯寮捄銊у姱濡炪們鍨洪悷銊х不濞戞ǚ妲堟俊顖濆亹閸橆剙鈹戦悩顔肩伇婵炲鐩、鏍炊椤掍礁浠奸梺鎯ф禋閸嬪倻鎹㈤崱娑欑厽闁规澘鍚€缁ㄥ鏌嶈閸撴艾煤閺嶎厽鏅濋柕蹇嬪€曠涵鈧梺?);
+    return snapshot.projectId;
+  }
+
+  function createProjectForTask(taskId: string, title: string) {
+    if (!data || !title.trim()) return "";
+    const sourceTask = data.tasks.find((task) => task.id === taskId);
+    const fallbackColor = sourceTask?.projectId
+      ? projects.find((project) => project.id === sourceTask.projectId)?.color || PROJECT_COLOR_PRESETS[0]
+      : PROJECT_COLOR_PRESETS[0];
+    const snapshot = projectSnapshot(data.projects, title, fallbackColor);
+    void saveData({
+      ...data,
+      projects: snapshot.projects,
+      tasks: data.tasks.map((task) => task.id === taskId ? { ...task, projectId: snapshot.projectId, updatedAt: new Date().toISOString() } : task)
+    });
+    showToast(snapshot.created ? "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺冨倸甯堕柣搴弮濮婃椽宕ㄦ繝搴㈢暭闂佺瀛╅崝娆忕暦閻㈢閱囬柕澶涘閸樺崬鈹戦悩缁樻锭婵☆偅顨婇、鏃堫敆閸曨剙鈧灚鎱ㄥ鍡楀箻闁瑰啿鎳橀弻鐔煎矗婢跺鈧劙鏌熼銊ユ搐闁卞洦绻濋棃娑氬ⅱ闁瑰啿妫濆缁樻媴鐟欏嫨浠ч梺绋款儏閹虫捇骞楅锔解拺闂傚牊绋掗幖鎰版倵濮橆厽绶查柣锝囧厴閹粎绮电€ｎ偅娅嶉梻浣虹帛濡礁鈻嶉敐鍛殾? : "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜韫囨挻顥犳い锔诲灡缁绘繈鎮介棃娴躲垽鎮楀闂寸盎闁宠绮欓、鏃堝醇閻斿搫骞楅梻浣哥秺閸嬪﹪宕㈤懖鈺佺筏濠电姵纰嶉悡鐔兼煙閹冩毐闁逞屽墮椤兘宕洪埀顒併亜閹哄棗浜惧┑鐘亾闂侇剙绉埀顒婄畵瀹曠厧鈹戦幇顒侇吙闂佽崵濮惧▍锝囦焊閵娾晜鍤€闁割煈鍟旇ぐ鎺撴櫜闁告侗鍨抽弳娑欑箾鐎涙鐭嬬紒顔芥崌瀵鈽夐姀鈩冩珕闁荤姴娲﹁ぐ鍐不閾忓湱纾?);
+    return snapshot.projectId;
+  }
+
+  function createTaskInProject(projectId: string) {
+    if (!data) return;
+    const title = window.prompt("闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煕瑜庨妵婊堝焵椤掆偓閸婂潡寮崘顔肩＜婵﹢纭搁崬褰掓⒒娓氣偓濞佳呮崲閸儱纾归柡鍥╁Х閻棗顭块懜闈涘闁绘挸鍟撮弻鏇熷緞閸繂顬夐梺缁樼箥娴滎亪寮诲☉娆戠瘈闁稿本绮ｇ槐鐐电磽?);
+    if (!title?.trim()) return;
+    const task = makeTask({
+      ...defaultForm("task"),
+      title: title.trim(),
+      projectId,
+      dueDate: today
+    });
+    void saveData({ ...data, tasks: [...data.tasks, task] });
+    showToast("闂傚倷娴囬褎顨ョ粙鍖¤€块梺顒€绉埀顒婄畵瀹曠厧鈹戦幇顒侇吙闂備礁澹婇崑鍛洪弽顓熺叆闁靛牆鎳夐弨浠嬫煟濡搫绾ч柟鍏煎姉缁辨帡鍩€椤掍礁绶為柟閭﹀幘閸樿棄鈹戦埥鍡楃仴妞ゆ泦鍛筏濠电姵纰嶉悡鐔兼煙閹冩毐闁逞屽墯閹倿鍨鹃弮鍫濈妞ゆ柨妲堣閺屾稑鈽夐崡鐐寸仌缂佺虎鍘搁崑鎾斥攽?);
+  }
+
+  function openQuickSchedule(clientY: number, scheduledDate = timelineDate, canvas?: HTMLElement | null) {
+    const startTime = slotFromPointer(clientY, 0, canvas);
+    setQuickSchedule({ startTime, scheduledDate, title: "", projectId: "" });
+  }
+
+  function saveQuickSchedule() {
+    if (!data || !quickSchedule?.title.trim()) return;
+    const endTime = addMinutes(quickSchedule.startTime, 60);
+    if (hasScheduleConflict(quickSchedule.startTime, endTime, undefined, quickSchedule.scheduledDate)) {
+      showToast("闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌滃闁稿绻濋弻鏇㈠醇濠垫劖效闂佺粯鎸搁崐鍦崲濠靛洨绡€闁稿本绮岄。铏圭磽娓氬洤浜滅紒澶婄秺瀵鈽夐姀鈺傛櫇闂佹寧绻傚Λ娑⑺囬妸鈺傗拺闁圭娴烽妴鎺楁煕閻樺磭澧电€殿喛顕ч埥澶婎潨閸℃瑥寮抽梻浣告啞閸旓箓宕㈡總鍓叉晜妞ゆ挶鍨洪埛鎴︽煕濞戞﹫宸ラ柣鎾亾缂傚倷鑳剁划顖滄崲閸岀儐鏁嬮柨婵嗩槸閸ㄥ倹銇勯幇鈺佺伄缂佹劗鍋炵换婵嬫偨闂堟刀銏ゆ倵濮樼厧骞栭柍缁樻崄椤﹁鎱ㄦ繝鍐┿仢鐎规洜鍏橀、姗€鎮欓幓鎺濈€遍梻浣圭湽閸╁嫰宕规潏鈺傛殰闁炽儱纾弳锔姐亜閺嶃劎鐭嬬€规洖顦甸弻鏇熺箾瑜嶉幊搴ｇ不?);
+      return;
+    }
+    const hashProjectTitle = quickSchedule.title.match(/#([^\s#]+)\s*$/)?.[1]?.trim() || "";
+    let projectId = quickSchedule.projectId;
+    let nextProjects = data.projects;
+    if (hashProjectTitle && hashProjectTitle.toLowerCase() !== "inbox") {
+      const projectExists = projectId && nextProjects.some((project) => String(project.id) === String(projectId));
+      if (!projectExists) {
+        const snapshot = projectSnapshot(nextProjects, hashProjectTitle);
+        projectId = snapshot.projectId;
+        nextProjects = snapshot.projects;
+      }
+    }
+    const cleanTitle = quickSchedule.title.replace(/#[^\s#]+/g, "").trim() || quickSchedule.title.trim();
+    const task = makeTask({
+      ...defaultForm("task"),
+      title: cleanTitle,
+      projectId,
+      dueDate: quickSchedule.scheduledDate,
+      estimatedHours: 1
+    });
+    void saveData({
+      ...data,
+      projects: nextProjects,
+      tasks: [...data.tasks, {
+        ...task,
+        plannedForDate: quickSchedule.scheduledDate,
+        scheduledDate: quickSchedule.scheduledDate,
+        scheduledStart: quickSchedule.startTime,
+        scheduledEnd: endTime
+      }]
+    });
+    setQuickSchedule(null);
+    showToast("闂傚倷娴囬褎顨ョ粙鍖¤€块梺顒€绉埀顒婄畵瀹曠厧鈹戦幇顒侇吙闂備礁澹婇崑鍛洪弽顓熺叆闁靛牆鎳夐弨浠嬫煟濡搫绾ч柟鍏煎姉缁辨帡鍩€椤掍礁绶為柟閭﹀幘閸樿棄鈹戦埥鍡楃仴妞ゆ泦鍛筏濠电姵纰嶉悡鐔兼煙閹冩毐闁逞屽墮濞尖€愁嚕婵犳碍鏅搁柣妯垮皺椤︺劑姊洪棃娴ゆ盯宕橀鍕婵犵數濮烽。钘壩ｉ崨鏉戠；闁告侗鍨崑鎾剁箔濞戞ê鏋ら柣?);
+  }
+
+  function hasScheduleConflict(startTime: string, endTime: string, ignoreTaskId?: string, scheduledDate = timelineDate) {
+    const start = timeToMinutes(startTime);
+    const end = timeToMinutes(endTime);
+    return tasks.filter((task) => task.scheduledDate === scheduledDate && task.scheduledStart).some((task) => {
+      if (task.id === ignoreTaskId || !task.scheduledStart || !task.scheduledEnd) return false;
+      const otherStart = timeToMinutes(task.scheduledStart);
+      const otherEnd = timeToMinutes(task.scheduledEnd);
+      return start < otherEnd && end > otherStart;
+    });
+  }
+
+  function findNextFreeSlot(duration: number) {
+    const now = new Date();
+    const earliest = clampSlot(Math.max(now.getHours() * 60 + now.getMinutes(), TIMELINE_START * 60));
+    const latestStart = TIMELINE_END * 60 - duration;
+    for (let cursor = earliest; cursor <= latestStart; cursor += SLOT_MINUTES) {
+      const start = minutesToTime(cursor);
+      const end = minutesToTime(cursor + duration);
+      if (!hasScheduleConflict(start, end)) return start;
+    }
+    return minutesToTime(Math.max(TIMELINE_START * 60, latestStart));
+  }
+
+  function slotFromPointer(clientY: number, offsetMinutes = 0, canvas?: HTMLElement | null) {
+    const rect = (canvas || timelineCanvasRef.current)?.getBoundingClientRect();
+    if (!rect) return "09:00";
+    const y = clientY - rect.top;
+    const raw = TIMELINE_START * 60 + (y / SLOT_HEIGHT) * SLOT_MINUTES - offsetMinutes;
+    return minutesToTime(clampSlot(raw));
+  }
+
+  function canvasForDate(date?: string) {
+    return date ? document.querySelector<HTMLElement>(`.df-timeline-canvas[data-date="${date}"]`) : timelineCanvasRef.current;
+  }
+
+  function timelineTargetAt(clientX: number, clientY: number) {
+    const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const allDay = target?.closest<HTMLElement>("[data-all-day-date]");
+    if (allDay) return { date: allDay.dataset.allDayDate || timelineDate, allDay: true, canvas: null };
+    const canvas = target?.closest<HTMLElement>(".df-timeline-canvas[data-date]");
+    if (canvas) return { date: canvas.dataset.date || timelineDate, allDay: false, canvas };
+    return null;
+  }
+
+  function pointerOutsideTimeline(clientX: number, clientY: number) {
+    return !timelineTargetAt(clientX, clientY);
+  }
+
+  function scheduleTask(taskId: string, startTime: string, scheduledDate = timelineDate) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const duration = taskDuration(task);
+    const endTime = addMinutes(startTime, duration);
+    if (hasScheduleConflict(startTime, endTime, taskId, scheduledDate)) {
+      showToast("闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌滃闁稿绻濋弻鏇㈠醇濠垫劖效闂佺粯鎸搁崐鍦崲濠靛洨绡€闁稿本绮岄。铏圭磽娓氬洤浜滅紒澶婄秺瀵鈽夐姀鈺傛櫇闂佹寧绻傚Λ娑⑺囬妸鈺傗拺闁圭娴烽妴鎺楁煕閻樺磭澧电€殿喛顕ч埥澶婎潨閸℃瑥寮抽梻浣告啞閸旓箓宕㈡總鍓叉晜妞ゆ挶鍨洪埛鎴︽煕濞戞﹫宸ラ柣鎾亾缂傚倷鑳剁划顖滄崲閸岀儐鏁嬮柨婵嗩槸閸ㄥ倹銇勯幇鈺佺伄缂佹劗鍋炵换婵嬫偨闂堟刀銏ゆ倵濮樼厧骞栭柍缁樻崄椤﹁鎱ㄦ繝鍐┿仢鐎规洜鍏橀、姗€鎮欓幓鎺濈€遍梻浣圭湽閸╁嫰宕规潏鈺傛殰闁炽儱纾弳锔姐亜閺嶃劎鐭嬬€规洖顦甸弻鏇熺箾瑜嶉幊搴ｇ不?);
+      setHoverSlot("");
+      setDrag(null);
+      return;
+    }
+    updateTask(taskId, {
+      plannedForDate: today,
+      scheduledDate,
+      scheduledStart: startTime,
+      scheduledEnd: endTime
+    });
+    showToast("闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺冨洦顥夊ù鐘层偢濮婃椽妫冨ù銉ョ墦瀵彃鈽夊鍙樼瑝闂佽鍎兼慨銈夋偂濞嗘挻鐓熼柟瀵镐紳椤忓牊鍊堕柕澶嗘櫆閻撶喖鏌熼幆褍鏆遍柍褜鍓欏鈥愁嚕婵犳碍鏅搁柣妯垮皺椤︺劑姊洪棃娴ゆ盯宕橀鍕婵犵數濮烽。钘壩ｉ崨鏉戠；闁告侗鍨崑鎾剁箔濞戞ê鏋ら柣?);
+    setHoverSlot("");
+    setDrag(null);
+  }
+
+  function scheduleAllDay(taskId: string, scheduledDate: string) {
+    updateTask(taskId, {
+      plannedForDate: today,
+      scheduledDate,
+      scheduledStart: undefined,
+      scheduledEnd: undefined
+    });
+    showToast("闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐煃閸濆嫬鈧顕ｉ崸妤佲拺缂備焦锚婵洭鏌熺喊鍗炰簽缂侇喖鐗撳畷鎺楁倷鐎电甯惧┑鐘灱濞夋盯鎮ч崱娑樼婵ɑ澧庨崑鎾斥枔閸喗鐏堥梺璇茬箲缁诲牓鍨?);
+    setHoverSlot("");
+    setDrag(null);
+  }
+
+  function unscheduleTask(taskId: string) {
+    updateTask(taskId, {
+      plannedForDate: today,
+      scheduledDate: undefined,
+      scheduledStart: undefined,
+      scheduledEnd: undefined
+    });
+    showToast("闂傚倷娴囬褍顫濋敃鍌︾稏濠㈣埖鍔栭崑銈夋煛閸モ晛小闁绘帒锕ョ换娑㈠幢濡や焦宕抽梺鍝勫閸婂灝顫忕紒妯诲閻熸瑥瀚禒鈺呮⒑缁嬪灝顒㈠┑鐐诧工閻ｇ兘骞嬪顏嗗枛閹剝鎯旈敍鍕枈闂傚倷绀侀幖顐ょ矙娓氣偓瀹曘垽鎳栭埡鍐ㄦ殫閻庡箍鍎遍ˇ浼存偂韫囨搩鐔嗛悹楦挎婢ф洟鏌涢弮鈧〃濠囧蓟濞戞埃鍋撻敐搴′簼閻忓浚鍙冮弻宥囨嫚閺屻儱寮板Δ鐘靛仦閿曘垽銆佸☉姗嗘僵妞ゆ劑鍩勫Λ?);
+    setDrag(null);
+    setHoverSlot("");
+  }
+
+  function returnToPlanning(taskId: string) {
+    updateTask(taskId, {
+      plannedForDate: undefined,
+      scheduledDate: undefined,
+      scheduledStart: undefined,
+      scheduledEnd: undefined
+    });
+    showToast("闂傚倷娴囬褎顨ョ粙鍖¤€块梺顒€绉埀顒婄畵瀹曠厧鈹戦幇顒侇吙闂備礁澹婇崑鍛洪弽顬稑螣閹巻鍋撻幒鎴僵闁挎繂鎳嶆竟鏇㈡煟鎼淬値娼愭繛鍙夌墵閹儲绺界粙璺ㄧ暫濠电偛妫欓崝褏妲愰敐鍡欑瘈闂傚牊绋掑婵堢磼婢跺苯鍘存慨?);
+  }
+
+  function beginBlockDrag(event: React.MouseEvent, task: Task) {
+    if ((event.target as HTMLElement).closest("button,input,textarea,select")) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const duration = taskDuration(task);
+    const rect = event.currentTarget.getBoundingClientRect();
+    const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+    const offsetMinutes = Math.min(Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0), Math.max(duration - SLOT_MINUTES, 0));
+    let active = false;
+    suppressBlockClickRef.current = false;
+    const move = (moveEvent: MouseEvent) => {
+      const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+      if (!active && distance < 5) return;
+      if (!active) {
+        active = true;
+        suppressBlockClickRef.current = true;
+        setDrag({ taskId: task.id, kind: "block", duration, offsetMinutes, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline: pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY) });
+      }
+      const target = timelineTargetAt(moveEvent.clientX, moveEvent.clientY);
+      const outsideTimeline = !target;
+      setDrag((current) => current && current.taskId === task.id ? {
+        ...current,
+        pointer: { x: moveEvent.clientX, y: moveEvent.clientY },
+        outsideTimeline,
+        targetDate: target?.date,
+        targetAllDay: target?.allDay
+      } : current);
+      setHoverSlot(!target || target.allDay ? "" : slotFromPointer(moveEvent.clientY, offsetMinutes, target.canvas));
+    };
+    const up = (upEvent: MouseEvent) => {
+      if (active) {
+        const leftPanel = document.querySelector(".df-candidate-panel")?.getBoundingClientRect();
+        const target = timelineTargetAt(upEvent.clientX, upEvent.clientY);
+        if (leftPanel && upEvent.clientX >= leftPanel.left && upEvent.clientX <= leftPanel.right && upEvent.clientY >= leftPanel.top && upEvent.clientY <= leftPanel.bottom) {
+          unscheduleTask(task.id);
+        } else if (target?.allDay) {
+          scheduleAllDay(task.id, target.date);
+        } else if (target?.canvas) {
+          scheduleTask(task.id, slotFromPointer(upEvent.clientY, offsetMinutes, target.canvas), target.date);
+        } else {
+          setDrag(null);
+          setHoverSlot("");
+        }
+      }
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.setTimeout(() => {
+        suppressBlockClickRef.current = false;
+      }, 0);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
+
+  function beginBlockResize(event: React.MouseEvent, task: Task, edge: "start" | "end") {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressBlockClickRef.current = true;
+    document.body.classList.add("df-resizing");
+    setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)) });
+    const move = (moveEvent: MouseEvent) => {
+      const slot = slotFromPointer(moveEvent.clientY, 0, timelineTargetAt(moveEvent.clientX, moveEvent.clientY)?.canvas || canvasForDate(task.scheduledDate));
+      const slotMin = timeToMinutes(slot);
+      const start = timeToMinutes(task.scheduledStart);
+      const end = timeToMinutes(task.scheduledEnd);
+      if (edge === "start") {
+        const nextStart = Math.min(slotMin, end - SLOT_MINUTES);
+        setResizePreview({ taskId: task.id, start: minutesToTime(nextStart), end: task.scheduledEnd || minutesToTime(end) });
+      } else {
+        const nextEnd = Math.max(slotMin, start + SLOT_MINUTES);
+        setResizePreview({ taskId: task.id, start: task.scheduledStart || minutesToTime(start), end: minutesToTime(nextEnd) });
+      }
+    };
+    const up = (upEvent: MouseEvent) => {
+      const slot = slotFromPointer(upEvent.clientY, 0, timelineTargetAt(upEvent.clientX, upEvent.clientY)?.canvas || canvasForDate(task.scheduledDate));
+      const slotMin = timeToMinutes(slot);
+      const start = timeToMinutes(task.scheduledStart);
+      const end = timeToMinutes(task.scheduledEnd);
+      if (edge === "start") {
+        const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
+        const nextEnd = task.scheduledEnd || minutesToTime(end);
+        if (hasScheduleConflict(nextStart, nextEnd, task.id, task.scheduledDate)) {
+          showToast("闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌滃闁稿绻濋弻鏇㈠醇濠垫劖效闂佺粯鎸搁崐鍦崲濠靛洨绡€闁稿本绮岄。铏圭磽娓氬洤浜滅紒澶婄秺瀵鈽夐姀鈺傛櫇闂佹寧绻傚Λ娑⑺囬妸銉㈡斀妞ゆ洖妫涚粙濠氭煕閺冣偓濞茬喎锕㈡笟鈧铏圭矙鐠恒劎顔戞繝銏㈡嚀閻楀﹦绮╅悢濂夋建闁逞屽墴瀵鎮㈤崗鑲╁弳闁诲函缍嗛崑鍡涘礄閳ユ剚娓婚柕鍫濇閻撱儳绱掔紒妯忣亪鎮鹃悜鑺ユ櫜闁糕剝顨堢粣鐐烘煟鎼搭垳绉甸柛鎾寸洴瀵娊濮€閵堝棌鎷洪柣鐘叉搐瀵爼骞戦敐澶嬬厵闁惧浚鍋呭畷宀勬寠濠靛鐓欐繛鍫濈仢閺嬬喖鏌￠崱妯肩煉闁哄瞼鍠栭獮鎴﹀箛闂堟稒顔勭紓鍌欒閸嬫捇鏌涢幇闈涙灍闁绘挾濮烽惀顏堝级閸喛鍩炴繝鈷€鍕棆闁?);
+        } else {
+          updateTask(task.id, {
+            scheduledStart: nextStart,
+            estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60
+          });
+          showToast("闂傚倷娴囬褍顫濋敃鍌︾稏濠㈣埖鍔栭崑銈夋煛閸モ晛小闁绘帒锕ラ妵鍕疀閹捐泛顤€闂佺楠哥粔褰掑蓟閿濆绫嶉柛灞捐壘娴犳﹢姊洪崫鍕靛剮缂佽埖宀搁獮鍐ㄎ旈埀顒勫煡婢跺ň鏋嶉柧蹇ｅ亜閻忔挳鎸婂┑鍫熷枑闁哄倹顑欏鏍р攽閻樺疇澹橀柣?);
+        }
+      } else {
+        const nextStart = task.scheduledStart || minutesToTime(start);
+        const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
+        if (hasScheduleConflict(nextStart, nextEnd, task.id, task.scheduledDate)) {
+          showToast("闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌滃闁稿绻濋弻鏇㈠醇濠垫劖效闂佺粯鎸搁崐鍦崲濠靛洨绡€闁稿本绮岄。铏圭磽娓氬洤浜滅紒澶婄秺瀵鈽夐姀鈺傛櫇闂佹寧绻傚Λ娑⑺囬妸銉㈡斀妞ゆ洖妫涚粙濠氭煕閺冣偓濞茬喎锕㈡笟鈧铏圭矙鐠恒劎顔戞繝銏㈡嚀閻楀﹦绮╅悢濂夋建闁逞屽墴瀵鎮㈤崗鑲╁弳闁诲函缍嗛崑鍡涘礄閳ユ剚娓婚柕鍫濇閻撱儳绱掔紒妯忣亪鎮鹃悜鑺ユ櫜闁糕剝顨堢粣鐐烘煟鎼搭垳绉甸柛鎾寸洴瀵娊濮€閵堝棌鎷洪柣鐘叉搐瀵爼骞戦敐澶嬬厵闁惧浚鍋呭畷宀勬寠濠靛鐓欐繛鍫濈仢閺嬬喖鏌￠崱妯肩煉闁哄瞼鍠栭獮鎴﹀箛闂堟稒顔勭紓鍌欒閸嬫捇鏌涢幇闈涙灍闁绘挾濮烽惀顏堝级閸喛鍩炴繝鈷€鍕棆闁?);
+        } else {
+          updateTask(task.id, {
+            scheduledEnd: nextEnd,
+            estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60
+          });
+          showToast("闂傚倷娴囬褍顫濋敃鍌︾稏濠㈣埖鍔栭崑銈夋煛閸モ晛小闁绘帒锕ラ妵鍕疀閹捐泛顤€闂佺楠哥粔褰掑蓟閿濆绫嶉柛灞捐壘娴犳﹢姊洪崫鍕靛剮缂佽埖宀搁獮鍐ㄎ旈埀顒勫煡婢跺ň鏋嶉柧蹇ｅ亜閻忔挳鎸婂┑鍫熷枑闁哄倹顑欏鏍р攽閻樺疇澹橀柣?);
+        }
+      }
+      setResizePreview(null);
+      document.body.classList.remove("df-resizing");
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.setTimeout(() => {
+        suppressBlockClickRef.current = false;
+      }, 0);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
+
+  function openAdd(type: AddType = "task") {
+    setAddType(type);
+    setEditingId("");
+    setForm(defaultForm(type));
+    setDrawerOpen(true);
+  }
+
+  function openAddForDate(date: string) {
+    setAddType("task");
+    setEditingId("");
+    setForm({ ...defaultForm("task"), dueDate: date });
+    setDrawerOpen(true);
+  }
+
+  function openTaskEdit(task: Task) {
+    setAddType("task");
+    setEditingId(task.id);
+    setForm({
+      title: task.title,
+      projectId: task.projectId || "",
+      projectColor: "#C69CF9",
+      dueDate: task.dueDate || today,
+      dueTime: "",
+      endDate: task.dueDate || today,
+      endTime: "",
+      category: task.category,
+      priority: task.priority,
+      importance: task.importance || task.priority,
+      urgency: task.urgency || "low",
+      estimatedHours: task.estimatedHours || 0.5,
+      details: task.notes || ""
+    });
+    setDrawerOpen(true);
+  }
+
+  function openProjectEdit(project: Project) {
+    setAddType("project");
+    setEditingId(project.id);
+    setForm({ ...defaultForm("project"), title: project.title, category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance || "high", urgency: project.urgency || "low" });
+    setDrawerOpen(true);
+  }
+
+  function openEventEdit(event: CalendarEvent) {
+    setAddType("event");
+    setEditingId(event.id);
+    setForm({ ...defaultForm("event"), title: event.title, dueDate: event.startDate || event.date, endDate: event.endDate || event.date, dueTime: event.startTime || "", endTime: event.endTime || "", category: event.category, details: event.details });
+    setDrawerOpen(true);
+  }
+
+  function saveForm() {
+    if (!data || !form.title.trim()) return;
+    const now = new Date().toISOString();
+    if (editingId) {
+      if (addType === "task") {
+        void saveData({
+          ...data,
+          tasks: data.tasks.map((task) => task.id === editingId ? {
+            ...task,
+            title: form.title.trim(),
+            dueDate: form.dueDate,
+            category: form.category,
+            priority: form.priority,
+            projectId: form.projectId || undefined,
+            estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
+            importance: form.importance,
+            urgency: form.urgency,
+            notes: form.details,
+            updatedAt: now
+          } : task)
+        });
+      } else if (addType === "project") {
+        void saveData({ ...data, projects: data.projects.map((project) => project.id === editingId ? { ...project, title: form.title.trim(), category: form.category, color: form.projectColor || categories[form.category].color, notes: form.details, importance: form.importance, urgency: form.urgency, updatedAt: now } : project) });
+      } else {
+        void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details } : event) });
+      }
+    } else if (addType === "task") {
+      const nextTask = makeTask(form);
+      const shouldJoinToday = mode === "execute";
+      void saveData({
+        ...data,
+        tasks: [...data.tasks, {
+          ...nextTask,
+          plannedForDate: shouldJoinToday ? today : undefined,
+          order: shouldJoinToday ? Date.now() : nextTask.order
+        }]
+      });
+    } else if (addType === "project") {
+      void saveData({ ...data, projects: [...data.projects, makeProject(form)] });
+    } else {
+      void saveData({ ...data, events: [...data.events, makeEvent(form)] });
+    }
+    setEditingId("");
+    setForm(defaultForm("task"));
+    setAddType("task");
+    setDrawerOpen(false);
+  }
+
+  function deleteEditingItem() {
+    if (!data || !editingId) return;
+    if (addType === "task") void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== editingId) });
+    if (addType === "project") void saveData({ ...data, projects: data.projects.filter((project) => project.id !== editingId) });
+    if (addType === "event") void saveData({ ...data, events: data.events.filter((event) => event.id !== editingId) });
+    setDrawerOpen(false);
+    setEditingId("");
+  }
+
+  function copyEditingTask() {
+    if (!data || !editingId) return;
+    const task = data.tasks.find((item) => item.id === editingId);
+    if (!task) return;
+    const now = new Date().toISOString();
+    void saveData({
+      ...data,
+      tasks: [...data.tasks, {
+        ...task,
+        id: uid("task"),
+        title: `${task.title} 闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鑼啇闂佸啿鎼幊搴ㄥ垂閸岀偞鐓曟俊銈呭暙閸撴娊鏌ら弶鎸庡仴闁?
+        completed: false,
+        scheduledDate: undefined,
+        scheduledStart: undefined,
+        scheduledEnd: undefined,
+        createdAt: now,
+        updatedAt: now
+      }]
+    });
+    showToast("闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺傝鐏╂繛宸幖椤曪絾绻濆顑┿劑鏌曟竟顖氭湰瀛濋梻鍌氬€风粈渚€骞栭锔藉亱闁糕剝绋掗崐鑸垫叏濮楀棗澧伴柡鍡畵閺岋紕浠︾拠鎻掑闂?);
+  }
+
+  function askAi(taskId: string) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    setReferencedTaskId(task.id);
+    setAiInput(`闂傚倸鍊峰ù鍥х暦閸偅鍙忛柡澶嬪殮濞差亜围濠㈣泛锕ょ花銉╂⒑閸涘﹦鎳冩い锔垮嵆瀹曟洟鎮㈤崫銉х槇婵犵數濮撮崐缁樻櫠閺囩姷纾奸柣娆忔噽缁夘噣鏌″畝鈧崰鎾诲焵椤掑倹鏆╂い顓炵墛缁傛帡鏁傛慨鎰盎濡炪倖鍔х徊鎸庢櫠闁秵鐓熼柕澶樺枙闁垱銇勯姀鈽嗙劸妞わ附鐓￠弻锛勨偓锝庡亝椤ュ牓鏌?{task.title}闂傚倸鍊搁崐椋庢濮橆剦鐒界憸宥堢亱濠德板€曢崯浼存儗閹剧粯鍋ｅΔ锕侊骏閳ь兘鍋撻梺鍝勵儐濡啴寮婚悢琛″亾閻㈡鐒惧ù鐘欏洦鐓冪紓浣股戦ˉ鍫ユ煙椤旂瓔娈滈柡浣瑰姍瀹曟帒鈽夊▎鎴濈悼濠碉紕鍋戦崐鏇犳崲濡や降浠堥柟闂寸缁犵偤鏌曟繛鍨姉闁衡偓娴犲鐓曢柡鍥ュ妼娴滄粌鈹戦鍝勨偓鏇⑩€旈崘顔嘉ч柛鎰╁妿娴犻箖姊洪幖鐐插闁诲繑绻堥幃鎯х暋閹佃櫕鏂€闁诲函缍嗛埀顒夊幐閺呯娀寮婚妸銉㈡斀闁糕剝銇涢崑鎾诲川婵犲嫷娲搁梺璇″灱閻?;
+    setAiOpen(true);
+  }
+
+  async function sendAi() {
+    if (!settings || !aiInput.trim()) return;
+    const task = tasks.find((item) => item.id === referencedTaskId);
+    setAiBusy(true);
+    try {
+      const response = await window.plannerApi.chat({
+        messages: [
+          { role: "system", content: "婵犵數濮烽弫鎼佸磻閻樿绠垫い蹇撴缁躲倝鏌熺粙鍨劉闁告瑥绻樺濠氬醇閻斿嘲骞?NavoPath 闂傚倸鍊搁崐鐑芥倿閿曞倹鍎戠憸鐗堝笒缁€澶屸偓鍏夊亾闁逞屽墴閸┾偓妞ゆ帊绀侀崵顒勬煕閹惧鎳囬柟顔藉劤閻ｏ繝骞嶉鑺ョ暦闂備線鈧偛鑻晶鎾煕閳规儳浜炬俊鐐€栫敮濠勭矆娓氣偓瀹曚即寮撮悩鐢碉紳闂佺鏈粙鎴﹀传閻戞﹩娈介柣鎰綑閻忔潙鈹戦鐟颁壕闂備線娼ч悧鍡涘箠閹板叓鍥敋閳ь剙顫忓ú顏勬闁靛闄勯悵鏃堟⒑閸濄儱娅忛柛銊ゅ嵆閸┿垽骞樺畷鍥ㄦ畷闂侀€炲苯澧版俊鍙夊姍楠炴鈧稒锚椤庢挾绱撴担鍓插剱閻庣瑳鍐ｆ灁鐟滄柨顫忓ú顏呯劵闁绘劘灏€氭澘顭胯閸ｏ綁寮诲☉娆戠瘈闁告劦浜濋幉娆撴⒑闂堟稒澶勯柛鏃€锕㈣棟閻庨潧鎽滅壕濂稿级閸稑濡肩紒妤佸浮閺屽秶鎷犻崣澶婃敪缂備胶濮甸惄顖炵嵁濡櫣鏆﹂柛銉ｅ妷閺嬫瑥鈹戦悩鍨毄闁稿濞€楠炴捇顢旈崱妤冪瓘婵°倧绲介崯顐ょ不閺夋娓婚悗锝庝簼閹癸絿绱掗悩铏棃闁哄本绋戦埥澶愬础閻愬浜鹃梻浣哥－缁垰螞閸愵喖钃熺€广儱鐗滃銊╂⒑閸涘﹥灏伴柣鐔叉櫊閺佹劙鎮欓崫鍕垫綂闂侀潧鐗嗛幉姗€濡搁敂杞扮盎闂佸搫绉查崝搴ㄦ儗鐏炰勘浜滈柨鏃囶嚙閺嬬喓绱掔紒妯兼创妤犵偛顑夐幃娆撳级閹寸媭鏆＄紓鍌氬€风粈渚€藝闁秴绀傛俊顖濇閺嗭箓姊婚崼鐔剁繁闁绘挶鍎甸弻娑㈩敃閿濆洨鐣煎銈忓瘜閸ｏ絽顫忓ú顏咁棃婵炴垼浜崝鎼佹⒑缁嬪尅鏀婚柣妤冨Т閻ｇ兘鏁愰崼銏㈡澑濠电偞鍨堕悷褔宕㈤幖浣光拺闂侇偆鍋涢懟顖涙櫠鐎电硶鍋撶憴鍕闁稿繑锕㈤妴浣割潨閳ь剟骞冮姀銈呭窛濠电姴楠搁幃鍛存⒒閸屾艾鈧嘲霉閸ヮ剨缍栧鑸靛姇缁犱即鏌熼幆鐗堫棄缂備讲鏅犲娲敆閳ь剛绮旈弶鎳堆囧蓟閵夛妇鍘介梺鍝勫暙閸婂摜鏁崜浣虹＜闁绘ɑ褰冪痪褔鏌曢崶褍顏€殿噮鍣ｅ畷鍫曞Ψ閵忕姳澹曢梺閫炲苯澧撮柡? },
+          { role: "user", content: JSON.stringify({ question: aiInput, task }) }
+        ]
+      });
+      setAiReply(response.reply);
+    } catch (error) {
+      setAiReply(error instanceof Error ? error.message : "AI 闂傚倸鍊峰ù鍥х暦閸偅鍙忛柡澶嬪殮濞差亶鏁囬柕蹇曞Х閸濇姊绘笟鍥у缂佸鏁诲畷鏇㈠箣閿旂晫鍘藉┑掳鍊愰崑鎾绘煟濡も偓濡稑鈻庨姀銈嗗€烽柛婵嗗妤犲洭姊洪崜鎻掍航闁稿瀚粋宥夘敍濠婂嫬浠?);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function generateNextAction() {
+    const task = editingId ? tasks.find((item) => item.id === editingId) : null;
+    if (!settings?.hasApiKey) {
+      setForm((current) => ({ ...current, details: replaceNextAction(current.details, `闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佽澹嗘晶妤呭磻鐎ｎ亖鏀介柣妯诲絻閺嗙偞绻涢崨顖氣枅闁哄被鍔戝鏉懳旈埀顒佺閹屾富闁靛牆妫欑粚璺ㄧ磽瀹ュ嫮绐旂€规洘妞介崺鈧い鎺嶉檷娴滄粓鏌熼悜妯虹仴妞ゅ浚浜弻娑欐償閳╁啯宕崇紓浣介哺鐢偤鍩€椤掑﹦绉靛ù婊呭仦缁傛帡濮€閵忊€虫瀾闂佽顔栭崰鏍煝閸儲鐓涢悘鐐殿焾婢ц尙鈧灚婢樼€氼噣鍩€椤掑﹦绉靛ù婊勭矒閿濈偛顓兼径瀣ф嫼闂佸憡绻傜€氱兘宕曞鍛＜缂備焦顭囩粻鐐碘偓娈垮櫘閸嬪嫰顢樻總绋跨倞闁挎棁妫勬刊浼存⒒娴ｉ涓茬紒韫矙瀵敻顢楅埀顒勫煝閹炬椿鏁嬮柍褜鍓欓～蹇撁洪鍛画闂佽顔栭崰妤呭箟婵傚憡鈷戦柛娑橈攻閳锋劙鏌涢妸銉﹀仴鐎规洘妞介崺鈧?{current.title}闂傚倸鍊搁崐椋庢濮橆剦鐒界憸宥堢亱濠德板€曢崯浼存儗閹剧粯鍋ｅΔ锕侊骏閳ь兘鍋撻梺鍝勵儐濡啴寮婚悢鍛婄秶闁告挆鍛闂佽瀛╅懝楣兯囬悽绋胯摕鐎广儱鐗滃銊╂⒑閸涘﹥灏扮紒瀣笧缁顓奸崪浣规〃閻庡厜鍋撻柍褜鍓熼幃鍧楀焵椤掑嫭鈷戦悷娆忓閸斻倝鏌ｉ妶鍛枠妞ゃ垺鐟﹀鍕箾閻愵剚鏉搁梻浣哥枃濡嫬螞濡や胶顩查柟鎵閻撴洟鎮楅敐搴′簼鐎规洖鐭傞弻鈥崇暆鐎ｎ剛锛熸繛瀵稿婵″洭骞忛悩璇茬闁圭儤鍤╅幋婵冩斀闁绘﹩鍋呮刊浼存煕閺囩偟浠涢柣銈勭窔閹鈻撻崹顔界亾闂佽桨绀侀…鐑藉Υ娓氣偓瀵粙顢橀悢鍝勫汲婵＄偑鍊栭悧妤呮儗椤旂晫鐝堕柡鍥╁枔缁? }));
+      return;
+    }
+    const response = await window.plannerApi.chat({
+      messages: [
+        { role: "system", content: "闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌滃闁藉啰鍠栭弻鏇熺箾閸喖澹?JSON闂傚倸鍊搁崐鐑芥倿閿旈敮鍋撶粭娑樻噽閻瑩鏌熼悜姗嗘闁轰礁妫涚槐?nextAction\":\"...\"}闂傚倸鍊搁崐椋庢濮橆剦鐒界憸宥堢亱濠德板€曢幊搴ｅ閻熼偊娓婚悗锝庝簼閹癸絿绱掗悩铏棃闁哄本绋戦埥澶愬础閻愬浜鹃梻浣哥－缁垰螞閸愵喖钃熺€广儱鐗滃銊╂⒑閸涘﹥灏伴柣鐔叉櫊閺佹劙鎮欓崫鍕垫綂闂侀潧鐗嗛幉姗€濡搁埡鍌滃帾婵犮垼顕栭崹浼村箠閹版澘姹查柣妯荤ゴ閺€浠嬫煥濞戞ê顏╁ù婊冦偢閺屾稒绻濋崘顏呭垱濡炪們鍨烘穱娲囬崷顓涘亾鐟欏嫭绌跨紓宥勭窔閻涱噣骞囬鐔峰妳闂侀潧绻掓刊顓㈠焵椤掍焦宕屾慨濠冩そ瀹曠兘顢橀悙鏉款棜濠电姭鎷冮崘顔煎及閻庤娲橀崹鍧楃嵁濡皷鍋撳☉娅亪顢撻幘鍓佺＝濞达絽澹婇崕鎾绘煕鎼粹槅鐓兼い銏＄懄瀵板嫰骞囬娑欏闂備線娼荤€靛矂宕㈡ィ鍐ㄧ疇婵°倕鎳忛悡鏇㈡煃闁款垰浜鹃梺鍝勬噺缁挸顕ｉ鍕劦妞ゆ帒瀚埛? },
+        { role: "user", content: JSON.stringify({ title: form.title, project: projects.find((project) => project.id === form.projectId)?.title, date: form.dueDate, estimatedHours: form.estimatedHours, notes: form.details, subtasks: task?.subtasks || [] }) }
+      ]
+    });
+    const match = response.reply.match(/\{[\s\S]*\}/);
+    const nextAction = match ? JSON.parse(match[0]).nextAction : response.reply.trim();
+    setForm((current) => ({ ...current, details: replaceNextAction(current.details, nextAction) }));
+  }
+
+  async function planMyDay() {
+    if (!settings || todayCandidates.length === 0) {
+      alert("婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇㈠醇濠垫劖笑婵℃鎳忕换婵嬪閿濆棛銆愬銈嗗灥濡瑧绮嬪澶娢ч柛鈩冩礈缁犳艾顪冮妶鍡欏缂佽鍊垮畷銉ф喆閸曨剙寮挎繝鐢靛Т濞层劑鎮惧ú顏呯厸鐎光偓鐎ｎ剛鐦堥悗瑙勬礈閸樠囧煘閹达箑绠涙い鎾愁檧缁犳挸顫忓ú顏呯劵闁绘劘灏€氭澘顭胯閸ㄥ爼寮婚敐澶嬪亜闁告瑥顦伴悵姘舵⒑缁洘鏉归柛瀣尭椤啴濡堕崱妤€娼戦梺绋款儐閹稿濡甸崟顖涙櫆閻犲洤寮堕悵婵單旈悩闈涗沪闁搞劍瀵ч幈銊╁焵椤掑嫭鐓忛柛顐ｇ箖閸ｈ姤銇勯敂璇叉珝闁哄瞼鍠栭幃婊兾熺悰鈩冪亞闂備胶纭堕弬渚€宕戦幘鎰佹富闁靛牆妫楅崸濠囨煕鐎ｎ偅宕岄柡灞剧⊕缁绘繃鎷呴搹鍦幆婵＄偑鍊戦崹鍝勭暆閹间降鈧礁螖閸涱厾顦板銈嗗姂閸娿倕危椤栫偞鈷掑ù锝囶焾椤ュ繘鏌涚€ｎ亝鍣介柛鎺撳笚閹棃濡搁敃鈧崜褰掓⒑闂堟稓澧曟い锔垮嵆瀹曟垿鍩勯崘顏嗩啎闂佺硶鍓濋〃鍫㈢不閻楀牄浜滈煫鍥э攻濞呭﹪鏌＄仦鍓ф创濠碘剝鎮傞弫鍌炲礈瑜忛弳銈夋⒑閸欍儳涓茬紓宥勭窔瀵顓兼径濞劑鏌曟竟顖氱Ф缁€濠勭磽娴ｉ缚妾搁柛妯绘倐瀹曟垿骞橀弬銉︽杸闂佺粯鍔栧娆撴倶閿曞倹鐓欓悘蹇旂墬濞呭﹦鈧娲╃紞浣哥暦濮椻偓椤㈡瑩鎳栭埡浣感曞┑锛勫亼閸婃牕顔忔繝姘；闁圭偓鐣禍婊堟煥閺冨洦顥夋い銉ヮ儔閺屽秷顧侀柛鎾村哺瀹曨偅鎯旈妸銉ь槷閻庡箍鍎卞ú銊╂儗婢舵劖鐓欓柣鎴炆戦埛鎰版倵濮橆厼鍝洪柡宀€鍠撶槐鎺懳熸潪鏉垮灁婵犵數鍋涢崥瀣箾婵犲偆娼栨繛宸簻瀹告繂鈹戦悩鎻掓殜闁归绮换婵嗏枔閸喗鐏嶉梺鍦焾閸熷潡鎮鹃悜鑺ユ櫜濠㈣泛锕ら懓鍨攽閻愭潙鐏︽い顓炴喘閺佸秴鈻庤箛濠冩杸闂佺粯鍔曞鍫曀夐悙鐑樼厵闁告稑锕ョ亸锔锯偓瑙勬礃閸ㄥ潡鐛鈧鍫曞箣閻樼數宓侀梻鍌欑婢瑰﹪宕戦崨瀛樺殞闁绘劦鍓涢々?);
+      return;
+    }
+    setAiPlanning(true);
+    setSelectedDate(today);
+    const todayScheduled = tasks.filter((task) => task.scheduledDate === today && task.scheduledStart);
+    const localFallback = () => {
+      let cursor = Math.max(9 * 60, clampSlot(new Date().getHours() * 60 + new Date().getMinutes()));
+      return todayCandidates.slice(0, 5).map((task) => {
+        const duration = taskDuration(task);
+        const startTime = minutesToTime(cursor);
+        const endTime = minutesToTime(cursor + duration);
+        cursor += duration + 15;
+        return { id: uid("suggestion"), taskId: task.id, startTime, endTime, reason: "闂傚倸鍊搁崐鐑芥嚄閸撲焦鍏滈柛顐ｆ礀閻ら箖鏌ｉ幇顒佲枙婵炲瓨鐗犻弻鏇熺箾瑜嶅Λ妤€鐨┑锛勫亼閸婃牜鏁繝鍥ㄥ殑闁割偅娲忛埀顒€鎳庨悾锟犲箥閾忣偅鏉搁梻浣虹帛钃辩憸鏉垮暣瀵娊鎮欓悜妯煎弳濠电偞鍨堕敃鈺佄熼埀顒勬⒑閸濆嫭婀扮紒瀣笧閹广垹鈹戠€ｎ亞顦ㄥ銈呯箰閹冲骸鈻嶅鑸碘拻濞撴埃鍋撻柍褜鍓涢崑娑㈡嚐椤栨稒娅犳い鏂款潟娴滄粓鏌ㄩ弮鍥跺殭闁诲骏闄勯〃銉╂倷閼碱剛顔掗梺璇″暙閸パ囧敹濡炪倖甯掗崐濠氭偂閹达附鈷掑ù锝呮啞閸熺偞绻涚拠褏鐣电€规洘濞婇、姘跺焵椤掆偓閻ｇ兘濡烽埡浣哄姦濡炪倖甯掔€氼參鍩涢幋鐐电闁肩⒈鍓涚敮娑樷攽閻愬弶鍠橀柡灞剧洴瀵剛鎹勯妸鎰╁灪閵囧嫰顢旈崟顐ｆ閻庤娲樼敮锟犲箖濞嗘挸绾ч柟瀛樼矌缁憋箓姊婚崒娆掑厡缂侇噮鍨伴～蹇旂節濮橈絺鍋撻敃鍌氶唶闁靛绠戦埀顒€鐖奸弻娑㈠Ψ椤旂厧顫梺?, nextAction: extractNextAction(task.notes) || `闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佽澹嗘晶妤呭磻鐎ｎ喗鐓曢柍鈺佸暟閳洟鏌涚€Ｑ勬珕闁靛洤瀚伴獮鎺楀箣濠垫劒鎮ｇ紓鍌欒兌婵绱炴笟鈧濠氭偄閻撳海顓奸梺鎯ф禋閸嬪懎顭块幒妤佲拺?{task.title}闂傚倸鍊搁崐椋庢濮橆剦鐒界憸宥堢亱濠德板€曢崯浼存儗閹剧粯鍋ｅΔ锕侊骏閳ь兘鍋撻梺鍝勵儐濡啴寮婚悢鍛婄秶闁告挆鍛闂佽瀛╅懝楣兯囬悽绋胯摕鐎广儱鐗滃銊╂⒑閸涘﹥灏扮紒瀣笧缁顓奸崪浣规〃閻庡厜鍋撻柍褜鍓熼幃鍧楀焵椤掑嫭鈷戦悷娆忓閸斻倝鏌ｉ妶鍛枠妞ゃ垺鐟﹀鍕偓锝庡墰椤旀洟鏌ｆ惔銏⑩姇闁挎碍绻涢崼銏犫枅闁哄本绋掔换婵嬪礃閳轰焦娈梻浣告啞鐢鏁敓鐘偓浣糕槈閵忊€斥偓鐑芥煛婢跺鐏ｇ紓鍐╂礋濮婄粯鎷呯粙娆炬闂佺顑呭Λ婵嗙暦娴兼潙绠涢柡澶庢硶椤斿棝姊绘笟鍥у缂佸鏁婚幃陇绠涘☉娆戝幈闂佹枼鏅涢崯顖滅矆閸垻纾?};
+      });
+    };
+    if (!settings.hasApiKey) {
+      setSuggestions(localFallback());
+      setAiPlanning(false);
+      return;
+    }
+    try {
+      const response = await window.plannerApi.chat({
+        messages: [
+          { role: "system", content: "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鍐蹭画濡炪倖鐗楃粙鎾汇€呴弻銉︾叆婵犻潧妫欐径鍕偓瑙勬礃閻擄繝寮婚悢鍛婄秶闁告挆鍛闂?JSON闂傚倸鍊搁崐鐑芥倿閿旈敮鍋撶粭娑樻噽閻瑩鏌熼悜姗嗘闁轰礁妫涚槐?suggestions\":[{\"taskId\":\"xxx\",\"startTime\":\"15:30\",\"endTime\":\"16:30\",\"reason\":\"...\",\"nextAction\":\"...\"}]}闂傚倸鍊搁崐椋庢濮橆剦鐒界憸宥堢亱濠德板€曢幊搴ｅ閻熼偊娓婚悗锝庝簼閹癸絿绱掗悩铏叆妞ゎ叀娉曢幑鍕倻濡粯瀚抽梻浣告憸閸犲酣骞栭锔界畳闂備焦瀵х换鍌毭洪妸鈺佺闁稿本绋撶粻鍓р偓鐟板閸犳牗鏅堕幘顔界厸鐎光偓鐎ｎ剛袦闂佺硶鏅换婵嗙暦閹烘埈鐓ラ柛鎰剁到閹懘姊婚崒娆戭槮闁硅绻濆畷鐑樼節閸曨剙搴婂┑鐘绘涧濡參宕甸弴銏＄厱妞ゎ厽鍨垫禍婊呯磼閸撲礁浠遍柟顔筋殜閺佹劖鎯旈垾鑼跺焻婵犵鈧櫕鈻曢柛銊ㄦ硾椤繑绻濆顒傦紲濠殿喗锕╅崗姗€宕戦幘缁樺仭闂侇叏濡囬崝宄扳攽閻愬弶顥滄繛瀛樺哺閹偞绂掔€ｎ偆鍙嗛梺缁樻煥閹碱偅鐗庨梻浣告惈閹峰宕滈悢鐓庣畺婵せ鍋撻柟顔界懇濡啫鈽夊Ο鍦笡闂傚倷绀侀悿鍥敋瑜忛幑銏狀潨閳ь剙顕?15 闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顒佹闂佸湱鍎ら崵锕€鈽夊Ο閿嬫杸闁诲函缍嗘禍鐐侯敊閸ヮ剚鈷戦悷娆忓缁€鍐╃箾婢跺娲寸€规洜鎳撻埞鎴犫偓锝庡亞閸樼敻姊虹紒妯虹仸闁挎岸鏌ｈ箛瀣姕闁靛洤瀚板顒勫礌闄囬崥顐︽⒑? },
+          { role: "user", content: JSON.stringify({ today, candidates: todayCandidates, scheduled: todayScheduled, projects, preferences: aiPlanPrefs }) }
+        ]
+      });
+      const json = JSON.parse((response.reply.match(/\{[\s\S]*\}/)?.[0]) || "{}");
+      setSuggestions((json.suggestions || []).map((item: any) => ({ id: uid("suggestion"), ...item })));
+    } catch {
+      setSuggestions(localFallback());
+    } finally {
+      setAiPlanning(false);
+    }
+  }
+
+  function suggestionConflict(suggestion: ScheduleSuggestion) {
+    const start = timeToMinutes(suggestion.startTime);
+    const end = timeToMinutes(suggestion.endTime);
+    return scheduledTasks.some((task) => {
+      const a = timeToMinutes(task.scheduledStart);
+      const b = timeToMinutes(task.scheduledEnd);
+      return start < b && end > a;
+    });
+  }
+
+  function applySuggestion(id: string) {
+    const suggestion = suggestions.find((item) => item.id === id);
+    const task = tasks.find((item) => item.id === suggestion?.taskId);
+    if (!suggestion || !task || suggestionConflict(suggestion)) return;
+    updateTask(task.id, {
+      plannedForDate: today,
+      scheduledDate: today,
+      scheduledStart: suggestion.startTime,
+      scheduledEnd: suggestion.endTime,
+      notes: suggestion.nextAction ? replaceNextAction(task.notes || "", suggestion.nextAction) : task.notes
+    });
+    setSuggestions((current) => current.filter((item) => item.id !== id));
+  }
+
+  function shiftTimeline(direction: -1 | 1) {
+    setSelectedDate((date) => {
+      if (timelineView === "3day") return addDays(date, direction * 3);
+      if (timelineView === "weekly") return addDays(date, direction * 7);
+      if (timelineView === "month") return addMonths(date, direction);
+      return addDays(date, direction);
+    });
+  }
+
+  if (authState?.mode === "cloud" && !authState.user) {
+    return <AuthGate busy={authBusy} error={authError} onSubmit={handleAuthSubmit} />;
+  }
+
+  if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鍨鹃幇浣圭稁缂傚倷鐒﹁摫闁告瑥绻橀弻鐔碱敍閿濆洣姹楅悷婊呭鐢帡鎮欐繝鍥ㄧ厪濠电倯鈧崑鎾绘煛?..</div>;
+
+  return (
+    <div className={`df-app mode-${mode} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""} ${settings.uiStyle === "neumorphic" ? "theme-neumorphic" : ""}`} style={themeVars(settings)}>
+      <header className="df-header">
+        <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
+        <div className="df-header-right">
+          {mode === "execute" && <div className="df-top-view-switch" aria-label="timeline views">
+            {([
+              ["daily", "婵?],
+              ["3day", "3婵?],
+              ["weekly", "闂?],
+              ["month", "闂?]
+            ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
+          </div>}
+          <nav className="df-tabs df-tabs-right">
+            <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸崑锟犳煙閹増顥夋鐐灲閺屽秹宕崟顐熷亾瑜版帒绾?/button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣?/button>
+          </nav>
+          <button className="df-user-avatar" onClick={() => setUtilityPanel("settings")} aria-label="settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          </button>
+        </div>
+      </header>
+
+      {mode === "execute" ? (
+        <main className="df-execute">
+          <section className="df-candidate-panel" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+            event.preventDefault();
+            const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
+            if (taskId) unscheduleTask(taskId);
+          }}>
+            <div className="df-panel-title">
+              <h2>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇熷緞閸繂澹斿┑鐐村灟閸ㄥ綊鎮″☉銏＄厱婵炴垵宕獮姗€鏌ㄥ☉娆戞噧闁宠鍨块幃娆撳矗婢舵ɑ锛侀梻浣烘嚀閹诧繝骞愰崘鑼殾?/h2>
+              <div>
+                <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? "闂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸缁犵娀鐓崶銊р槈缂佲偓婢跺绻嗘い鏍ㄧ懅缁夋寧绻涢幋鐐电叝婵炲矈浜炵槐鎺戔槈濮楀棗鍓伴梺鍝勬噽婵炩偓婵﹥妞藉畷鐑筋敇閻樿尙顐奸梺姹囧焺閸ㄦ娊宕戦妶鍜佸殨闁告劕妯婂鈺呮煠閸濄儲鏆╅柛? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍌氫壕婵鍘ф晶顖炴煛閸涙澘鐓愮紒鍌涘笧閳ь剨缍嗛埀顒夊弿闂勫嫰骞堥妸銉建闁糕剝顨呴埛鎺楁⒑閸濄儱鏋庨柟铏耿瀵鎮㈤搹鍦紲濠碘槅鍨靛▍锝夘敄閸岀偞鈷戦柛婵嗗椤ョ偟鈧厜鍋撻柟闂寸閽?} aria-label={showCompletedCandidates ? "闂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸缁犵娀鐓崶銊р槈缂佲偓婢跺绻嗘い鏍ㄧ懅缁夋寧绻涢幋鐐电叝婵炲矈浜炵槐鎺戔槈濮楀棗鍓伴梺鍝勬噽婵炩偓婵﹥妞藉畷鐑筋敇閻樿尙顐奸梺姹囧焺閸ㄦ娊宕戦妶鍜佸殨闁告劕妯婂鈺呮煠閸濄儲鏆╅柛? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍌氫壕婵鍘ф晶顖炴煛閸涙澘鐓愮紒鍌涘笧閳ь剨缍嗛埀顒夊弿闂勫嫰骞堥妸銉建闁糕剝顨呴埛鎺楁⒑閸濄儱鏋庨柟铏耿瀵鎮㈤搹鍦紲濠碘槅鍨靛▍锝夘敄閸岀偞鈷戦柛婵嗗椤ョ偟鈧厜鍋撻柟闂寸閽?} onClick={() => setShowCompletedCandidates((value) => !value)} />
+                <button className="df-icon-action i-branch" data-tip="婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌℃径瀣劸婵炲皷鏅犻弻銊╁即閻愯弓鍠婄紓鍌氱У閻楁洟鈥﹂崸妤佸殝闂傚牊绋戦～宀€绱撴担鎻掍壕闂佺硶鍓濈粙鎺楁偂濞嗘挻鐓熼柟瀵稿€戝鍕浄婵犲﹤鐗婇悡鏇㈡倵閿濆骸浜濋悘蹇斿閳ь剙鐏氬妯尖偓姘煎櫍閸┾偓妞ゆ帒锕︾粔闈浢瑰鍡楃厫缂? aria-label="婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌℃径瀣劸婵炲皷鏅犻弻銊╁即閻愯弓鍠婄紓鍌氱У閻楁洟鈥﹂崸妤佸殝闂傚牊绋戦～宀€绱撴担鎻掍壕闂佺硶鍓濈粙鎺楁偂濞嗘挻鐓熼柟瀵稿€戝鍕浄婵犲﹤鐗婇悡鏇㈡倵閿濆骸浜濋悘蹇斿閳ь剙鐏氬妯尖偓姘煎櫍閸┾偓妞ゆ帒锕︾粔闈浢瑰鍡楃厫缂? onClick={openPlanningPicker} />
+              </div>
+            </div>
+            <div className="df-candidate-list">
+              {visibleCandidates.length === 0 ? (
+                <div className="df-empty"><div className="blob-accent" /><strong>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇㈠醇濠垫劖笑婵℃鎳忕换婵嬪閿濆棛銆愬銈嗗灥濡瑧绮嬪澶娢ч柛鈩冩礈缁犳艾顪冮妶鍡欏缂佽鍊垮畷銉ф喆閸曨剙寮挎繝鐢靛Т濞层劑鎮惧ú顏呯厸鐎光偓鐎ｎ剛鐦堥悗瑙勬礈閸樠囧煘閹达箑绠涙い鎾寸⊕閻庝即姊婚崒娆戠獢闁逞屽墰閸嬫盯鎳熼娑欐珷妞ゆ柨顫曟禍婊堟煥閺冨洦顥夋い銉ヮ儔閺屽秷顧侀柛鎾村哺瀹曨偅鎯旈妸銉ь槷闁瑰吋鐣崝宀€绮婚悢鍏肩厽婵°倐鍋撻柣妤€锕ラ崚濠囧箻椤旂晫鍘介梺缁樻⒒椤牓顢撳鍫熺厱婵﹩鍓欓埀顒€娼″濠氬焺閸愩劎绐為梺绯曞墲钃遍柣婵囨礈缁辨挻鎷呴崜鎻掑壉闂佺懓鎲￠幃鍌炲春閵忋倕绠婚悹鍥皺椤撴椽姊虹紒妯哄妞ゆ梹鐗曢湁闁告洦鍨遍悡鐔兼煟濡搫绾у璺哄閹叉悂寮堕崹顔芥闂佹寧绻勯崑銈嗕繆閼搁潧绶為悗锝庡墮鐢?/strong><span>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌℃径瀣劸婵炲皷鏅犻弻銊╁即閻愯弓鍠婄紓鍌氱У閻楁洟鈥﹂崸妤佸殝闂傚牊绋戦～宀€绱撴担鎻掍壕闂佺硶鍓濈粙鎺楁偂濞嗘挻鐓熼柟瀵稿€栭幋鐘亾濮橆剚鍣归棁澶愭煥濠靛棙鍣规い銉ョ箻閺屾盯濡堕崱妯碱槹闂佺粯鎼╅崑濠傜暦閹偊妲奸梺鍝ュ仜椤︾敻寮诲☉姗嗘建闁糕剝顨呴埛瀣⒑閸濆嫮鐏遍柛鐘查叄閹箖鏁撻悩鍐蹭罕闂佸壊鍋掗崑鍛存晬閸涘瓨鐓熼柣鎰嚟椤ｆ煡鏌ｉ悢鍙夋珚鐎殿喖顭烽弫鎰緞婵犲嫬骞愬┑鐘垫暩婵挳宕愯ぐ鎺撳€剁€广儱顦伴埛鎴犵磽娴ｈ鐒藉鐟板缁辨挸顓奸崟顓犵崲閻庢鍣崑鍕敇婵傜宸濇い鏍ㄧ⊕閻ｇ兘姊绘担鍛婂暈婵炴彃绻樺畷婵堜沪閸撗屾锤闂佽鍨庡畝鈧崬鐢告煟閻樼儤顏犻悘蹇嬪妼椤斿繘濡烽敂钘夊伎闂佹寧绻傞幏瀣ｉ幖浣诡梿濠㈣埖鍔栭悡鐔镐繆椤栨粠鏀版い鎺斿枛閺屾盯濡堕崱娆愬櫑闂佸疇顫夐崹鍧椼€佸▎鎾崇畾鐟滃酣鎮橀崼銉﹀€甸悷娆忓缁€鍐磼鐠囪尙澧︽鐐插暣閸╋繝宕ㄩ鐙€鍞介梻浣告贡閸庛倝宕归懜鍨秶闁割偁鍎查埛鎺懨归敐鍕劅闁绘帡绠栭弻銊╁即濡搫濮﹂梺璇″枤閸忔﹢宕洪敓鐘插窛妞ゆ挾濮存慨锔戒繆閻愵亜鈧牕顔忔繝姘；闁圭偓鐣禍婊呮喐婢舵劕纾婚柟鎯у绾捐棄霉閿濆嫮鐭欓柛婵婃缁辨帞鎷犻懠顒€顣洪梺浼欑到閸㈣尪鐏掓繛鎾村嚬閸ㄤ即骞冮幋锔解拺缂侇垱娲栨晶鍙夈亜閵娿儺妯€鐎规洏鍎靛畷鎺楁倷鐎电骞愬┑鐘灱濞夋稑螞濞嗗繆鏋嶉柛鈩冪懅绾惧ジ鎮楅敐搴′簻闁诲繐顕埀顒冾潐濞叉繂鈻嶉敐鍡欘浄闁挎洖鍊哥粈鍫㈡喐濠婂厾褰掑礋椤掑倻鐦堥梺姹囧灲濞佳冪摥闂備礁鎽滈崳銉╁垂閸洖鏋佺€广儱妫楃欢鐐烘煙闁箑骞橀柛妯兼暩缁辨挻鎷呯拠鈩冪暦缂備礁顑嗛崹浣冪亱濡炪倖鎸堕崹鍦磼閳轰急褰掓偐瀹割喖鍓遍梺?/span><button onClick={() => openAdd("task")}>闂傚倸鍊搁崐鎼佲€﹂鍕；闁告洦鍊嬭ぐ鎺戠＜闁绘劘灏欓敍娑欑節閻㈤潧孝婵炲眰鍊濋幃鐐哄垂椤愮姳绨婚梺鍦劋閸ㄧ敻鍩€椤掍焦鍊愮€殿喗鎮傞獮瀣晜閻ｅ苯骞堥柣鐔哥矊缁夊綊寮崘顕呮晜闁告洦鍘藉▓?/button></div>
+              ) : visibleCandidates.map((task) => (
+                <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
+                  void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
+                  showToast("闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺冨倸甯堕柣搴弮閹嘲顭ㄩ崨顓ф毉闁汇埄鍨遍〃濠囧春濞戙垹绫嶉柛顐ゅ枔閸橆亪姊洪崜鎻掍簼缂佽鍊块、鏃堫敂閸″繐浜鹃悷娆忓缁€鍐煟閹垮嫮绡€鐎?);
+                }} onClick={() => openTaskEdit(task)} onDragStart={(event) => {
+                  event.dataTransfer.setData("taskId", task.id);
+                  setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                }} onDragEnd={() => setDrag(null)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} />
+              ))}
+            </div>
+            <form className="df-quick-add" onSubmit={(event) => {
+              event.preventDefault();
+              quickAddTask();
+            }}>
+              <input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煕瑜庨妵婊堝焵椤掆偓閸婂潡寮崘顔肩＜婵﹢纭搁崬褰掓⒒娓氣偓濞佳呮崲閸儱纾归柡鍥╁Х閻?#婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂? />
+              <QuickProjectPicker
+                projects={projects}
+                value={quickProjectId}
+                open={quickProjectOpen}
+                newTitle={quickProjectTitle}
+                newColor={quickProjectColor}
+                onOpenChange={setQuickProjectOpen}
+                onChange={setQuickProjectId}
+                onTitleChange={setQuickProjectTitle}
+                onColorChange={setQuickProjectColor}
+                onProjectColorChange={(projectId, color) => updateProject(projectId, { color })}
+                onCreate={createQuickProject}
+              />
+              <button className="df-quick-add-submit" type="submit" disabled={!quickTitle.trim()}>濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌?/button>
+            </form>
+          </section>
+
+          <section className="df-timeline-panel">
+            <button className="df-date-arrow left" aria-label="闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鑼唶闂佸憡绺块崕鎶芥儗閹惧灈鍋撶憴鍕婵炲眰鍔戝畷鈥愁潩閼哥數鍘告繝銏ｆ硾椤戝懘鎮樺澶嬬厸? onClick={() => shiftTimeline(-1)}>闂?/button>
+            <button className="df-date-arrow right" aria-label="闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鍐叉疄闂佸憡鎸嗛崱妞ワ繝姊洪崗鑲┿偞闁哄懏绻堝畷鈥愁潩閼哥數鍘告繝銏ｆ硾椤戝懘鎮樺澶嬬厸? onClick={() => shiftTimeline(1)}>闂?/button>
+            <div className="df-execute-top">
+              <div className="df-ai-planner">
+                    <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip="AI 闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦悙濠囨煃閸濆嫸鏀荤紒渚囧亜閳规垿鎮╅崹顐ｆ瘎婵犳鍠楅幐鍐茬暦閹扮増鍤嬮柣銏☆問濞? aria-label="AI 闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦悙濠囨煃閸濆嫸鏀荤紒渚囧亜閳规垿鎮╅崹顐ｆ瘎婵犳鍠楅幐鍐茬暦閹扮増鍤嬮柣銏☆問濞? disabled={aiPlanning} onClick={() => void planMyDay()}>{aiPlanning ? <><i />濠电姷鏁告慨鐢割敊閺嶎厼绐楁俊銈呭暞瀹曟煡鏌熼柇锕€鏋涚紒韬插€濋弻锕€螣娓氼垱顎嗛梺鑲╁鐎笛囧Φ閸曨喚鐤€闁圭偓鎯屽Λ锟犳⒑閸濄儱孝婵☆偅绻堝璇测槈閵忕姴宓嗛梺闈涱焾閸庢壆鑺辨繝姘拺?..</> : "闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦悙濠囨煃閸濆嫸鏀荤紒渚囧亜閳规垿鎮╅崹顐ｆ瘎婵犳鍠楅幐鍐茬暦閹扮増鍤嬮柣銏☆問濞?}</button>
+                <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label="AI 闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦柋鍥煟閺傛娈犻柍褜鍓氶惄顖氼潖濞差亜宸濆┑鐘插暙閻︾兘姊洪崨濠佺繁闁哥姵宀搁崺鈧? onClick={(event) => {
+                  event.stopPropagation();
+                  setAiPlanMenuOpen((open) => !open);
+                }}>闂?/button>
+                {aiPlanMenuOpen && <span className="df-ai-plan-menu open" onClick={(event) => event.stopPropagation()}>
+                  <label>闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т绾惧鏌涢弴銊ョ€柛銉墮缁犮儲銇勯弮鍌涘殌濞存粎鍋撻幈銊ノ熺粙鍨婵犵鈧櫕鍋ラ柡宀€鍠栭幊鐘活敆閳ь剟銆傛總鍛婄厵鐎瑰嫮澧楅崵鍥┾偓瑙勬处閸嬪﹥淇婇悜鑺ユ櫆缂佹稑顑呴幃鈺呮⒒閸屾艾鈧绮堟担闈╄€块梺顒€绉寸壕鍧楁煏閸繃澶勯柡鍡樼矒閺岋綁骞囬鐘仦闂佸搫顑嗗Λ鍐蓟閻旇　鍋撻悽娈跨劸濞寸姍鍕╀簻闁冲搫鍟崢鎾煙椤旇偐绉虹€规洖鐖兼俊鎼佸Ψ瑜忛妶閿嬩繆?select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇熷緞閸繂澹斿┑鐐村灟閸ㄥ綊鎮″☉銏＄厱婵炴垵宕獮姗€鏌ㄥ☉娆戞噧闁宠鍨块幃娆撳矗婢舵ɑ锛侀梻浣烘嚀閹诧繝骞愰崘鑼殾?/option><option value="all">闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸壊鍋侀崕杈╃矆婢舵劖鐓欓弶鍫濆⒔閻ｈ京鐥幆褎鍋ラ柡宀€鍠撶槐鎺楀閻樺磭浜梺璇插閼归箖藝娴兼潙桅闁告洦鍠氶悿鈧梺鍦亾閸撴碍瀵奸埀顒勬⒒娴ｅ憡鎯堟俊顐ｇ懃閻ｆ繈骞栨担姝屾憰?/option></select></label>
+                  <label>闂傚倸鍊峰ù鍥敋瑜嶉湁闁绘垼妫勭粻鐘绘煙閹冩闁搞儺鍓欑粻銉︺亜閺冨洤袚婵炲牅鍗冲娲偡閺夊簱鎸冪紓渚囧櫘閸ㄨ泛鐣烽悽绋跨闁挎梻鏅崢閬嶆⒑鐟欏嫬顥愰柡鍛⊕娣囧﹪鎮惧畝鈧壕?select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熺紒銏犳灈缁炬儳顭烽弻鐔兼倷椤掆偓婢ь垶鏌?/option><option value="3day">婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌箞闁搞儺鍓﹂弫宥夋煟閹邦剙妫?/option></select></label>
+                  <label>闂傚倸鍊峰ù鍥敋瑜嶉湁闁绘垼妫勭粻鐘绘煙閹冩闁搞儺鍓欑粻銉︺亜閺冨洤袚婵炲牅鍗冲铏规喆閸曨偄濮㈡繝鈷€鍐劉闁靛洦鐟╅獮搴ㄦ嚍閵壯冨箰闁诲骸绠嶉崕杈殽閸涘﹦顩叉繝闈涙川缁?select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="simple">闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉埀顒婄畵瀹曞ジ濡风€ｎ亝鍠橀柟顔炬櫕缁瑧鎷犳穱鍗炲姦妤犵偞鐗曡彁妞ゆ巻鍋撻柣蹇ｄ邯閺屾稒鎯旈敐鍛亪闂佺粯鎼╅崑濠傜暦閸洖惟闁挎洍鍋撻柡鍡橆殜濮婃椽宕崟顒夋！濠碘槅鍋勯崯鏉戭嚕?/option><option value="priority">婵犵數濮烽弫鎼佸磻閻愬樊鐒芥繛鍡樻尭鐟欙箓鎮楅敐搴℃灍闁哄拋浜缁樻媴閸涘﹤鏆堥柦鍐含缁辨帞鈧綆鍋呭畷宀勬煙椤栨浜炬俊鐐€曠换鎰归崒姣硷綁鎼归崷顓狅紳婵炴挻鍩冮崑鎾剁棯椤撶喐鍊愮€规洩缍佸畷姗€濡歌濞?/option><option value="deadline">闂傚倸鍊搁崐宄懊归崶顒婄稏濠㈣埖鍔曠粻姘舵倶閻愭彃鈷旀い鈺佸级缁绘繈妫冨☉鍗炲壘闂佽桨绀佸Λ娆戞崲濞戙垹绠ｆ繛鍡楃箳娴犺偐绱撴笟鍥т簻缂佸缍婂濠氬即閻旈绐炲┑鐐村灟閸ㄦ椽顢撳澶嬧拺缂侇垱娲樺▍鍛存煕婵犲啯鍊愭繝鈧笟鈧铏圭矙鐠恒劎顔夌紓浣风缂嶅﹪銆侀弮鍫濋唶婵犻潧妫楁禍?/option></select></label>
+                </span>}
+              </div>
+              <div className="df-timeline-actions">
+                <div className="df-view-switch" aria-label="闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顒佹闂佸湱鍎ら崵姘洪鍛珖闂侀€炲苯澧撮柟顕€绠栭幃婊堟寠婢跺孩鎲伴梻渚€娼чˇ顓㈠磿閹惰姤鍎撻柛鏇ㄥ灡閳锋垿鏌涢幘鏉戠祷濞存粍绻冪换娑㈠矗婢舵稖鈧潡鏌℃担鍝バч柟顔哄灲瀹曟鎮℃惔婵堟暰濠电姷鏁搁崑娑樜涘Δ鍐╁床闁规璇差槸椤劑宕熼鐙€鍟?>
+                  {([
+                    ["daily", "婵?],
+                    ["3day", "3婵?],
+                    ["weekly", "闂?],
+                    ["month", "闂?]
+                  ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
+                </div>
+              </div>
+            </div>
+            {(timelineView === "3day" || timelineView === "weekly") ? (() => {
+              const rangeStart = timelineView === "weekly" ? startOfWeekIso(timelineDate) : timelineDate;
+              const rangeLength = timelineView === "weekly" ? 7 : 3;
+              const threeDates = Array.from({ length: rangeLength }, (_, index) => addDays(rangeStart, index));
+              const weekdayShort = ["闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢跺备鍋撻獮鍨姎闁?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢т即鏌?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢ф彃鈹?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢ф壆绱?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊堕柣鎰暩閸?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢ф彃鈹?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢跺备鍋撻崗澶婁壕闂佸憡娲﹂崑鍡涙偂?];
+              const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+              const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
+              return (
+                <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": rangeLength } as CSSProperties}>
+                  <div className="df-timeline-3day-top">
+                    <div className="df-timeline-3day-ruler-spacer" />
+                    <div className="df-timeline-3day-dates">
+                      {threeDates.map((colDate) => {
+                        const isToday = colDate === today;
+                        const dateObj = new Date(`${colDate}T00:00:00`);
+                        return (
+                          <div key={colDate} className={`df-timeline-3day-date${isToday ? " today" : ""}`}>
+                            <span className="df-timeline-3day-date-num">{dateObj.getDate()}</span>
+                            <span className="df-timeline-3day-date-wd">{weekdayShort[dateObj.getDay()]}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="df-timeline-3day-allday">
+                    <div className="df-timeline-3day-ruler-spacer">
+                      <span className="df-timeline-3day-allday-label">闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸壊鍋侀崕杈╃矆婢跺备鍋撻崗澶婁壕闂佸憡娲﹂崐?/span>
+                    </div>
+                    <div className="df-timeline-3day-dates">
+                      {threeDates.map((colDate) => {
+                        const adTasks = tasks.filter((task) => task.scheduledDate === colDate && !task.scheduledStart && !task.completed);
+                        return (
+                          <div key={colDate} data-all-day-date={colDate} className={`df-timeline-3day-allday-cell ${drag?.targetAllDay && drag.targetDate === colDate ? "drop-active" : ""}`} onDragOver={(event) => {
+                            event.preventDefault();
+                            setDrag((current) => current ? { ...current, outsideTimeline: false, targetDate: colDate, targetAllDay: true } : current);
+                          }} onDrop={(event) => {
+                            event.preventDefault();
+                            const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                            if (taskId) scheduleAllDay(taskId, colDate);
+                          }}>
+                            {adTasks.map((task) => (
+                              <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                                event.dataTransfer.setData("taskId", task.id);
+                                setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                              }} onDragEnd={() => setDrag(null)} />
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="df-timeline-3day-scroll" ref={timelineRef}>
+                    <div className="df-timeline-3day-grid">
+                      <div className="df-timeline-3day-ruler">
+                        <div className="df-timeline-canvas" style={{ height: `${canvasHeight}px`, width: "52px", margin: 0, borderLeft: "none", background: "transparent" }}>
+                          {Array.from({ length: slotCount }).map((_, index) => {
+                            const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                            const isHour = minutes % 60 === 0;
+                            const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+                            return (
+                              <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}>
+                                {isHour ? <span>{hourLabel(minutes)}</span> : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="df-timeline-3day-cols">
+                        {threeDates.map((colDate) => {
+                          const colTasks = tasks.filter((task) => task.scheduledDate === colDate && task.scheduledStart).sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+                          const isToday = colDate === today;
+                          return (
+                            <div key={colDate} className={`df-day-col${isToday ? " is-today" : ""}`}
+                              onDragOver={(event) => {
+                                event.preventDefault();
+                                const canvas = event.currentTarget.querySelector<HTMLElement>(".df-day-col-canvas");
+                                setDrag((current) => current ? { ...current, outsideTimeline: false, targetDate: colDate, targetAllDay: false } : current);
+                                setHoverSlot(slotFromPointer(event.clientY, 0, canvas));
+                              }}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                                if (taskId) {
+                                  const canvas = event.currentTarget.querySelector<HTMLElement>(".df-day-col-canvas");
+                                  const slot = hoverSlot || slotFromPointer(event.clientY, 0, canvas);
+                                  scheduleTask(taskId, slot, colDate);
+                                }
+                              }}
+                              onDragLeave={() => setHoverSlot("")}
+                            >
+                              <div data-date={colDate} className="df-timeline-canvas df-day-col-canvas" style={{ height: `${canvasHeight}px` }} onClick={(event) => {
+                                if (drag || resizePreview) return;
+                                if ((event.target as HTMLElement).closest(".df-time-block,.df-drop-preview,.df-quick-schedule")) return;
+                                if (quickSchedule) {
+                                  setQuickSchedule(null);
+                                  return;
+                                }
+                                openQuickSchedule(event.clientY, colDate, event.currentTarget);
+                              }}>
+                                {Array.from({ length: slotCount }).map((_, index) => {
+                                  const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                                  const isHour = minutes % 60 === 0;
+                                  const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+                                  return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes} />;
+                                })}
+                                {isToday && <NowLine />}
+                                {quickSchedule?.scheduledDate === colDate && <QuickScheduleInput draft={quickSchedule} projects={projects} onChange={setQuickSchedule} onSave={saveQuickSchedule} onCancel={() => setQuickSchedule(null)} onCreateProject={quickCreateProject} />}
+                                {hoverSlot && drag && !drag.outsideTimeline && !drag.targetAllDay && drag.targetDate === colDate && <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId, colDate)} />}
+                                {colTasks.length === 0 && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
+                                {colTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
+                                  <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
+                                    if (!suppressBlockClickRef.current) openTaskEdit(task);
+                                  }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
+                                    createProjectForTask(task.id, title);
+                                  }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : timelineView === "month" ? (() => {
+              const monthStart = startOfMonthGridIso(timelineDate);
+              const monthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
+              const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
+              return (
+                <div className="df-month-view">
+                  <div className="df-month-title">{monthTitle(timelineDate)}</div>
+                  <div className="df-month-weekdays">{["闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢跺备鍋撻獮鍨姎闁?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢т即鏌?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢ф彃鈹?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢ф壆绱?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊堕柣鎰暩閸?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢舵劖鍊甸柨婵嗛婢ф彃鈹?, "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顓犵厯闂婎偄娲︾粙鎴犵矆婢跺备鍋撻崗澶婁壕闂佸憡娲﹂崑鍡涙偂?].map((day) => <span key={day}>{day}</span>)}</div>
+                  <div className="df-month-grid">
+                    {monthDays.map((day) => {
+                      const dateObj = new Date(`${day}T00:00:00`);
+                      const dayTasks = tasks.filter((task) => !task.completed && (task.scheduledDate === day || task.plannedForDate === day || task.dueDate === day)).slice(0, 5);
+                      return (
+                        <div key={day} data-all-day-date={day} className={`df-month-cell ${dateObj.getMonth() !== activeMonth ? "muted" : ""} ${day === today ? "today" : ""}`}
+                          onClick={(event) => {
+                            if ((event.target as HTMLElement).closest(".df-month-task")) return;
+                            openAddForDate(day);
+                          }}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                            if (taskId) scheduleAllDay(taskId, day);
+                          }}
+                        >
+                          <strong>{dateObj.getDate()}</strong>
+                          {dayTasks.map((task) => (
+                            <button key={task.id} draggable className="df-month-task" style={{ "--cat": projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color } as CSSProperties} onDragStart={(event) => {
+                              event.dataTransfer.setData("taskId", task.id);
+                              setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task), targetDate: day, targetAllDay: true });
+                            }} onDragEnd={() => setDrag(null)} onClick={() => openTaskEdit(task)}>
+                              <span />{task.title}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })() : (
+              <>
+                <div className="df-date-title">{displayDateTitle(timelineDate)}</div>
+                <div className="df-timeline-allday">
+                  <span className="df-timeline-allday-label">闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸壊鍋侀崕杈╃矆婢跺备鍋撻崗澶婁壕闂佸憡娲﹂崐?/span>
+                  <div data-all-day-date={timelineDate} className={`df-timeline-allday-content ${drag?.targetAllDay && drag.targetDate === timelineDate ? "drop-active" : ""}`} onDragOver={(event) => {
+                    event.preventDefault();
+                    setDrag((current) => current ? { ...current, outsideTimeline: false, targetDate: timelineDate, targetAllDay: true } : current);
+                  }} onDrop={(event) => {
+                    event.preventDefault();
+                    const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                    if (taskId) scheduleAllDay(taskId, timelineDate);
+                  }}>
+                    {tasks.filter((task) => task.scheduledDate === timelineDate && !task.scheduledStart && !task.completed).map((task) => (
+                      <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                        event.dataTransfer.setData("taskId", task.id);
+                        setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                      }} onDragEnd={() => setDrag(null)} />
+                    ))}
+                  </div>
+                </div>
+                <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
+                  event.preventDefault();
+                  setDrag((current) => current ? { ...current, outsideTimeline: false, targetDate: timelineDate, targetAllDay: false } : current);
+                  setHoverSlot(slotFromPointer(event.clientY));
+                }} onDrop={(event) => {
+                  event.preventDefault();
+                  const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                  if (taskId) scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY));
+                }} onDragLeave={() => setHoverSlot("")}>
+                  <div ref={timelineCanvasRef} data-date={timelineDate} className="df-timeline-canvas" style={{ height: `${((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT}px` }} onClick={(event) => {
+                    if (drag || resizePreview) return;
+                    if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
+                    if (quickSchedule) {
+                      setQuickSchedule(null);
+                      return;
+                    }
+                    openQuickSchedule(event.clientY);
+                  }}>
+                    {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
+                      const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                      const isHour = minutes % 60 === 0;
+                      const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+                      return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
+                    })}
+                    {isViewingToday && <NowLine />}
+                    {quickSchedule && <QuickScheduleInput draft={quickSchedule} projects={projects} onChange={setQuickSchedule} onSave={saveQuickSchedule} onCancel={() => setQuickSchedule(null)} onCreateProject={quickCreateProject} />}
+                    {scheduledTasks.length === 0 && suggestions.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />闂傚倸鍊搁崐椋庣矆娴ｈ櫣绀婂┑鐘叉搐缂佲晠姊洪鈧粔鐢稿磻鐎ｎ喗鐓涢柛鎰╁妿婢ф洜绱掗悩宕囧弨闁哄本娲濈粻娑氣偓锝庝簴閸嬫捇寮撮悩鐢电劶婵犮垼鍩栭崝鏍偂閸愵喗鐓忓璺虹墕閸旀岸鏌￠崱娑楁喚闁哄矉缍侀獮姗€宕樺ù瀣壕闁割煈鍣崵鏇㈡煕椤愶絾绀€闁绘挻鐩弻娑氫沪閸撗呯厑闂侀潻绲奸崡鍐差潖濞差亝顥堥柍鍝勫暟琚︽俊鐐€戦崕鏌ュ箲閸ヮ剙鏄ラ柍褜鍓氶妵鍕箳閹存績鍋撹ぐ鎺戝惞闁逞屽墮椤啴濡惰箛娑欘€嶆繝銏㈡嚀濡繂顕ｉ锔绘晪闁逞屽墴閻涱喖螣閸忕厧鐝伴梺鑲┾拡閸撴稑顭囨径鎰拻濞达絿顭堥ˉ蹇涙煕鐎ｎ亝鍣归悡銈嗘叏濡炶浜鹃梺?/div>}
+                    {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
+                    {suggestions.filter((item) => !item.ignored).map((suggestion) => <SuggestionBlock key={suggestion.id} suggestion={suggestion} task={tasks.find((task) => task.id === suggestion.taskId)} conflict={suggestionConflict(suggestion)} onApply={() => applySuggestion(suggestion.id)} onIgnore={() => setSuggestions((current) => current.map((item) => item.id === suggestion.id ? { ...item, ignored: true } : item))} />)}
+                    {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
+                      <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
+                        if (!suppressBlockClickRef.current) openTaskEdit(task);
+                      }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
+                        createProjectForTask(task.id, title);
+                      }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </main>
+      ) : (
+        <PlanningView data={data} projects={projects} tasks={tasks} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} pickMode={planningPickMode} picks={planningPicks} onExitPickMode={() => setPlanningPickMode(false)} onAddPick={addPlanningPick} onUpdatePick={updatePlanningPick} onRemovePick={removePlanningPick} onClearPicks={clearPlanningPicks} onApplyPicks={applyPlanningPicks} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onTaskDelete={(taskId) => {
+          void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== taskId) });
+        }} />
+      )}
+
+      <button className="df-add-fab df-icon-action i-plus" data-tip="濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌? aria-label="濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌? onClick={() => openAdd("task")} />
+      <button className="df-ai-fab df-icon-action i-ai" data-tip="闂?Navo" aria-label="settings" onClick={() => setAiOpen((open) => !open)} />
+
+      {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => setDrawerOpen(false)} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} />}
+      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} reply={aiReply} busy={aiBusy} onSend={() => void sendAi()} onClose={() => setAiOpen(false)} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onOpenAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? () => void handleSignOut() : undefined} />}
+      {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={tasks.find((task) => task.id === drag.taskId)} pointer={drag.pointer} />}
+      {toast && <div className="df-toast">{toast}</div>}
+    </div>
+  );
+}
+
+function FloatingUnschedulePreview({ task, pointer }: { task?: Task; pointer: { x: number; y: number } }) {
+  if (!task) return null;
+  return <div className="df-floating-unschedule" style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曚綅閸ャ劌顕遍柡澶嬪灩閿涚喖鎮楃憴鍕婵炶绠撻敐鐐哄即閵忥紕鍘甸柡澶婄墕婢т粙鎮炬潏鈺冪＝濞达絽寮跺▍濠囨煛瀹€鈧崰鏍€佸☉銏犲耿婵°倐鍋撴い蹇ｅ亝閵囧嫰鏁傞崫鍕缂備胶绮粙鎾诲焵椤掑倹鏆╂い顓炵墕閻☆參姊绘担鐟邦嚋婵炴彃绻樺畷鏇熸綇椤愩倓缃曢梻鍌欑閸熷潡骞栭锕€绠犻幖杈剧到椤ユ岸鎮峰▎蹇擃伀缂佺娀绠栭弻娑㈠焺閸忊晜鍨规禍鎼佸Ω閳哄倻鍘?/span></div>;
+}
+
+function QuickScheduleInput({ draft, projects, onChange, onSave, onCancel, onCreateProject }: { draft: NonNullable<QuickSchedule>; projects: Project[]; onChange: (draft: NonNullable<QuickSchedule>) => void; onSave: () => void; onCancel: () => void; onCreateProject: (title: string) => string }) {
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const showProjects = /#\S*$/.test(draft.title);
+  const hashDraft = draft.title.match(/#(\S*)$/)?.[1] || "";
+  const top = ((timeToMinutes(draft.startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+  function chooseProject(project: Project | null) {
+    const base = draft.title.replace(/#\S*$/, "").trimEnd();
+    onChange({ ...draft, title: `${base}${base ? " " : ""}#${project?.title || "Inbox"}`, projectId: project?.id || "" });
+  }
+  function createProject() {
+    const title = (newProjectTitle || hashDraft).trim();
+    if (!title) return;
+    const id = onCreateProject(title);
+    if (!id) return;
+    const base = draft.title.replace(/#\S*$/, "").trimEnd();
+    onChange({ ...draft, title: `${base}${base ? " " : ""}#${title}`, projectId: id });
+    setNewProjectTitle("");
+  }
+  return (
+    <div className="df-quick-schedule" style={{ top }} onClick={(event) => event.stopPropagation()}>
+      {showProjects && <div className="df-project-suggest">
+        <button onClick={() => chooseProject(null)}>#闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>
+        {projects.map((project) => <button key={project.id} onClick={() => chooseProject(project)}>#{project.title}</button>)}
+        <div className="df-project-create-line compact">
+          <input value={newProjectTitle} placeholder={hashDraft || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閹达絾顥夌痪顓涘亾闂備浇顫夐崕鐓幬涢崟顔剧闂佽楠哥粻宥夊磿闁单鍥ㄥ閺夋垹锛熼柟鍏兼儗濞兼寧绂嶅鍫熺厸闁稿本姘ㄦ禒銏ゆ煙椤旇棄鐏撮柡?} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              createProject();
+            }
+          }} />
+          <button onClick={createProject}>闂?/button>
+        </div>
+      </div>}
+      <input autoFocus value={draft.title} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閻旂厧浜伴柣鏂挎娣囧﹪顢涘┑鍡曟睏缂佹儳褰炵划娆撳蓟閻旂厧绠氱憸蹇旂椤忓牊鐓曢悗锝庡亝瀹曞矂鏌熼鎯у幋闁哄苯娲弫鍌炲矗椤愬骸娲﹂悡鐔兼煏韫囧﹥娅呴柣蹇ョ節閺岀喎顫㈢仦钘夋優缂備緡鍠栭澶愮嵁閹烘绫嶉柍褜鍓涢埀顒佺瀹€鎼佸蓟閻旇櫣纾兼俊顖濇〃閸掑﹤鈹?#婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂? onChange={(event) => onChange({ ...draft, title: event.target.value })} onKeyDown={(event) => {
+        if (event.key === "Enter") onSave();
+        if (event.key === "Escape") onCancel();
+      }} />
+      <button className="df-quick-confirm" onClick={onSave}>闂?/button>
+    </div>
+  );
+}
+
+function TaskCard({ task, projects, focusDate, projectName, onQuickDuration, onProjectChange, onReturnPlanning, onSaveNote, onDelete, onToggleDone, onClick, onDragStart, onDragEnd }: { task: Task; projects: Project[]; focusDate: string; projectName: string; onQuickDuration: (minutes: number) => void; onProjectChange: (projectId: string) => void; onReturnPlanning: () => void; onSaveNote: (note: string) => void; onDelete: () => void; onToggleDone: () => void; onClick: () => void; onDragStart: (event: React.DragEvent) => void; onDragEnd: () => void }) {
+  const [quickOpen, setQuickOpen] = useState<"duration" | "info" | "note" | "project" | null>(null);
+  const [noteDraft, setNoteDraft] = useState(task.notes || "");
+  const overdue = task.dueDate < focusDate ? dateDiff(task.dueDate, focusDate) : 0;
+  const status = overdue > 0 ? `闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т绾惧鏌涢埄鍐槈缁炬儳顭烽弻鐔煎礈瑜滈崝婊堟煠?${overdue} 婵犵數濮烽弫鍛婃叏娴兼潙鍨傞柤娴嬫櫇缁€鍕归崗鍏肩稇缂佲偓?: task.plannedForDate === focusDate ? (focusDate === todayIso() ? "婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇熷緞閸繂澹? : "闂傚倷娴囧畷鐢稿窗閹邦喖鍨濋幖娣灪濞呯姵淇婇妶鍛櫣缂佺姳鍗抽幃褰掑炊瑜嶅Λ?) : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ら悧鍡欑矆閸喓绠鹃柛鈩兩戠亸顓犵磼?;
+  const stop = (event: React.MouseEvent) => event.stopPropagation();
+  return (
+    <article className={`df-task-card ${overdue > 0 ? "overdue" : ""}`} draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onClick}>
+      <div className="df-card-strip" style={{ background: categories[task.category].color }} />
+      <div className="df-candidate-row">
+        <button className="df-candidate-check" title={task.completed ? "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍥╃厠闂佸搫顦伴崵姘洪鍕幐闂佸憡绮堥悞锕傚疾閳哄懏鈷戦柟鑲╁仜閸旀挳鏌涢幘瀵告噮闁逞屽墯閼归箖藝娴兼潙桅闁告洦鍠氶悿鈧梺鍦亾閸撴碍瀵奸埀顒勬⒒娴ｅ憡鎯堟俊顐ｇ懃閻ｆ繈骞栨担姝屾憰? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍥╃厠闂佸搫顦伴崵姘洪鍕幐闂佸憡绮堥悞锕傚疾閳哄懏鈷戦柟鑲╁仜閸旀鏌￠崒娆戠獢鐎规洘鍨块獮妯肩磼濡桨鐢婚梻浣虹帛椤ㄥ懘鎮ф繝鍥х闂侇剙绉甸埛?} onClick={(event) => {
+          event.stopPropagation();
+          onToggleDone();
+        }}>{task.completed ? "闂? : ""}</button>
+        <strong className="df-candidate-title">{task.title}</strong>
+        <button className={`df-duration-pill ${quickOpen === "note" || quickOpen === "project" ? "project-mode" : ""}`} title={quickOpen === "note" || quickOpen === "project" ? "缂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾閽樻繈鏌熼崜浣烘憘闁轰礁顑囬幉鍛婃償閵娿儳鐤勯梺闈浥堥弲娑㈡偂濞戙垺鐓曟繛鎴濆船楠炴ɑ銇勯敂璇蹭簼缂佺粯鐩鍫曞箣濠靛洤鈧垶姊烘导娆戠У濞存粠浜畷娲焵椤掍降浜滈柟鍝勬娴滃墽绱撴担鍓叉Ц缂傚秴锕悰? : "婵犵數濮烽弫鎼佸磿閹寸姴绶ら柦妯侯棦瑜版帒纾奸柣鎰皺閻涖儱鈹戞幊閸婃洟骞婃惔銊ュ嚑濞达絿纭堕弨浠嬫煕鐏炲墽鐭ら柣鎺戝⒔缁辨帡顢曢姀鈶垦囨煛鐏炲墽娲存い銏℃礋閺佹劙宕卞▎妯恍炲┑?} onClick={(event) => {
+          event.stopPropagation();
+          if (quickOpen === "note" || quickOpen === "project") {
+            setQuickOpen(quickOpen === "project" ? "note" : "project");
+          } else {
+            setQuickOpen(quickOpen === "duration" ? null : "duration");
+          }
+        }}>{quickOpen === "note" || quickOpen === "project" ? "#" : formatDuration(task.estimatedHours || 0.5)}</button>
+        <button className={`df-icon-button ${quickOpen === "info" ? "icon-collapse" : "icon-info"}`} title={quickOpen === "info" ? "闂傚倸鍊搁崐宄懊归崶顒€违闁逞屽墴閺屾稓鈧綆鍋呭畷宀勬煛瀹€鈧崰鏍€佸☉姗嗙叆闁告劗鍋撳В澶愭煟? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢埛姘そ閺佸啴鍩€椤掑嫧鈧箓宕惰閺嬪酣鏌熼幆褏孝婵炲樊鍙冮悰顕€骞囬鐔峰妳闂佹寧绻傞崐褰掑极閻㈠憡鈷掑ù锝堫潐閻忛亶鏌￠崨顔炬创鐎规洦鍨堕崺锟犲礃閳哄﹥缍?} onClick={(event) => {
+          event.stopPropagation();
+          setQuickOpen(quickOpen === "info" ? null : "info");
+        }} />
+        <button className="df-icon-button icon-note" title="闂傚倸鍊峰ù鍥敋瑜忛幑銏ゅ箳濡も偓绾惧鏌ｉ幇顖ｆ⒖婵炲樊浜滈崘鈧銈嗗姧缂嶅棗顭囬悢鍏尖拺闁荤喖鍋婇崵鐔兼煕鐎ｎ偆銆掓繛鍡愬灲閹瑩鎮滃Ο鐓庡箞闂備線娼ч¨鈧紒鑼跺Г娣囧﹥绂掔€ｎ偆鍘? onClick={(event) => {
+          event.stopPropagation();
+          setQuickOpen(quickOpen === "note" ? null : "note");
+        }} />
+      </div>
+      {quickOpen === "duration" && (
+        <div className="df-card-popover duration-list" onClick={stop}>
+          {DURATION_OPTIONS.map((minutes) => <button key={minutes} className={Math.round((task.estimatedHours || 0.5) * 60) === minutes ? "active" : ""} onClick={() => {
+            onQuickDuration(minutes);
+            setQuickOpen(null);
+          }}>{formatMinutes(minutes)}</button>)}
+        </div>
+      )}
+      {quickOpen === "info" && (
+        <div className="df-card-popover info" onClick={stop}>
+          <span>{status}</span>
+          <span>{projectName}</span>
+          <span>婵犵數濮烽弫鎼佸磻閻愬樊鐒芥繛鍡樻尭鐟欙箓鎮楅敐搴℃灍闁哄拋浜缁樻媴閸涘﹤鏆堥柦鍐含缁辨帞鈧綆鍋呭畷宀勬煙椤栨浜?{priorityLabel[task.priority]}</span>
+          <span>闂傚倸鍊搁崐宄懊归崶顒婄稏濠㈣埖鍔曠粻姘舵倶閻愭彃鈷旀い鈺佸级缁绘繈妫冨☉鍗炲壘闂?{shortDate(task.dueDate)}</span>
+          <button onClick={() => {
+            onReturnPlanning();
+            setQuickOpen(null);
+          }}>闂傚倸鍊搁崐宄懊归崶顒€违闁逞屽墴閺屾稓鈧綆鍋呭畷宀勬煛瀹€鈧崰鏍€佸☉銏犲耿婵°倐鍋撴い蹇ｅ亝閵囧嫰鏁傞崫鍕Е闂佸搫鐭夌紞渚€骞冮姀銈呬紶闁靛绠戝▍鎴︽⒑鐠囨彃顒㈤柛鎴濈秺瀹曟粓鎮㈡搴㈡?/button>
+        </div>
+      )}
+      {quickOpen === "project" && (
+        <div className="df-card-popover project-list" onClick={stop}>
+          <button onClick={() => {
+            onProjectChange("");
+            setQuickOpen(null);
+          }}># 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>
+          {projects.map((project) => <button key={project.id} className={String(project.id) === String(task.projectId || "") ? "active" : ""} onClick={() => {
+            onProjectChange(project.id);
+            setQuickOpen(null);
+          }}># {project.title}</button>)}
+        </div>
+      )}
+      {quickOpen === "note" && (
+        <div className="df-card-popover note" onClick={stop}>
+          <textarea autoFocus rows={4} value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="婵犵數濮烽弫鍛婃叏娴兼潙鍨傞柣鎾崇岸閺嬫牗绻涢幋鐐╂（婵炲樊浜濋弲婵嬫煕鐏炲墽顣查柣? />
+          <button onClick={() => {
+            onSaveNote(noteDraft);
+            setQuickOpen(null);
+          }}>婵犵數濮烽弫鎼佸磿閹寸姴绶ら柦妯侯棦濞差亝鏅滈柣鎰靛墮鎼村﹪姊虹粙璺ㄧ伇闁稿鍋ゅ畷?/button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function formatMinutes(minutes: number) {
+  const rounded = Math.max(0, Math.round(minutes));
+  if (rounded < 60) return `${rounded}m`;
+  const hours = Math.floor(rounded / 60);
+  const rest = rounded % 60;
+  return rest ? `${hours}h${rest}m` : `${hours}h`;
+}
+
+function formatDuration(hours: number) {
+  return formatMinutes(Math.round(hours * 60));
+}
+
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void }) {
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const start = preview?.start || task.scheduledStart || "09:00";
+  const end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task));
+  const top = ((timeToMinutes(start) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+  const height = Math.max(((timeToMinutes(end) - timeToMinutes(start)) / SLOT_MINUTES) * SLOT_HEIGHT, 38);
+  const next = extractNextAction(task.notes);
+  const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
+  return (
+    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""}`} style={{ top, height, "--cat": stripeColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+      onHover("");
+      setProjectOpen(false);
+    }} onMouseDown={onDragStart} onClick={onEdit} onDoubleClick={onEdit}>
+      <div className="df-category-strip" />
+      {hovered && <button className="df-resize-dot top" aria-label="闂傚倸鍊峰ù鍥х暦閸偅鍙忛柟缁㈠櫘閺佸嫰鏌涘☉娆愮稇闁汇値鍠楅妵鍕冀椤愵澀绮跺┑顔款潐閻擄繝寮婚妸銉㈡斀闁糕剝锚椤庢盯姊洪幖鐐测偓鏍洪悢鐓庤摕鐎广儱鐗滃銊╂⒑閸涘﹥灏扮€光偓閹间胶宓侀柛顐犲劚鎯熼悷婊冾樀瀹曟垿骞樼紒妯绘珳闁硅偐琛ラ埀顒冨皺閸戣淇婇悙顏冪礀濞达絽鎲℃径鍕煃? onMouseDown={(event) => onResizeStart(event, "start")} />}
+      <div className="df-block-title-row">
+        <button className="df-block-check" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
+          event.stopPropagation();
+          onToggleDone();
+        }} aria-label={task.completed ? "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍥╃厠闂佸搫顦伴崵姘洪鍕幐闂佸憡绮堥悞锕傚疾閳哄懏鈷戦柟鑲╁仜閸旀挳鏌涢幘瀵告噮闁逞屽墯閼归箖藝娴兼潙桅闁告洦鍠氶悿鈧梺鍦亾閸撴碍瀵奸埀顒勬⒒娴ｅ憡鎯堟俊顐ｇ懃閻ｆ繈骞栨担姝屾憰? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍥╃厠闂佸搫顦伴崵姘洪鍕幐闂佸憡绮堥悞锕傚疾閳哄懏鈷戦柟鑲╁仜閸旀鏌￠崒娆戠獢鐎规洘鍨块獮妯肩磼濡桨鐢婚梻浣虹帛椤ㄥ懘鎮ф繝鍥х闂侇剙绉甸埛?}>{task.completed ? "闂? : ""}</button>
+        <strong>{task.title}</strong>
+        {hovered && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+          <button className="df-block-project" onClick={() => setProjectOpen((open) => !open)}># {projectName}</button>
+          {projectOpen && <div className="df-project-popover">
+            <button onClick={() => { onProjectChange(""); setProjectOpen(false); }}># 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>
+            {projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { onProjectChange(project.id); setProjectOpen(false); }} onColorChange={(color) => onProjectColorChange(project.id, color)} />)}
+            <div className="df-project-create-line"><input value={newProjectTitle} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閹达絾顥夌痪顓涘亾闂備浇顫夐崕鐓幬涢崟顔剧闂佽楠哥粻宥夊磿闁单鍥ㄥ閺夋垹锛熼柟鍏兼儗濞兼寧绂嶅鍫熺厸闁稿本姘ㄦ禒銏ゆ煙椤旇棄鐏撮柡? onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={() => { onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); }}>闂?/button></div>
+          </div>}
+        </span>}
+      </div>
+      {next && <span className="df-next">婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑㈠即閵娿儱绠婚梺鍛婎殕瀹€鎼佸蓟閳╁啫绶為悗锝庝簽閸旂鈹戦悙鐑橈紵闁告濞婂濠氬即閻旈绐炲┑鈽嗗灥濞咃絾绂掗婊呯＝濞达絿鎳撴慨鍫ユ煃瀹勬壆宕竐xt}</span>}
+      {hovered && <button className="df-resize-dot bottom" aria-label="闂傚倸鍊峰ù鍥х暦閸偅鍙忛柟缁㈠櫘閺佸嫰鏌涘☉娆愮稇闁汇値鍠楅妵鍕冀椤愵澀绮跺┑顔款潐閻擄繝寮婚妸銉㈡斀闁糕剝锚缁愭稓绱掗悙顒€鍔ら柕鍫熸倐瀵鎮㈤悡搴ｇ暰閻熸粌绻橀獮妤呮偐缂佹ê鈧爼鐓崶銊﹀鞍妞ゃ儯鍨介弻鈥崇暆鐎ｎ剛鐦堥悗瑙勬礃閿曘垺淇婂宀婃Щ闂佺粯鎸鹃崰搴ㄥ煘? onMouseDown={(event) => onResizeStart(event, "end")} />}
+    </div>
+  );
+}
+
+function PreviewBlock({ task, startTime, duration, draggingBlock, conflict }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean }) {
+  if (!task) return null;
+  const top = ((timeToMinutes(startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+  const height = Math.max((duration / SLOT_MINUTES) * SLOT_HEIGHT, 38);
+  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${conflict ? "conflict" : ""}`} style={{ top, height }}><strong>{task.title}</strong>{!draggingBlock && <span>{conflict ? "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鑼槷濠碘槅鍨跺Λ鍧楁倿婵犲啰绠鹃柛鈩兩戠亸浼存煕? : startTime} 闂?{Math.round(duration)}min</span>}</div>;
+}
+
+function SuggestionBlock({ suggestion, task, conflict, onApply, onIgnore }: { suggestion: ScheduleSuggestion; task?: Task; conflict: boolean; onApply: () => void; onIgnore: () => void }) {
+  if (!task) return null;
+  const top = ((timeToMinutes(suggestion.startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+  const height = Math.max(((timeToMinutes(suggestion.endTime) - timeToMinutes(suggestion.startTime)) / SLOT_MINUTES) * SLOT_HEIGHT, 48);
+  return <div className={`df-suggestion ${conflict ? "conflict" : ""}`} style={{ top, height }}>
+    <button className="df-suggestion-action apply" disabled={conflict} aria-label="闂傚倸鍊风粈浣革耿闁秴鍌ㄧ憸鏃堝箖濞差亜惟闁靛鍠楃紞搴㈢節閻㈤潧校闁煎綊绠栧鍛婄瑹閳ь剟寮婚弴銏犻唶婵犻潧娲ら娑㈡⒑閹肩偛鈧洟鎮ч崱姘变簷闂備焦瀵у濠氭偤閺冨牆纾块柕澶嗘櫆閻? onClick={onApply}>闂?/button>
+    <button className="df-suggestion-action ignore" aria-label="婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌涘┑鍕姢闁活厽鎸鹃幉鎼佹偋閸繄鐟ㄩ梻鍌氬亞閸ㄤ即婀侀梺缁樻尭濞寸兘骞楅悩缁樼厱閻庯絻鍔屾慨鍌炴煛鐏炵偓绀冪紒缁樼洴瀹曞綊顢欓悡骞垹绱撻崒娆戝妽闁哥偠宕电划濠氬箻鐠囪尙鐣? onClick={onIgnore}>闂?/button>
+    <span>AI 闂傚倷娴囬褍霉閻戣棄纾婚柨婵嗩槸绾捐绻濋棃娑氬ⅱ缁炬崘濮ら幈銊ヮ潨閳ь剟路閸岀偛鏋?{conflict && "闂?闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鑼槷濠碘槅鍨跺Λ鍧楁倿婵犲啰绠鹃柛鈩兩戠亸浼存煕?}</span><strong>{task.title}</strong><small>{suggestion.reason}</small>{suggestion.nextAction && <em>婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑㈠即閵娿儱绠婚梺鍛婎殕瀹€鎼佸蓟閳╁啫绶為悗锝庝簽閸旂鈹戦悙鐑橈紵闁告濞婂濠氬即閻旈绐炲┑鈽嗗灥濞咃絾绂掗婊呯＝濞达絿鎳撴慨鍫ユ煃瀹勬壆宓剈ggestion.nextAction}</em>}
+  </div>;
+}
+
+function ProjectColorPicker({ value, onChange, compact = false, presets = PROJECT_COLOR_PRESETS }: { value: string; onChange: (color: string) => void; compact?: boolean; presets?: string[] }) {
+  const isCustom = !presets.includes(value);
+  const { r, g, b } = hexToRgb(value);
+  const isLight = (0.299 * r + 0.587 * g + 0.114 * b) > 195;
+  return (
+    <div className={`df-project-color-picker ${compact ? "compact" : ""} ${isCustom ? "custom-active" : ""} ${isLight ? "color-light" : ""}`}>
+      {presets.map((color) => {
+        const { r: pr, g: pg, b: pb } = hexToRgb(color);
+        const pLight = (0.299 * pr + 0.587 * pg + 0.114 * pb) > 195;
+        return <button key={color} type="button" className={`${value === color ? "active" : ""} ${pLight ? "color-light" : ""}`} style={{ "--project-color": color } as CSSProperties} aria-label={color} onClick={() => onChange(color)} />;
+      })}
+      <label className="df-project-color-custom" style={{ "--project-color": value } as CSSProperties} title="闂傚倸鍊搁崐鐑芥嚄閸洖鍌ㄧ憸鏃堝Υ閸愨晜鍎熼柕蹇嬪焺濞茬鈹戦悩璇у伐闁绘锕畷鎴﹀煛閸涱喚鍘介梺閫涘嵆濞佳勬櫠娴煎瓨鐓?beta)">
+        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
+        <span />
+      </label>
+    </div>
+  );
+}
+
+function ProjectChoice({ project, onChoose, onColorChange }: { project: Project; onChoose: () => void; onColorChange: (color: string) => void }) {
+  const [colorOpen, setColorOpen] = useState(false);
+  const color = project.color || categories[project.category].color;
+  const { r, g, b } = hexToRgb(color);
+  const colorLight = (0.299 * r + 0.587 * g + 0.114 * b) > 195;
+  return (
+    <div className="df-project-choice">
+      <button type="button" onClick={onChoose}># {project.title}</button>
+      <span className="df-project-color-menu" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="df-project-color-dot-button" aria-label={`${project.title} 婵犵數濮烽。钘壩ｉ崨鏉戠；闁糕剝蓱濞呯姵淇婇妶鍛殭闁搞劍绻堥悡顐﹀炊閵婏腹鎷婚梺缁樼箚濞夋盯鍩為幋锕€纾兼繝濠傚閸?onClick={() => setColorOpen((open) => !open)}><span className={`df-project-color-dot ${colorLight ? "color-light" : ""}`} style={{ "--project-color": color } as CSSProperties} /></button>
+        {colorOpen && <ProjectColorPicker value={color} onChange={(nextColor) => { onColorChange(nextColor); setColorOpen(false); }} compact />}
+      </span>
+    </div>
+  );
+}
+
+function QuickProjectPicker(props: {
+  projects: Project[];
+  value: string;
+  open: boolean;
+  newTitle: string;
+  newColor: string;
+  onOpenChange: (open: boolean) => void;
+  onChange: (projectId: string) => void;
+  onTitleChange: (title: string) => void;
+  onColorChange: (color: string) => void;
+  onProjectColorChange: (projectId: string, color: string) => void;
+  onCreate: () => void;
+}) {
+  const selected = props.projects.find((project) => String(project.id) === String(props.value));
+  const selectedColor = selected?.color || PROJECT_COLOR_PRESETS[0];
+  const { r: sr, g: sg, b: sb } = hexToRgb(selectedColor);
+  const selectedColorLight = (0.299 * sr + 0.587 * sg + 0.114 * sb) > 195;
+  return (
+    <div className="df-quick-project-picker" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+      <button type="button" className="df-quick-project-trigger" onClick={() => props.onOpenChange(!props.open)}>
+        <span className={`df-project-color-dot ${selectedColorLight ? "color-light" : ""}`} style={{ "--project-color": selectedColor } as CSSProperties} />
+        <span>{selected ? `# ${selected.title}` : "#"}</span>
+      </button>
+      {props.open && <div className="df-project-popover df-quick-project-popover up">
+        <button type="button" onClick={() => { props.onChange(""); props.onOpenChange(false); }}># 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>
+        {props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { props.onChange(project.id); props.onOpenChange(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}
+        <div className="df-project-create-line df-project-create-with-color">
+          <input value={props.newTitle} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閹达絾顥夌痪顓涘亾闂備浇顫夐崕鐓幬涢崟顔剧闂佽楠哥粻宥夊磿闁单鍥ㄥ閺夋垹锛熼柟鍏兼儗濞兼寧绂嶅鍫熺厸闁稿本姘ㄦ禒銏ゆ煙椤旇棄鐏撮柡? onChange={(event) => props.onTitleChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); props.onCreate(); } }} />
+          <ProjectColorPicker value={props.newColor} onChange={props.onColorChange} compact />
+          <button type="button" onClick={props.onCreate}>闂?/button>
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onDragEnd }: { task: Task; projectName: string; projects: Project[]; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.DragEvent) => void; onDragEnd: () => void }) {
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
+  return (
+    <article className={`df-all-day-block ${task.completed ? "completed" : ""} ${projectOpen ? "project-open" : ""}`} draggable style={{ "--cat": stripeColor } as CSSProperties} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onEdit} onMouseLeave={() => setProjectOpen(false)}>
+      <div className="df-category-strip" />
+      <button className="df-block-check" onClick={(event) => {
+        event.stopPropagation();
+        onToggleDone();
+      }}>{task.completed ? "闂? : ""}</button>
+      <strong>{task.title}</strong>
+      <span className="df-block-project-wrap" onClick={(event) => event.stopPropagation()}>
+        <button className="df-block-project" onClick={() => setProjectOpen((open) => !open)}># {projectName}</button>
+        {projectOpen && <div className="df-project-popover">
+          <button onClick={() => { onProjectChange(""); setProjectOpen(false); }}># 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>
+          {projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { onProjectChange(project.id); setProjectOpen(false); }} onColorChange={(color) => onProjectColorChange(project.id, color)} />)}
+          <div className="df-project-create-line"><input value={newProjectTitle} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閹达絾顥夌痪顓涘亾闂備浇顫夐崕鐓幬涢崟顔剧闂佽楠哥粻宥夊磿闁单鍥ㄥ閺夋垹锛熼柟鍏兼儗濞兼寧绂嶅鍫熺厸闁稿本姘ㄦ禒銏ゆ煙椤旇棄鐏撮柡? onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={() => { onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); }}>闂?/button></div>
+        </div>}
+      </span>
+    </article>
+  );
+}
+
+function NowLine() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (minutes < TIMELINE_START * 60 || minutes > TIMELINE_END * 60) return null;
+  const top = ((minutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+  return <div className="df-now-line" style={{ top }}><span>闂傚倸鍊搁崐鐑芥嚄閸撲礁鍨濇い鏍ㄧ矊閸ㄦ繄鈧箍鍎遍幏瀣偄閸℃ü绻嗘い鏍ㄧ矊閻ㄦ垿鏌?/span></div>;
+}
+
+function EditDrawer(props: {
+  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
+}) {
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const f = props.form;
+  const set = (key: keyof FormState, value: FormState[keyof FormState]) => props.setForm((current) => ({ ...current, [key]: value }));
+  const selectedProjectTitle = props.projects.find((project) => String(project.id) === String(f.projectId))?.title || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?;
+  const priorityText = f.priority === "high" ? "闂傚倸鍊搁崐鎼佲€﹂鍕；闁告洦鍊嬪ú顏勎у璺猴功閻ゅ洤鈹戦濮愪粶闁稿鎸搁埞鎴︽晬閸曞灚顥撶紓浣哄У缁嬫垿鍩ユ径濞㈢喓娑垫搴¤€? : f.priority === "low" ? "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佺硶鍓濋摂瀣炊椤掍胶鍔堕悗骞垮劚閹虫劙宕㈤幘顔解拺闁告繂瀚埢澶愭煕濡灝浜瑰? : "闂傚倸鍊风粈浣革耿闁秴鍌ㄧ憸鏃堝箖濞差亜惟闁靛瀛╃粙鎺旂箔閻旂厧鐒垫い鎺戝閳ь兛绀侀～婵嬵敆婢跺鍏婇梺鑽ゅ█缂傛艾鈻嶉敐澶嬫櫖?;
+  function createAndSelectProject() {
+    const id = props.onCreateProject(newProjectTitle);
+    if (!id) return;
+    set("projectId", id);
+    setNewProjectTitle("");
+    setProjectPickerOpen(false);
+  }
+  function setDurationMinutes(minutes: number) {
+    const safeMinutes = Math.max(minutes, SLOT_MINUTES);
+    set("estimatedHours", safeMinutes / 60);
+    if (!props.editing || props.type !== "task" || !props.task) return;
+    const patch: Partial<Task> = { estimatedHours: safeMinutes / 60 };
+    if (props.task.scheduledStart) patch.scheduledEnd = addMinutes(props.task.scheduledStart, safeMinutes);
+    props.onTaskUpdate(props.task.id, patch);
+  }
+  function addSubtask() {
+    if (!props.task) return;
+    const title = window.prompt("闂傚倸鍊峰ù鍥敋瑜忛埀顒佺▓閺呮繄鍒掑▎鎾崇婵°倐鍋撶紒鈧径鎰厵闁绘垶锕╁▓鏃傜磼閻樺磭鍙€闁哄本娲濈粻娑氣偓锝庝簴閸嬫捇寮撮悩鐢电劶婵犮垼鍩栭崝鏍偂閸愵喗鐓忓璺虹墕婵′粙鏌ｅ┑鎰偗闁哄本绋掔换婵嬪磼濠婃劗绀婄紓?);
+    if (!title?.trim()) return;
+    props.onTaskUpdate(props.task.id, {
+      subtasks: [...(props.task.subtasks || []), { id: uid("subtask"), title: title.trim(), completed: false, done: false, order: Date.now(), createdAt: new Date().toISOString() }]
+    });
+  }
+  function updateSubtask(subtaskId: string, patch: { title?: string; completed?: boolean }) {
+    if (!props.task) return;
+    props.onTaskUpdate(props.task.id, {
+      subtasks: (props.task.subtasks || []).map((subtask) => subtask.id === subtaskId ? { ...subtask, ...patch, done: patch.completed ?? subtask.done } : subtask)
+    });
+  }
+  function scheduleText(task: Task) {
+    if (task.scheduledDate && task.scheduledStart && task.scheduledEnd) return `${task.scheduledDate} ${task.scheduledStart} - ${task.scheduledEnd} 闂?${formatDuration(taskDuration(task) / 60)}`;
+    if (task.plannedForDate === props.today) return "婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇㈠醇濠垫劖笑婵?闂?闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊绘晶娑㈡煕鐎Ｑ勬珚闁哄本娲樼换娑㈡倷椤掍胶褰呯紓鍌欒兌婵灚绻涙繝鍥ц摕闁绘柨鍚嬮崐缁樹繆椤栨繃顏犲ù鐘虫尦閹鎮介棃娑辨毉闂佸搫琚崝鎴濓耿娓氣偓濮婃椽骞愭惔锝囩暤濠碘槅鍋呴悷褎绂嶉幖浣瑰亱闁割偅绮庣粻姘舵⒑缂佹ê濮堢憸鏉垮暣閸┾偓妞ゆ巻鍋撻柣蹇旂箞閿?;
+    if (task.dueDate) return `${task.dueDate} 闂?${formatDuration(f.estimatedHours || 0.5)}`;
+    return "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊绘晶娑㈡煕鐎Ｑ勬珚闁哄本娲樼换娑㈡倷椤掍胶褰呯紓?;
+  }
+  if (props.editing && props.type === "task" && props.task) {
+    const isCandidate = props.task.plannedForDate === props.today && !props.task.scheduledDate;
+    const isScheduled = props.task.scheduledDate === props.today || Boolean(props.task.scheduledDate && props.task.scheduledStart);
+    return (
+      <aside className="df-drawer df-task-detail">
+        <div className="df-drawer-head"><h2>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繐螖閿濆懎鏋ら柡浣割儑閹插憡鎯旈妸銉х杽闂侀潧艌閺呮粓宕戦崟顖涚厽闁瑰浼濋鍫熷仧濞寸厧鐡ㄩ埛鎴︽煙缁嬪灝顒㈡い銉ユ娣囧﹪顢曢姀鐙€浼冮悗?/h2><div className="df-detail-head-actions"><button className="df-icon-action i-more" data-tip="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢埛姘そ閺佸啴鍩€椤掑嫧鈧箓宕惰閺嬪酣鏌? aria-label="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢埛姘そ閺佸啴鍩€椤掑嫧鈧箓宕惰閺嬪酣鏌? onClick={() => setMoreOpen((open) => !open)} />{moreOpen && <div className="df-detail-more"><button onClick={() => { props.onCopy(); setMoreOpen(false); }}>婵犵數濮烽弫鍛婃叏娴兼潙鍨傞柣鎾崇岸閺嬫牗绻涢幋鐐寸殤闁活厽鎹囬弻鐔虹磼閵忕姵鐏堥梺鍝勫閸庡弶绌辨繝鍥ч柛鏇ㄥ枛閸樷€愁渻閵堝倹娅囬柛蹇旓耿楠炲啳銇愰幒鎴犲€為梺闈涱焾閸庡磭绮婂畡閭︽富?/button><button onClick={() => setProjectPickerOpen(true)}>缂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾閽樻繈鏌熼崜浣烘憘闁轰礁顑囬幉鍛婃償閵娿儳鐤勯梺闈浥堥弲娑㈡偂濞戙垺鐓曟繛鎴濆船楠炴ɑ銇勯敂璇蹭簼缂佺粯鐩鍫曞箣濠靛洤鈧垶姊烘导娆戠У濞存粠浜畷娲焵椤掍降浜滈柟鍝勬娴滃墽绱撴担鍓叉Ц缂傚秴锕悰?/button><button className="danger" onClick={props.onDelete}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顒佹闂佺粯鍔曢顓犵不妤ｅ啯鐓冪憸婊堝礈濮樿鲸宕叉繛鎴欏灩瀹告繃銇勯幘璺哄壉闁告柨顦辩槐鎾存媴缁嬪簱鍋撻崷顓熸殰闁绘劕鎼粻顖炴煟濡鍤欑紒鐘垫暬閺岀喖鎮滃Ο鑲╃暫闂?/button></div>}<button className="df-icon-action i-close" data-tip="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={props.onClose} /></div></div>
+        <section className="df-detail-title">
+          <input type="checkbox" checked={props.task.completed} onChange={props.onToggleDone} />
+          <div>
+            <input value={f.title} onChange={(event) => set("title", event.target.value)} />
+            <span>{props.task.completed ? "闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺冨洦顥夊ù鐘靛帶椤啴濡堕崱妤冪懆闁诲孩鍑归崜娑氬垝? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊绘晶娑㈡煕鐎Ｑ勬珕闁靛洤瀚伴獮鎺楀箣濠垫劒鎮ｇ紓?} 闂?{isScheduled ? "婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇熷緞閸繂澹斿┑鐐村灟閸ㄥ綊鎮″☉銏＄厱婵炴垵宕獮妯汇亜閹剧偨鍋㈤柟顔煎槻椤劑宕熼銈勭礉闂? : isCandidate ? "婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇㈠醇濠垫劖笑婵? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊绘晶娑㈡煕鐎Ｑ勬珚闁哄本娲樼换娑㈡倷椤掍胶褰呯紓?} 闂?{priorityText}</span>
+          </div>
+        </section>
+        <section className="df-detail-context">
+          {!isCandidate && !isScheduled && <><span>闂傚倸鍊风粈渚€骞栭位鍥敃閿曗偓閻ょ偓绻濇繝鍌滃闁稿绻濋弻鏇㈠醇濠垫劖效闂佺粯鎸搁崐鍦崲濠靛洨绡€闁稿本鍑规导鈧俊鐐€愰弲婵嬪礂濮椻偓楠炲啳銇愰幒鎴犲€為梺闈涱焾閸庡磭绮婂畡閭︽富闁靛牆楠告禍鏍煕婵犲啰绠撴い鏇秮瀹曞ジ寮撮悙闈涘箰闂備胶顭堥鍛存倶濮樿泛鍨傞柛褎顨呯粻姘舵煃瑜滈崜鐔煎蓟濞戞ǚ妲堟繛鍡樺姉缁嬪洭鏌ｆ惔銏ｅ妞わ富鍨堕垾锔炬崉閵婏箑纾梺缁樼濞兼瑦鎱ㄥ☉銏♀拺闁告繂瀚ˉ鐐翠繆椤愩垹鏆ｇ€?/span><button onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: props.today, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined })}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鍨鹃幇浣圭稁缂傚倷鐒﹁摫闁告瑥绻橀弻鐔虹磼閵忕姵鐏堥梺娲诲幗椤ㄥ﹪寮诲☉銏犵労闁告劦浜栧Σ鍫㈢磼閻愵剙绀冩い顐㈩槺閹广垹鈽夐姀鐘茶€垮┑鈽嗗灥椤曆囨儍閹达附鈷?/button></>}
+          {isCandidate && <><span>闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐煃閸濆嫬鈧顕ｉ崸妤佲拺缂備焦锚婵洭鏌熺喊鍗炰簽缂侇喖鐗撳畷鎺楁倷鐎电甯惧┑鐘灱濞夋盯鎮ч崱娑樼婵°倕鎳忛悡鏇㈡倵閿濆骸浜濋悘蹇ｅ弮閺屽秶鎷犻弻銉ュ及濡ょ姷鍋為敃銏ゃ€佸☉姗嗘僵妞ゆ劑鍩勫Λ婊勭節閻㈤潧袨闁搞劎鍘ч埢鏂库槈閳跺搫娲鍓佹崉閵婏附顔曢梻浣告惈鐞氼偊宕曢弻銉﹀亗?/span><select value={f.priority} onChange={(event) => { set("priority", event.target.value as Priority); props.onTaskUpdate(props.task!.id, { priority: event.target.value as Priority }); }}><option value="high">闂傚倸鍊搁崐鎼佲€﹂鍕；闁告洦鍊嬪ú顏勎у璺猴功閻ゅ洤鈹戦濮愪粶闁稿鎸搁埞鎴︽晬閸曞灚顥撶紓浣哄У缁嬫垿鍩ユ径濞㈢喓娑垫搴¤€?/option><option value="medium">闂傚倸鍊风粈浣革耿闁秴鍌ㄧ憸鏃堝箖濞差亜惟闁靛瀛╃粙鎺旂箔閻旂厧鐒垫い鎺戝閳ь兛绀侀～婵嬵敆婢跺鍏婇梺鑽ゅ█缂傛艾鈻嶉敐澶嬫櫖?/option><option value="low">闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佺硶鍓濋摂瀣炊椤掍胶鍔堕悗骞垮劚閹虫劙宕㈤幘顔解拺闁告繂瀚埢澶愭煕濡灝浜瑰?/option></select><button onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: undefined })}>缂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾閽樻繈鏌熼崜浣烘憘闁轰礁顑囬幉鎼佸棘鐠恒劍娈鹃梺姹囧灩婢瑰﹪寮崶顒佺厪闊洦娲栧暩闂佹寧绋掗悷銉╁煘閹达附鍊烽柛娆忣樈濡繝姊洪悷鐗堝暈闁圭鍟块悾?/button></>}
+          {isScheduled && <span>闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐煃閸濆嫬鈧顕ｉ崸妤佲拺缂備焦锚婵洭鏌熺喊鍗炰簽缂侇喖鐗撳畷鎺楁倷鐎电甯惧┑鐘灱濞夋盯鎮ч崱娑樼劦妞ゆ帊绶″▓婊堟煙椤栨氨鐒哥€殿喗鎸虫慨鈧柨娑樺楠炴劙姊绘担鍛婂暈闁告枮鍛笉闁硅揪绠戠粈澶嬬節婵犲倸鏋ら柣鏂挎閹叉瓕绠涘☉妯兼煣濡炪倖鍔х粻鎴犵不?闂?{scheduleText(props.task)}</span>}
+        </section>
+        <section className="df-detail-section">
+          <h3>闂傚倸鍊峰ù鍥敋瑜嶉湁闁绘垼妫勭粻鐘绘煙閹冩闁搞儺鍓欑粻銉︺亜閺冨洤袚婵?/h3>
+          <div className="df-detail-grid"><label>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧悿顕€鏌曟繛鐐珔缁炬儳娼￠弻鐔虹磼濡椽鍤嬮梺?input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧悿顔姐亜閹板爼妾柛瀣樀閺岋綁骞橀崘宸敨?input type="time" value={props.task.scheduledStart || ""} onChange={(event) => props.onTaskUpdate(props.task!.id, { scheduledDate: f.dueDate || props.today, scheduledStart: event.target.value, scheduledEnd: event.target.value ? addMinutes(event.target.value, Math.round(Math.max(f.estimatedHours || 0.25, 0.25) * 60)) : undefined })} /></label><label>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧悿顔姐亜閹板爼妾柛瀣槸閳规垿宕掑搴ｅ姼濠?select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label><label>闂傚倸鍊搁崐鎼佸磹閻戣姤鍊块柨鏇氶檷娴滃綊鏌涢幇鍏哥敖闁活厽鎹囬弻鐔虹磼閵忕姵娈?select><option>婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌涘┑鍕姢闁活厽鎸鹃幉鎼佹偋閸繄鐟ㄩ梻鍌氬亞閸ㄥ爼寮诲☉妯锋婵鐗嗘导鎰磽?/option></select></label></div>
+          <div className="df-detail-chips"><button onClick={() => set("dueDate", props.today)}>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁哄懏绻堥弻鏇㈠醇濠垫劖笑婵?/button><button onClick={() => set("dueDate", addDays(props.today, 1))}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍌氫壕婵鍘ф晶顖涖亜閵婏絽鍔︽鐐寸墬閹峰懘鎳?/button><button onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: props.today, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined })}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ら悧鍡欑矆閸喓绠鹃柛鈩兩戠亸顓犵磼?/button><button onClick={() => props.onTaskUpdate(props.task!.id, { scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined })}>濠电姷鏁告慨鐑藉极閹间礁纾婚柣鎰惈缁犱即鏌熼梻瀵割槮缂佺姷濮垫穱濠囶敍濠靛嫧鍋撻埀顒勬煛鐎ｎ亞效妤犵偞鐗曡彁妞ゆ巻鍋撳┑陇鍋愮槐鎺楊敃閵忊懣褔鏌＄仦鍓ф创妞ゃ垺娲熼弫鎰板幢濞嗘ɑ袨闂?/button></div>
+        </section>
+        <section className="df-detail-section">
+          <h3>闂傚倷娴囧畷鐢稿窗閹邦喖鍨濋幖娣灪濞呯姵淇婇妶鍛殲闁哄棙绮撻弻鐔兼倻濮楀棙鐣烽梺?/h3>
+          <div className="df-detail-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}>婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂梺缁樺灦閿氭い鏇憾閹鈽夊▍铏灥閳诲秹寮借閺€鑺ャ亜閺冨倹娅曠紒鐘筹耿楠炴牜鈧稒顭囬绛秂ctedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閹达絾顥夌痪顓涘亾闂備浇顫夐崕鐓幬涢崟顔剧闂佽楠哥粻宥夊磿闁单鍥ㄥ閺夋垹锛熼柟鍏兼儗濞兼寧绂嶅鍫熺厸闁稿本姘ㄦ禒銏ゆ煙椤旇棄鐏撮柡? onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>闂?/button></div></div>}</div>
+          <div className="df-detail-meta"><span>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曚綅閸ヮ剦鏁囬柕蹇曞Х閿涚喖姊洪懖鈹炬嫛闁告挻绻冮幈銊╂惞椤愮姳绨婚梺鍝勬处椤ㄥ懏绂嶆ィ鍐┾拺閺夌偞澹嗛ˇ锔剧磼婢跺灏﹂柨婵堝仜閳规垹鈧綆浜為悿鈧┑鐐舵彧缁茶棄锕㈡潏鈺冪煋闁绘垼濮ら埛鎺懨归敐鍛暈闁哥喓鍋ら幃浠嬵敍濞戣鲸鐣奸梺杞扮贰閸犳牞鐏冮梺鍛婁緱閸犳牗绂?/ {selectedProjectTitle}</span><label>婵犵數濮烽弫鎼佸磻閻愬樊鐒芥繛鍡樻尭鐟欙箓鎮楅敐搴℃灍闁哄拋浜缁樻媴閸涘﹤鏆堥柦鍐含缁辨帞鈧綆鍋呭畷宀勬煙椤栨浜?select value={f.priority} onChange={(event) => set("priority", event.target.value as Priority)}><option value="high">闂傚倸鍊搁崐鎼佲€﹂鍕；闁告洦鍊嬪ú顏勎у璺猴功閻ゅ洤鈹戦濮愪粶闁稿鎸搁埞鎴︽晬閸曞灚顥撶紓浣哄У缁嬫垿鍩ユ径濞㈢喓娑垫搴¤€?/option><option value="medium">闂傚倸鍊风粈浣革耿闁秴鍌ㄧ憸鏃堝箖濞差亜惟闁靛瀛╃粙鎺旂箔閻旂厧鐒垫い鎺戝閳ь兛绀侀～婵嬵敆婢跺鍏婇梺鑽ゅ█缂傛艾鈻嶉敐澶嬫櫖?/option><option value="low">闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佺硶鍓濋摂瀣炊椤掍胶鍔堕悗骞垮劚閹虫劙宕㈤幘顔解拺闁告繂瀚埢澶愭煕濡灝浜瑰?/option></select></label><label>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍥╃厠闂佸搫顦伴崵姘洪鍕庘晠鏌嶉崫鍕舵敾闁?input value={categories[f.category].label} readOnly /></label></div>
+        </section>
+        <section className="df-detail-section">
+          <h3>闂傚倸鍊峰ù鍥敋瑜忛埀顒佺▓閺呮繄鍒掑▎鎾崇婵°倐鍋撶紒鈧径鎰厵闁绘垶锕╁▓鏃傜磼閻樺磭鍙€闁哄本娲濈粻娑氣偓锝庝簴閸嬫捇寮撮悩鐢电劶?/h3>
+          <div className="df-subtask-list">{(props.task.subtasks || []).map((subtask) => <div className="df-subtask-row" key={subtask.id}><input type="checkbox" checked={Boolean(subtask.completed || subtask.done)} onChange={(event) => updateSubtask(subtask.id, { completed: event.target.checked })} /><input value={subtask.title} onChange={(event) => updateSubtask(subtask.id, { title: event.target.value })} /></div>)}</div>
+          <div className="df-detail-chips"><button onClick={addSubtask}>+ 濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌涘▎蹇曠闁哄矉缍侀獮鍥敋閸涱喗鐦滈梻浣侯焾椤戝棝骞愰幖浣哥叀濠㈣泛艌閺嬪酣鐓崶銊︽儎婵炵厧绻樺缁樻媴閻戞ê娈岀紓浣哄Т缁夌懓鐣疯ぐ鎺撳癄濠㈣泛鏈▓?/button><button onClick={props.onNextAction}>AI 闂傚倸鍊搁崐鐑芥嚄閸洖绠犻柟鎹愵嚙鎼村﹪鏌熺紒妯哄瀭婵炴垶菤閺嬪酣鏌熼幆褍鏆遍柣搴幖閳规垿顢欓惌顐海閵囨劖寰勯幇顓炩偓鍨攽閻樺弶宸濋柛娆愭崌閺屾盯濡烽敐鍛瀴濡炪們鍎插Λ鍐蓟濞戙垹妫橀柛顭戝櫘娴犲ジ鏌?/button></div>
+        </section>
+        <section className="df-detail-section">
+          <h3>婵犵數濮烽弫鍛婃叏娴兼潙鍨傞柣鎾崇岸閺嬫牗绻涢幋鐐╂（婵炲樊浜濋弲婵嬫煕鐏炲墽顣查柣?/h3>
+          <textarea rows={6} value={f.details} placeholder="濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌涘▎蹇曠闁哄矉缍侀獮鍥敆閸屾瑧椹抽梺璇插绾板秴鐣濋幖浣哥畺婵°倐鍋撻柍钘夘槸閳诲秹鎼归銏紝闂佹寧绻勯崑銈咁嚕娴犲鏁囬柣鏂挎惈鐢箖姊绘担铏广€婇柛鎾寸箓鐓ゆ繝濠傛噽閻滃鏌￠崘銊у闁绘挻鐟╅弻锕€螣娓氼垱肖闂佺顑冮崹娲€冮妷鈺傚€烽柡澶嬪灦鐠囩偞绻濈喊澶岀？闁稿繑锕㈠顐﹀礃椤旇偐鍔﹀銈嗗笒鐎氼參宕愰懜鍏哥箚闁靛牆鎳忛崳娲煟閹惧鎳勯柕鍥у瀵粙濡歌閻ｆ椽姊虹紒妯肩濞存粎鍋ら幆鈧い蹇撶墱閺佸洭鏌ｉ幇鐗堟锭闁绘挾鍠栧? onChange={(event) => set("details", event.target.value)} />
+        </section>
+        <div className="df-drawer-actions quiet"><button onClick={props.onSave}>婵犵數濮烽弫鎼佸磿閹寸姴绶ら柦妯侯棦濞差亝鏅滈柣鎰靛墮鎼村﹪姊虹粙璺ㄧ伇闁稿鍋ゅ畷鎴﹀Χ婢跺鍘繝鐢靛Т缁绘劙銆呴鍕厓闁荤喐澹嗘牎闂侀潧娲ょ€氭澘顕ｉ鈧畷鍫曗€栭鑺ュ磳闁?/button></div>
+      </aside>
+    );
+  }
+  return (
+    <aside className="df-drawer">
+      <div className="df-drawer-head"><h2>{props.editing ? "缂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸绾惧湱鎲搁悧鍫濈瑲闁稿顑夐弻锝夊箛椤掑倷绮靛? : "濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌?}</h2><button className="df-icon-action i-close" data-tip="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={props.onClose} /></div>
+      <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} onClick={() => props.setType(type)}>{type === "task" ? "婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繐螖閿濆懎鏋ら柡浣割儑閹插憡鎯旈妸銉х杽? : type === "project" ? "婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂? : "婵犵數濮烽弫鎼佸磻濞戙垺鍋ら柕濞у啫鐏婇悗鍏夊亾闁告洖鐏氶弲鐐烘⒑閸涘﹥澶勯柛瀣у亾闂?}</button>)}</div>
+      {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />闂傚倷娴囬褍霉閻戣棄绠犻柟鎹愵嚙缁犵喖姊介崶顒€桅闁圭増婢樼粈鍐┿亜閺冨洦顥夊ù鐘靛帶椤啴濡堕崱妤冪懆闁诲孩鍑归崜娑氬垝?/label>}
+      <label>闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鍐叉疄闂佸憡鎸嗛崨顖滃帬闂備浇顕栭崹杈ㄧ珶鐎ｎ喖鐭?input value={f.title} onChange={(event) => set("title", event.target.value)} /></label>
+      {props.type === "task" && <><label>婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂?div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧壕褰掓煟閹达絾顥夌痪顓涘亾闂備浇顫夐崕鐓幬涢崟顔剧闂佽楠哥粻宥夊磿闁单鍥ㄥ閺夋垹锛熼柟鍏兼儗濞兼寧绂嶅鍫熺厸闁稿本姘ㄦ禒銏ゆ煙椤旇棄鐏撮柡? onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>闂?/button></div></div>}</div></label><label>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧悿顕€鏌曟繛鐐珔缁炬儳娼￠弻鐔虹磼濡椽鍤嬮梺?input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label></>}
+      {props.type === "project" && <><label>婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂┑鐐叉▕娴滄粎绮婚妷锔轰簻闁哄啫娲﹂ˉ澶愭煟濠靛懎宓嗛柡宀嬬稻閹棃濮€閳垛晛顫岄梺钘夊暢妞存悂濡?textarea rows={3} value={f.details} onChange={(event) => set("details", event.target.value)} /></label><label>婵犵數濮烽。钘壩ｉ崨鏉戠；闁糕剝蓱濞呯姵淇婇妶鍛殭闁搞劍绻堥悡顐﹀炊閵婏腹鎷婚梺?input type="color" value={f.projectColor} onChange={(event) => set("projectColor", event.target.value)} /></label></>}
+      {props.type === "event" && <div className="df-grid2"><label>闂傚倷娴囬褏鈧稈鏅犻、娆撳冀椤撶偟鐛ラ梺鍦劋椤ㄥ懐澹曟繝姘厵闁绘劦鍓氶悘閬嶆煛閳ь剟鎳為妷锝勭盎闂佸搫鍟崐鐢稿箯閿熺姵鐓曢幖娣灩婵牆菐閸パ嶈含妞ゃ垺娲熼幃銏ゅ川婵犲嫬缍冮梺?input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>闂傚倷娴囬褏鈧稈鏅犻、娆撳冀椤撶偟鐛ラ梺鍦劋椤ㄥ懐澹曟繝姘厵闁绘劦鍓氶悘閬嶆煛閳ь剟鎳為妷锝勭盎闂佸搫鍟崐鐢稿箯閿熺姵鐓曢幖娣灩婵牆菐閸パ嶈含闁诡喗鐟╅獮鎾诲箳閸℃ぞ澹曢梺鍓茬厛閸ｎ喖顭?input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>缂傚倸鍊搁崐鎼佸磹閹间礁纾归柣鎴ｅГ閸婂潡鏌ㄩ弴鐐测偓鍝ョ不娴煎瓨鍋ｉ柛銉戝嫧鏋欓梺缁樺笩婵倝濡甸崟顖氱疀闁告挷鑳堕弳鐘电磽娓氬洤浜滅紒澶婄秺瀵寮撮悢椋庣獮濠电偞鍨崹娲敁瀹ュ鈷?input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>缂傚倸鍊搁崐鎼佸磹閹间礁纾归柣鎴ｅГ閸婂潡鏌ㄩ弴鐐测偓鍝ョ不娴煎瓨鍋ｉ柛銉戝嫧鏋欓梺缁樺笩婵倝濡甸崟顖氱疀闁告挷鑳堕弳鐘电磽娓氬洤浜滅紒澶婄秺瀵鈽夐姀鈺傛櫇闂佹寧绻傚Λ娑⑺囬妸鈺傗拺?input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div>}
+      <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? "闂傚倸鍊搁崐宄懊归崶顒€违闁逞屽墴閺屾稓鈧綆鍋呭畷宀勬煛瀹€鈧崰鏍€佸☉姗嗙叆闁告劗鍋撳В澶愭煟鎼淬値娼愭繛鍙夌墵瀹曨垶鎳楅婊€绨烽梻鍌欒兌椤牓寮甸浣虹懝婵°倕鎳忛崐鍧楁煢濡尨绱? : "闂傚倸鍊峰ù鍥敋瑜忛幑銏ゅ箳濡も偓绾惧鏌ｉ幇顖ｆ⒖婵炲樊浜滈崘鈧銈嗗姧缂嶅棗顭囬悢鍏尖拺闁荤喖鍋婇崵鐔兼煕鎼淬垹濮囬柍缁樻尭铻栧ù锝夘棑缁犳艾顪冮妶鍡欏闁告繂閰ｅ畷鎴﹀閵堝棛鍘?}</button>
+      {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <label>婵犵數濮烽。钘壩ｉ崨鏉戠；闁告侗鍙庨悢鍡樹繆椤栨氨姣為柛瀣尭椤繈鎮℃惔锝勬婵＄偑鍊戦崹娲晝閵忋倗宓侀柡宥冨妽婵挳鏌ｉ悢纰辨殥缂傚倹鎹囧缁樼瑹閳ь剙顭囪閳ワ箓顢橀姀鈾€鎸冮梺鍛婃处閸?select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>}<label>婵犵數濮烽弫鍛婃叏娴兼潙鍨傞柣鎾崇岸閺嬫牗绻涢幋鐐╂（婵炲樊浜濋弲婵嬫煕鐏炲墽顣查柣?textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
+      <div className="df-drawer-actions">{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip="闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顒佹闂佺粯鍔曢顓犵不妤ｅ啯鐓冪憸婊堝礈濮樿鲸宕? aria-label="闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁嶉崟顒佹闂佺粯鍔曢顓犵不妤ｅ啯鐓冪憸婊堝礈濮樿鲸宕? onClick={props.onDelete} />}{props.type === "task" && <button className="df-icon-action i-next" data-tip="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍌氫壕婵鍘ф晶顕€妫佹径鎰厽闁硅揪绲鹃ˉ澶愭煟韫囨碍鐝ǎ鍥э躬椤㈡稑鈹戦崱妤佸劒闂備礁纾划顖毼涢崘顔肩畺婵°倕鎳忛弲鏌ユ煕鐏炲墽鈯曢柣婵囩墪椤啴濡堕崨顖滎啈婵＄偛鐡ㄩ幃鍌炵嵁? aria-label="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍌氫壕婵鍘ф晶顕€妫佹径鎰厽闁硅揪绲鹃ˉ澶愭煟韫囨碍鐝ǎ鍥э躬椤㈡稑鈹戦崱妤佸劒闂備礁纾划顖毼涢崘顔肩畺婵°倕鎳忛弲鏌ユ煕鐏炲墽鈯曢柣婵囩墪椤啴濡堕崨顖滎啈婵＄偛鐡ㄩ幃鍌炵嵁? onClick={props.onNextAction} />}<button className="primary" onClick={props.onSave}>{props.editing ? "婵犵數濮烽弫鎼佸磿閹寸姴绶ら柦妯侯棦濞差亝鏅滈柣鎰靛墮鎼村﹪姊虹粙璺ㄧ伇闁稿鍋ゅ畷鎴﹀Χ婢跺鍘繝鐢靛Т缁绘劙銆呴鍕厓闁荤喐澹嗘牎闂侀潧娲ょ€氭澘顕ｉ鈧畷鍫曗€栭鑺ュ磳闁? : "濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌?}</button></div>
+    </aside>
+  );
+}
+
+function AiPanel({ input, setInput, reply, busy, onSend, onClose }: { input: string; setInput: (v: string) => void; reply: string; busy: boolean; onSend: () => void; onClose: () => void }) {
+  return <aside className="df-ai-panel"><div><strong>NavoPath AI</strong><button className="df-icon-action i-close" data-tip="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={onClose} /></div><textarea value={input} onChange={(event) => setInput(event.target.value)} /><button className="df-icon-action i-send" data-tip={busy ? "闂傚倸鍊搁崐宄懊归崶顒夋晪闁哄稁鍘肩粈鍫熸叏濡潡鍝虹€规洘鐓￠弻娑㈠焺閸愵亖妲堥梺缁樺笒閻忔岸濡甸崟顖氱闁糕剝銇炴竟鏇㈡⒒娴ｅ憡鎲搁柛鐔锋健瀵煡鎮╃拠鑼枃? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鍐蹭画闂佹寧娲栭崐鎼佸垂閸岀偞鐓曠憸搴ㄣ€冮崨瀛樺€?} aria-label={busy ? "闂傚倸鍊搁崐宄懊归崶顒夋晪闁哄稁鍘肩粈鍫熸叏濡潡鍝虹€规洘鐓￠弻娑㈠焺閸愵亖妲堥梺缁樺笒閻忔岸濡甸崟顖氱闁糕剝銇炴竟鏇㈡⒒娴ｅ憡鎲搁柛鐔锋健瀵煡鎮╃拠鑼枃? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鏁撻悩鍐蹭画闂佹寧娲栭崐鎼佸垂閸岀偞鐓曠憸搴ㄣ€冮崨瀛樺€?} onClick={onSend} disabled={busy || !input.trim()} />{reply && <pre>{reply}</pre>}</aside>;
+}
+
+function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onOpenAbout, onSignOut }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onOpenAbout: () => void; onSignOut?: () => void }) {
+  if (kind === "settings") {
+    return (
+      <>
+        <div className="df-utility-backdrop" onMouseDown={onClose} />
+        <aside className="df-utility-panel">
+          <div className="df-utility-head">
+            <h2>闂傚倸鍊峰ù鍥х暦閸偅鍙忕€规洖娲ㄩ惌鍡椕归敐鍫綈婵炲懐濮撮湁闁绘ê妯婇崕鎰版煕?/h2>
+            <button className="df-icon-action i-close" aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={onClose} />
+          </div>
+          <div className="df-utility-body">
+            <section className="df-settings-profile">
+              <div className="df-settings-profile-avatar">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+              </div>
+              <div>
+                <strong>{settings.displayName || authEmail || "NavoPath User"}</strong>
+                {authEmail && <span>{authEmail}</span>}
+                <small>闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸綊鍋婇崰姘舵儗閹剧粯鐓熼柟杈剧稻椤ュ鏌涢妸銉モ偓鍧楀蓟濞戞鏆嗛柍褜鍓熷畷鎴︽倷閸濆嫮锛?/small>
+              </div>
+            </section>
+            <ThemeColorSetting label="闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸崑锟犳煙閹増顥夋鐐灲閺屽秹宕崟顐熷亾瑜版帒绾х紒瀣氨閺€浠嬫煥濞戞ê顏╁ù婊冦偢閺屾稒绻濋崘鈺冾槹閻庤娲忛崕鐢稿春閳ь剚銇勯幒鎴濐仾闁稿﹦鏁诲濠氬醇閻旀亽鈧帡鏌ｉ幒鎾村€愰柡? presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
+            <ThemeColorSetting label="闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦悙濠囨煏婢跺牆鈧鎯勬惔銊︹拻濞达絼璀﹂悞鍓х磼缂佹ê娴柍銉畵瀹曞ジ濡烽敃鈧崜銊モ攽閻樿宸ラ柣妤€锕幃? presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />缂傚倸鍊搁崐鎼佸磹閻戣姤鍊块柨鏇炲€哥粈澶愭煙閻戞ɑ鈷掗柣顓炴閵嗘帒顫濋敐鍛闁诲氦顫夊ú婊堝极婵犳哎鈧礁顫滈埀顒佹叏閳ь剟鏌ｅΟ璇茬祷闁规悶鍊濆缁樻媴閸涘﹤鏆堥梺鍦焾濡瑩骞忛崨顕呮Ч閹兼番鍔夐弨?/label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />闂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸缁犵娀鐓崶銊р槈缂佲偓婢跺绻嗘い鏍ㄧ懅缁夋寧绻涢幋鐐电叝婵炲矈浜炵槐鎺戔槈濮楀棗鍓伴梺鍝勬噽婵炩偓婵﹥妞藉畷鐑筋敇閻樿尙顐奸梺姹囧焺閸ㄦ娊宕戦妶鍜佸殨闁告劕妯婂鈺呮煠閸濄儲鏆╅柛妯兼暬閺岋絾鎯旈姀鈶╁闂佹寧鑹鹃埞鎴︻敊閻撳孩娈婚梺鍝勭灱閸犳牠鎮伴鈧畷褰掝敊閸欍儳绀勯梺?/label>
+            <label className="df-utility-check"><input type="checkbox" checked={settings.aiMemoryEnabled} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闁诲函缍嗛埀顑惧灩缂嶅﹤鐣烽崼鏇ㄦ晢濠㈣泛顑嗗▍?AI 婵犵數濮烽弫鎼佸磻閻樿绠垫い蹇撴缁€濠囨煃瑜滈崜姘辨崲濞戞瑥绶為悗锝庡亞椤︿即鎮楀▓鍨珮闁稿锕ユ穱濠囧醇閺囩偛鑰垮┑鐐叉钃辩紒渚囧亰濮婃椽鎳￠妶鍛呫垺绻涚拠褏鐣抽柕鍥ㄥ姍瀹曟﹢顢氶崱娆戔棨闂備線娼ч悧鍡涘箠婢跺á锝夊醇閵夛妇鍘甸梺鍛婃寙鐏炶棄顫氭繝娈垮枛閿曘儵銆冮崼銏☆潟闁圭儤鍤﹂弮鍫濈劦妞ゆ帒瀚粻鐘充繆椤栨瑨顒熼柛?/label>
+            <div className="df-utility-section-label">闂傚倸鍊搁崐宄邦渻閹烘梹顫曟い鏃€鍎崇欢銈吤归悩宸剱闁稿孩顨婇弻娑氫沪閹冩瘓闂佺粯甯婄划娆撳蓟閿濆憘鏃堝焵椤掑嫭鍋嬫繝濠傚悩閿濆牄浜归柟鐑樺灩椤旀劕鈹戦悜鍥╃У闁告挻鐟╅幃姗€顢欑喊杈╁數?/div>
+            <div className="df-ui-style-toggle">
+              <button type="button" className={`df-ui-style-btn ${settings.uiStyle !== "neumorphic" ? "active" : ""}`} onClick={() => onSave({ uiStyle: "gradient" })}>
+                <span className="df-ui-style-preview sf" />
+                Gradient
+              </button>
+              <button type="button" className={`df-ui-style-btn ${settings.uiStyle === "neumorphic" ? "active" : ""}`} onClick={() => onSave({ uiStyle: "neumorphic" })}>
+                <span className="df-ui-style-preview neu" />
+                Neumorphic
+              </button>
+            </div>
+            {onSignOut && <button className="df-utility-logout" onClick={onSignOut}>闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т绾惧鏌嶈閸撶喖寮诲☉姘ｅ亾閿濆骸浜濈€规洖鐭傞弻锛勪沪閸撗勫垱濡ょ姷鍋涢澶愬极閹版澘骞㈤柍琛″亾闁告繃顨嗙换婵嬫偨闂堟稐绮堕梺鐟板暱閻倸鐣烽弴銏犵妞ゆ柨妲?/button>}
+            <button className="df-about-entry" onClick={onOpenAbout}>
+              <span className="df-about-entry-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              </span>
+              <span>闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸湱澧楀姗€宕掗妸鈺傜厸鐎广儱楠告禍顖氣攽?NavoPath</span>
+            </button>
+          </div>
+        </aside>
+      </>
+    );
+  }
+  if (kind === "about") {
+    return (
+      <>
+        <div className="df-utility-backdrop" onMouseDown={onClose} />
+        <aside className="df-utility-panel">
+          <div className="df-utility-head">
+            <h2>闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸湱澧楀姗€宕掗妸鈺傜厸鐎广儱楠告禍顖氣攽?NavoPath</h2>
+            <button className="df-icon-action i-close" aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={onClose} />
+          </div>
+          <div className="df-utility-body">
+            <strong>NavoPath v0.4.0</strong>
+            <p>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁绘挴鍋撻梻浣瑰缁诲倿藝椤栨褔寮婚妷锔规嫼濡炪倖宸婚崑鎾剁磼婢跺鍤熼柍褜鍓氶懝楣兯囬悽绋胯摕闁挎繂顦猾宥夋煃瑜滈崜娆撯€旈崘顔煎瀭妞ゆ洖鎳愰崝鐑芥⒑鐟欏嫬顥嬪褎顨婇幃锟犲即閵忥紕鍘甸梺缁樺灦钃遍悘蹇ｅ幗缁绘盯骞栭鐐寸彎闂佸搫鏈惄顖炲极閹版澘鐐婄憸宥夌嵁鐎ｎ喗鈷戦柛婵嗗鐎氫即鏌熼崘鑼妞ゆ洏鍎靛畷鐔碱敆閸屾粎妲囬梻浣侯焾閺堫剛绮欓幘婢勶絽螣鐞涒剝鏂€闂佺粯鍔曞Ο濠囧吹閻斿皝鏀芥い鏃囧Г鐏忥箓鏌℃担绋挎殻濠德ゅ煐瀵板嫭绻涢～顔剧暠妞ゎ叀娉曢幑鍕倻濡粯瀚抽梻浣告憸閸犲酣骞栭锔界畳闂備焦瀵х换鍌毭洪敃鍌氬惞闁逞屽墴濮婄儤绺介崨濠冮敪缂傚倸绉撮敃銈夘敋閿濆閱囬柡鍥╁仧閸樻悂姊虹粙鎸庢拱闁搞倕閰ｉ崺鈧い鎺嶇缁楁氨绱掔紒妯兼创鐎规洖銈搁幃銏☆槹鎼存繃顢樼紓鍌氬€风粈渚€宕愰崫銉х煋闁割偅娲栭悞鍨亜閹烘埊鍔熼柛鎺撴緲椤儻顦叉繛鎾棑閸掓帡宕奸悢椋庣獮闂佸綊鍋婇崢楣冨储閻㈠憡鈷戠紓浣姑悘锕傛煥濮樿京纾兼俊鐐电帛濞呭洨绱掓潏銊ョ缂佽鲸甯掗～婊堝醇閿濆倸浜鹃悹鎭掑妷閸嬫挸鈻撻崹顔界彯闂侀潻缍囩徊浠嬫偩闁垮闄勭紒瀣仢瀹撳棝姊虹紒妯荤闁稿﹤顭峰畷銉ㄣ亹閹烘挴鎷洪梺鍛婄箓鐎氬嘲危濞差亝鐓曢悗锝庡墮閳诲牊顨ラ悙瀛樺磳妞ゃ垺妫冨畷鍗烆潨閸℃绋愬┑鐘垫暩婵炩偓婵炰匠鍥舵晞闁搞儜鍛婵炴挻鍩冮崑鎾绘煛鐏炶鈧鍒掑▎鎴炲磯闁靛鍊楁す铏繆閻愵亜鈧倝宕戦崨瀛樺亱婵犲﹤鐗婇崕澶嬨亜韫囨挾澧遍柡浣告川閹茬顓兼径濠傚殤濠电偛妫欓崹鍦閸忛棿绻嗛柕鍫濆€告禍楣冩⒑閻熸澘鏆辩紒缁樺笧閸掓帒鈻庨幇顒傜獮闂佸綊鍋婇崜娑㈠礉閿曗偓椤啴濡堕崱妤€娼戦梺绋款儐閹稿濡甸崟顖ｆ晝闁绘灏欐导鍫熺節绾板纾块柛蹇旓耿瀵偊宕掗悙鏉戜画婵☆偊顣︾粈渚€藟濮樿埖鈷戦柛锔诲幖鐢爼鏌ｆ幊閸斿酣骞戦姀銈呯妞ゆ牗绋戞禒楣冩⒑閸涘﹥澶勯柛銊╀憾閹繝寮撮姀鈥斥偓鐢告煥濠靛棝顎楀ù婊勭矒閺岀喖宕楅崗鐓庘偓鎰版煛?/p>
+            <small>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佸憡鍔﹂崰鏍婵犳碍鐓欓柛鎾楀懎绗￠梺缁樻尰閻╊垶寮诲☉姘勃闁告挆鈧Σ鍫濐渻閵堝啫鍔氭い鎴濇嚇閳ワ箓鎳楅锝喰俊鐐€戦崝宀勬晝閵堝鏁嬮柨婵嗩槹閸嬨劑鏌涢幘鍐茬骇闁哄懌鍨虹换娑欐綇閸撗呅氬銈嗘礃閻楁洖宓勫銈嗙墱閸嬬偤鍩涢幒妤佺厱閻忕偞宕樻竟姗€鏌嶈閸忔稓鍒掑▎鎾跺祦闁圭偓妞块弫鍌炴煕閳╁喛渚涙繛?026-06-05</small>
+            <div className="df-release-list">
+              {RELEASE_NOTES.map((item) => (
+                <article key={`${item.date}-${item.title}`} className="df-release-item">
+                  <strong>{item.title}</strong>
+                  <span>{item.date}</span>
+                  <p>{item.summary}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="df-utility-backdrop" onMouseDown={onClose} />
+      <aside className="df-utility-panel">
+        <div className="df-utility-head">
+          <h2>{kind === "settings" ? "闂傚倸鍊峰ù鍥х暦閸偅鍙忕€规洖娲ㄩ惌鍡椕归敐鍫綈婵炲懐濮撮湁闁绘ê妯婇崕鎰版煕? : "闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸湱澧楀姗€宕掗妸鈺傜厸鐎广儱楠告禍顖氣攽?NavoPath"}</h2>
+          <button className="df-icon-action i-close" aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={onClose} />
+        </div>
+        {kind === "settings" ? (
+          <div className="df-utility-body">
+            <section className="df-settings-profile">
+              <div className="df-settings-profile-avatar">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+              </div>
+              <div>
+                <strong>{settings.displayName || authEmail || "NavoPath User"}</strong>
+                {authEmail && <span>{authEmail}</span>}
+                <small>闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸綊鍋婇崰姘舵儗閹剧粯鐓熼柟杈剧稻椤ュ鏌涢妸銉モ偓鍧楀蓟濞戞鏆嗛柍褜鍓熷畷鎴︽倷閸濆嫮锛?/small>
+              </div>
+            </section>
+            <ThemeColorSetting label="闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸崑锟犳煙閹増顥夋鐐灲閺屽秹宕崟顐熷亾瑜版帒绾х紒瀣氨閺€浠嬫煥濞戞ê顏╁ù婊冦偢閺屾稒绻濋崘鈺冾槹閻庤娲忛崕鐢稿春閳ь剚銇勯幒鎴濐仾闁稿﹦鏁诲濠氬醇閻旀亽鈧帡鏌ｉ幒鎾村€愰柡? presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
+            <ThemeColorSetting label="闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戦悙濠囨煏婢跺牆鈧鎯勬惔銊︹拻濞达絼璀﹂悞鍓х磼缂佹ê娴柍銉畵瀹曞ジ濡烽敃鈧崜銊モ攽閻樿宸ラ柣妤€锕幃? presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />闂傚倷娴囬褏鈧稈鏅犻、娆撳冀椤撶偟鐛ラ梺鍦劋椤ㄥ懐澹曟繝姘厵闁告挆鍛闂佺粯鎸诲ú姗€骞堥妸銉庣喖鎮℃惔鈥茬帛闂備浇顕х换鍫ュ磿閻㈢钃熸繛鎴欏灩鍥撮梺绯曞墲閻熝囨偂婢舵劖鍊甸悷娆忓缁€鍐磼鐠囪尙澧涘ǎ鍥э躬楠炴牗鎷呴崫銉ュ箰闂備礁鎲￠崝鎴﹀礉韫囨稑绠い鎰╁€楃壕浠嬫煕鐏炲墽鎳嗛柛蹇撶焸閹顫濋鍌滎啋閻庤娲滈崰鏍€佸鈧幃鈺呭礃閸欏褰欓梻?/label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />闂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸缁犵娀鐓崶銊р槈缂佲偓婢跺绻嗘い鏍ㄧ懅缁夋寧绻涢幋鐐电叝婵炲矈浜炵槐鎺戔槈濮楀棗鍓伴梺鍝勬噽婵炩偓婵﹥妞藉畷鐑筋敇閻樿尙顐奸梺姹囧焺閸ㄦ娊宕戦妶鍜佸殨闁告劕妯婂鈺呮煠閸濄儲鏆╅柛妯兼暬閺岋絾鎯旈姀鈶╁闂佹寧鑹鹃埞鎴︻敊閻撳孩娈婚梺鍝勭灱閸犳牠鎮伴鈧畷褰掝敊閸欍儳绀勯梺?/label>
+            <label className="df-utility-check"><input type="checkbox" checked={settings.aiMemoryEnabled} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闁诲函缍嗛埀顑惧灩缂嶅﹤鐣烽崼鏇ㄦ晢濠㈣泛顑嗗▍?AI 婵犵數濮烽弫鎼佸磻閻樿绠垫い蹇撴缁€濠囨煃瑜滈崜姘辨崲濞戞瑥绶為悗锝庡亞椤︿即鎮楀▓鍨珮闁稿锕ユ穱濠囧醇閺囩偛鑰垮┑鐐叉钃辩紒渚囧亰濮婃椽鎳￠妶鍛呫垺绻涚拠褏鐣抽柕鍥ㄥ姍瀹曟﹢顢氶崱娆戔棨闂備線娼ч悧鍡涘箠婢跺á锝夊醇閵夛妇鍘甸梺鍛婃寙鐏炶棄顫氭繝娈垮枛閿曘儵銆冮崼銏☆潟闁圭儤鍤﹂弮鍫濈劦妞ゆ帒瀚粻鐘充繆椤栨瑨顒熼柛?/label>
+            <div className="df-utility-section-label">闂傚倸鍊搁崐宄邦渻閹烘梹顫曟い鏃€鍎崇欢銈吤归悩宸剱闁稿孩顨婇弻娑氫沪閹冩瘓闂佺粯甯婄划娆撳蓟閿濆憘鏃堝焵椤掑嫭鍋嬫繝濠傚悩閿濆牄浜归柟鐑樺灩椤旀劕鈹戦悜鍥╃У闁告挻鐟╅幃姗€顢欑喊杈╁數?/div>
+            <div className="df-ui-style-toggle">
+              <button className={`df-ui-style-btn ${settings.uiStyle !== "neumorphic" ? "active" : ""}`} onClick={() => onSave({ uiStyle: "gradient" })}>
+                <span className="df-ui-style-preview sf" />
+                Gradient
+              </button>
+              <button className={`df-ui-style-btn ${settings.uiStyle === "neumorphic" ? "active" : ""}`} onClick={() => onSave({ uiStyle: "neumorphic" })}>
+                <span className="df-ui-style-preview neu" />
+                Neumorphic
+              </button>
+            </div>
+            {authEmail && <p>闂傚倷娴囧畷鐢稿窗閹邦喖鍨濋幖娣灪濞呯姵淇婇妶鍛櫣缂佺姳鍗抽弻娑樷槈濮楀牊鏁惧┑鐐叉噽婵炩偓闁哄矉绲借灒闁惧繘鈧稓椹抽梺璇插閼归箖鈥﹂悜钘夎摕闁靛ň鏅涢崡铏繆閵堝倸浜炬繛瀛樼矒缁犳牠骞冨畡閭︾叆闁告洦鍓涢崙鈥斥攽閻愮偣鈧鎹㈠┑鍡╁殨妞ゆ劑鍩勯崥瀣煕濠娾偓閻掞箑顩奸妸褏纾藉ù锝呮惈閸斿鏌ｉ姀銏犵hEmail}</p>}
+          </div>
+        ) : (
+          <div className="df-utility-body">
+            <strong>NavoPath v0.4.0</strong>
+            <p>婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鏌熺紒銏犳灍闁绘挴鍋撻梻浣瑰缁诲倿藝椤栨褔寮婚妷锔规嫼濡炪倖宸婚崑鎾剁磼婢跺鍤熼柍褜鍓氶懝楣兯囬悽绋胯摕闁挎繂顦猾宥夋煃瑜滈崜娆撯€旈崘顔奸敜婵°倐鍋撻悷娆欑畵閺屽秷顧侀柛鎾跺枎椤繐煤椤忓嫬绐涙繝鐢靛Т閸婂鎮烽弻銉︾厽闁靛繆鏅涢悘锟犳偨椤栨せ鍋撳畷鍥ㄦ闂佹儳绻橀埀顒佺⊕閸曞啴姊洪崨濠冨瘷閻忕偛澧介妶顐ｇ節閻㈤潧啸闁轰礁鎲￠幈銊╁箻椤旇偐鏌堝銈嗙墱閸嬬偤寮查鈧…鍧楁嚋闂堟稑顫嶉梺缁樻尰閻熝呮閹烘嚦鏃€鎷呯悰鈩冾潔婵犵妲呴崑鎺楀矗閸愵煈鍤曢柕濠忓椤╃兘鎮楅敐搴′簽闁告﹩浜铏瑰寲閺囩偛鈷夊銈冨妼閹虫﹢宕洪埀顒併亜閹哄棗浜鹃梺纭咁嚋缁绘繈鐛崱娑樻婵炲棗澧介崣鍡涙⒑閸涘﹥澶勯柛鎾寸懇椤㈡捇骞樼紒妯锋嫼缂傚倷鐒﹂埣銈夘敂閸繄鏌堥梺鍦焾妤犳悂宕濋弮鍫熲拻闁稿本鐟ㄩ崗宀勬煕鎼达絾鏆€殿喗鐓￠崺锟犲川椤撶姷宕舵繝寰锋澘鈧洟骞婅箛娑樼；濠㈣埖鍔栭悡銉︾節闂堟稒锛嶆俊鎻掓憸缁辨帡鎮埀顒勫垂閸洖钃熸繛鎴欏灩閻掓椽鏌涜箛鏇烆€屽ù婊庝邯楠炲啫顫滈埀顒€鐣烽崼鏇炍╃憸蹇涱敊閺囥垺鈷戦悷娆忓缁€鍐╃箾閸涱喗绀嬬€规洘濞婇幃婊兾熼懖鈺婂晭闂備礁鎲℃笟妤呭窗濡ゅ懏鍎嶉柟杈鹃檮閻撴瑩鏌ｉ悢鍛婄凡妞ゅ浚鍘介妵鍕閿涘嫧妲堝銈庡亝缁诲啫顭囪箛娑樼厸闁告劑鍔庨妶锕傛⒒閸屾艾鈧兘鎮為敂閿亾缁楁稑鎳愰惌娆撴煙鐎电浠ч梻鍕閺岋繝宕橀妸銉㈠亾閹间礁鍨傛繝闈涱儐閻撶喐淇婇婵囶仩闁挎稑绉归弻宥囩磼濡儵鎷归梺闈涙搐鐎氫即鐛鈧、娑樷槈濡崵褰撮梻鍌欒兌椤牓顢栭崱娑樼閻犲洤妯婇崵妤呮煕閺囥劌澧扮紒鈾€鍋撻梻浣侯焾閺堫剛绮欓幘婢勶絽顫滈埀顒€顫忕紒妯诲閻熸瑥瀚ㄦ禒褎绻涚€涙鐭岄柛瀣ㄥ€曢悾閿嬪閺夋垹鐤€闂備緡鍙忛梽鍕疾閵忕姭鏀介柣妯款嚋瀹搞儵鏌ｅΔ鈧敃顏堝箖閿熺姴纾兼繝褎鍎虫禍鐐殽閻愯尙浠㈤柛鏃€宀搁弻锝呂旀担铏圭厐闁绘挶鍊濋弻銊モ攽閸♀晜效闂佺粯鎸鹃崰鏍蓟閺囩喓绠鹃柛顭戝枛婵骸顪冮妶鍛珯闁搞儯鍔庨崢闈浳旈悩闈涗粶闁诲繑绻堥幃姗€鎳犻钘変壕閻熸瑥瀚粈鍐磼鐠囪尙澧︾€规洘妞芥俊鐑藉煛娴ｅ摜鐛╂俊鐐€栭悧妤冨垝閻樺弬锝夋煥鐎ｂ晝绠氶梺闈涚墕濞层倕鏆╅梻浣侯焾椤戝洦鎱ㄩ幘顔肩厺闁哄倸绨卞Σ鍫熺箾閸℃ê濮囩€殿喖娼″铏圭磼濡搫顫岄梺鍦拡閸嬪棛鍒掗崼銉ョ＜闁绘劕顕崢顏呯節閵忥絽鐓愮紒瀣灴閵嗗懘顢楁担椋庣畾闁诲繒鍋涢崐鍛婃叏閸岀偞鐓涚€光偓鐎ｎ剛鐦堥悗瑙勬礃閿曘垽寮崘顔肩劦妞ゆ帒瀚粈澶嬬節婵犲倸鏋ら柣鏂挎閹叉瓕绠涘☉妯兼煣濡炪倖鍔х粻鎴犵不閺嶎厽鐓欐繛鍫濈仢閺嬫瑦绻涘畝濠侀偗闁哄本鐩獮妯侯渻閸撗屾М婵炲瓨绮嶆竟鍡欐閹捐纾兼繛鍡樺焾濡差喖顪冮妶鍡楃仴闁硅櫕锕㈤妴渚€寮介鐐殿槰濡炪倖妫侀崑鎰板礉?/p>
+            <small>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佸憡鍔﹂崰鏍婵犳碍鐓欓柛鎾楀懎绗￠梺缁樻尰閻╊垶寮诲☉姘勃闁告挆鈧Σ鍫濐渻閵堝啫鍔氭い鎴濇嚇閳ワ箓鎳楅锝喰俊鐐€戦崝宀勬晝閵堝鏁嬮柨婵嗩槹閸嬨劑鏌涢幘鍐茬骇闁哄懌鍨虹换娑欐綇閸撗呅氬銈嗘礃閻楁洖宓勫銈嗙墱閸嬬偤鍩涢幒妤佺厱閻忕偞宕樻竟姗€鏌嶈閸忔稓鍒掑▎鎾跺祦闁圭偓妞块弫鍌炴煕閳╁喛渚涙繛?026-06-05</small>
+            <ul>
+              <li>闂傚倸鍊峰ù鍥х暦閻㈢绐楅柟鎵閸嬶繝鏌曟竟顖楀亾闁稿鎸搁～婵嬫偂鎼粹檧鎷柣搴ゎ潐濞叉粓骞婇幘璇茬厴闁硅揪绠戠粣妤併亜閺冣偓閸庢娊寮稿☉銏＄厱闁靛绠戦崝銈夋煟閿濆洤鍘寸€规洖鐖奸崺鈩冪節閸愨晜娈?闂?婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繐螖閿濆懎鏋ら柡浣割儑閹插憡鎯旈妸銉х杽闂侀潧艌閺呮粓宕戦崟顖涚厽闁圭偓濞婇妤呮煕閻愵亜濮傛慨濠冩そ閹兘鏌囬敃鈧▓鍫曟⒑缁嬫鍎戦柛瀣洴閸┿垽骞樼€靛摜鐦堝┑顔斤供閸橀箖宕㈡禒瀣拺缂備焦锚婵洨鈧鍠栭悥鑹版＂闂侀潧绻堥崐鏍偂濞戙垺鐓曢柍鈺佸暟閳笺儵鏌熼幓鎺戔挃闁逞屽墯椤旀牠宕板璺烘瀬濠电姵鑹剧粻鏍煏韫囨洖违闁惧繗顫夌€氭岸鏌涘▎蹇ｆЦ闁逞屽墮闁帮絽顫忕紒妯诲闁告稑锕ら弳鍫ユ煟閵忊晛鐏℃い銊ョ墦瀵偊顢氶埀顒勩€侀弮鍫濆耿婵妫欑紞妤佺節閻㈤潧鈻堟繛浣冲浂鏁勯柛娑卞灣娑撳秵銇勯弽顐沪闁绘挻娲熼弻宥夊煛娴ｅ憡鐏撻梺鎼炰紘閸ャ劎鍘甸梺缁樺灦钃遍柣鎾寸洴閺屾稓鈧綆鍋呯亸顓㈡煃閽樺妲搁柍璇叉唉缁犳盯骞欓崘鈺冪Ф闂傚倸鍊烽懗鍫曞箠閹惧墎涓嶇€广儱顦崹鍌炴煢濡警妲洪柡鍡檮缁绘繈妫冨☉鍗炲壈闂佺粯鎼换婵嬪蓟濞戞ǚ妲堥柛妤冨仧娴狀垰顪冮妶蹇撶槣闁革綇绲介～蹇撁洪鍕獩婵犵數濮撮崯鐘诲箯缂佹绡€婵炲牆鐏濋弸鐔兼煙缁嬪灝鏆遍柣锝囧厴閺佹劖寰勬繝鍌濃偓鍨攽閻愭潙鐏︽い顓炴喘閺佸秴鈻庤箛濠冩杸闂佺粯鍔曞鍫曀夐悙鐑樼厵闁告稑锕ョ亸锔锯偓瑙勬礃閸ㄥ潡鐛鈧鍫曞箣閻樼數宓侀梻浣筋嚙閸戠晫寰婃禒瀣€舵慨妯挎硾閺嬩線姊洪鈧粔鐢稿煕?/li>
+              <li>闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸崑锟犳煙閹増顥夋鐐灲閺屽秹宕崟顐熷亾瑜版帒绾ч柛娑橈功缁♀偓缂佸墽澧楄摫妞ゎ偄锕弻娑⑩€﹂幋婊堝仐闂佺硶鏂侀崑鎾愁渻閵堝棗鍧婇柛瀣尵閻ヮ亞绱掗姀鐘茬濠电偞鍨归弫濠氬春閳?闂?Daily / 3 Day / Weekly / Month 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敃鈧悿顔姐亜閹板爼妾柛瀣樀閺岋綁骞橀崘宸敨濠电偞鍨剁喊宥呯暦婢舵劖鐓忓┑鐘茬箳閻ｉ亶鏌＄€ｎ亜鈧灝顫忛搹鐟板闁哄洨鍋涢埛澶婎渻閵堝啫濡兼俊顐ｇ〒閸掓帞鈧綆鍠栭柋鍥煏婢舵稑顩柛娆忔閳规垿鎮欓弶鎴犱桓闁藉啳椴哥换婵嬪焵椤掍礁顕遍悗娑櫭埀顒€鐏氶幈銊ヮ潨閸℃鈷掗梺绋垮濮婂綊銆冮妷鈺傚€烽柤纰卞墰椤旀帡姊洪悷鎵紞闁稿鍊栨穱濠囨倻閽樺）銊ф喐韫囨稑绠犻柛銉㈡櫇绾句粙鏌涚仦鍓ф噮妞わ讣闄勯妵鍕箣濠靛洤娈楀銈冨灪閻楃姴鐣峰鈧、娆撴嚃閳轰礁袝?/li>
+              <li>婵犵數濮烽。顔炬閺囥垹纾婚柟杈剧畱绾惧綊鏌￠崶鈺佸壋闁兼澘娼￠弻娑樜旈崘褏闂┑鐐叉▕娴滄繈宕戠€ｎ喗鐓曟い鎰靛亜婢т即鏌ｉ鐕佹當闁宠鍨块幃鈺冩嫚瑜嶆导鎰攽閳藉棗浜濇い銊ワ龚濡垽妫呴銏″缂佸甯￠幃锟犳偐鐠囪尙楠囬梺鍓插亝缁嬫垶淇婃禒瀣厽闁规儳宕崝姘舵煃鐟欏嫬鐏存い銏＄懅閹叉挳宕熼鍌氱秲闂佽瀛╅鏍闯椤曗偓瀹曟娊鏁愰崨顖涙婵犻潧鍊婚…鍫ュ础閹惰姤鐓熼柡鍥╁仜閳ь剙顭峰畷銉ㄣ亹閹烘挴鎷洪梺鍛婄箓鐎氬嘲危濞差亝鐓曢悗锝庡墮閺嬫棃鏌熼獮鍨仼闁宠鍨归埀顒婄秵娴滅偤顢欐径鎰拺闂傚牊绋撶粻鐐烘煕婵犲啯绀堢紒顔肩墛瀵板嫰骞囬娑欏瘱闂備焦鎮堕崕顖炲礉鎼淬劍鍋熼悹楦裤€€閺€浠嬫煟濡搫绾ч柟鍏煎姉缁辨帡鎮▎蹇旀悙缂佺姵濞婇弻鐔煎箚閻楀牜妫勯梺?/li>
+              <li>AI 闂傚倸鍊搁崐宄懊归崶褜娴栭柕濞炬櫆閸婂潡鏌ㄩ弴鐐测偓褰掑磻閿涘嫭鍠愰煫鍥ㄧ☉缁€鍡涙煙閻戞ɑ鐓ｆ繛宀婁邯閺岋綁骞囬棃娑橆潾缂備礁顦悥鐓庮潖濞差亜宸濆┑鐘辫兌缁讳線姊洪崨濠庣劸濠㈢懓鐗撹矾闁告稑鐡ㄩ埛鎺懨归敐鍥у妺闁搞倐鍋撻梻浣规偠閸ㄩ缚銇愰崘顓犱罕婵犵數濮撮敃銈呂涢銏犳辈闁哄绨遍弨浠嬫煟閹邦厽缍戦柣蹇ョ畵閺岀喖宕ㄦ繝鍐ㄢ偓鎰亜閵忥紕澧电€规洜鍠栭、姗€鎮╅幓鎺曅曢梻鍌欑閹碱偊藝娴兼潙鏄ラ柛顐ｇ箥閻掕棄霉閻撳海鎽犻柣鎾崇箰椤潡鎳滃▓璺ㄥ姺闂佸憡蓱閻╊垶寮婚敓鐘茬劦妞ゆ帊鑳堕々鐑芥倵閿濆骸浜為柛姗€浜跺娲传閸曨偀鍋撴禒瀣垫晪鐟滃孩绌辨繝鍥х濞达絽婀遍崢?/li>
+            </ul>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+
+function ThemeColorSetting({ label, presets, value, onChange }: { label: string; presets: string[]; value: string; onChange: (color: string) => void }) {
+  const { r, g, b } = hexToRgb(value);
+  const isLight = (0.299 * r + 0.587 * g + 0.114 * b) > 195;
+  return (
+    <section className="df-theme-setting">
+      <div>
+        <strong>{label}</strong>
+        <span className={isLight ? "color-light" : ""} style={{ "--project-color": value } as CSSProperties} />
+      </div>
+      <ProjectColorPicker presets={presets} value={value} onChange={onChange} />
+    </section>
+  );
+}
+
+function SourceModal({ tasks, projects, today, onClose, onJoin }: { tasks: Task[]; projects: Project[]; today: string; onClose: () => void; onJoin: (taskIds: string[]) => void }) {
+  const [filter, setFilter] = useState<string>("all");
+  const [showAdded, setShowAdded] = useState(false);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState("");
+  const openTasks = tasks.filter((task) => {
+    if (task.completed) return false;
+    if (!showAdded && task.plannedForDate === today) return false;
+    if (filter === "all") return true;
+    if (filter === "unassigned") return !task.projectId;
+    return task.projectId === filter;
+  });
+  const filteredProjects = projects.filter((project) => filter === "all" || filter === project.id);
+  const selectedIds = Object.keys(selected).filter((id) => selected[id]);
+  const toggleSelected = (taskId: string) => setSelected((current) => ({ ...current, [taskId]: !current[taskId] }));
+  const addSelected = () => {
+    onJoin(selectedIds);
+    setSelected({});
+    onClose();
+  };
+  return (
+    <div className="df-modal" onClick={onClose}>
+      <div className="df-source" onClick={(event) => event.stopPropagation()}>
+        <div className="df-source-fixed">
+          <div className="df-source-head">
+            <h2>闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т绾惧鏌涢弴銊ョ€柛銉墮缁犮儲銇勯弮鍌涘殌濞存粎鍋撻幈銊ノ熺粙鍨婵犵绱曢弲顐ゆ閹烘纾兼繛鎴烆焽閻熻尙绱撴担铏瑰笡缂佽鐗嗛悾鐑藉箳閹冲磭鍠栭幃鐑藉级閹稿海妲梻鍌氬€峰ù鍥х暦閻㈢绐楅柟閭﹀劒濞差亜绠ｉ柨鏃囨閳ь剙娼￠弻銊╁籍閸屾矮澹曢梺鍝勬缁捇骞冨畡鎵虫瀻闊洦鎼╂禒鐐箾鐎涙ê娈犻柛濠冪墱閹广垹鈽夐姀鐘殿吅闂佺粯鍔栭鏍汲閿熺姵鈷戝ù鍏肩懅閸掓壆鈧娲﹂崜鐔凤耿娓氣偓濮婅櫣绱掑Ο蹇氬亹閹峰啴鏁冮崒姘優濠电偛妫楃换鍡涘绩?/h2>
+            <button className="df-icon-action i-close" data-tip="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? aria-label="闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佺懓顕崑鐔虹不閹€鏀介柣妯垮紦鏉? onClick={onClose} />
+          </div>
+          <div className="df-source-toolbar">
+            <button className="light" onClick={() => setShowAdded((value) => !value)}>{showAdded ? "闂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸缁犵娀鐓崶銊р槈缂佲偓婢跺绻嗘い鏍ㄧ懅缁夋寧绻涢幋鐐电叝婵炲矈浜炵槐鎺戔槈濮楀棗鍓伴梺鍝勬噽婵炩偓婵﹥妞藉畷銊︾節閸曨剙娅戞俊鐐€х€靛矂宕规导绮光偓锕傚炊椤掆偓缁狅綁鏌ㄩ弮鍌涙珪闁? : "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢妶鍌氫壕婵鍘ф晶顖炴煛閸涙澘鐓愮紒鍌涘笧閳ь剨缍嗛埀顒夊弿闂勫嫰骞堥妸銉建闁糕剝顨呴埛鎺楁⒑閸濄儱鏋庨柟铏耿瀵鈽夊Ο閿嬬€婚棅顐㈡祫缁插墽鐟у┑鐘垫暩閸嬫盯宕ョ€ｎ喖鍨傞柛褎顨呴拑?}</button>
+            <button className="primary" disabled={selectedIds.length === 0} onClick={addSelected}>濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌涘▎蹇曠闁哄矉缍侀獮鍥敊閻撳骸顬嗛梻浣虹帛鐢喖顢氳閳ワ妇鎹勯妸锕€纾繛鎾村嚬閸ㄨ鲸鐡忛梻鍌欑閹诧繝鏁冮埡鍛婵炲棙鎸撮埀?{selectedIds.length || ""}</button>
+          </div>
+          <div className="df-filter-row">
+            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸姀鈥冲簥闂佸壊鍋侀崕杈╃矆婢舵劖鐓欓弶鍫濆⒔閻ｈ京鐥幆褎鍋ラ柟顔筋殔閳藉鈻嶆潏銊х煁缂佸倸绉撮…銊╁醇閻斿搫骞堥梻浣瑰濡線顢氳閻涱喖螖閸愵亞锛?/button>
+            <button className={filter === "unassigned" ? "active" : ""} onClick={() => setFilter("unassigned")}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/button>
+            {projects.map((project) => <button key={project.id} className={filter === project.id ? "active" : ""} onClick={() => setFilter(project.id)}>{project.title}</button>)}
+          </div>
+        </div>
+        <div className="df-source-body">
+          {openTasks.filter((task) => task.dueDate < today).length > 0 && <section className="df-source-section"><h3>闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т绾惧鏌涢埄鍐槈缁炬儳顭烽弻鐔煎礈瑜滈崝婊堟煠閺夋寧鍋ラ柡灞界Ч閸┾剝鎷呴崨濠冾啀婵＄偑鍊愰弲婵嬪礂濮椻偓楠炲啳銇愰幒鎴犲€為梺闈涱焾閸庡磭绮婂畡閭︽富?/h3>
+            {openTasks.filter((task) => task.dueDate < today).slice(0, 8).map((task) => <SourceRow key={task.id} task={task} today={today} projectName={projects.find((project) => project.id === task.projectId)?.title || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?} selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}
+          </section>}
+          {openTasks.filter((task) => task.dueDate >= today).length > 0 && <section className="df-source-section"><h3>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ら悧鍡欑矆閸喓绠鹃柛鈩兩戠亸顓犵磼閻橀潧鈻堥柡灞剧洴閸╁嫰宕橀崜褍濮烘俊鐐€愰弲婵嬪礂濮椻偓楠炲啳銇愰幒鎴犲€為梺闈涱焾閸庡磭绮婂畡閭︽富?/h3>
+            {openTasks.filter((task) => task.dueDate >= today).slice(0, 8).map((task) => <SourceRow key={task.id} task={task} today={today} projectName={projects.find((project) => project.id === task.projectId)?.title || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?} selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}
+          </section>}
+          {filteredProjects.some((project) => openTasks.some((task) => task.projectId === project.id)) && <section className="df-source-section"><h3>闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉埀顒婄畵瀹曞ジ濡风€ｎ亝鍠橀柟顔炬櫕缁瑧鎷犳穱鍗炲姢闁逞屽墮缁犲秹宕曢柆宓ュ洦瀵奸弶鎴狅紵闁瑰吋鎯屽鎸庣濠婂牊鐓涢柛鎰╁妼閳ь剛鎳撻埢宥夊即閵忥紕鍘梺鍓插亝缁诲秹鎮℃總鍛婄厵?/h3>
+        {filteredProjects.map((project) => {
+          const projectTasks = openTasks.filter((task) => task.projectId === project.id).slice(0, 8);
+          if (projectTasks.length === 0) return null;
+          return <section key={project.id}><strong>{project.title}</strong>{projectTasks.map((task) => <SourceRow key={task.id} task={task} today={today} projectName={project.title} selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}</section>;
+        })}
+          </section>}
+          {filter === "unassigned" && openTasks.length > 0 && <section><strong>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?/strong>{openTasks.map((task) => <SourceRow key={task.id} task={task} today={today} projectName="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁? selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}</section>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SourceRow({ task, today, projectName, selected, expanded, onSelect, onExpand }: { task: Task; today: string; projectName: string; selected: boolean; expanded: boolean; onSelect: () => void; onExpand: () => void }) {
+  const joined = task.plannedForDate === today;
+  return (
+    <div className={`df-source-row ${selected ? "selected" : ""} ${joined ? "joined" : ""}`}>
+      <button className="df-source-select" onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}>{selected ? "闂? : "闂?}</button>
+      <div className="df-source-main" onClick={onExpand}>
+        <span>{task.title}</span>
+        <small>{joined ? "闂傚倷娴囬褎顨ョ粙鍖¤€块梺顒€绉埀顒婄畵瀹曠厧鈹戦幇顒侇吙闂備礁澹婇崑鍛洪弽顓熺叆闁靛牆鎳夐弨浠嬫煟濡搫绾ч柟鍏煎姉缁辨帡鍩€? : `${projectName} 闂?${formatDuration(task.estimatedHours || 0.5)} 闂?闂傚倸鍊搁崐宄懊归崶顒婄稏濠㈣埖鍔曠粻姘舵倶閻愭彃鈷旀い鈺佸级缁绘繈妫冨☉鍗炲壘闂?${shortDate(task.dueDate)}`}</small>
+        {expanded && <p>{task.notes || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢埗鑺ョ☉铻栭柛娑卞幘閿涙瑩姊洪懡銈呮瀾閻庢艾鐗嗛埥澶愬閻樻爠鍥ㄧ厱闁斥晛鍠氬▓妯肩磼閹邦喖浠辨慨濠冩そ楠炴牠鎮欓幓鎺戭潙闂備礁鎲￠弻銊х矓閻熼偊鍤?}</p>}
+      </div>
+    </div>
+  );
+}
+
+function PlanningView(props: {
+  data: PlannerData;
+  projects: Project[];
+  tasks: Task[];
+  collapsed: Record<string, boolean>;
+  setCollapsed: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  pickMode: boolean;
+  picks: Record<string, PlanPickPriority>;
+  onExitPickMode: () => void;
+  onAddPick: (taskId: string) => void;
+  onUpdatePick: (taskId: string, priority: PlanPickPriority) => void;
+  onRemovePick: (taskId: string) => void;
+  onClearPicks: () => void;
+  onApplyPicks: (scope: "today" | "week") => void;
+  onProjectEdit: (project: Project) => void;
+  onTaskEdit: (task: Task) => void;
+  onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
+  onTaskCreate: (projectId: string) => void;
+  onTaskDelete: (taskId: string) => void;
+}) {
+  const unassigned = props.tasks.filter((task) => !task.projectId && !task.completed);
+  const pickedTasks = Object.keys(props.picks)
+    .map((id) => props.tasks.find((task) => task.id === id))
+    .filter(Boolean) as Task[];
+  const priorityGroups: Array<[PlanPickPriority, string]> = [["must", "闂傚倸鍊搁崐鎼佲€﹂鍕；闁告洦鍊嬪ú顏勎у璺猴功閻ゅ洤鈹戦濮愪粶闁稿鎸搁埞鎴︽晬閸曞灚顥撶紓浣哄У缁嬫垿鍩ユ径濞㈢喓娑垫搴¤€?], ["should", "闂傚倸鍊风粈浣革耿闁秴鍌ㄧ憸鏃堝箖濞差亜惟闁靛瀛╃粙鎺旂箔閻旂厧鐒垫い鎺戝閳ь兛绀侀～婵嬵敆婢跺鍏婇梺鑽ゅ█缂傛艾鈻嶉敐澶嬫櫖?], ["could", "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佺硶鍓濋摂瀣炊椤掍胶鍔堕悗骞垮劚閹虫劙宕㈤幘顔解拺闁告繂瀚埢澶愭煕濡灝浜瑰?]];
+  const projectName = (task: Task) => props.projects.find((project) => String(project.id) === String(task.projectId || ""))?.title || "闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁?;
+  const addSubtask = (task: Task) => {
+    const title = window.prompt("闂傚倸鍊峰ù鍥敋瑜忛埀顒佺▓閺呮繄鍒掑▎鎾崇婵°倐鍋撶紒鈧径鎰厵闁绘垶锕╁▓鏃傜磼閻樺磭鍙€闁哄本娲濈粻娑氣偓锝庝簴閸嬫捇寮撮悩鐢电劶婵犮垼鍩栭崝鏍偂閸愵喗鐓忓璺虹墕婵′粙鏌ｅ┑鎰偗闁哄本绋掔换婵嬪磼濠婃劗绀婄紓?);
+    if (!title?.trim()) return;
+    props.onTaskUpdate(task.id, {
+      subtasks: [...(task.subtasks || []), { id: uid("subtask"), title: title.trim(), completed: false, done: false, order: Date.now(), createdAt: new Date().toISOString() }]
+    });
+  };
+  const setTaskDate = (task: Task) => {
+    const date = window.prompt("闂傚倸鍊峰ù鍥х暦閸偅鍙忕€规洖娲ㄩ惌鍡椕归敐鍫綈婵炲懐濮撮湁闁绘ê妯婇崕鎰版煕鐎ｅ吀閭柡灞剧洴閸╁嫰宕橀浣诡潔缂傚倷绶￠崑鍕矓瑜版帒钃熼柡鍥╁枎缁剁偞绻涢幋娆忕仾妞ゅ骸绉瑰?YYYY-MM-DD", task.dueDate || todayIso());
+    if (!date?.trim()) return;
+    props.onTaskUpdate(task.id, { dueDate: date.trim() });
+  };
+  const moveTaskProject = (task: Task) => {
+    const options = props.projects.map((project, index) => `${index + 1}. ${project.title}`).join("\n");
+    const choice = window.prompt(`缂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾閽樻繈鏌熼崜浣烘憘闁轰礁顑囬幉鍛婃償閵娿儳鐤勯梺闈浥堥弲娑㈡偂濞戙垺鐓曟繛鎴濆船楠炴ɑ銇勯敂璇蹭簼缂佺粯鐩鍫曞箣濠靛洤鈧垶姊烘导娆戠У濞存粠浜畷娲焵椤掍降浜滈柟鍝勬娴滃墽绱撴担鍓叉Ц缂傚秴锕悰顕€宕卞☉妯碱槹濡炪倖鐗徊楣冨疾椤忓牊鈷戠紒顖涙礀婢ф煡鏌ｉ悢婵嗘处閸嬫ɑ銇勮閺?. 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁绘稑鐣濇繝渚€鍋楅梺鍝勭焿缁查箖骞嗛弮鍫濈伋鐎规洖娲ょ敮?{options}`, "0");
+    if (choice === null) return;
+    const index = Number(choice) - 1;
+    props.onTaskUpdate(task.id, { projectId: index >= 0 ? props.projects[index]?.id : undefined });
+  };
+  const renameTask = (task: Task) => {
+    const title = window.prompt("缂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸绾惧湱鎲搁悧鍫濈瑲闁稿顑夐弻锝夊箛椤掑倷绮靛銈嗗姌婵倝濡甸崟顖氱疀闁告挷鑳堕弳鐘绘煟閻斿摜鎳曞┑鈥虫喘閸┾偓妞ゆ巻鍋撶紒鐘茬Ч瀹曟洟宕￠悙鈺傜亙?, task.title);
+    if (!title?.trim()) return;
+    props.onTaskUpdate(task.id, { title: title.trim() });
+  };
+  return (
+    <main className={`df-planning ${props.pickMode ? "pick-mode" : ""}`}>
+      <section className="df-mindmap no-root">
+        {props.pickMode && <div className="df-pick-banner"><strong>濠电姷鏁告慨鐢割敊閺嶎厼绐楁俊銈呭暞瀹曟煡鏌熼柇锕€鏋涚紒韬插€濋弻锕€螣娓氼垱顎嗛梺鑲╁鐎笛囧Φ閸曨喚鐤€闁圭偓娼欏▍褍顪冮妶鍌涙珖闁稿繑锕㈤悰顕€寮介‖銉ラ叄椤㈡鍩€椤掑嫬鐒垫い鎴炲劤閳ь剚娲熼垾锕傚炊椤掆偓缁犳盯鏌ｅΔ鈧悧蹇涘储闁秵鈷戦柛锔诲幖閸斿鏌熺粙鎸庢喐缂侇噮鍙冨畷鎺楁倷鐎电骞橀梻浣稿閻撳牓宕戦崟顖涘€堕柟缁㈠枟閻撴盯鎮橀悙璺盒撻柛锝堟閳ь剙鐏氬妯尖偓姘煎櫍閸┾偓妞ゆ帒锕︾粔闈浢瑰鍡楃厫缂佸倹甯為埀顒佺⊕椤洨绮绘ィ鍐╁€甸柣銏☆問閻掗箖妫勭€ｎ亶娓婚柕鍫濇閼茬娀鏌涢弴銊ュ鐎?/strong><span>闂傚倸鍊搁崐鐑芥嚄閸撲礁鍨濇い鏍仜缁€澶嬩繆閵堝懏鍣圭紒鐘靛█閺岀喖骞戦幇闈涙闂佸憡淇洪～澶愬Φ閸曨垰绫嶉柛灞剧⊕閻濐亜顪冮妶鍌涙珖闁稿繑锕㈤獮鍐亹閹烘垹鍊為梺闈涱焾閸庡磭绮婂畡閭︽富闁靛牆楠告禍鏍煕婵犲啰绠炵€殿喖顭烽弫鎾绘偐閼碱剦妲伴柣鐔哥矋閸ㄥ灝鐣峰Δ鍐ф勃闁告挆鍜佸晭?+ 闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鍨鹃幇浣圭稁缂傚倷鐒﹁摫闁告瑥绻橀弻鐔虹磼閵忕姵鐏堥梺娲诲幗椤ㄥ﹪寮诲☉銏犵労闁告劦浜栧Σ鍫㈢磼閻愵剙绀冩い顐㈩槺閹广垹鈽夐姀鐘茶€垮┑鈽嗗灥椤曆囨儍閹达附鈷戠紒瀣儥閸庢劙鏌熷宀婂殭妞ゆ洏鍎靛畷鐔碱敇濞戞ü澹曢梺鎸庣箓閹虫劖绂掑☉銏＄厸濞撴埃鍋撳ù婊嗘硾椤繐煤椤忓嫮顔囬柟鑹版彧缁插搫危閸儲鈷戞繛鑼额嚙楠炴牠鏌涙繝鍌涘仴鐎规洘妞介崺鈧い鎺嶉檷娴滄粓鏌熼崫鍕棞濞存粍鍎抽—鍐Χ韫囨挾妲ｉ梺鎼炲姀閸╂牗绌辨繝鍥ㄥ殝闁汇垺顔栧ù鍕煟鎼搭垳绉靛ù婊愮秬椤ゅ倿姊绘担渚敯闁稿鍔楅幃浼村Ψ閳轰胶鍔﹀銈嗗笂缁€浣规櫠椤栨稓绠惧┑鍌炴櫜閹茬偓鎱ㄦ繝鍛仩缂侇喗鐟ч幑鍕Ω瑜忛弶浠嬫⒒娴ｄ警鐒鹃悗娑掓櫆缁旂喖宕卞☉妯碱槴闂佸湱鍎ら〃鍛村礃閳ь剙顪冮妶鍡樺暗闁稿鍠栭幆鍫ュ礋椤栨稈鎷洪梻鍌氱墛娓氭顬婅缁辨帡鎮╅崘鑼紝闂佺硶鏅滈惄顖氼嚕椤曗偓瀹曞ジ鎮㈤摎鍌氭憢濠电姷鏁搁崑鐐哄垂閸洍鈧箓宕奸妷顖滅◤闂佹寧娲栭崐褰掓偂?/span><button onClick={props.onExitPickMode}>闂傚倸鍊搁崐鎼佸磹妞嬪孩顐介柨鐔哄Т绾惧鏌嶈閸撶喖寮诲☉姘ｅ亾閿濆骸浜濈€规洖鐭傞弻?/button></div>}
+        <div className="df-tree">
+          {props.projects.map((project) => {
+            const projectTasks = props.tasks.filter((task) => String(task.projectId || "") === String(project.id) && !task.completed);
+            return (
+              <div className="df-category-branch" key={project.id}>
+                <button className="df-collapse" onClick={() => props.setCollapsed((current) => ({ ...current, [project.id]: !current[project.id] }))}>{props.collapsed[project.id] ? "+" : "-"}</button>
+                <PlanningProjectNode title={project.title} onOpen={() => props.onProjectEdit(project)} onAddTask={() => props.onTaskCreate(project.id)} />
+                {!props.collapsed[project.id] && <div className="df-project-list"><div className="df-task-branch">{projectTasks.map((task) => (
+                  <PlanningTaskNode key={task.id} task={task} projectName={project.title} picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onStar={() => props.onTaskUpdate(task.id, { priority: "high", importance: "high" })} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
+                ))}</div></div>}
+              </div>
+            );
+          })}
+          {unassigned.length > 0 && (
+            <div className="df-category-branch">
+              <button className="df-collapse" onClick={() => props.setCollapsed((current) => ({ ...current, unassigned: !current.unassigned }))}>{props.collapsed.unassigned ? "+" : "-"}</button>
+              <PlanningProjectNode title="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁绘稑鐣濇繝渚€鍋楅梺鍝勭焿缂嶄線鐛崶顒夋晩缁炬媽椴稿В澶愭煟鎼淬値娼愭繛鍙夛耿閹繝鏁撻悩鑼舵憰? onAddTask={() => props.onTaskCreate("")} />
+              {!props.collapsed.unassigned && <div className="df-project-list"><div className="df-task-branch">{unassigned.map((task) => (
+                <PlanningTaskNode key={task.id} task={task} projectName="闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕濠电姴锕ょ€氼噣銆呴崣澶岀瘈濠电姴鍊归崳鐣岀磼閳ь剚绻濋崒妤佹杸闂佺粯蓱瑜板啴顢旇缁? picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onStar={() => props.onTaskUpdate(task.id, { priority: "high", importance: "high" })} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
+              ))}</div></div>}
+            </div>
+          )}
+        </div>
+      </section>
+      <section className="df-pick-panel">
+        <div className="df-pick-panel-head"><strong>闂傚倸鍊搁崐鐑芥嚄閸洍鈧箓宕奸妷锔芥珖闂侀潧顦弲婊堝磻閿熺姵鐓冮柛婵嗗閸ｅ綊鏌ｉ幒鎴犱粵闁靛洤瀚伴獮鎺楀幢濡炴儳顥氬┑锛勫亼閸娧呪偓闈涚焸瀹曟娊鏁愭径灞界ウ闂佺鎻粻鎴︼綖閸涘瓨鐓忛柛顐ｇ箖閸ｈ姤銇?/strong><span>{pickedTasks.length} 婵?/span></div>
+        {pickedTasks.length === 0 ? <div className="df-pick-empty">婵犵數濮烽弫鎼佸磻濞戙埄鏁嬫い鎾跺枑閸欏繘鎮楀☉娆欎緵婵炲牅绮欓弻娑樷槈濮楀牆濮涢梺宕囩帛濞茬喖鎮￠锕€鐐婇柕濠忚吂閹峰姊洪懡銈呮瀻婵犫偓闁秴绠熼柟闂寸缁秹鏌涢锝嗗剷闁靛／鈧崑鎾荤嵁閸喖濮庡銈忕細閸楀啿鐣烽弴鐔稿劅妞ゎ偒鍏涚花濠氭⒑閸濆嫬鏆欓柛濠勬嚀閳诲秹寮撮姀锛勫幈闂佸啿鎼崐鍛婃叏閸ヮ剚鐓冮柦妯侯樈濡偓濡ょ姷鍋為悷鈺佺暦濮椻偓婵℃悂濡疯濞煎姊婚崒娆戠獢闁逞屽墰閸嬫盯鎳熼娑欐珷妞ゆ柨顫曟禍婊堟煥閺冨洦顥夋い銉ヮ儔閺屽秷顧侀柛鎾村哺瀹曨偅鎯旈妸銉ь槷閻庡箍鍎卞ú銊╂儗婢舵劖鐓欓柣鎴炆戠亸鐢电磼閳锯偓閸嬫捇姊绘担渚劸闁哄牜鍓涘﹢渚€姊洪崨濠傜仯缂侇喗鐟ラ～蹇涙惞鐟欏嫬鐝伴梺鐐藉劚绾绢厽绂掗弶鎴旀斀闁绘劕寮堕崳鐑樼箾閸欏鐭掔€殿噮鍋婇、娆撴倷椤掆偓閺嬪倿姊洪崨濠冨闁稿繑绋戦～婵嬫晝閳ь剟鍩為幋锔藉€烽柡澶嬪灩娴犲摜绱掗悙顒佺凡缂佸缍婇獮鍐┿偅閸愩劎顢呴梺璇茬箺椤曆呯礊婵犲洤绠栭柍鍝勫€婚悷瑙勩亜閺嶃劎顣叉い鏂垮閳?/div> : priorityGroups.map(([priority, label]) => {
+          const groupTasks = pickedTasks.filter((task) => props.picks[task.id] === priority);
+          return <div className="df-pick-group" key={priority}><h3>{label}</h3>{groupTasks.length === 0 ? <small>闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢埗鑺ョ☉铻栭柛娑卞幘閿涙瑩姊洪懡銈呮瀾閻?/small> : groupTasks.map((task) => (
+            <article key={task.id} className="df-pick-card">
+              <div><strong>{task.title}</strong><span># {projectName(task)}</span></div>
+              <select value={props.picks[task.id]} onChange={(event) => props.onUpdatePick(task.id, event.target.value as PlanPickPriority)}>
+                <option value="must">闂傚倸鍊搁崐鎼佲€﹂鍕；闁告洦鍊嬪ú顏勎у璺猴功閻ゅ洤鈹戦濮愪粶闁稿鎸搁埞鎴︽晬閸曞灚顥撶紓浣哄У缁嬫垿鍩ユ径濞㈢喓娑垫搴¤€?/option>
+                <option value="should">闂傚倸鍊风粈浣革耿闁秴鍌ㄧ憸鏃堝箖濞差亜惟闁靛瀛╃粙鎺旂箔閻旂厧鐒垫い鎺戝閳ь兛绀侀～婵嬵敆婢跺鍏婇梺鑽ゅ█缂傛艾鈻嶉敐澶嬫櫖?/option>
+                <option value="could">闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢敂钘変罕闂佺硶鍓濋摂瀣炊椤掍胶鍔堕悗骞垮劚閹虫劙宕㈤幘顔解拺闁告繂瀚埢澶愭煕濡灝浜瑰?/option>
+              </select>
+              <button onClick={() => props.onRemovePick(task.id)}>缂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾閽樻繃銇勯弽顐汗闁逞屽墾缁犳垿鎮鹃敓鐘茬闁惧浚鍋嗛埀?/button>
+            </article>
+          ))}</div>;
+        })}
+        <div className="df-pick-actions">
+          <button className="primary" disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("today")}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鍨鹃幇浣圭稁缂傚倷鐒﹁摫闁告瑥绻橀弻鐔虹磼閵忕姵鐏堥梺娲诲幗椤ㄥ﹪寮诲☉銏犵労闁告劕澧介崝宄邦渻閵堝倹娅呴柛銏＄叀閸╃偤骞嬮敂钘変汗闂佸湱绮敮妤€鈻撻弻銉︹拺闁圭娴烽埥澶嬨亜閿旂偓鏆€殿喖顭烽幃銏ゆ惞閸︻厾鏆ユ繝鐢靛仦閸ㄦ儼鎽梺鎸庣☉缁夊綊寮婚敓鐘茬劦?/button>
+          <button disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("week")}>闂傚倸鍊搁崐椋庣矆娓氣偓楠炲鍨鹃幇浣圭稁缂傚倷鐒﹁摫闁告瑥绻橀弻鐔虹磼閵忕姵鐏堥梺娲诲幗椤ㄥ﹪寮诲☉銏犵労闁告劦浜栧Σ鍫ユ煟鎼淬垼澹樻い锔垮嵆婵＄敻宕熼姘鳖唺闂佺硶鍓濋妵鐐寸珶閺囥垺鈷掑ù锝囧劋閸も偓闂佸摜鍠庨悘婵婄亱濠电偞鍨崹鍦不椤栫偞鍊甸柨婵嗛閺嬫盯鏌ｈ箛鏂库枙闁哄本鐩獮鍥敍濮樿鲸顕楀┑?/button>
+          <button className="light" disabled={pickedTasks.length === 0} onClick={props.onClearPicks}>濠电姷鏁告慨鐑藉极閹间礁纾婚柣鎰惈缁犱即鏌熼梻瀵割槮缂佺姷濞€閺岀喖鎮ч崼鐔哄嚒闂佺粯鎸婚敃銏ゅ蓟閳ユ剚鍚嬮幖绮光偓宕囶啇缂備胶鍋撳畷姗€锝炴径灞惧床婵炴垯鍨归獮銏′繆椤栨繍鍤欓柣銊﹀灴濮?/button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function PlanningTaskNode(props: {
+  task: Task;
+  projectName: string;
+  picked: boolean;
+  onOpen: () => void;
+  onAdd: () => void;
+  onRename: () => void;
+  onAddSubtask: () => void;
+  onSetDate: () => void;
+  onMoveProject: () => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div className={`df-plan-task-node ${props.picked ? "picked" : ""}`}> 
+      <button className="df-task-node" onClick={props.onOpen}>
+        <span>{props.task.title}</span>
+        {(props.task.subtasks || []).length > 0 && <small>{props.task.subtasks?.filter((sub) => sub.completed || sub.done).length}/{props.task.subtasks?.length}</small>}
+        {props.picked && <em>Picked</em>}
+      </button>
+      <div className="df-plan-node-actions">
+        <button title="Join candidate" onClick={props.onAdd}>&rarr;</button>
+        <button title="More" onClick={() => setMenuOpen((open) => !open)}>&hellip;</button>
+      </div>
+      {menuOpen && <div className="df-plan-more">
+        <button onClick={() => { props.onRename(); setMenuOpen(false); }}>Rename</button>
+        <button onClick={() => { props.onAddSubtask(); setMenuOpen(false); }}>Add subtask</button>
+        <button onClick={() => { props.onSetDate(); setMenuOpen(false); }}>Set date</button>
+        <button onClick={() => { props.onMoveProject(); setMenuOpen(false); }}>Move to project</button>
+        <button className="danger" onClick={() => { props.onDelete(); setMenuOpen(false); }}>Delete</button>
+      </div>}
+    </div>
+  );
+}
+
+function PlanningProjectNode(props: { title: string; onOpen?: () => void; onAddTask: () => void }) {
+  return (
+    <div className="df-plan-project-node">
+      <button className="df-category-node project-root" onClick={props.onOpen}>{props.title}</button>
+      <button className="df-plan-project-add" title="濠电姷鏁告慨鐑藉极閹间礁纾块柟瀵稿Х缁€濠囨煃瑜滈崜姘跺Φ閸曨垰鍗抽柛鈩冾殔椤忣亪鏌涘▎蹇曠闁哄矉缍侀獮鍥敆婢跺﹥顔嶆俊鐐€愰弲婵嬪礂濮椻偓楠炲啳銇愰幒鎴犲€為梺闈涱焾閸庡磭绮婂畡閭︽富? onClick={props.onAddTask}>+</button>
+    </div>
+  );
+}
+
+const rootElement = document.getElementById("root")!;
+const rootKey = "__plannerRoot";
+const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
+const root = rootWindow[rootKey] ?? createRoot(rootElement);
+rootWindow[rootKey] = root;
+root.render(<App />);
