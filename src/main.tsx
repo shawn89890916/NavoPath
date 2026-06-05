@@ -12,9 +12,9 @@ const TIMELINE_END = 24;
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
-const PROJECT_COLOR_PRESETS = ["#C69CF9", "#8B5CF6", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444", "#64748B"];
-const EXECUTE_THEME_PRESETS = ["#C69CF9", "#8B5CF6", "#EC4899", "#38BDF8", "#F59E0B", "#64748B"];
-const PLANNING_THEME_PRESETS = ["#CAFF72", "#84CC16", "#22C55E", "#38BDF8", "#C69CF9", "#F59E0B"];
+const PROJECT_COLOR_PRESETS = ["#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
+const EXECUTE_THEME_PRESETS = ["#8B5CF6", "#7C3AED", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8"];
+const PLANNING_THEME_PRESETS = ["#8B5CF6", "#7C3AED", "#A78BFA", "#38BDF8", "#22C55E", "#F59E0B"];
 const RELEASE_NOTES = [
   { date: "2026-06-05", summary: "统一执行页与规划页的主题色联动，补齐项目颜色对时间轴色条的映射。" },
   { date: "2026-06-05", summary: "加入 3天 / 周 / 月视图，并持续修正多日时间轴的拖拽与布局对齐。" },
@@ -25,12 +25,12 @@ const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60)
   return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
 });
 const categories: Record<Category, { label: string; color: string }> = {
-  exam: { label: "考试", color: "#8B5CF6" },
-  uk: { label: "英国申请", color: "#C69CF9" },
-  us: { label: "美国申请", color: "#7C3AED" },
+  exam: { label: "考试", color: "#7C3AED" },
+  uk: { label: "英国申请", color: "#8B5CF6" },
+  us: { label: "美国申请", color: "#A78BFA" },
   essay: { label: "文书", color: "#EC4899" },
   materials: { label: "材料", color: "#22C55E" },
-  project: { label: "项目", color: "#CAFF72" },
+  project: { label: "项目", color: "#38BDF8" },
   personal: { label: "个人", color: "#64748B" }
 };
 const priorityLabel: Record<Priority, string> = { high: "高", medium: "中", low: "低" };
@@ -50,7 +50,7 @@ function normalizeHexColor(value: string, fallback: string) {
 }
 
 function hexToRgb(value: string) {
-  const hex = normalizeHexColor(value, "#C69CF9").slice(1);
+  const hex = normalizeHexColor(value, "#8B5CF6").slice(1);
   return {
     r: parseInt(hex.slice(0, 2), 16),
     g: parseInt(hex.slice(2, 4), 16),
@@ -71,8 +71,8 @@ function isLightColor(value: string) {
 }
 
 function themeVars(settings: Settings) {
-  const execute = normalizeHexColor(settings.executeAccentColor || "#C69CF9", "#C69CF9");
-  const planning = normalizeHexColor(settings.planningAccentColor || "#CAFF72", "#CAFF72");
+  const execute = normalizeHexColor(settings.executeAccentColor || "#8B5CF6", "#8B5CF6");
+  const planning = normalizeHexColor(settings.planningAccentColor || "#A78BFA", "#A78BFA");
   const executeLight = isLightColor(execute);
   const planningLight = isLightColor(planning);
   return {

@@ -3,13 +3,13 @@
   --df-font-ui: "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   --df-font-task: "Inter", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   font-family: var(--df-font-ui);
-  --color-primary: var(--mode-primary, #C69CF9);
-  --color-primary-strong: var(--mode-primary-strong, #8B5CF6);
-  --color-primary-soft: var(--mode-primary-soft, #F6EEFF);
-  --color-accent: var(--mode-accent, #CAFF72);
-  --color-accent-soft: var(--mode-accent-soft, #F3FFD6);
-  --color-bg: #F8FAFC;
-  --color-bg-tint: #FBF7FF;
+  --color-primary: var(--mode-primary, #8B5CF6);
+  --color-primary-strong: var(--mode-primary-strong, #7C3AED);
+  --color-primary-soft: var(--mode-primary-soft, #F3ECFD);
+  --color-accent: var(--mode-accent, #A78BFA);
+  --color-accent-soft: var(--mode-accent-soft, #F3ECFD);
+  --color-bg: #F5F3FA;
+  --color-bg-tint: #F3ECFD;
   --color-surface: #FFFFFF;
   --color-border: #E5E7EB;
   --color-border-soft: #EEF0F4;
@@ -20,7 +20,7 @@
   --color-warning: #F59E0B;
   --color-success: #10B981;
   color: #111827;
-  background: #F8FAFC;
+  background: #F5F3FA;
   font-synthesis: none;
   text-rendering: geometricPrecision;
   /* Clean design tokens */
@@ -30,7 +30,7 @@
   --nv-shadow: 0 1px 3px rgba(0,0,0,0.04);
   --nv-shadow-sm: 0 1px 2px rgba(0,0,0,0.03);
   --nv-shadow-md: 0 4px 12px rgba(0,0,0,0.06);
-  --nv-shadow-hover: 0 8px 20px rgba(198, 156, 249, 0.16);
+  --nv-shadow-hover: 0 8px 20px rgba(139, 92, 246, 0.18);
   --nv-shadow-active: inset 0 1px 2px rgba(0,0,0,0.06);
   --nv-transition: all .15s ease;
 }
@@ -69,7 +69,7 @@ body {
   margin: 0;
   min-width: 980px;
   min-height: 720px;
-  background: #F8FAFC;
+  background: #F5F3FA;
 }
 
 button,
@@ -92,7 +92,7 @@ p {
 
 .app-shell,
 .loading {
-  --bg: #F8FAFC;
+  --bg: #F5F3FA;
   --surface: #FFFFFF;
   --surface-subtle: #FAFAFA;
   --surface-raised: #FFFFFF;
@@ -111,7 +111,7 @@ p {
 
 .theme-calm,
 .theme-focus {
-  --bg: #F8FAFC;
+  --bg: #F5F3FA;
 }
 
 .theme-dark {
@@ -4268,7 +4268,7 @@ textarea:focus {
   top: -10px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: var(--color-primary-soft, #F6EEFF);
+  background: var(--color-primary-soft, #F3ECFD);
   color: var(--mode-primary-strong);
   font-size: 10px;
   font-weight: 720;
@@ -5948,24 +5948,24 @@ input[type="range"] {
 
 /* NavoPath rebuilt shell */
 .df-app {
-  --df-primary: var(--mode-primary, #C69CF9);
-  --df-primary-strong: var(--mode-primary-strong, var(--mode-primary));
-  --df-primary-soft: color-mix(in srgb, var(--mode-primary, #C69CF9) 14%, #fff);
-  --df-accent: #CAFF72;
-  --df-accent-soft: #F3FFD6;
-  --df-bg: #F8FAFC;
+  --df-primary: var(--mode-primary, #8B5CF6);
+  --df-primary-strong: var(--mode-primary-strong, #7C3AED);
+  --df-primary-soft: color-mix(in srgb, var(--mode-primary, #8B5CF6) 14%, #fff);
+  --df-accent: #A78BFA;
+  --df-accent-soft: #F3ECFD;
+  --df-bg: #F5F3FA;
   --df-surface: #FFFFFF;
   --df-border: #E5E7EB;
   --df-text: #111827;
   --df-muted: #6B7280;
   --df-danger: #EF4444;
-  --mode-primary: #C69CF9;
-  --mode-primary-strong: var(--mode-primary);
-  --mode-primary-soft: #F6EEFF;
+  --mode-primary: #8B5CF6;
+  --mode-primary-strong: #7C3AED;
+  --mode-primary-soft: #F3ECFD;
   --mode-on-primary: #fff;
-  --mode-bg-a: #F8FAFC;
-  --mode-bg-b: #FAFAFA;
-  --mode-bg-c: #FBF7FF;
+  --mode-bg-a: #F5F3FA;
+  --mode-bg-b: #FAFAFE;
+  --mode-bg-c: #F3ECFD;
   min-height: 100vh;
   background:
     radial-gradient(ellipse at 15% 5%, color-mix(in srgb, var(--mode-primary) 22%, transparent), transparent 45%),
@@ -5976,50 +5976,47 @@ input[type="range"] {
   transition: background .42s ease;
 }
 .df-app.mode-execute {
-  --mode-primary: var(--execute-primary, #C69CF9);
-  --mode-primary-strong: var(--execute-primary-strong, var(--mode-primary));
-  --mode-primary-soft: color-mix(in srgb, var(--execute-primary, #C69CF9) 14%, #fff);
+  --mode-primary: var(--execute-primary, #8B5CF6);
+  --mode-primary-strong: var(--execute-primary-strong, #7C3AED);
+  --mode-primary-soft: color-mix(in srgb, var(--execute-primary, #8B5CF6) 14%, #fff);
   --mode-on-primary: var(--execute-on-primary, #fff);
-  --mode-bg-a: #F8FAFC;
-  --mode-bg-b: #FAFAFA;
-  --mode-bg-c: #FBF7FF;
-  --header-fg: #111827;
+  --mode-bg-a: #F5F3FA;
+  --mode-bg-b: #FAFAFE;
+  --mode-bg-c: #F3ECFD;
+  --header-fg: #FFFFFF;
   --header-fg-muted: #6B7280;
   --header-bg: var(--execute-header-bg);
 }
 .df-app.mode-planning {
-  --mode-primary: var(--planning-primary, #CAFF72);
-  --mode-primary-strong: var(--planning-primary-strong, var(--mode-primary-strong));
-  --mode-primary-soft: color-mix(in srgb, var(--planning-primary, #CAFF72) 16%, #fff);
+  --mode-primary: var(--planning-primary, #A78BFA);
+  --mode-primary-strong: var(--planning-primary-strong, #8B5CF6);
+  --mode-primary-soft: color-mix(in srgb, var(--planning-primary, #A78BFA) 16%, #fff);
   --mode-on-primary: var(--planning-on-primary, #111827);
-  --mode-bg-a: #F8FAFC;
-  --mode-bg-b: #FAFAFA;
-  --mode-bg-c: #FBF7FF;
+  --mode-bg-a: #F5F3FA;
+  --mode-bg-b: #FAFAFE;
+  --mode-bg-c: #F3ECFD;
   --header-fg: #111827;
   --header-fg-muted: #6B7280;
   --header-bg: var(--planning-header-bg);
 }
 .df-app.no-theme-gradient {
-  background: #F8FAFC;
+  background: #F5F3FA;
 }
 .df-app.no-theme-gradient .df-header,
 .df-app.no-theme-gradient .df-execute,
 .df-app.no-theme-gradient .df-planning-shell {
   background-image: none !important;
 }
-.df-app.no-theme-gradient .df-header {
-  background: linear-gradient(180deg, #FFFFFF 0%, #FBF7FF 100%) !important;
-}
 .df-app.no-theme-gradient .df-execute,
 .df-app.no-theme-gradient .df-planning-shell {
-  background: #F8FAFC !important;
+  background: #F5F3FA !important;
 }
 .df-app.no-theme-gradient .df-candidate-panel,
 .df-app.no-theme-gradient .df-timeline-panel,
 .df-app.no-theme-gradient .df-drawer,
 .df-app.no-theme-gradient .df-utility-panel {
   background: #FFFFFF !important;
-  border-color: #E5E7EB !important;
+  border-color: color-mix(in srgb, var(--mode-primary) 22%, #E5E7EB) !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
 }
 .df-app.no-theme-gradient .df-timeline-canvas,
@@ -6129,9 +6126,9 @@ input[type="range"] {
   align-items: center;
   justify-content: space-between;
   padding: 0 18px 0 4px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FBF7FF 100%);
-  border-bottom: 1px solid #E5E7EB;
-  color: #111827;
+  background: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 50%, #A78BFA 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  color: #FFFFFF;
   transition: background .42s ease, border-color .42s ease, color .2s ease;
 }
 .df-header::after {
@@ -6182,22 +6179,23 @@ input[type="range"] {
 .dayflow-icon.compact { width: 28px; height: 28px; }
 .dayflow-icon img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 0; box-shadow: none; }
 
-.df-tabs { display: inline-flex; padding: 4px; border: 1px solid color-mix(in srgb, var(--header-fg, #fff) 55%, transparent); background: color-mix(in srgb, var(--header-fg, #fff) 72%, transparent); border-radius: 12px; box-shadow: 0 1px 3px rgba(198, 156, 249, 0.1); }
+.df-tabs { display: inline-flex; padding: 4px; border: 1px solid color-mix(in srgb, var(--header-fg, #fff) 55%, transparent); background: color-mix(in srgb, var(--header-fg, #fff) 72%, transparent); border-radius: 12px; box-shadow: 0 1px 3px rgba(139, 92, 246, 0.12); }
 .df-header > .df-tabs { display: none; }
 .df-tabs button { border: 0; background: transparent; min-width: 74px; box-shadow: none; }
 .df-tabs button { color: #6B7280; font-weight: 760; }
-.df-tabs button.active { background: linear-gradient(135deg, var(--mode-primary-strong), var(--mode-primary)); border: 1px solid rgba(255,255,255,.62); color: #5B21B6; }
+.df-tabs button.active { background: linear-gradient(135deg, #7C3AED, #8B5CF6); border: 1px solid rgba(255,255,255,.62); color: #FFFFFF; box-shadow: 0 4px 12px rgba(124, 58, 237, .28); }
 .df-header .df-tabs {
-  background: rgba(198, 156, 249, 0.08);
-  border-color: rgba(198, 156, 249, 0.2);
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 .df-header .df-tabs button {
-  color: #6B7280 !important;
+  color: rgba(255, 255, 255, .82) !important;
 }
 .df-header .df-tabs button.active {
-  background: #F6EEFF !important;
-  border: 1px solid #C69CF9 !important;
-  color: #5B21B6 !important;
+  background: rgba(255, 255, 255, .22) !important;
+  border: 1px solid rgba(255, 255, 255, .34) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .12) !important;
 }
 
 .df-execute {
@@ -6208,7 +6206,7 @@ input[type="range"] {
   padding: 8px 8px 10px;
   overflow: hidden;
   border-radius: 0;
-  background: #F8FAFC;
+  background: #F5F3FA;
   animation: dfPageIn .22s ease-out;
 }
 
@@ -6809,7 +6807,7 @@ input[type="range"] {
   min-width: 0;
   padding: 0 !important;
   border-radius: 18px 8px 18px 18px !important;
-  background: #F6EEFF !important;
+  background: #F3ECFD !important;
   color: #5B21B6 !important;
   font-size: 12px;
   font-weight: 900;
@@ -6924,7 +6922,7 @@ input[type="range"] {
   background: rgba(198, 156, 249, 0.1) !important;
 }
 .df-top-view-switch button.active {
-  background: #F6EEFF !important;
+  background: #F3ECFD !important;
   border: 1px solid #C69CF9 !important;
   box-shadow: none !important;
   color: #5B21B6 !important;
@@ -6977,7 +6975,7 @@ input[type="range"] {
   outline-offset: 1px;
 }
 .df-view-switch button.active {
-  background: #F6EEFF !important;
+  background: #F3ECFD !important;
   border: 1px solid #C69CF9 !important;
   color: #5B21B6 !important;
   box-shadow: 0 1px 3px rgba(198, 156, 249, 0.2) !important;
@@ -7491,10 +7489,10 @@ body.df-resizing * {
 .df-now-line { position: absolute; left: -4px; right: -4px; height: 0; border-top: 2px solid var(--mode-primary-strong); z-index: 7; pointer-events: none; }
 .df-now-line span { position: absolute; left: -50px; top: -10px; background: var(--mode-primary-strong); color: #fff; padding: 2px 6px; border-radius: 999px; font-size: 11px; box-shadow: 0 6px 16px color-mix(in srgb, var(--mode-primary-strong) 24%, transparent); }
 
-.df-add-fab, .df-ai-fab { position: fixed; right: 22px; z-index: 20; box-shadow: 0 12px 28px rgba(17,24,39,.14); }
-.df-add-fab { bottom: 86px; background: #FFFFFF; color: #5B21B6; border-color: rgba(198, 156, 249, 0.5); }
-.df-ai-fab { bottom: 24px; width: 52px; height: 52px; border-radius: 18px; color: #FFFFFF; background: linear-gradient(135deg, #8B5CF6, #C69CF9); border: 0; }
-.df-ai-fab:hover { box-shadow: 0 0 0 6px rgba(202, 255, 114, 0.28), 0 8px 24px rgba(139, 92, 246, 0.3); }
+.df-add-fab, .df-ai-fab { position: fixed; right: 22px; z-index: 20; box-shadow: 0 8px 22px rgba(124, 58, 237, .28); }
+.df-add-fab { bottom: 86px; background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: #FFFFFF; border-color: transparent; border-radius: 13px; }
+.df-ai-fab { bottom: 24px; width: 52px; height: 52px; border-radius: 18px; color: #FFFFFF; background: linear-gradient(135deg, #8B5CF6, #A78BFA); border: 0; }
+.df-ai-fab:hover { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0.22), 0 8px 24px rgba(139, 92, 246, 0.34); }
 
 .df-drawer-backdrop { position: fixed; inset: 0; z-index: 39; background: rgba(17, 24, 39, .14); backdrop-filter: blur(4px); }
 .df-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 94vw); z-index: 40; border-radius: 16px 0 0 16px; padding: 18px; overflow: auto; box-shadow: -18px 0 48px rgba(17,24,39,.12); animation: dfSlideIn .2s ease-out; }
@@ -8309,7 +8307,7 @@ body.df-resizing * {
   height: 36px;
   border-radius: 50%;
   border: 1.5px solid #E5E7EB;
-  background: #F6EEFF;
+  background: #F3ECFD;
   color: #5B21B6;
   display: flex;
   align-items: center;
@@ -9489,7 +9487,7 @@ body.df-resizing * {
 
 /* Header tabs — keep special dark treatment */
 .theme-neumorphic .df-header .df-tabs{
-  background: #F6EEFF !important;
+  background: #F3ECFD !important;
   box-shadow: none !important;
 }
 
@@ -10276,7 +10274,7 @@ body.df-resizing * {
 }
 
 .df-top-view-switch button.active {
-  background: #F6EEFF !important;
+  background: #F3ECFD !important;
   border: 1px solid #C69CF9 !important;
   box-shadow: none !important;
   color: #5B21B6 !important;
@@ -10752,16 +10750,16 @@ body.df-resizing * {
 
 .df-header {
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--mode-primary) 13%, #FFFFFF) 0%, #FFFFFF 42%, color-mix(in srgb, var(--mode-primary) 8%, #FFFFFF) 100%) !important;
-  border-bottom-color: color-mix(in srgb, var(--mode-primary) 18%, #E5E7EB) !important;
+    linear-gradient(135deg, #7C3AED 0%, #8B5CF6 50%, #A78BFA 100%) !important;
+  border-bottom-color: rgba(255, 255, 255, .14) !important;
   color: #111827;
 }
 
 .df-execute,
 .df-planning-shell {
   background:
-    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--mode-primary) 6%, transparent) 0, transparent 32%),
-    #FFFFFF !important;
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--mode-primary) 5%, transparent) 0, transparent 32%),
+    #FAFAFE !important;
 }
 
 .df-candidate-panel,
@@ -10797,16 +10795,17 @@ body.df-resizing * {
 }
 
 .df-app.no-theme-gradient .df-header {
-  background: #FFFFFF !important;
+  background: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 50%, #A78BFA 100%) !important;
+  color: #FFFFFF !important;
 }
 
 /* The title bar is the single strong brand-color surface. */
 .df-header,
 .df-app.no-theme-gradient .df-header {
-  background: var(--mode-primary) !important;
-  border-bottom-color: color-mix(in srgb, var(--mode-primary-strong) 24%, transparent) !important;
+  background: linear-gradient(135deg, var(--mode-primary-strong) 0%, var(--mode-primary) 62%, color-mix(in srgb, var(--mode-primary) 84%, #ffffff) 100%) !important;
+  border-bottom-color: color-mix(in srgb, var(--mode-primary-strong) 42%, transparent) !important;
   color: var(--mode-on-primary) !important;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--mode-primary-strong) 16%, transparent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--mode-primary-strong) 18%, transparent);
 }
 
 .df-header::after {
@@ -10823,27 +10822,33 @@ body.df-resizing * {
 .df-header .df-tabs,
 .df-app.no-theme-gradient .df-top-view-switch,
 .df-app.no-theme-gradient .df-tabs {
-  background: color-mix(in srgb, var(--mode-on-primary) 9%, transparent) !important;
-  border-color: color-mix(in srgb, var(--mode-on-primary) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--mode-on-primary) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--mode-on-primary) 26%, transparent) !important;
+  backdrop-filter: blur(4px);
+}
+
+.df-header .df-top-view-switch button,
+.df-header .df-tabs button {
+  color: color-mix(in srgb, var(--mode-on-primary) 86%, transparent) !important;
 }
 
 .df-header .df-top-view-switch button.active,
 .df-header .df-tabs button.active {
-  background: color-mix(in srgb, var(--mode-primary-strong) 34%, transparent) !important;
-  color: var(--mode-on-primary) !important;
-  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--mode-on-primary) 68%, transparent) !important;
+  background: rgba(255, 255, 255, .24) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .12) !important;
 }
 
-/* Unified primary actions: quiet white surfaces with theme-color detail. */
+/* Unified primary actions: prominent purple pill buttons. */
 .df-ai-plan,
 .df-quick-add-submit,
 .df-add-fab,
 .df-ai-fab {
-  border: 1px solid color-mix(in srgb, var(--mode-primary) 34%, #E5E7EB) !important;
-  background: rgba(255, 255, 255, .94) !important;
-  color: var(--mode-primary-strong) !important;
-  box-shadow: 0 5px 16px rgba(17, 24, 39, .08) !important;
-  transition: transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease !important;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 42%, transparent) !important;
+  background: linear-gradient(135deg, var(--mode-primary-strong), var(--mode-primary)) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--mode-primary-strong) 38%, transparent) !important;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease !important;
 }
 
 .df-ai-plan {
@@ -10899,10 +10904,10 @@ body.df-resizing * {
 .df-quick-add-submit:not(:disabled):hover,
 .df-add-fab:hover,
 .df-ai-fab:hover {
-  transform: translateY(-1px) !important;
-  border-color: var(--mode-primary) !important;
-  background: color-mix(in srgb, var(--mode-primary) 7%, #FFFFFF) !important;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--mode-primary-strong) 12%, transparent) !important;
+  transform: translateY(-2px) !important;
+  border-color: color-mix(in srgb, #FFFFFF 34%, transparent) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mode-primary-strong) 82%, #fff), color-mix(in srgb, var(--mode-primary) 78%, #fff)) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--mode-primary-strong) 48%, transparent) !important;
 }
 
 .df-ai-plan:active,
@@ -10910,11 +10915,11 @@ body.df-resizing * {
 .df-add-fab:active,
 .df-ai-fab:active {
   transform: translateY(0) scale(.97) !important;
-  box-shadow: 0 2px 8px rgba(17, 24, 39, .08) !important;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--mode-primary-strong) 32%, transparent) !important;
 }
 
 .df-quick-add-submit:disabled {
-  background: #FFFFFF !important;
+  background: #E5E7EB !important;
   color: #9CA3AF !important;
   border-color: #E5E7EB !important;
   box-shadow: none !important;
@@ -10922,17 +10927,17 @@ body.df-resizing * {
 
 /* Execute workspace framing: two clear white boards with a theme-color rim. */
 .df-execute {
-  gap: 12px;
-  padding: 10px;
+  gap: 14px;
+  padding: 12px;
 }
 
 .df-candidate-panel,
 .df-timeline-panel {
   background: #FFFFFF !important;
-  border: 2px solid color-mix(in srgb, var(--mode-primary) 78%, #FFFFFF) !important;
+  border: 2px solid color-mix(in srgb, var(--mode-primary) 38%, #E8E4F8) !important;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--mode-primary) 18%, transparent),
-    0 10px 26px rgba(17, 24, 39, .055) !important;
+    0 0 0 1px color-mix(in srgb, var(--mode-primary) 10%, transparent),
+    0 8px 28px rgba(124, 58, 237, .08) !important;
 }
 
 .df-candidate-panel {
@@ -10946,7 +10951,7 @@ body.df-resizing * {
 .df-app.no-theme-gradient .df-candidate-panel,
 .df-app.no-theme-gradient .df-timeline-panel {
   background: #FFFFFF !important;
-  border-color: var(--mode-primary) !important;
+  border-color: color-mix(in srgb, var(--mode-primary) 34%, #e5e7eb) !important;
 }
 
 /* Final contrast guard: operation feedback must stay readable in every theme. */
@@ -11040,10 +11045,10 @@ body.df-resizing * {
 .df-header .df-tabs button.active,
 .df-top-view-switch button.active,
 .df-view-switch button.active {
-  background: linear-gradient(135deg, var(--mode-primary-strong), var(--mode-primary)) !important;
-  border-color: color-mix(in srgb, var(--mode-primary) 58%, #ffffff) !important;
-  color: var(--mode-on-primary) !important;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--mode-primary) 24%, transparent) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mode-primary-strong) 78%, #FFFFFF), var(--mode-primary)) !important;
+  border-color: color-mix(in srgb, #FFFFFF 68%, transparent) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--mode-primary-strong) 56%, transparent) !important;
 }
 
 .df-top-view-switch button,
@@ -11053,14 +11058,15 @@ body.df-resizing * {
 }
 
 .df-user-avatar {
-  border-color: color-mix(in srgb, var(--mode-primary) 36%, #d1d5db) !important;
-  background: color-mix(in srgb, var(--mode-primary) 10%, #fff) !important;
-  color: var(--mode-primary-strong) !important;
+  border-color: color-mix(in srgb, var(--mode-on-primary) 42%, transparent) !important;
+  background: color-mix(in srgb, var(--mode-on-primary) 18%, transparent) !important;
+  color: var(--mode-on-primary) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
 }
 
 .df-user-avatar:hover {
-  background: color-mix(in srgb, var(--mode-primary) 18%, #fff) !important;
-  border-color: color-mix(in srgb, var(--mode-primary) 52%, #d1d5db) !important;
+  background: color-mix(in srgb, var(--mode-on-primary) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--mode-on-primary) 62%, transparent) !important;
 }
 
 .df-settings-profile {
