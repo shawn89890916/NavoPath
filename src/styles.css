@@ -6575,7 +6575,7 @@ input[type="range"] {
   min-width: 0;
   height: 34px;
   border: 0;
-  border-bottom: 1px solid rgba(107, 114, 128, .48);
+  border-bottom: 1px solid color-mix(in srgb, var(--mode-primary) 36%, #d1d5db);
   background: transparent;
   padding: 0 2px;
   color: var(--df-text);
@@ -7744,7 +7744,7 @@ body.df-resizing * {
 .df-ai-panel { position: fixed; right: 22px; bottom: 88px; width: min(360px, 92vw); z-index: 35; padding: 14px; box-shadow: 0 18px 44px rgba(17,24,39,.16); animation: dfPopoverIn .16s ease-out; transform-origin: right bottom; }
 .df-ai-panel > div { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .df-ai-panel textarea { width: 100%; min-height: 96px; border: 1px solid var(--df-border); border-radius: 10px; padding: 10px; }
-.df-ai-panel pre { white-space: pre-wrap; background: #F9FAFB; border: 1px solid var(--df-border); border-radius: 10px; padding: 10px; max-height: 240px; overflow: auto; }
+.df-ai-panel pre { white-space: pre-wrap; background: color-mix(in srgb, var(--mode-primary) 4%, #FFFFFF); border: 1px solid color-mix(in srgb, var(--mode-primary) 18%, var(--df-border)); border-radius: 10px; padding: 10px; max-height: 240px; overflow: auto; }
 
 .df-modal { position: fixed; inset: 0; z-index: 50; background: rgba(17,24,39,.14); display: grid; place-items: center; animation: dfFadeIn .14s ease-out; }
 .df-source { width: min(760px, 94vw); height: min(680px, 82vh); overflow: hidden; padding: 0; display: grid; grid-template-rows: auto 1fr; }
@@ -10377,7 +10377,7 @@ body.df-resizing * {
 /* ── AI Panel & Dock ─────────────────────────────────────────── */
 .df-ai-panel {
   background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 22%, #E5E7EB);
 }
 
 .df-ai-dock-trigger {
@@ -10488,8 +10488,8 @@ body.df-resizing * {
 
 /* ── Quick Add ───────────────────────────────────────────────── */
 .df-quick-add {
-  background: #FAFAFA;
-  border: 1px solid #E5E7EB;
+  background: color-mix(in srgb, var(--mode-primary) 3%, #FFFFFF);
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 26%, #E5E7EB);
   border-radius: 8px;
   box-shadow: none;
   padding: 6px 10px;
