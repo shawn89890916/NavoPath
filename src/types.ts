@@ -141,6 +141,7 @@ export interface PlannerData {
 
 export interface Settings {
   activeMode: "execute" | "planning";
+  defaultTimelineView?: "daily" | "3day" | "weekly" | "month";
   planningView: "tree" | "matrix" | "split";
   aiDockOpen: boolean;
   appTitle: string;

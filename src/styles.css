@@ -6730,6 +6730,39 @@ input[type="range"] {
   color: #111827;
   font-size: 22px;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.df-date-title.today {
+  color: var(--mode-primary-strong);
+}
+.df-back-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 34%, #E5E7EB);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mode-primary) 8%, #FFFFFF);
+  color: var(--mode-primary-strong);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .14s ease;
+}
+.df-back-today:hover {
+  background: color-mix(in srgb, var(--mode-primary) 18%, #FFFFFF);
+}
+.df-back-today kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 34%, #E5E7EB);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--df-muted);
 }
 
 /* ── Daily All Day 栏 ── */
@@ -8524,8 +8557,26 @@ body.df-resizing * {
   color: var(--df-text);
 }
 .df-utility-check {
+  display: grid;
   grid-template-columns: 18px 1fr;
   align-items: center;
+}
+.df-utility-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 22%, #E5E7EB);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--df-muted);
+}
+.df-utility-select select {
+  padding: 4px 8px;
+  border: 1px solid var(--df-border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
 }
 .df-utility-body p,
 .df-utility-body small {
@@ -9235,6 +9286,7 @@ body.df-resizing * {
   border-right: 1px solid color-mix(in srgb, var(--mode-primary) 12%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--mode-primary) 12%, transparent);
   background: rgba(255,255,255,.32);
+  cursor: pointer;
 }
 .df-month-cell:nth-child(7n) { border-right: 0; }
 .df-month-cell.muted { opacity: .45; }

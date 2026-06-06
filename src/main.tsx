@@ -453,6 +453,7 @@ function App() {
       setSettings(cached.settings);
       setModeState((cached.settings.activeMode as Mode) || "execute");
       setAdvancedOpen(Boolean(cached.settings.addAdvancedOpen));
+      if (cached.settings.defaultTimelineView) setTimelineView(cached.settings.defaultTimelineView);
     }
     const bootstrap = api.getBootstrap
       ? await api.getBootstrap()
@@ -471,6 +472,7 @@ function App() {
     setSettings(nextSettings);
     setModeState((nextSettings.activeMode as Mode) || "execute");
     setAdvancedOpen(Boolean(nextSettings.addAdvancedOpen));
+    if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
   }
 
   useEffect(() => {
@@ -1251,14 +1253,6 @@ function App() {
       <header className="df-header">
         <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
         <div className="df-header-right">
-          {mode === "execute" && <div className="df-top-view-switch" aria-label="timeline views">
-            {([
-              ["daily", "天"],
-              ["3day", "3天"],
-              ["weekly", "周"],
-              ["month", "月"]
-            ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
-          </div>}
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>执行</button>
             <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>规划</button>
@@ -1473,6 +1467,11 @@ function App() {
                             if (taskId) updateTask(taskId, { plannedForDate: day, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined });
                             setDrag(null);
                           }}
+                          onDoubleClick={() => {
+                            if (drawerOpen) return;
+                            setSelectedDate(day);
+                            openAdd("task");
+                          }}
                         >
                           <strong>{dateObj.getDate()}</strong>
                           {dayTasks.map((task) => (
@@ -1488,7 +1487,15 @@ function App() {
               );
             })() : (
               <>
-                <div className="df-date-title">{displayDateTitle(timelineDate)}</div>
+                <div className={`df-date-title${timelineDate === today ? " today" : ""}`}>
+                  {displayDateTitle(timelineDate)}
+                  {timelineDate !== today && (
+                    <button className="df-back-today" onClick={() => setSelectedDate(today)} title="回到今天 (Enter)">
+                      <span>回到今天</span>
+                      <kbd>↵</kbd>
+                    </button>
+                  )}
+                </div>
                 <div className="df-timeline-allday">
                   <span className="df-timeline-allday-label">all-day</span>
                   <div className="df-timeline-allday-content" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
@@ -2003,6 +2010,7 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
             </section>
             <ThemeColorSetting label="执行页主色" presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
             <ThemeColorSetting label="规划页主色" presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <label className="df-utility-select">默认视图<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">天</option><option value="3day">3天</option><option value="weekly">周</option><option value="month">月</option></select></label>
             <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />突出显示</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />隐藏已完成任务</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />允许 AI 使用任务上下文</label>
