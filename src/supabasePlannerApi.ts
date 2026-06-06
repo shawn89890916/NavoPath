@@ -24,7 +24,7 @@ const defaultSettings: Settings = {
   displayName: "NavoPath",
   dailyFocusTime: "20:00",
   weekStartsOn: 0,
-  theme: "light",
+  theme: "dark",
   accentColor: "#C69CF9",
   executeAccentColor: "#C69CF9",
   planningAccentColor: "#CAFF72",

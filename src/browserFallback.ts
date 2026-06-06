@@ -135,7 +135,7 @@ export function installBrowserFallback() {
     displayName: "陈潇杨",
     dailyFocusTime: "20:00",
     weekStartsOn: 0 as 0 | 1,
-    theme: "light" as const,
+    theme: "dark" as const,
     accentColor: "#175cd3",
     executeAccentColor: "#C69CF9",
     planningAccentColor: "#CAFF72",
