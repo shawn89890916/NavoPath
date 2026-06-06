@@ -73,11 +73,38 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       autoRefreshToken: true
     }
   });
+  let cachedUser: User | null | undefined;
+  let userPromise: Promise<User | null> | null = null;
+  let profileCache: { data: PlannerData; settings: Settings } | null = null;
+  let profilePromise: Promise<{ data: PlannerData; settings: Settings }> | null = null;
+
+  void supabase.auth.getSession().then(({ data }) => {
+    cachedUser = data.session?.user ?? null;
+  });
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedUser = session?.user ?? null;
+    userPromise = null;
+    profileCache = null;
+    profilePromise = null;
+  });
 
   async function getUser() {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return null;
-    return data.user;
+    if (cachedUser !== undefined) return cachedUser;
+    if (userPromise) return userPromise;
+    const pending = supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        cachedUser = null;
+        return null;
+      }
+      cachedUser = data.session?.user ?? null;
+      return cachedUser;
+    });
+    userPromise = pending;
+    try {
+      return await pending;
+    } finally {
+      if (userPromise === pending) userPromise = null;
+    }
   }
 
   async function requireUser() {
@@ -86,39 +113,57 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     return user;
   }
 
-  async function ensureProfile(user: User) {
-    const { data, error } = await supabase
-      .from(PROFILE_TABLE)
-      .select("data, settings")
-      .eq("user_id", user.id)
-      .maybeSingle();
+  async function ensureProfile(user: User, force = false) {
+    if (!force && profileCache) return profileCache;
+    if (!force && profilePromise) return profilePromise;
+    const pending = (async () => {
+      const { data, error } = await supabase
+        .from(PROFILE_TABLE)
+        .select("data, settings")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (error) throw new Error(error.message);
-    if (data) {
-      return {
-        data: normalizeData((data as any).data as PlannerData),
-        settings: mergeSettings((data as any).settings)
-      };
+      if (error) throw new Error(error.message);
+      if (data) {
+        profileCache = {
+          data: normalizeData((data as any).data as PlannerData),
+          settings: mergeSettings((data as any).settings)
+        };
+        return profileCache;
+      }
+
+      const initialData = fallbackData();
+      const initialSettings = defaultSettings;
+      const { error: insertError } = await supabase
+        .from(PROFILE_TABLE)
+        .insert({
+          user_id: user.id,
+          data: initialData,
+          settings: initialSettings,
+          created_at: now(),
+          updated_at: now()
+        });
+
+      if (insertError) throw new Error(insertError.message);
+      profileCache = { data: initialData, settings: initialSettings };
+      return profileCache;
+    })();
+    profilePromise = pending;
+    try {
+      return await pending;
+    } finally {
+      if (profilePromise === pending) profilePromise = null;
     }
-
-    const initialData = fallbackData();
-    const initialSettings = defaultSettings;
-    const { error: insertError } = await supabase
-      .from(PROFILE_TABLE)
-      .insert({
-        user_id: user.id,
-        data: initialData,
-        settings: initialSettings,
-        created_at: now(),
-        updated_at: now()
-      });
-
-    if (insertError) throw new Error(insertError.message);
-    return { data: initialData, settings: initialSettings };
   }
 
   async function updateProfile(patch: { data?: PlannerData; settings?: Settings }) {
     const user = await requireUser();
+    if (profileCache) {
+      profileCache = {
+        data: patch.data ? normalizeData(patch.data) : profileCache.data,
+        settings: patch.settings ? mergeSettings(patch.settings) : profileCache.settings
+      };
+    }
     const { error } = await supabase
       .from(PROFILE_TABLE)
       .update({ ...patch, updated_at: now() })
@@ -133,10 +178,22 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       configured: true
     }),
 
+    getBootstrap: async () => {
+      const user = await getUser();
+      const auth = {
+        mode: "cloud" as const,
+        user: publicUser(user),
+        configured: true
+      };
+      if (!user) return { auth, data: null, settings: null };
+      const profile = await ensureProfile(user);
+      return { auth, data: profile.data, settings: profile.settings };
+    },
+
     signUp: async (email, password) => {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw new Error(authErrorMessage(error.message));
-      if (data.user && data.session) await ensureProfile(data.user);
+      if (data.user && data.session) await ensureProfile(data.user, true);
       return {
         user: publicUser(data.user),
         message: data.user && !data.session ? "注册成功。请检查邮箱完成确认后再登录。" : undefined
@@ -146,7 +203,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     signIn: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(authErrorMessage(error.message));
-      if (data.user) await ensureProfile(data.user);
+      if (data.user) await ensureProfile(data.user, true);
       return { user: publicUser(data.user) };
     },
 

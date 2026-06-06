@@ -212,6 +212,11 @@ export interface AiPlanItem {
 
 export interface PlannerApi {
   getAuthState?: () => Promise<{ mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean }>;
+  getBootstrap?: () => Promise<{
+    auth: { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
+    data: PlannerData | null;
+    settings: Settings | null;
+  }>;
   signUp?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null; message?: string }>;
   signIn?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null }>;
   signOut?: () => Promise<void>;

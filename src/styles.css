@@ -1,7 +1,7 @@
 :root {
-  --df-font-brand: "Sora", "Inter", system-ui, sans-serif;
-  --df-font-ui: "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
-  --df-font-task: "Inter", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --df-font-brand: system-ui, "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --df-font-ui: system-ui, "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --df-font-task: system-ui, "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
   font-family: var(--df-font-ui);
   --color-primary: var(--mode-primary, #8B5CF6);
   --color-primary-strong: var(--mode-primary-strong, #7C3AED);
@@ -8149,6 +8149,7 @@ body.df-resizing * {
 .df-quadrant span { color: var(--df-muted); font-size: 11px; }
 
 .df-loading { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 12px; color: var(--mode-primary-strong); background: #F8FAFC; }
+.df-loading-inline { min-height: 280px; display: grid; place-items: center; color: var(--mode-primary-strong); border: 1px dashed color-mix(in srgb, var(--mode-primary) 22%, white); border-radius: 20px; background: rgba(255,255,255,.72); }
 
 .df-auth-shell {
   min-height: 100vh;

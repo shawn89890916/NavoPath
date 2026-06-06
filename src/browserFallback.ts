@@ -190,6 +190,11 @@ export function installBrowserFallback() {
   };
   const api: PlannerApi = {
     getAuthState: async () => ({ mode: "local", user: null, configured: false }),
+    getBootstrap: async () => ({
+      auth: { mode: "local", user: null, configured: false },
+      data: read(),
+      settings: readSettings()
+    }),
     getData: async () => read(),
     saveData: async (data) => write(data),
     applyActions: async (actions: AiAction[]) => {
