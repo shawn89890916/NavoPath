@@ -79,16 +79,65 @@ function themeVars(settings: Settings, mode: Mode) {
   const executeLight = isLightColor(execute);
   const planningLight = isLightColor(planning);
   const activeAccent = mode === "execute" ? execute : planning;
+  const activeLight = mode === "execute" ? executeLight : planningLight;
   const { r, g, b } = hexToRgb(activeAccent);
+  const isDark = settings.theme === "dark";
+  const hl = settings.themeGradientEnabled !== false;
+  if (isDark) {
+    return {
+      "--execute-primary": execute,
+      "--execute-on-primary": executeLight ? "#111827" : "#FFFFFF",
+      "--planning-primary": planning,
+      "--planning-on-primary": planningLight ? "#111827" : "#FFFFFF",
+      "--accent-active": activeAccent,
+      "--accent-rgb": `${r}, ${g}, ${b}`,
+      "--accent-on": activeLight ? "#111827" : "#FFFFFF",
+      "--bg-app": "#0F1117",
+      "--bg-app-soft": "#14161C",
+      "--surface-main": "#181B22",
+      "--surface-raised": "#1E2129",
+      "--surface-card": "#20242D",
+      "--text-main": "#F5F7FA",
+      "--text-muted": "#AAB0BD",
+      "--text-faint": "#737A88",
+      "--border-soft": "rgba(255,255,255,0.12)",
+      "--border-subtle": "rgba(255,255,255,0.08)",
+      "--shadow-soft": "0 8px 24px rgba(0,0,0,0.40)",
+      "--shadow-hl": hl ? `0 0 18px rgba(${r},${g},${b},0.12)` : "none",
+      "--header-bg": "rgba(15,17,23,0.86)",
+      "--header-border": "rgba(255,255,255,0.08)",
+      "--header-fg": "#F5F7FA",
+      "--header-fg-muted": "#AAB0BD",
+      "--input-bg": "#1A1D25",
+      "--input-border": "rgba(255,255,255,0.14)",
+    } as CSSProperties;
+  }
   return {
     "--execute-primary": execute,
-    "--execute-primary-strong": executeLight ? mixHex(execute, "#111827", execute === "#ffffff" || execute === "#FFFFFF" ? 0.10 : 0.22) : mixHex(execute, "#000000", 0.14),
     "--execute-on-primary": executeLight ? "#111827" : "#FFFFFF",
     "--planning-primary": planning,
-    "--planning-primary-strong": planningLight ? mixHex(planning, "#111827", planning === "#ffffff" || planning === "#FFFFFF" ? 0.10 : 0.24) : mixHex(planning, "#000000", 0.14),
     "--planning-on-primary": planningLight ? "#111827" : "#FFFFFF",
     "--accent-active": activeAccent,
-    "--accent-rgb": `${r}, ${g}, ${b}`
+    "--accent-rgb": `${r}, ${g}, ${b}`,
+    "--accent-on": activeLight ? "#111827" : "#FFFFFF",
+    "--bg-app": "#F8FAFC",
+    "--bg-app-soft": "#FBF7FF",
+    "--surface-main": "#FFFFFF",
+    "--surface-raised": "#FFFFFF",
+    "--surface-card": "#F9FAFB",
+    "--text-main": "#111827",
+    "--text-muted": "#6B7280",
+    "--text-faint": "#9CA3AF",
+    "--border-soft": "#E5E7EB",
+    "--border-subtle": "#EEF0F4",
+    "--shadow-soft": "0 10px 30px rgba(17,24,39,0.06)",
+    "--shadow-hl": hl ? `0 0 24px rgba(${r},${g},${b},0.14)` : "none",
+    "--header-bg": "rgba(255,255,255,0.86)",
+    "--header-border": "rgba(229,231,235,0.72)",
+    "--header-fg": "#111827",
+    "--header-fg-muted": "#6B7280",
+    "--input-bg": "#FFFFFF",
+    "--input-border": "#E5E7EB",
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
@@ -1313,10 +1362,11 @@ function App() {
   if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 加载中...</div>;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme}${settings.themeGradientEnabled === false ? " no-highlight" : ""}`} style={themeVars(settings, mode)}>
       <header className="df-header">
-        <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
-        <div className="df-header-right">
+        <div className="df-header-inner">
+          <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
+          <div className="df-header-right">
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>执行</button>
             <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>规划</button>
@@ -1325,7 +1375,9 @@ function App() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         </div>
+        </div>
       </header>
+      <div className="df-header-fade" />
 
       {mode === "execute" ? (
         <main className="df-execute">
@@ -2074,6 +2126,15 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
                 <small>免费版</small>
               </div>
             </section>
+            <label className="df-utility-select">
+              界面模式
+              <select value={settings.theme} onChange={(event) => onSave({ theme: event.target.value as Settings["theme"] })}>
+                <option value="dark">深色</option>
+                <option value="light">浅色</option>
+                <option value="calm">浅色·柔和</option>
+                <option value="focus">浅色·专注</option>
+              </select>
+            </label>
             <ThemeColorSetting label="执行页主色" presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
             <ThemeColorSetting label="规划页主色" presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
             <label className="df-utility-select">默认视图<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">天</option><option value="3day">3天</option><option value="weekly">周</option><option value="month">月</option></select></label>
