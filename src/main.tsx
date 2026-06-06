@@ -4,6 +4,7 @@ import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
 import { installBrowserFallback } from "./browserFallback";
 import "./styles.css";
+import "./landing.css";
 
 installBrowserFallback();
 
@@ -108,6 +109,7 @@ type FormState = {
 };
 
 const PlanningViewLazy = lazy(() => import("./PlanningView"));
+const LandingPageLazy = lazy(() => import("./LandingPage"));
 const LOCAL_BOOTSTRAP_PREFIX = "navopath-bootstrap";
 
 function localIso(date: Date) {
@@ -331,7 +333,7 @@ function makeEvent(form: FormState): CalendarEvent {
   };
 }
 
-function ProductIcon({ compact = false }: { compact?: boolean }) {
+export function ProductIcon({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`dayflow-icon ${compact ? "compact" : ""}`} aria-hidden="true">
       <img src="/navopath-icon.png" alt="" />
@@ -1243,7 +1245,9 @@ function App() {
   }
 
   if (authState?.mode === "cloud" && !authState.user) {
-    return <AuthGate busy={authBusy} error={authError} onSubmit={handleAuthSubmit} />;
+    return <Suspense fallback={<div className="df-loading"><ProductIcon />NavoPath 加载中...</div>}>
+      <LandingPageLazy busy={authBusy} error={authError} onLogin={handleAuthSubmit} />
+    </Suspense>;
   }
 
   if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 加载中...</div>;
