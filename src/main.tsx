@@ -88,7 +88,7 @@ function themeVars(settings: Settings) {
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
 type ScheduleSuggestion = { id: string; taskId: string; startTime: string; endTime: string; reason: string; nextAction?: string; ignored?: boolean };
-type QuickSchedule = { startTime: string; title: string; projectId: string } | null;
+type QuickSchedule = { startTime: string; title: string; projectId: string; isAllDay?: boolean } | null;
 type PlanPickPriority = "must" | "should" | "could";
 type AuthState = { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
 type FormState = {
@@ -754,6 +754,41 @@ function App() {
 
   function saveQuickSchedule() {
     if (!data || !quickSchedule?.title.trim()) return;
+    if (quickSchedule.isAllDay) {
+      const hashProjectTitle = quickSchedule.title.match(/#([^\s#]+)\s*$/)?.[1]?.trim() || "";
+      let projectId = quickSchedule.projectId;
+      let nextProjects = data.projects;
+      if (hashProjectTitle && hashProjectTitle.toLowerCase() !== "inbox") {
+        const projectExists = projectId && nextProjects.some((project) => String(project.id) === String(projectId));
+        if (!projectExists) {
+          const snapshot = projectSnapshot(nextProjects, hashProjectTitle);
+          projectId = snapshot.projectId;
+          nextProjects = snapshot.projects;
+        }
+      }
+      const cleanTitle = quickSchedule.title.replace(/#[^\s#]+/g, "").trim() || quickSchedule.title.trim();
+      const task = makeTask({
+        ...defaultForm("task"),
+        title: cleanTitle,
+        projectId,
+        dueDate: timelineDate,
+        estimatedHours: 1
+      });
+      void saveData({
+        ...data,
+        projects: nextProjects,
+        tasks: [...data.tasks, {
+          ...task,
+          plannedForDate: today,
+          scheduledDate: timelineDate,
+          scheduledStart: undefined,
+          scheduledEnd: undefined
+        }]
+      });
+      setQuickSchedule(null);
+      showToast("已添加到全天任务");
+      return;
+    }
     const endTime = addMinutes(quickSchedule.startTime, 60);
     if (hasScheduleConflict(quickSchedule.startTime, endTime)) {
       showToast("这个时间和已有安排冲突");
@@ -1461,6 +1496,10 @@ function App() {
                     const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
                     if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: timelineDate, scheduledStart: undefined, scheduledEnd: undefined });
                     setDrag(null);
+                  }} onDoubleClick={() => {
+                    if (drawerOpen || aiPlanning) return;
+                    if (quickSchedule) { setQuickSchedule(null); return; }
+                    setQuickSchedule({ startTime: "00:00", title: "", projectId: "", isAllDay: true });
                   }}>
                     {tasks.filter((task) => task.scheduledDate === timelineDate && !task.scheduledStart && !task.completed).map((task) => (
                       <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
@@ -1468,6 +1507,18 @@ function App() {
                         setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
                       }} onDragEnd={() => setDrag(null)} />
                     ))}
+                    {quickSchedule?.isAllDay && (
+                      <div className="df-all-day-quick" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          value={quickSchedule.title}
+                          onChange={(e) => setQuickSchedule({ ...quickSchedule, title: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickSchedule(); } }}
+                          placeholder="添加全天任务"
+                        />
+                        <button type="button" onClick={saveQuickSchedule}>✓</button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
