@@ -8340,6 +8340,51 @@ body.df-resizing * {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--mode-primary) 16%, transparent);
 }
 
+.df-auth-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.df-auth-check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.df-auth-notice {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 18%, white);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--mode-primary) 6%, white);
+}
+
+.df-auth-notice span {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.df-auth-notice-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.df-auth-notice-actions button {
+  flex: 1;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .df-auth-submit {
   height: 42px;
   margin-top: 4px;
@@ -11913,4 +11958,3 @@ body.df-resizing * {
 /* Scrollbar */
 .theme-dark ::-webkit-scrollbar-track { background: transparent; }
 .theme-dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-

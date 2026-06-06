@@ -514,6 +514,53 @@
 .landing-auth-card button[type="submit"] {
   margin-top: 4px;
 }
+.landing-auth-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 10px;
+  color: var(--l-text-muted);
+  font-size: 12px;
+}
+.landing-auth-check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.landing-auth-notice {
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  color: var(--l-text);
+}
+.landing-auth-notice strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.landing-auth-notice p {
+  margin: 0;
+  color: var(--l-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.landing-auth-notice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.landing-auth-secondary {
+  flex: 1;
+  min-height: 38px;
+  border: 1px solid var(--l-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--l-text);
+  font-size: 12px;
+  font-weight: 600;
+}
 .landing-auth-error {
   margin-top: 12px;
   color: #EF4444;

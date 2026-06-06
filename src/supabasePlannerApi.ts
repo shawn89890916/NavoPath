@@ -45,7 +45,7 @@ const defaultSettings: Settings = {
   aiMemoryEnabled: true,
   hideAi: false,
   addAdvancedOpen: false,
-  uiStyle: "gradient" as const
+  uiStyle: "gradient"
 };
 
 function publicUser(user: User | null) {
@@ -58,12 +58,12 @@ function mergeSettings(settings: unknown): Settings {
 
 function authErrorMessage(message: string) {
   const waitMatch = message.match(/after\s+(\d+)\s+seconds?/i);
-  if (waitMatch) return `请求太频繁，请 ${waitMatch[1]} 秒后再试。`;
+  if (waitMatch) return `请求过于频繁，请在 ${waitMatch[1]} 秒后重试。`;
   if (/invalid login credentials/i.test(message)) return "邮箱或密码不正确。";
-  if (/email not confirmed/i.test(message)) return "邮箱还没有确认，请先打开邮件里的确认链接。";
+  if (/email not confirmed/i.test(message)) return "邮箱还没有完成确认，请先打开确认邮件中的链接。";
   if (/user already registered|already been registered|already exists/i.test(message)) return "这个邮箱已经注册过，请直接登录。";
   if (/password/i.test(message) && /weak|short|least/i.test(message)) return "密码强度不够，请至少使用 6 位字符。";
-  if (/rate limit|security purposes/i.test(message)) return "请求太频繁，请稍后再试。";
+  if (/rate limit|security purposes/i.test(message)) return "请求过于频繁，请稍后再试。";
   return message || "账号请求失败，请稍后再试。";
 }
 
@@ -192,12 +192,20 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
 
     signUp: async (email, password) => {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin
+        }
+      });
       if (error) throw new Error(authErrorMessage(error.message));
       if (data.user && data.session) await ensureProfile(data.user, true);
       return {
         user: publicUser(data.user),
-        message: data.user && !data.session ? "注册成功。请检查邮箱完成确认后再登录。" : undefined
+        message: data.user && !data.session ? "注册成功。请检查邮箱完成确认后再登录。" : undefined,
+        requiresEmailConfirmation: Boolean(data.user && !data.session),
+        email
       };
     },
 
@@ -206,6 +214,18 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       if (error) throw new Error(authErrorMessage(error.message));
       if (data.user) await ensureProfile(data.user, true);
       return { user: publicUser(data.user) };
+    },
+
+    resendConfirmation: async (email) => {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: window.location.origin
+        }
+      });
+      if (error) throw new Error(authErrorMessage(error.message));
+      return { message: "确认邮件已重新发送。" };
     },
 
     signOut: async () => {

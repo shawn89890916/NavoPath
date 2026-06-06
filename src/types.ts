@@ -219,8 +219,14 @@ export interface PlannerApi {
     data: PlannerData | null;
     settings: Settings | null;
   }>;
-  signUp?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null; message?: string }>;
+  signUp?: (email: string, password: string) => Promise<{
+    user: { id: string; email?: string } | null;
+    message?: string;
+    requiresEmailConfirmation?: boolean;
+    email?: string;
+  }>;
   signIn?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null }>;
+  resendConfirmation?: (email: string) => Promise<{ message?: string }>;
   signOut?: () => Promise<void>;
   getData: () => Promise<PlannerData>;
   saveData: (data: PlannerData) => Promise<PlannerData>;

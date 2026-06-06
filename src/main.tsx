@@ -92,6 +92,7 @@ type ScheduleSuggestion = { id: string; taskId: string; startTime: string; endTi
 type QuickSchedule = { startTime: string; title: string; projectId: string; isAllDay?: boolean } | null;
 type PlanPickPriority = "must" | "should" | "could";
 type AuthState = { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
+type AuthNotice = { type: "confirm-email"; email: string } | null;
 type FormState = {
   title: string;
   projectId: string;
@@ -344,11 +345,18 @@ export function ProductIcon({ compact = false }: { compact?: boolean }) {
 function AuthGate(props: {
   busy: boolean;
   error: string;
-  onSubmit: (email: string, password: string, intent: "signin" | "signup") => Promise<void>;
+  notice: AuthNotice;
+  onSubmit: (email: string, password: string, displayName: string, intent: "signin" | "signup") => Promise<void>;
+  onResend: (email: string) => Promise<void>;
+  onContinueAfterConfirm: (email: string) => Promise<void>;
 }) {
   const [intent, setIntent] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const mismatch = intent === "signup" && password && confirmPassword && password !== confirmPassword;
   return (
     <main className="df-auth-shell">
       <section className="df-auth-card">
@@ -365,12 +373,18 @@ function AuthGate(props: {
         </div>
         <form onSubmit={(event) => {
           event.preventDefault();
-          void props.onSubmit(email.trim(), password, intent);
+          if (mismatch) return;
+          void props.onSubmit(email.trim(), password, displayName.trim(), intent);
         }}>
+          {intent === "signup" && <label>用户名<input type="text" value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="nickname" maxLength={64} /></label>}
           <label>邮箱<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
-          <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={intent === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
+          <label>密码<input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={intent === "signin" ? "current-password" : "new-password"} minLength={6} required /></label>
+          {intent === "signup" && <label>确认密码<input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={6} required /></label>}
+          <label className="df-auth-check"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />显示密码</label>
+          {mismatch && <p className="df-auth-error">两次输入的密码不一致。</p>}
           {props.error && <p className="df-auth-error">{props.error}</p>}
-          <button className="df-auth-submit" type="submit" disabled={props.busy || !email.trim() || password.length < 6}>
+          {props.notice?.type === "confirm-email" && <div className="df-auth-notice"><strong>请先确认邮箱</strong><span>确认邮件已发送到 {props.notice.email}。完成确认后再登录。</span><div className="df-auth-notice-actions"><button type="button" onClick={() => void props.onResend(props.notice!.email)}>重发邮件</button><button type="button" onClick={() => void props.onContinueAfterConfirm(props.notice!.email)}>我已确认，去登录</button></div></div>}
+          <button className="df-auth-submit" type="submit" disabled={props.busy || !email.trim() || password.length < 6 || Boolean(mismatch)}>
             {props.busy ? "处理中..." : intent === "signin" ? "进入 NavoPath" : "创建账号"}
           </button>
         </form>
@@ -386,6 +400,7 @@ function App() {
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
   const [mode, setModeState] = useState<Mode>("execute");
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
@@ -486,11 +501,20 @@ function App() {
   async function handleAuthSubmit(email: string, password: string, displayName: string, intent: "signin" | "signup") {
     setAuthBusy(true);
     setAuthError("");
+    setAuthNotice(null);
     try {
       const api = await waitForPlannerApi();
-      const response = intent === "signup"
-        ? await api.signUp?.(email, password)
-        : await api.signIn?.(email, password);
+      let feedbackMessage = "";
+      if (intent === "signup") {
+        const response = await api.signUp?.(email, password);
+        if (response?.requiresEmailConfirmation) {
+          setAuthNotice({ type: "confirm-email", email: response.email || email });
+          return;
+        }
+        feedbackMessage = response?.message || "";
+      } else {
+        await api.signIn?.(email, password);
+      }
       await loadInitial();
       if (displayName) {
         const current = settingsRef.current;
@@ -498,11 +522,37 @@ function App() {
           void saveSettings({ displayName });
         }
       }
-      if (response && "message" in response && typeof response.message === "string") setAuthError(response.message);
+      if (feedbackMessage) setAuthError(feedbackMessage);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : String(error));
     } finally {
       setAuthBusy(false);
+    }
+  }
+
+  async function resendConfirmation(email: string) {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const api = await waitForPlannerApi();
+      const response = await api.resendConfirmation?.(email);
+      if (response?.message) setAuthError(response.message);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function continueAfterConfirm(email: string) {
+    setAuthError("");
+    setAuthNotice(null);
+    await loadInitial();
+    const api = await waitForPlannerApi();
+    const latest = await api.getAuthState?.();
+    if (!latest?.user) {
+      setAuthNotice({ type: "confirm-email", email });
+      setAuthError("邮箱确认完成后，请直接登录。");
     }
   }
 
@@ -1252,7 +1302,7 @@ function App() {
 
   if (authState?.mode === "cloud" && !authState.user) {
     return <Suspense fallback={<div className="df-loading"><ProductIcon />NavoPath 加载中...</div>}>
-      <LandingPageLazy busy={authBusy} error={authError} onLogin={handleAuthSubmit} />
+      <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} />
     </Suspense>;
   }
 

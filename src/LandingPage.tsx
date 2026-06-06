@@ -4,6 +4,19 @@ import { ProductIcon } from "./main";
 type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
 
+function localizeAuthMessage(message: string, lang: Lang) {
+  if (!message) return "";
+  if (lang === "zh") return message;
+  if (message.includes("邮箱或密码不正确")) return "Incorrect email or password.";
+  if (message.includes("邮箱还没有完成确认")) return "Your email is not confirmed yet. Open the confirmation link in your inbox first.";
+  if (message.includes("这个邮箱已经注册过")) return "This email is already registered. Sign in instead.";
+  if (message.includes("密码强度不够")) return "Password is too weak. Use at least 6 characters.";
+  if (message.includes("请求过于频繁")) return "Too many requests. Please try again later.";
+  if (message.includes("确认邮件已重新发送")) return "Confirmation email has been sent again.";
+  if (message.includes("邮箱确认完成后，请直接登录")) return "After confirming your email, sign in with your password.";
+  return message;
+}
+
 const t = {
   en: {
     nav: { features: "Features", projects: "Projects", contact: "Contact", login: "Log In" },
@@ -41,10 +54,13 @@ const t = {
   }
 };
 
-export default function LandingPage({ onLogin, busy, error }: {
+export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm, busy, error, notice }: {
   onLogin: (email: string, password: string, displayName: string, intent: AuthIntent) => void;
+  onResend: (email: string) => void;
+  onContinueAfterConfirm: (email: string) => void;
   busy: boolean;
   error: string;
+  notice: { type: "confirm-email"; email: string } | null;
 }) {
   const [lang, setLang] = useState<Lang>("en");
   const [showAuth, setShowAuth] = useState(false);
@@ -52,7 +68,11 @@ export default function LandingPage({ onLogin, busy, error }: {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const content = t[lang];
+  const passwordMismatch = authIntent === "signup" && password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
+  const visibleError = localizeAuthMessage(error, lang);
 
   // Scroll reveal
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -86,6 +106,7 @@ export default function LandingPage({ onLogin, busy, error }: {
 
   function handleAuthSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (passwordMismatch) return;
     onLogin(email.trim(), password, displayName.trim(), authIntent);
   }
 
@@ -153,13 +174,29 @@ export default function LandingPage({ onLogin, busy, error }: {
               <button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{content.auth.signup}</button>
             </div>
             <form onSubmit={handleAuthSubmit}>
-              <input type="text" placeholder={content.auth.displayName} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={64} />
+              {authIntent === "signup" && <input type="text" placeholder={lang === "en" ? "Display Name" : "用户名"} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={64} />}
               <input type="email" placeholder={content.auth.email} value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <input type="password" placeholder={content.auth.password} value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} maxLength={128} required />
-              <button type="submit" disabled={busy} className="landing-cta-pill primary full">
+              <input type={showPassword ? "text" : "password"} placeholder={content.auth.password} value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} maxLength={128} required />
+              {authIntent === "signup" && <input type={showPassword ? "text" : "password"} placeholder={lang === "en" ? "Confirm password" : "确认密码"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} maxLength={128} required />}
+              <label className="landing-auth-check">
+                <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />
+                <span>{lang === "en" ? "Show password" : "显示密码"}</span>
+              </label>
+              {notice?.type === "confirm-email" && (
+                <div className="landing-auth-notice">
+                  <strong>{lang === "en" ? "Check your inbox" : "请检查邮箱"}</strong>
+                  <p>{lang === "en" ? `We've sent a confirmation email to ${notice.email}. Confirm it, then sign in.` : `确认邮件已发送到 ${notice.email}。完成确认后再登录。`}</p>
+                  <div className="landing-auth-notice-actions">
+                    <button type="button" className="landing-auth-secondary" onClick={() => onResend(notice.email)}>{lang === "en" ? "Resend email" : "重发邮件"}</button>
+                    <button type="button" className="landing-auth-secondary" onClick={() => { setAuthIntent("signin"); onContinueAfterConfirm(notice.email); }}>{lang === "en" ? "I've confirmed, go to sign in" : "我已确认，去登录"}</button>
+                  </div>
+                </div>
+              )}
+              {passwordMismatch && <p className="landing-auth-error">{lang === "en" ? "Passwords do not match." : "两次输入的密码不一致。"}</p>}
+              <button type="submit" disabled={busy || passwordMismatch} className="landing-cta-pill primary full">
                 {busy ? (authIntent === "signin" ? content.auth.signingIn : content.auth.signingUp) : (authIntent === "signin" ? content.auth.signin : content.auth.signup)}
               </button>
-              {error && <p className="landing-auth-error">{error}</p>}
+              {visibleError && <p className="landing-auth-error">{visibleError}</p>}
             </form>
             <p className="landing-auth-note">{content.auth.note}</p>
           </div>
