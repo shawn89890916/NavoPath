@@ -1740,7 +1740,7 @@ function ProjectChoice({ project, onChoose, onColorChange }: { project: Project;
   const color = project.color || categories[project.category].color;
   return (
     <div className="df-project-choice">
-      <button type="button" onClick={onChoose}><span className="df-project-color-dot" style={{ "--project-color": color } as CSSProperties} /># {project.title}</button>
+      <button type="button" onClick={onChoose}># {project.title}</button>
       <span className="df-project-color-menu" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="df-project-color-dot-button" aria-label={`${project.title} color`} onClick={() => setColorOpen((open) => !open)}><span className="df-project-color-dot" style={{ "--project-color": color } as CSSProperties} /></button>
         {colorOpen && <ProjectColorPicker value={color} onChange={(nextColor) => { onColorChange(nextColor); setColorOpen(false); }} compact />}
@@ -1764,6 +1764,7 @@ function QuickProjectPicker(props: {
 }) {
   const selected = props.projects.find((project) => String(project.id) === String(props.value));
   const selectedColor = selected?.color || PROJECT_COLOR_PRESETS[0];
+  const [newColorOpen, setNewColorOpen] = useState(false);
   return (
     <div className="df-quick-project-picker" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
       <button type="button" className="df-quick-project-trigger" onClick={() => props.onOpenChange(!props.open)}>
@@ -1773,9 +1774,14 @@ function QuickProjectPicker(props: {
       {props.open && <div className="df-project-popover df-quick-project-popover up">
         <button type="button" onClick={() => { props.onChange(""); props.onOpenChange(false); }}># 未归属</button>
         {props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { props.onChange(project.id); props.onOpenChange(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}
-        <div className="df-project-create-line df-project-create-with-color">
+        <div className="df-project-create-line">
           <input value={props.newTitle} placeholder="新项目名" onChange={(event) => props.onTitleChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); props.onCreate(); } }} />
-          <ProjectColorPicker value={props.newColor} onChange={props.onColorChange} compact />
+          <span className="df-create-color-wrap" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="df-project-color-dot-button" aria-label="新项目颜色" onClick={() => setNewColorOpen((v) => !v)}>
+              <span className="df-project-color-dot" style={{ "--project-color": props.newColor } as CSSProperties} />
+            </button>
+            {newColorOpen && <ProjectColorPicker value={props.newColor} onChange={(c) => { props.onColorChange(c); setNewColorOpen(false); }} compact />}
+          </span>
           <button type="button" onClick={props.onCreate}>✓</button>
         </div>
       </div>}

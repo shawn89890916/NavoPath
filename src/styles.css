@@ -7289,8 +7289,20 @@ input[type="range"] {
   transform: scale(.92);
 }
 .df-project-color-menu .df-project-color-dot {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
+}
+.df-create-color-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.df-create-color-wrap .df-project-color-picker {
+  position: absolute;
+  right: -4px;
+  top: 100%;
+  margin-top: 6px;
+  z-index: 20;
 }
 .df-project-color-picker {
   display: inline-flex;
@@ -7385,12 +7397,15 @@ input[type="range"] {
 }
 .df-project-create-line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto 28px;
+  align-items: center;
   gap: 6px;
   margin-top: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--df-border);
+}
+.df-project-create-line.compact {
+  grid-template-columns: minmax(0, 1fr) 28px;
 }
 .df-project-create-line input {
   min-width: 0;
