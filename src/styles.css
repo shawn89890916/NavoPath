@@ -11215,6 +11215,17 @@ body.df-resizing * {
   display: block;
   margin: 0;
 }
+.df-settings-name-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--df-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--df-text);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+}
 
 .df-settings-profile small {
   display: block;

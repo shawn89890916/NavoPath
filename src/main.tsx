@@ -483,7 +483,7 @@ function App() {
     });
   }, []);
 
-  async function handleAuthSubmit(email: string, password: string, intent: "signin" | "signup") {
+  async function handleAuthSubmit(email: string, password: string, displayName: string, intent: "signin" | "signup") {
     setAuthBusy(true);
     setAuthError("");
     try {
@@ -492,6 +492,12 @@ function App() {
         ? await api.signUp?.(email, password)
         : await api.signIn?.(email, password);
       await loadInitial();
+      if (displayName) {
+        const current = settingsRef.current;
+        if (current && current.displayName !== displayName) {
+          void saveSettings({ displayName });
+        }
+      }
       if (response && "message" in response && typeof response.message === "string") setAuthError(response.message);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : String(error));
@@ -2005,7 +2011,12 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
             <section className="df-settings-profile">
               <div className="df-settings-avatar">N</div>
               <div>
-                <strong>{userName}</strong>
+                <input
+                  className="df-settings-name-input"
+                  value={settings.displayName || ""}
+                  placeholder="用户名"
+                  onChange={(e) => onSave({ displayName: e.target.value })}
+                />
                 <small>免费版</small>
               </div>
             </section>

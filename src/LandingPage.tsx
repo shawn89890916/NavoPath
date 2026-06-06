@@ -7,7 +7,7 @@ type Lang = "en" | "zh";
 const t = {
   en: {
     nav: { features: "Features", projects: "Projects", contact: "Contact", login: "Log In" },
-    hero: { title: "Navigate your next step.", subtitle: "The planning tool for engineering students.", getStarted: "Get Started", signIn: "Sign In" },
+    hero: { title: "Navigate your next step.", subtitle: "The planning tool for turning goals into action.", getStarted: "Get Started", signIn: "Sign In" },
     features: { badge: "What it does", title: "From Planning to Execution", subtitle: "Break down complex long-term projects into actionable daily plans", items: [
       { title: "Tree Planning", desc: "Organize long-term projects in a tree structure. Break complex goals into manageable steps.", icon: "🌳" },
       { title: "Timeline Execution", desc: "Drag tasks to the timeline. Precisely schedule your day's action plan.", icon: "📅" },
@@ -19,7 +19,7 @@ const t = {
       { title: "OpenClaw Soul", desc: "AI Agent self-evolution framework with three-layer memory architecture and autonomous reflection", tags: ["TypeScript", "MCP", "Memory"] },
     ]},
     cta: { title: "Ready to plan?", subtitle: "Start organizing your projects and time with NavoPath.", button: "Get Started" },
-    auth: { signin: "Sign In", signup: "Sign Up", email: "Email", password: "Password (6+ chars)", signingIn: "Signing in...", signingUp: "Signing up...", note: "Account data is stored independently. Repeated signups may trigger email rate limiting." },
+    auth: { signin: "Sign In", signup: "Sign Up", email: "Email", displayName: "Display Name", password: "Password (6+ chars)", signingIn: "Signing in...", signingUp: "Signing up...", note: "Account data is stored independently. Repeated signups may trigger email rate limiting." },
     footer: "© 2026 NavoPath by 陈潇杨. Built with 🟣",
   },
   zh: {
@@ -36,13 +36,13 @@ const t = {
       { title: "OpenClaw Soul", desc: "AI Agent 自我进化框架，三层记忆架构，目标管理，自主反思", tags: ["TypeScript", "MCP", "记忆架构"] },
     ]},
     cta: { title: "准备开始了吗？", subtitle: "开始用 NavoPath 管理你的项目和时间。", button: "立即开始" },
-    auth: { signin: "登录", signup: "注册", email: "邮箱", password: "密码（至少6位）", signingIn: "登录中...", signingUp: "注册中...", note: "每个账号的数据独立保存。连续注册会触发邮件安全限流。" },
+    auth: { signin: "登录", signup: "注册", email: "邮箱", displayName: "用户名", password: "密码（至少6位）", signingIn: "登录中...", signingUp: "注册中...", note: "每个账号的数据独立保存。连续注册会触发邮件安全限流。" },
     footer: "© 2026 NavoPath by 陈潇杨. Built with 🟣",
   }
 };
 
 export default function LandingPage({ onLogin, busy, error }: {
-  onLogin: (email: string, password: string, intent: AuthIntent) => void;
+  onLogin: (email: string, password: string, displayName: string, intent: AuthIntent) => void;
   busy: boolean;
   error: string;
 }) {
@@ -51,6 +51,7 @@ export default function LandingPage({ onLogin, busy, error }: {
   const [authIntent, setAuthIntent] = useState<AuthIntent>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const content = t[lang];
 
   // Scroll reveal
@@ -85,7 +86,7 @@ export default function LandingPage({ onLogin, busy, error }: {
 
   function handleAuthSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onLogin(email.trim(), password, authIntent);
+    onLogin(email.trim(), password, displayName.trim(), authIntent);
   }
 
   const techTags = ["React", "Vite", "TypeScript", "Electron", "GitHub Actions", "Cloudflare Pages"];
@@ -152,6 +153,7 @@ export default function LandingPage({ onLogin, busy, error }: {
               <button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{content.auth.signup}</button>
             </div>
             <form onSubmit={handleAuthSubmit}>
+              <input type="text" placeholder={content.auth.displayName} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={64} />
               <input type="email" placeholder={content.auth.email} value={email} onChange={(e) => setEmail(e.target.value)} required />
               <input type="password" placeholder={content.auth.password} value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} maxLength={128} required />
               <button type="submit" disabled={busy} className="landing-cta-pill primary full">
