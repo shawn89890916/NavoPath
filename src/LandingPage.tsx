@@ -2,16 +2,56 @@ import { useState, useEffect, useRef } from "react";
 import { ProductIcon } from "./main";
 
 type AuthIntent = "signin" | "signup";
+type Lang = "en" | "zh";
+
+const t = {
+  en: {
+    nav: { features: "Features", projects: "Projects", contact: "Contact", login: "Log In" },
+    hero: { title: "Plan Your Path, Execute Today", subtitle: "The ultimate planning tool for engineering students — organize long-term projects into daily actions.", getStarted: "Get Started", signIn: "Sign In" },
+    features: { badge: "What it does", title: "From Planning to Execution", subtitle: "Break down complex long-term projects into actionable daily plans", items: [
+      { title: "Tree Planning", desc: "Organize long-term projects in a tree structure. Break complex goals into manageable steps.", icon: "🌳" },
+      { title: "Timeline Execution", desc: "Drag tasks to the timeline. Precisely schedule your day's action plan.", icon: "📅" },
+      { title: "AI Assisted", desc: "Smart daily planning based on priority and deadlines. Let AI handle the scheduling.", icon: "🤖" },
+      { title: "Cloud Sync", desc: "Data stored securely in the cloud. Access from any device, anywhere.", icon: "☁️" },
+    ]},
+    work: { badge: "Built on", title: "Tech Stack & Open Source", subtitle: "Built with modern technology. Fully open source. Contributions welcome.", items: [
+      { title: "Navo AI", desc: "ESP32-S3 voice assistant with serial protocol hacking and MCP-integrated servo control", tags: ["Hardware", "Voice", "IoT"] },
+      { title: "OpenClaw Soul", desc: "AI Agent self-evolution framework with three-layer memory architecture and autonomous reflection", tags: ["TypeScript", "MCP", "Memory"] },
+    ]},
+    cta: { title: "Ready to plan?", subtitle: "Start organizing your projects and time with NavoPath.", button: "Get Started" },
+    auth: { signin: "Sign In", signup: "Sign Up", email: "Email", password: "Password (6+ chars)", signingIn: "Signing in...", signingUp: "Signing up...", note: "Account data is stored independently. Repeated signups may trigger email rate limiting." },
+    footer: "© 2026 NavoPath by 陈潇杨. Built with 🟣",
+  },
+  zh: {
+    nav: { features: "功能", projects: "项目", contact: "联系", login: "登录" },
+    hero: { title: "规划路径，执行今天", subtitle: "面向工程学生的时间管理工具——将长期项目拆解为每日行动。", getStarted: "立即开始", signIn: "登录" },
+    features: { badge: "核心功能", title: "从规划到执行，一步到位", subtitle: "把长期项目的复杂任务拆解为每天可执行的行动计划", items: [
+      { title: "项目树规划", desc: "用树形结构组织长期项目，拆解复杂任务为可执行的小步骤", icon: "🌳" },
+      { title: "时间轴执行", desc: "拖拽任务到时间轴，精确安排每天的行动计划", icon: "📅" },
+      { title: "AI 辅助", desc: "智能规划今天要做什么，基于优先级和截止日自动安排", icon: "🤖" },
+      { title: "数据同步", desc: "云端存储，多设备访问，数据安全加密", icon: "☁️" },
+    ]},
+    work: { badge: "技术栈", title: "技术栈与开源", subtitle: "现代技术栈构建，完全开源，欢迎贡献", items: [
+      { title: "Navo AI", desc: "ESP32-S3 语音助手，串口协议破解，MCP 集成舵机控制", tags: ["硬件黑客", "语音识别", "IoT"] },
+      { title: "OpenClaw Soul", desc: "AI Agent 自我进化框架，三层记忆架构，目标管理，自主反思", tags: ["TypeScript", "MCP", "记忆架构"] },
+    ]},
+    cta: { title: "准备开始了吗？", subtitle: "开始用 NavoPath 管理你的项目和时间。", button: "立即开始" },
+    auth: { signin: "登录", signup: "注册", email: "邮箱", password: "密码（至少6位）", signingIn: "登录中...", signingUp: "注册中...", note: "每个账号的数据独立保存。连续注册会触发邮件安全限流。" },
+    footer: "© 2026 NavoPath by 陈潇杨. Built with 🟣",
+  }
+};
 
 export default function LandingPage({ onLogin, busy, error }: {
   onLogin: (email: string, password: string, intent: AuthIntent) => void;
   busy: boolean;
   error: string;
 }) {
+  const [lang, setLang] = useState<Lang>("en");
   const [showAuth, setShowAuth] = useState(false);
   const [authIntent, setAuthIntent] = useState<AuthIntent>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const content = t[lang];
 
   // Scroll reveal
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -51,7 +91,7 @@ export default function LandingPage({ onLogin, busy, error }: {
   const techTags = ["React", "Vite", "TypeScript", "Electron", "GitHub Actions", "Cloudflare Pages"];
 
   return (
-    <div className="landing">
+    <div className="landing" lang={lang}>
       {/* Particle Canvas */}
       <ParticleBackground />
 
@@ -63,16 +103,19 @@ export default function LandingPage({ onLogin, busy, error }: {
             <span>NavoPath</span>
           </div>
           <div className="landing-nav-links">
-            <a href="#features">Features</a>
-            <a href="#work">Projects</a>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
+            <a href="#features">{content.nav.features}</a>
+            <a href="#work">{content.nav.projects}</a>
+            <a href="#contact">{content.nav.contact}</a>
           </div>
           <div className="landing-nav-actions">
+            <div className="landing-lang-switch">
+              <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>EN</button>
+              <button className={lang === "zh" ? "active" : ""} onClick={() => setLang("zh")}>中</button>
+            </div>
             <button
               className="landing-cta-pill small"
               onClick={() => { setAuthIntent("signin"); setShowAuth(true); }}
-            >Log In</button>
+            >{content.nav.login}</button>
           </div>
         </div>
       </nav>
@@ -83,18 +126,18 @@ export default function LandingPage({ onLogin, busy, error }: {
           <h1>
             <span className="hero-name">NavoPath</span>
             <br />
-            <span className="hero-tagline">规划路径，执行今天</span>
+            <span className="hero-tagline">{content.hero.title}</span>
           </h1>
-          <p>从长期项目里选出今天要推进的事，排进时间轴，明确下一步。工程学生的时间管理工具。</p>
+          <p>{content.hero.subtitle}</p>
           <div className="landing-hero-buttons">
             <button
               className="landing-cta-pill primary"
               onClick={() => { setAuthIntent("signup"); setShowAuth(true); }}
-            >Get Started</button>
+            >{content.hero.getStarted}</button>
             <button
               className="landing-cta-pill secondary"
               onClick={() => { setAuthIntent("signin"); setShowAuth(true); }}
-            >Sign In</button>
+            >{content.hero.signIn}</button>
           </div>
         </div>
       </section>
@@ -105,18 +148,18 @@ export default function LandingPage({ onLogin, busy, error }: {
           <div className="landing-auth-card" onClick={(e) => e.stopPropagation()}>
             <button className="landing-auth-close" onClick={() => setShowAuth(false)}>×</button>
             <div className="landing-auth-tabs">
-              <button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>登录</button>
-              <button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>注册</button>
+              <button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>{content.auth.signin}</button>
+              <button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{content.auth.signup}</button>
             </div>
             <form onSubmit={handleAuthSubmit}>
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <input type="password" placeholder="Password (6+ chars)" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} maxLength={128} required />
+              <input type="email" placeholder={content.auth.email} value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input type="password" placeholder={content.auth.password} value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} maxLength={128} required />
               <button type="submit" disabled={busy} className="landing-cta-pill primary full">
-                {busy ? `${authIntent === "signin" ? "登录" : "注册"}中...` : authIntent === "signin" ? "登录" : "注册"}
+                {busy ? (authIntent === "signin" ? content.auth.signingIn : content.auth.signingUp) : (authIntent === "signin" ? content.auth.signin : content.auth.signup)}
               </button>
               {error && <p className="landing-auth-error">{error}</p>}
             </form>
-            <p className="landing-auth-note">每个账号的数据独立保存。连续注册会触发邮件安全限流。</p>
+            <p className="landing-auth-note">{content.auth.note}</p>
           </div>
         </div>
       )}
@@ -124,17 +167,12 @@ export default function LandingPage({ onLogin, busy, error }: {
       {/* Features Section */}
       <section id="features" className="landing-section">
         <div className="landing-section-header" ref={setRevealRef("features-header")}>
-          <span className="landing-badge">What it does</span>
-          <h2>从规划到执行，一步到位</h2>
-          <p>NavoPath 帮你把长期项目的复杂任务拆解为每天可执行的行动计划</p>
+          <span className="landing-badge">{content.features.badge}</span>
+          <h2>{content.features.title}</h2>
+          <p>{content.features.subtitle}</p>
         </div>
         <div className="landing-features-grid">
-          {[
-            { title: "项目树规划", desc: "用树形结构组织长期项目，拆解复杂任务为可执行的小步骤", icon: "🌳" },
-            { title: "时间轴执行", desc: "拖拽任务到时间轴，精确安排每天的行动计划", icon: "📅" },
-            { title: "AI 辅助", desc: "智能规划今天要做什么，基于优先级和截止日自动安排", icon: "🤖" },
-            { title: "数据同步", desc: "云端存储，多设备访问，数据安全加密", icon: "☁️" },
-          ].map((f, i) => (
+          {content.features.items.map((f, i) => (
             <div key={f.title} className="landing-feature-card" ref={setRevealRef(`feat-${i}`)} style={{ transitionDelay: `${i * 0.08}s` }}>
               <span className="landing-feature-icon">{f.icon}</span>
               <h3>{f.title}</h3>
@@ -147,9 +185,9 @@ export default function LandingPage({ onLogin, busy, error }: {
       {/* Projects Section */}
       <section id="work" className="landing-section">
         <div className="landing-section-header" ref={setRevealRef("work-header")}>
-          <span className="landing-badge">Built on</span>
-          <h2>技术栈与开源</h2>
-          <p>现代技术栈构建，完全开源，欢迎贡献</p>
+          <span className="landing-badge">{content.work.badge}</span>
+          <h2>{content.work.title}</h2>
+          <p>{content.work.subtitle}</p>
         </div>
         <div className="landing-projects-grid">
           <div className="landing-project-card featured" ref={setRevealRef("proj-navopath")}>
@@ -157,17 +195,13 @@ export default function LandingPage({ onLogin, busy, error }: {
             <div className="landing-project-content">
               <span className="landing-project-version">v0.4.1</span>
               <h3>NavoPath</h3>
-              <p>面向工程学生的时间管理工具。从长期项目拆解到每日执行，AI辅助规划。</p>
+              <p>{lang === "en" ? "Time management tool for engineering students. Break down long-term projects into daily execution with AI assistance." : "面向工程学生的时间管理工具。从长期项目拆解到每日执行，AI辅助规划。"}</p>
               <div className="landing-project-tags">
                 {techTags.map((t) => <span key={t} className="landing-tag">{t}</span>)}
               </div>
             </div>
           </div>
-          {[
-            { title: "OpenClaw Soul", desc: "AI Agent 自我进化框架，三层记忆架构，目标管理，自主反思", tags: ["TypeScript", "MCP", "记忆架构"] },
-            { title: "Water Rocket", desc: "基于 ESP32 的水火箭记录仪，BMP280 传感器 + SD 卡数据采集", tags: ["ESP32", "嵌入式", "传感器"] },
-            { title: "XiaoZhi AI", desc: "ESP32-S3 语音助手，串口协议破解，MCP 集成舵机控制", tags: ["硬件黑客", "语音识别", "IoT"] },
-          ].map((p, i) => (
+          {content.work.items.map((p, i) => (
             <div key={p.title} className="landing-project-card" ref={setRevealRef(`proj-${i}`)} style={{ transitionDelay: `${i * 0.08}s` }}>
               <div className="landing-project-stripe" />
               <h3>{p.title}</h3>
@@ -183,16 +217,16 @@ export default function LandingPage({ onLogin, busy, error }: {
       {/* Footer CTA */}
       <section id="contact" className="landing-section landing-footer">
         <div className="landing-section-header" ref={setRevealRef("footer")}>
-          <h2>Ready to plan?</h2>
-          <p>开始用 NavoPath 管理你的项目和时间。</p>
+          <h2>{content.cta.title}</h2>
+          <p>{content.cta.subtitle}</p>
           <button
             className="landing-cta-pill primary"
             style={{ marginTop: 24 }}
             onClick={() => { setAuthIntent("signup"); setShowAuth(true); }}
-          >Get Started</button>
+          >{content.cta.button}</button>
         </div>
         <div className="landing-footer-meta">
-          <span>© 2026 NavoPath by 陈潇杨. Built with 🟣</span>
+          <span>{content.footer}</span>
         </div>
       </section>
     </div>

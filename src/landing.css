@@ -113,6 +113,29 @@
   gap: 10px;
 }
 
+/* ── Language Switch ── */
+.landing-lang-switch {
+  display: flex;
+  border: 1px solid var(--l-border);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.landing-lang-switch button {
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--l-text-muted);
+  font-family: 'Sora', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.landing-lang-switch button.active {
+  background: var(--l-accent);
+  color: var(--l-bg);
+}
+
 /* ── Buttons ── */
 .landing-cta-pill {
   display: inline-flex;
