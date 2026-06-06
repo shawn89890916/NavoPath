@@ -1834,6 +1834,7 @@ function QuickProjectPicker(props: {
         {props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { props.onChange(project.id); props.onOpenChange(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}
         <div className="df-project-create-line">
           <input value={props.newTitle} placeholder="新项目名" onChange={(event) => props.onTitleChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); props.onCreate(); } }} />
+          <button type="button" onClick={props.onCreate}>✓</button>
           <span className="df-create-color-wrap" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="df-project-color-dot-button" aria-label="新项目颜色" onClick={() => setNewColorOpen((v) => !v)}>
               <span className="df-project-color-dot" style={{ "--project-color": props.newColor } as CSSProperties} />
