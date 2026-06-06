@@ -1259,7 +1259,7 @@ function App() {
   if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 加载中...</div>;
 
   return (
-    <div className={`df-app mode-${mode} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings)}>
       <header className="df-header">
         <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
         <div className="df-header-right">
