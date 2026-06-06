@@ -14,8 +14,8 @@ const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
 const PROJECT_COLOR_PRESETS = ["#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
-const EXECUTE_THEME_PRESETS = ["#8B5CF6", "#7C3AED", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8"];
-const PLANNING_THEME_PRESETS = ["#8B5CF6", "#7C3AED", "#A78BFA", "#38BDF8", "#22C55E", "#F59E0B"];
+const EXECUTE_THEME_PRESETS = ["#C69CF9", "#8B5CF6", "#7C3AED", "#A78BFA", "#EC4899", "#38BDF8"];
+const PLANNING_THEME_PRESETS = ["#CAFF72", "#8B5CF6", "#7C3AED", "#A78BFA", "#38BDF8", "#F59E0B"];
 const RELEASE_NOTES = [
   { date: "2026-06-05", summary: "统一执行页与规划页的主题色联动，补齐项目颜色对时间轴色条的映射。" },
   { date: "2026-06-05", summary: "加入 3天 / 周 / 月视图，并持续修正多日时间轴的拖拽与布局对齐。" },
