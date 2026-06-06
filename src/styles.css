@@ -6771,11 +6771,11 @@ input[type="range"] {
 .df-timeline-allday {
   width: min(640px, 68%);
   margin: 0 auto;
-  padding: 8px 64px 10px;
+  padding: 6px 64px 8px;
   display: flex;
   align-items: flex-start;
   gap: 0;
-  min-height: 64px;
+  min-height: 40px;
   background: linear-gradient(to bottom, color-mix(in srgb, var(--mode-primary) 16%, #fff), transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--mode-primary) 8%, transparent);
 }
