@@ -116,24 +116,34 @@
 /* ── Language Switch ── */
 .landing-lang-switch {
   display: flex;
-  border: 1px solid var(--l-border);
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 100px;
-  overflow: hidden;
+  background: rgba(255,255,255,0.04);
 }
 .landing-lang-switch button {
-  padding: 4px 10px;
+  width: 28px;
+  height: 26px;
+  padding: 0;
   border: 0;
+  border-radius: 100px;
   background: transparent;
   color: var(--l-text-muted);
   font-family: 'Sora', sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .landing-lang-switch button.active {
-  background: var(--l-accent);
+  background: linear-gradient(135deg, var(--l-accent), rgba(198,156,249,0.7));
   color: var(--l-bg);
+  box-shadow: 0 0 12px rgba(198,156,249,0.3);
 }
 
 /* ── Buttons ── */

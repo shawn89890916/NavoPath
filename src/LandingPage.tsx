@@ -7,7 +7,7 @@ type Lang = "en" | "zh";
 const t = {
   en: {
     nav: { features: "Features", projects: "Projects", contact: "Contact", login: "Log In" },
-    hero: { title: "Plan Your Path, Execute Today", subtitle: "The ultimate planning tool for engineering students — organize long-term projects into daily actions.", getStarted: "Get Started", signIn: "Sign In" },
+    hero: { title: "Plan Your Path, Execute Today", subtitle: "Navigate your next step.", getStarted: "Get Started", signIn: "Sign In" },
     features: { badge: "What it does", title: "From Planning to Execution", subtitle: "Break down complex long-term projects into actionable daily plans", items: [
       { title: "Tree Planning", desc: "Organize long-term projects in a tree structure. Break complex goals into manageable steps.", icon: "🌳" },
       { title: "Timeline Execution", desc: "Drag tasks to the timeline. Precisely schedule your day's action plan.", icon: "📅" },
@@ -24,7 +24,7 @@ const t = {
   },
   zh: {
     nav: { features: "功能", projects: "项目", contact: "联系", login: "登录" },
-    hero: { title: "规划路径，执行今天", subtitle: "面向工程学生的时间管理工具——将长期项目拆解为每日行动。", getStarted: "立即开始", signIn: "登录" },
+    hero: { title: "规划路径，执行今天", subtitle: "导航你的下一步。", getStarted: "立即开始", signIn: "登录" },
     features: { badge: "核心功能", title: "从规划到执行，一步到位", subtitle: "把长期项目的复杂任务拆解为每天可执行的行动计划", items: [
       { title: "项目树规划", desc: "用树形结构组织长期项目，拆解复杂任务为可执行的小步骤", icon: "🌳" },
       { title: "时间轴执行", desc: "拖拽任务到时间轴，精确安排每天的行动计划", icon: "📅" },
