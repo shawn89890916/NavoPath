@@ -6795,6 +6795,7 @@ input[type="range"] {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-height: 36px;
 }
 
 .df-all-day-block {

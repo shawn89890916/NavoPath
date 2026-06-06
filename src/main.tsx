@@ -540,7 +540,7 @@ function App() {
     if (!quickSchedule) return;
     const cancelQuickSchedule = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (target.closest(".df-quick-schedule") || target.closest(".df-timeline-canvas")) return;
+      if (target.closest(".df-quick-schedule") || target.closest(".df-timeline-canvas") || target.closest(".df-all-day-quick")) return;
       setQuickSchedule(null);
     };
     document.addEventListener("mousedown", cancelQuickSchedule);
