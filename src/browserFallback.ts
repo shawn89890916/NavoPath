@@ -154,6 +154,7 @@ export function installBrowserFallback() {
     panelWidths: { left: 310, right: 360 },
     chatMessageMaxHeight: 220,
     aiMemoryEnabled: true,
+    hideAi: false,
     addAdvancedOpen: false,
     uiStyle: "gradient" as const
   };

@@ -1316,7 +1316,7 @@ function App() {
             <button className="df-date-arrow left" aria-label="前一段" onClick={() => shiftTimeline(-1)}>‹</button>
             <button className="df-date-arrow right" aria-label="后一段" onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
-              <div className="df-ai-planner">
+              {!settings.hideAi && <div className="df-ai-planner">
                     <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip={drawerOpen ? "请先关闭侧边栏" : "AI 规划今天"} aria-label="AI 规划今天" disabled={aiPlanning || drawerOpen} onClick={() => void planMyDay()}>{aiPlanning ? <><i />ANALYZING TASKS...</> : "PLAN MY DAY"}</button>
                 <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label="AI 规划设置" onClick={(event) => {
                   event.stopPropagation();
@@ -1327,7 +1327,7 @@ function App() {
                   <label>安排范围<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">天</option><option value="3day">3天</option></select></label>
                   <label>规划策略<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="simple">顺序安排</option><option value="priority">优先级优先</option><option value="deadline">截止日优先</option></select></label>
                 </span>}
-              </div>
+              </div>}
               <div className="df-timeline-actions">
                 <div className="df-view-switch" aria-label="切换时间视图">
                   {([
@@ -1575,7 +1575,7 @@ function App() {
       )}
 
       <button className="df-add-fab df-icon-action i-plus" data-tip="添加" aria-label="添加" onClick={() => openAdd("task")} />
-      <button className="df-ai-fab df-icon-action i-ai" data-tip="问Navo" aria-label="问Navo" onClick={() => setAiOpen((open) => !open)} />
+      {!settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip="问Navo" aria-label="问Navo" onClick={() => setAiOpen((open) => !open)} />}
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => setDrawerOpen(false)} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} />}
@@ -2011,6 +2011,7 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
             <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />突出显示</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />隐藏已完成任务</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />允许 AI 使用任务上下文</label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />隐藏所有 AI 功能</label>
             {authEmail && <p>当前账号：{authEmail}</p>}
             <div className="df-settings-footer">
               <button className="df-settings-about" onClick={onShowAbout}>

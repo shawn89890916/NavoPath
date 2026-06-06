@@ -43,6 +43,7 @@ const defaultSettings: Settings = {
   panelWidths: { left: 360, right: 390 },
   chatMessageMaxHeight: 220,
   aiMemoryEnabled: true,
+  hideAi: false,
   addAdvancedOpen: false,
   uiStyle: "gradient" as const
 };

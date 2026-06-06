@@ -174,6 +174,7 @@ export interface Settings {
   };
   chatMessageMaxHeight: number;
   aiMemoryEnabled: boolean;
+  hideAi: boolean;
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
 }
