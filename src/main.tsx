@@ -1732,7 +1732,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const start = preview?.start || task.scheduledStart || "09:00";
   const end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task));
   const top = ((timeToMinutes(start) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-  const height = Math.max(((timeToMinutes(end) - timeToMinutes(start)) / SLOT_MINUTES) * SLOT_HEIGHT, 38);
+  const height = Math.max(((timeToMinutes(end) - timeToMinutes(start)) / SLOT_MINUTES) * SLOT_HEIGHT, SLOT_HEIGHT);
   const next = extractNextAction(task.notes);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   return (
@@ -1766,7 +1766,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
 function PreviewBlock({ task, startTime, duration, draggingBlock, conflict }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean }) {
   if (!task) return null;
   const top = ((timeToMinutes(startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-  const height = Math.max((duration / SLOT_MINUTES) * SLOT_HEIGHT, 38);
+  const height = Math.max((duration / SLOT_MINUTES) * SLOT_HEIGHT, SLOT_HEIGHT);
   return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${conflict ? "conflict" : ""}`} style={{ top, height }}><strong>{task.title}</strong>{!draggingBlock && <span>{conflict ? "冲突" : startTime} · {Math.round(duration)}min</span>}</div>;
 }
 

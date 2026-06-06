@@ -7104,7 +7104,7 @@ input[type="range"] {
   overflow: visible;
   background: #FFFFFF;
   border: 1px solid #EEF0F4;
-  border-left: 3px solid #C69CF9;
+  border-left: 0;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   z-index: 4;
   transition: box-shadow .14s ease, transform .14s ease;
