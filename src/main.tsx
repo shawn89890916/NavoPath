@@ -1288,7 +1288,7 @@ function App() {
             <button className="df-date-arrow right" aria-label="后一段" onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
               <div className="df-ai-planner">
-                    <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip="AI 规划今天" aria-label="AI 规划今天" disabled={aiPlanning} onClick={() => void planMyDay()}>{aiPlanning ? <><i />ANALYZING TASKS...</> : "PLAN MY DAY"}</button>
+                    <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip={drawerOpen ? "请先关闭侧边栏" : "AI 规划今天"} aria-label="AI 规划今天" disabled={aiPlanning || drawerOpen} onClick={() => void planMyDay()}>{aiPlanning ? <><i />ANALYZING TASKS...</> : "PLAN MY DAY"}</button>
                 <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label="AI 规划设置" onClick={(event) => {
                   event.stopPropagation();
                   setAiPlanMenuOpen((open) => !open);

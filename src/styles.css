@@ -10926,6 +10926,15 @@ body.df-resizing * {
   box-shadow: 0 10px 24px color-mix(in srgb, var(--mode-primary-strong) 48%, transparent) !important;
 }
 
+.df-ai-plan:disabled {
+  background: #E5E7EB !important;
+  color: #9CA3AF !important;
+  border-color: #E5E7EB !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
 .df-ai-plan:active,
 .df-quick-add-submit:not(:disabled):active,
 .df-add-fab:active,
