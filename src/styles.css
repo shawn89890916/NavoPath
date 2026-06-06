@@ -6775,19 +6775,19 @@ input[type="range"] {
   display: flex;
   align-items: flex-start;
   gap: 0;
-  min-height: 52px;
+  min-height: 44px;
   background: linear-gradient(to bottom, color-mix(in srgb, var(--mode-primary) 16%, #fff), transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--mode-primary) 8%, transparent);
 }
 .df-timeline-allday-label {
   flex-shrink: 0;
-  width: 54px;
+  width: 48px;
   text-align: right;
   font-size: 12px;
   font-weight: 650;
   color: rgba(17, 24, 39, .45);
   padding-right: 12px;
-  margin-top: 2px;
+  margin-top: 0;
   white-space: nowrap;
 }
 .df-timeline-allday-content {
@@ -6803,11 +6803,11 @@ input[type="range"] {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 6px 8px 6px 16px;
+  gap: 6px;
+  min-height: 20px;
+  padding: 2px 6px 2px 12px;
   border: 1px solid color-mix(in srgb, var(--mode-primary) 28%, #CBD5E1);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255,255,255,.92);
   box-shadow: 0 6px 14px color-mix(in srgb, var(--mode-primary-strong) 10%, transparent);
   cursor: pointer;

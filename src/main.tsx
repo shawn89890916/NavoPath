@@ -1368,7 +1368,7 @@ function App() {
                   </div>
                   <div className="df-timeline-3day-allday">
                     <div className="df-timeline-3day-ruler-spacer">
-                      <span className="df-timeline-3day-allday-label">all-day</span>
+                      <span className="df-timeline-3day-allday-label">全天</span>
                     </div>
                     <div className="df-timeline-3day-dates">
                       {threeDates.map((colDate) => {
@@ -1494,7 +1494,7 @@ function App() {
                   {displayDateTitle(timelineDate)}
                 </div>
                 <div className="df-timeline-allday">
-                  <span className="df-timeline-allday-label">all-day</span>
+                  <span className="df-timeline-allday-label">全天</span>
                   <div className="df-timeline-allday-content" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
                     event.preventDefault();
                     const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
