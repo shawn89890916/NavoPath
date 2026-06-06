@@ -6999,7 +6999,7 @@ input[type="range"] {
 .df-timeline-canvas {
   position: relative;
   width: calc(100% - 2px);
-  margin: 18px 0 80px;
+  margin: 0 0 80px;
   overflow: visible;
   background:
     repeating-linear-gradient(
