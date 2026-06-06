@@ -73,18 +73,22 @@ function isLightColor(value: string) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 174;
 }
 
-function themeVars(settings: Settings) {
-  const execute = normalizeHexColor(settings.executeAccentColor || "#8B5CF6", "#8B5CF6");
-  const planning = normalizeHexColor(settings.planningAccentColor || "#A78BFA", "#A78BFA");
+function themeVars(settings: Settings, mode: Mode) {
+  const execute = normalizeHexColor(settings.executeAccentColor || "#C69CF9", "#C69CF9");
+  const planning = normalizeHexColor(settings.planningAccentColor || "#CAFF72", "#CAFF72");
   const executeLight = isLightColor(execute);
   const planningLight = isLightColor(planning);
+  const activeAccent = mode === "execute" ? execute : planning;
+  const { r, g, b } = hexToRgb(activeAccent);
   return {
     "--execute-primary": execute,
     "--execute-primary-strong": executeLight ? mixHex(execute, "#111827", execute === "#ffffff" || execute === "#FFFFFF" ? 0.10 : 0.22) : mixHex(execute, "#000000", 0.14),
     "--execute-on-primary": executeLight ? "#111827" : "#FFFFFF",
     "--planning-primary": planning,
     "--planning-primary-strong": planningLight ? mixHex(planning, "#111827", planning === "#ffffff" || planning === "#FFFFFF" ? 0.10 : 0.24) : mixHex(planning, "#000000", 0.14),
-    "--planning-on-primary": planningLight ? "#111827" : "#FFFFFF"
+    "--planning-on-primary": planningLight ? "#111827" : "#FFFFFF",
+    "--accent-active": activeAccent,
+    "--accent-rgb": `${r}, ${g}, ${b}`
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
@@ -1309,7 +1313,7 @@ function App() {
   if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 加载中...</div>;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} ${settings.themeGradientEnabled === false ? "no-theme-gradient" : ""}`} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
         <div className="df-header-right">

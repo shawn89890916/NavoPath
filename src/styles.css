@@ -8,8 +8,11 @@
   --color-primary-soft: var(--mode-primary-soft, #F3ECFD);
   --color-accent: var(--mode-accent, #A78BFA);
   --color-accent-soft: var(--mode-accent-soft, #F3ECFD);
-  --color-bg: #F5F3FA;
-  --color-bg-tint: #F3ECFD;
+  --accent-execute: #C69CF9;
+  --accent-plan: #CAFF72;
+  --accent-active: var(--accent-execute);
+  --color-bg: #F8FAFC;
+  --color-bg-tint: #FBF7FF;
   --color-surface: #FFFFFF;
   --color-border: #E5E7EB;
   --color-border-soft: #EEF0F4;
@@ -92,19 +95,20 @@ p {
 
 .app-shell,
 .loading {
-  --bg: #F5F3FA;
+  --bg: #F8FAFC;
   --surface: #FFFFFF;
-  --surface-subtle: #FAFAFA;
+  --surface-subtle: #F9FAFB;
   --surface-raised: #FFFFFF;
-  --text: #111111;
-  --muted: #6f6f6f;
-  --faint: #9a9a9a;
+  --text: #111827;
+  --muted: #6B7280;
+  --faint: #9CA3AF;
   --border: #E5E7EB;
-  --border-strong: rgba(0,0,0,0.12);
-  --shadow: 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-strong: 0 4px 16px rgba(0,0,0,0.1);
-  --accent-rgb: 23, 92, 211;
-  --focus: color-mix(in srgb, var(--accent, #175cd3) 18%, transparent);
+  --border-strong: #D1D5DB;
+  --shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+  --shadow-strong: 0 10px 28px rgba(198, 156, 249, 0.18);
+  --accent-rgb: 198, 156, 249;
+  --accent-active: var(--accent-execute);
+  --focus: color-mix(in srgb, var(--accent-active, #C69CF9) 18%, transparent);
   background: #F8FAFC;
   color: var(--text);
 }
@@ -115,17 +119,19 @@ p {
 }
 
 .theme-dark {
-  --bg: #09090b;
-  --surface: rgba(255,255,255,0.03);
-  --surface-subtle: rgba(255,255,255,0.02);
-  --surface-raised: rgba(255,255,255,0.06);
-  --text: #f4f4f5;
-  --muted: #a1a1aa;
-  --faint: #71717a;
-  --border: rgba(255,255,255,0.06);
-  --border-strong: rgba(255,255,255,0.12);
-  --shadow: 0 1px 3px rgba(0,0,0,.2);
-  --shadow-strong: 0 4px 16px rgba(0,0,0,.3);
+  --bg: #07070B;
+  --surface: rgba(18, 16, 26, 0.82);
+  --surface-subtle: rgba(28, 24, 40, 0.72);
+  --surface-raised: rgba(255, 255, 255, 0.06);
+  --text: #F8FAFC;
+  --muted: #B8B4C7;
+  --faint: #7F7894;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --shadow: 0 18px 45px rgba(0, 0, 0, 0.32);
+  --shadow-strong: 0 0 28px color-mix(in srgb, var(--accent-active, #C69CF9) 32%, transparent);
+  --accent-rgb: 198, 156, 249;
+  --accent-active: var(--accent-execute);
 }
 
 .task-edit-overlay {
@@ -272,8 +278,8 @@ h3 {
 }
 
 .primary-button {
-  border-color: var(--accent, #175cd3);
-  background: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
+  background: var(--accent-active, #C69CF9);
   color: #ffffff;
 }
 
@@ -485,7 +491,7 @@ h3 {
 
 .today-progress-bar {
   height: 100%;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   border-radius: 2px;
   transition: width 0.4s ease;
 }
@@ -643,12 +649,12 @@ h3 {
 }
 
 .mini-month-grid button.selected {
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
 }
 
 .mini-month-grid button.today {
   color: #fff;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
 }
 
 .calendar-mode-toolbar,
@@ -742,7 +748,7 @@ h3 {
 }
 
 .planning-stat-chip:hover {
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
@@ -838,9 +844,9 @@ h3 {
   position: absolute;
   z-index: 2;
   padding: 14px 18px;
-  border: 2px solid var(--accent, #175cd3);
+  border: 2px solid var(--accent-active, #C69CF9);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 9%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 9%, var(--surface));
   text-align: center;
   box-shadow: 0 2px 14px rgba(0,0,0,0.08);
 }
@@ -871,7 +877,7 @@ h3 {
   z-index: 2;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-left: 4px solid var(--accent, #175cd3);
+  border-left: 4px solid var(--accent-active, #C69CF9);
   border-radius: 8px;
   background: var(--surface-raised);
   text-align: left;
@@ -1053,11 +1059,11 @@ h3 {
 }
 
 .q-noturgent-important {
-  background: color-mix(in srgb, #175cd3 5%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 5%, var(--surface));
 }
 
 .q-noturgent-important h3 {
-  color: #175cd3;
+  color: var(--accent-active, #C69CF9);
 }
 
 .q-urgent-notimportant {
@@ -1122,9 +1128,9 @@ h3 {
 }
 
 .matrix-quadrant.drag-over {
-  outline: 2px dashed var(--accent, #175cd3);
+  outline: 2px dashed var(--accent-active, #C69CF9);
   outline-offset: -4px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 8%, var(--surface)) !important;
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 8%, var(--surface)) !important;
 }
 
 .ai-dock-trigger {
@@ -1136,7 +1142,7 @@ h3 {
   height: 48px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   color: #fff;
   font-size: 18px;
   font-weight: 800;
@@ -1148,11 +1154,11 @@ h3 {
 
 .ai-dock-trigger:hover {
   transform: scale(1.08);
-  box-shadow: 0 4px 20px rgba(23, 92, 211, 0.35);
+  box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.35);
 }
 
 .ai-dock-trigger.drag-active {
-  outline: 2px dashed var(--accent, #175cd3);
+  outline: 2px dashed var(--accent-active, #C69CF9);
   outline-offset: 4px;
   transform: scale(1.12);
 }
@@ -1187,7 +1193,7 @@ h3 {
   justify-content: space-between;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #175cd3) 6%, var(--surface)), var(--surface));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-active, #C69CF9) 6%, var(--surface)), var(--surface));
 }
 
 .ai-dock-header-left {
@@ -1251,7 +1257,7 @@ h3 {
 }
 
 .chat-welcome-text strong {
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
   font-weight: 720;
 }
 
@@ -1277,9 +1283,9 @@ h3 {
 }
 
 .quick-prompt-chip:hover {
-  border-color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 8%, var(--surface));
-  color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 8%, var(--surface));
+  color: var(--accent-active, #C69CF9);
 }
 
 /* ── Chat bubble wrapper ── */
@@ -1311,8 +1317,8 @@ h3 {
 }
 
 .chat-bubble-wrap.by-user .chat-bubble-avatar {
-  background: color-mix(in srgb, var(--accent, #175cd3) 14%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent, #175cd3) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent-active, #C69CF9) 30%, var(--border));
 }
 
 /* ── Bubble body ── */
@@ -1340,7 +1346,7 @@ h3 {
 }
 
 .chat-bubble-wrap.by-user .chat-bubble-role {
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
 }
 
 .chat-bubble-time {
@@ -1365,7 +1371,7 @@ h3 {
 }
 
 .chat-bubble-wrap.by-user .chat-bubble-content {
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   color: #fff;
   border-top-right-radius: 4px;
 }
@@ -1433,7 +1439,7 @@ h3 {
 .thinking-dots {
   display: inline-flex;
   gap: 3px;
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
 }
 
 .thinking-dots span {
@@ -1455,9 +1461,9 @@ h3 {
 /* ── Referenced task chip ── */
 .ai-dock-body .referenced-task-chip {
   padding: 8px 12px;
-  border: 1px solid var(--accent, #175cd3);
+  border: 1px solid var(--accent-active, #C69CF9);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 6%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 6%, var(--surface));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1516,7 +1522,7 @@ h3 {
 
 .ai-dock-input-row textarea:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -1525,7 +1531,7 @@ h3 {
   height: 36px;
   border: none;
   border-radius: 10px;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   color: #fff;
   font-size: 15px;
   cursor: pointer;
@@ -1536,7 +1542,7 @@ h3 {
 }
 
 .ai-send-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent, #175cd3) 85%, #000);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 85%, #000);
   transform: scale(1.05);
 }
 
@@ -1631,7 +1637,7 @@ h3 {
 
 .ai-plan-textarea:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -1863,8 +1869,8 @@ h3 {
 }
 
 .ai-task-item.checked {
-  background: color-mix(in srgb, var(--accent, #175cd3) 6%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent, #175cd3) 25%, var(--border));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 6%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent-active, #C69CF9) 25%, var(--border));
 }
 
 .ai-task-item-header {
@@ -1881,7 +1887,7 @@ h3 {
   flex-shrink: 0;
   width: 14px;
   height: 14px;
-  accent-color: var(--accent, #175cd3);
+  accent-color: var(--accent-active, #C69CF9);
 }
 
 .ai-task-item-main {
@@ -1933,14 +1939,14 @@ h3 {
 }
 
 .ai-task-chip:hover {
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   color: var(--text);
 }
 
 .ai-task-chip.active {
-  border-color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, var(--bg));
-  color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, var(--bg));
+  color: var(--accent-active, #C69CF9);
   font-weight: 600;
 }
 
@@ -1982,7 +1988,7 @@ h3 {
 }
 
 .chip-option.selected {
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, transparent);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, transparent);
   font-weight: 600;
 }
 
@@ -2080,7 +2086,7 @@ h3 {
 .ai-task-detail-title-row input:focus,
 .ai-task-detail-notes-row textarea:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 2px var(--focus);
 }
 
@@ -2125,7 +2131,7 @@ h3 {
 
 .ai-task-detail-subtasks li input:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 2px var(--focus);
 }
 
@@ -2155,7 +2161,7 @@ h3 {
 .chat-message.user {
   align-self: flex-end;
   color: #ffffff;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
 }
 
 .chat-message.assistant {
@@ -2181,7 +2187,7 @@ h3 {
 
 .action-feedback {
   font-size: 11px;
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
   font-weight: 640;
   margin-left: auto;
   animation: fadeOut 2s ease;
@@ -2235,7 +2241,7 @@ h3 {
 .subtask-item input[type="checkbox"] {
   width: 15px;
   height: 15px;
-  accent-color: var(--accent, #175cd3);
+  accent-color: var(--accent-active, #C69CF9);
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -2270,7 +2276,7 @@ h3 {
 
 .subtask-progress-bar {
   height: 100%;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   border-radius: 1px;
   transition: width 0.3s ease;
 }
@@ -2583,8 +2589,8 @@ h3 {
 }
 
 .workspace-resizer:hover {
-  background: color-mix(in srgb, var(--accent, #175cd3) 12%, transparent);
-  border-left-color: var(--accent, #175cd3);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 12%, transparent);
+  border-left-color: var(--accent-active, #C69CF9);
 }
 
 .workspace-chat {
@@ -2829,7 +2835,7 @@ h3 {
 }
 
 .task-complete-button {
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
 }
 
 .task-ai-button {
@@ -2899,7 +2905,7 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -3009,13 +3015,13 @@ textarea:focus {
 }
 
 .day-cell.selected {
-  border-color: var(--accent, #175cd3);
-  box-shadow: inset 0 0 0 1px var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
+  box-shadow: inset 0 0 0 1px var(--accent-active, #C69CF9);
 }
 
 .day-cell.today .day-number {
   color: #ffffff;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
 }
 
 .day-number {
@@ -3044,7 +3050,7 @@ textarea:focus {
 
 .day-cell.selected .day-markers span,
 .day-cell.today .day-markers span {
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   opacity: 1;
 }
 
@@ -3115,7 +3121,7 @@ textarea:focus {
   min-height: 44px;
   border: 1px dashed var(--border-strong);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 7%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 7%, var(--surface));
   color: var(--muted);
   display: grid;
   place-items: center;
@@ -3176,7 +3182,7 @@ textarea:focus {
 }
 
 .drop-target.active {
-  background: color-mix(in srgb, var(--accent, #175cd3) 5%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 5%, var(--surface));
 }
 
 /* 已完成区域样式 */
@@ -3208,7 +3214,7 @@ textarea:focus {
 
 /* 编辑模式样式 */
 .task-card.editing {
-  box-shadow: 0 0 0 2px var(--accent, #175cd3);
+  box-shadow: 0 0 0 2px var(--accent-active, #C69CF9);
 }
 
 /* AI Dock拖放目标 — 使用 .drag-active 伪元素边框 */
@@ -3216,7 +3222,7 @@ textarea:focus {
   content: '';
   position: absolute;
   inset: 0;
-  border: 2px dashed var(--accent, #175cd3);
+  border: 2px dashed var(--accent-active, #C69CF9);
   border-radius: 8px;
   pointer-events: none;
 }
@@ -3297,14 +3303,14 @@ textarea:focus {
 }
 
 .wizard-choice-card:hover {
-  border-color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 5%, var(--surface));
+  border-color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 5%, var(--surface));
 }
 
 .wizard-choice-card.selected {
-  border-color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, var(--surface));
-  box-shadow: 0 0 0 1px var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, var(--surface));
+  box-shadow: 0 0 0 1px var(--accent-active, #C69CF9);
 }
 
 .wizard-choice-card.small {
@@ -3360,7 +3366,7 @@ textarea:focus {
 }
 
 .wizard-dot.active {
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
 }
 
 .wizard-field {
@@ -3383,7 +3389,7 @@ textarea:focus {
 .wizard-field input:focus,
 .wizard-field textarea:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -3424,7 +3430,7 @@ textarea:focus {
 .wizard-summary-type {
   font-size: 11px;
   font-weight: 720;
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -3508,8 +3514,8 @@ textarea:focus {
 }
 
 .wizard-type-btn:hover {
-  border-color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 8%, var(--surface));
+  border-color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 8%, var(--surface));
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
@@ -3550,7 +3556,7 @@ textarea:focus {
 
 .wizard-date-time input:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -3565,9 +3571,9 @@ textarea:focus {
 }
 
 .wizard-color-card.selected {
-  border-color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 8%, var(--surface));
-  box-shadow: 0 0 0 2px var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 8%, var(--surface));
+  box-shadow: 0 0 0 2px var(--accent-active, #C69CF9);
 }
 
 .wizard-final-actions {
@@ -3587,7 +3593,7 @@ textarea:focus {
 .wizard-preset-check input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent, #175cd3);
+  accent-color: var(--accent-active, #C69CF9);
 }
 
 .draft-list-footer {
@@ -3655,7 +3661,7 @@ textarea:focus {
 
 .exec-progress-fill {
   height: 100%;
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   border-radius: 999px;
   transition: width 0.3s ease;
 }
@@ -3726,8 +3732,8 @@ textarea:focus {
 
 .execute-quick-add input:focus {
   outline: none;
-  border-color: var(--accent, #175cd3);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #175cd3) 20%, transparent);
+  border-color: var(--accent-active, #C69CF9);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-active, #C69CF9) 20%, transparent);
 }
 
 .execute-quick-add button {
@@ -3832,9 +3838,9 @@ textarea:focus {
   transition: background 0.15s, color 0.15s;
 }
 .source-tab.active {
-  background: var(--accent, #175cd3);
+  background: var(--accent-active, #C69CF9);
   color: white;
-  border-color: var(--accent, #175cd3);
+  border-color: var(--accent-active, #C69CF9);
 }
 .source-modal-list {
   flex: 1;
@@ -3932,7 +3938,7 @@ textarea:focus {
   border-bottom: 1px solid var(--border);
 }
 .source-group-header:hover {
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
 }
 .source-group-caret {
   font-size: 11px;
@@ -4110,12 +4116,12 @@ textarea:focus {
 .zone-tomorrow {
   left: 22px;
   top: 82px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 3%, transparent);
-  color: var(--accent, #175cd3);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 3%, transparent);
+  color: var(--accent-active, #C69CF9);
 }
 
 .zone-tomorrow.hovered {
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, transparent);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, transparent);
 }
 
 .zone-ai {
@@ -4226,8 +4232,8 @@ textarea:focus {
 }
 
 .timeline-slot.hovered {
-  background: color-mix(in srgb, var(--accent, #175cd3) 8%, transparent);
-  border-top-color: var(--accent, #175cd3);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 8%, transparent);
+  border-top-color: var(--accent-active, #C69CF9);
 }
 
 .timeline-slot-label {
@@ -4279,9 +4285,9 @@ textarea:focus {
   position: absolute;
   left: 52px;
   right: 8px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent, #175cd3) 25%, transparent);
-  border-left: 3px solid var(--accent, #175cd3);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent-active, #C69CF9) 25%, transparent);
+  border-left: 3px solid var(--accent-active, #C69CF9);
   border-radius: 5px;
   padding: 5px 8px;
   overflow: hidden;
@@ -4314,7 +4320,7 @@ textarea:focus {
 }
 
 .time-block.priority-medium {
-  border-left-color: var(--accent, #175cd3);
+  border-left-color: var(--accent-active, #C69CF9);
 }
 
 .time-block.priority-low {
@@ -4331,7 +4337,7 @@ textarea:focus {
 .time-block-time {
   font-size: 10px;
   font-weight: 600;
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
 }
 
 .time-block.priority-urgent .time-block-time {
@@ -4468,7 +4474,7 @@ textarea:focus {
   font-size: 12px;
   font-weight: 600;
   border: none;
-  border-bottom: 1px solid var(--accent, #175cd3);
+  border-bottom: 1px solid var(--accent-active, #C69CF9);
   background: transparent;
   padding: 0;
   outline: none;
@@ -4503,7 +4509,7 @@ textarea:focus {
 }
 
 .tb-action-btn:hover {
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, var(--surface));
   color: #111;
 }
 
@@ -4664,7 +4670,7 @@ textarea:focus {
 .link-toggle {
   border: 0;
   background: transparent;
-  color: var(--accent, #175cd3);
+  color: var(--accent-active, #C69CF9);
   padding: 2px 0;
   text-align: left;
   font-size: 12px;
@@ -4722,7 +4728,7 @@ textarea:focus {
 }
 
 .completed-title:hover {
-  background: color-mix(in srgb, var(--accent, #175cd3) 6%, var(--surface-subtle));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 6%, var(--surface-subtle));
   border-color: var(--border-strong);
 }
 
@@ -4732,14 +4738,14 @@ textarea:focus {
 
 /* Column drop-active outline */
 .focus-panel.drop-active {
-  outline: 2px dashed color-mix(in srgb, var(--accent, #175cd3) 40%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--accent-active, #C69CF9) 40%, transparent);
   outline-offset: -4px;
 }
 
 .add-panel-wrapper.drag-active {
-  outline: 2px dashed color-mix(in srgb, var(--accent, #175cd3) 50%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--accent-active, #C69CF9) 50%, transparent);
   outline-offset: -4px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 5%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 5%, var(--surface));
 }
 
 .undo-toast {
@@ -4781,7 +4787,7 @@ textarea:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
   border-radius: 4px;
-  background: color-mix(in srgb, var(--accent, #175cd3) 14%, var(--surface));
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 14%, var(--surface));
   color: var(--text);
   padding: 2px 5px;
   font-size: 10px;
@@ -4832,8 +4838,8 @@ textarea:focus {
 .pending-task-badge {
   font-size: 11px;
   font-weight: 700;
-  color: var(--accent, #175cd3);
-  background: color-mix(in srgb, var(--accent, #175cd3) 10%, transparent);
+  color: var(--accent-active, #C69CF9);
+  background: color-mix(in srgb, var(--accent-active, #C69CF9) 10%, transparent);
   padding: 2px 8px;
   border-radius: 6px;
 }
@@ -5027,7 +5033,7 @@ textarea:focus {
 
 input[type="range"] {
   padding: 0;
-  accent-color: var(--accent, #175cd3);
+  accent-color: var(--accent-active, #C69CF9);
 }
 
 .modal-actions {
