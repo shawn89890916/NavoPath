@@ -1339,6 +1339,9 @@ function App() {
                 </div>
               </div>
             </div>
+            {timelineDate !== today && (
+              <button className="df-back-today" onClick={() => setSelectedDate(today)} title="回到今天">↵</button>
+            )}
             {(timelineView === "3day" || timelineView === "weekly") ? (() => {
               const rangeStart = timelineView === "weekly" ? startOfWeekIso(timelineDate) : timelineDate;
               const rangeLength = timelineView === "weekly" ? 7 : 3;
@@ -1489,12 +1492,6 @@ function App() {
               <>
                 <div className={`df-date-title${timelineDate === today ? " today" : ""}`}>
                   {displayDateTitle(timelineDate)}
-                  {timelineDate !== today && (
-                    <button className="df-back-today" onClick={() => setSelectedDate(today)} title="回到今天 (Enter)">
-                      <span>回到今天</span>
-                      <kbd>↵</kbd>
-                    </button>
-                  )}
                 </div>
                 <div className="df-timeline-allday">
                   <span className="df-timeline-allday-label">all-day</span>

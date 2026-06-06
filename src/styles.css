@@ -6739,30 +6739,32 @@ input[type="range"] {
   color: var(--mode-primary-strong);
 }
 .df-back-today {
+  position: absolute;
+  top: 8px;
+  right: -4px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border: 1px solid color-mix(in srgb, var(--mode-primary) 34%, #E5E7EB);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 26%, #E5E7EB);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--mode-primary) 8%, #FFFFFF);
+  background: rgba(255, 255, 255, .9);
   color: var(--mode-primary-strong);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   transition: background .14s ease;
 }
 .df-back-today:hover {
-  background: color-mix(in srgb, var(--mode-primary) 18%, #FFFFFF);
+  background: color-mix(in srgb, var(--mode-primary) 12%, #FFFFFF);
+}
+.df-back-today span {
+  display: none;
 }
 .df-back-today kbd {
-  display: inline-block;
-  padding: 1px 6px;
-  border: 1px solid color-mix(in srgb, var(--mode-primary) 34%, #E5E7EB);
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 10px;
-  color: var(--df-muted);
+  display: none;
 }
 
 /* ── Daily All Day 栏 ── */
@@ -7205,13 +7207,12 @@ input[type="range"] {
 }
 .df-category-strip {
   position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
   background: var(--cat, var(--df-primary));
-  border-radius: 999px;
+  border-radius: 3px 0 0 3px;
 }
 .df-block-check {
   position: relative;
@@ -9166,12 +9167,11 @@ body.df-resizing * {
   background: color-mix(in srgb, var(--mode-primary) 6%, transparent);
 }
 .df-day-col .df-time-block .df-category-strip {
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 4px;
+  border-radius: 0 2px 2px 0;
 }
 .df-day-col .df-time-block.completed {
   opacity: .45;
@@ -9205,12 +9205,10 @@ body.df-resizing * {
   box-shadow: 0 10px 20px color-mix(in srgb, var(--mode-primary-strong) 16%, transparent);
 }
 .df-day-col .df-time-block .df-category-strip {
-  top: 50%;
-  transform: translateY(-50%);
-  bottom: auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 3px 0 0 3px;
 }
 .df-day-col .df-time-block .df-block-title-row {
   grid-template-columns: 20px minmax(0, 1fr) auto;
@@ -11729,12 +11727,11 @@ body.df-resizing * {
 
 .df-day-col .df-time-block .df-category-strip,
 .df-all-day-block .df-category-strip {
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 3px 0 0 3px;
 }
 
 .df-ai-fab[data-tip="问 Navo"]::after {
