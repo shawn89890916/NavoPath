@@ -1395,7 +1395,7 @@ function App() {
             </div>
             <div className="df-candidate-list">
               {visibleCandidates.length === 0 ? (
-                <div className="df-empty"><div className="blob-accent" /><strong>今天还没有选择要推进的任务。</strong><span>从规划中选择任务。</span><button className="df-empty-pick-btn" onClick={openPlanningPicker}>从规划选择</button></div>
+                <div className="df-empty"><div className="blob-accent" /><strong>今天还没有选择要推进的任务。</strong><span>从规划中选择任务，或直接添加一个今天要做的事。</span><button onClick={() => openAdd("task")}>快速添加</button></div>
               ) : visibleCandidates.map((task) => (
                 <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
                   void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
@@ -1605,7 +1605,7 @@ function App() {
                 </div>
               );
             })() : (
-              <div className="df-timeline-daily">
+              <>
                 <div className={`df-date-title${timelineDate === today ? " today" : ""}`}>
                   {displayDateTitle(timelineDate)}
                 </div>
@@ -1678,7 +1678,7 @@ function App() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </section>
         </main>

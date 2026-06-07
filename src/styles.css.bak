@@ -4004,25 +4004,6 @@ input:focus, select:focus, textarea:focus {
   background: color-mix(in srgb, #dc2626 10%, transparent);
 }
 
-/* Preserve color picker dots — dark */
-.df-app.theme-dark .df-theme-setting > div > span {
-  background: var(--project-color, var(--accent-active)) !important;
-  border-color: rgba(255,255,255,0.15) !important;
-}
-.df-app.theme-dark .df-theme-setting > div > span.color-light {
-  border-color: rgba(255,255,255,0.30) !important;
-}
-
-
-/* Preserve color picker dots — dark */
-.df-app.theme-dark .df-theme-setting > div > span {
-  background: var(--project-color, var(--accent-active)) !important;
-  border-color: rgba(255,255,255,0.15) !important;
-}
-.df-app.theme-dark .df-theme-setting > div > span.color-light {
-  border-color: rgba(255,255,255,0.30) !important;
-}
-
 /* Timeline */
 .execute-timeline {
   display: flex;
@@ -6194,23 +6175,6 @@ input[type="range"] {
   color: color-mix(in srgb, var(--accent-active) 80%, var(--text-main));
 }
 
-.df-empty-pick-btn {
-  margin-top: 4px;
-  padding: 8px 20px !important;
-  border-radius: 999px !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  cursor: pointer;
-  background: color-mix(in srgb, var(--accent-active) 14%, var(--bg-surface));
-  border: 1px solid color-mix(in srgb, var(--accent-active) 38%, var(--border-soft));
-  color: color-mix(in srgb, var(--accent-active) 80%, var(--text-main));
-  transition: all .15s ease;
-}
-.df-empty-pick-btn:hover {
-  background: color-mix(in srgb, var(--accent-active) 22%, var(--bg-surface)) !important;
-  border-color: color-mix(in srgb, var(--accent-active) 55%, var(--border-soft)) !important;
-}
-
 .blob-accent { width: 100px; height: 68px; background: color-mix(in srgb, var(--accent-active) 45%, transparent); border-radius: 48% 52% 58% 42% / 44% 40% 60% 56%; position: absolute; opacity: .55; }
 .blob-accent::after { content: ""; position: absolute; inset: 10px; border: 2px solid rgba(255,255,255,.9); border-radius: 43% 57% 50% 50% / 56% 41% 59% 44%; transform: rotate(-8deg); }
 
@@ -6527,13 +6491,6 @@ input[type="range"] {
   border-color: var(--border-soft);
   box-shadow: var(--shadow-soft);
   animation: dfPanelPop .24s ease-out;
-}
-
-.df-timeline-daily {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
 }
 
 .df-date-arrow {
@@ -7584,7 +7541,7 @@ body.df-resizing, body.df-resizing * {
   width: min(440px, 94vw);
   padding: 18px 18px 14px;
   background:
-    linear-gradient(180deg, var(--bg-surface), rgba(251,247,255,.72)),
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(251,247,255,.72)),
     #fff;
 }
 .df-detail-head-actions {
@@ -7804,7 +7761,7 @@ body.df-resizing, body.df-resizing * {
   z-index: 1;
   margin: 0 -2px 4px;
   padding: 9px 2px 7px;
-  background: linear-gradient(180deg, var(--bg-surface), rgba(255,255,255,.92));
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.92));
   border-bottom: 1px solid rgba(229,231,235,.72);
   color: var(--df-muted);
   font-size: 12px;
@@ -11480,7 +11437,7 @@ body.df-resizing, body.df-resizing * {
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--mode-primary) 14%, #e5e7eb);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--mode-primary) 4%, var(--bg-surface));
+  background: color-mix(in srgb, var(--mode-primary) 4%, #fff);
 }
 
 .df-release-item span {
@@ -11492,8 +11449,8 @@ body.df-resizing, body.df-resizing * {
 .mode-execute .df-quick-add {
   border: 1px solid color-mix(in srgb, var(--mode-primary) 28%, #e5e7eb);
   background:
-    linear-gradient(180deg, var(--bg-surface), rgba(255,255,255,.94)),
-    color-mix(in srgb, var(--mode-primary) 4%, var(--bg-surface));
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.94)),
+    color-mix(in srgb, var(--mode-primary) 4%, #fff);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--mode-primary) 10%, transparent);
 }
 
@@ -11974,9 +11931,6 @@ body.df-resizing, body.df-resizing * {
   border-color: var(--border);
 }
 .theme-dark .df-date-title { color: var(--text); }
-.theme-dark .df-date-title.today {
-  color: var(--accent-active);
-}
 .theme-dark .df-timeline-canvas { 
   background: transparent;
 }
@@ -12229,24 +12183,6 @@ body.df-resizing, body.df-resizing * {
 /* Settings */
 .df-app.theme-dark .df-utility-panel {
   background: var(--surface-main) !important;
-
-.df-app.theme-dark .i-close {
-  background: transparent !important;
-  border: none !important;
-  color: var(--text-muted) !important;
-}
-.df-app.theme-dark .i-close:hover {
-  color: var(--text-main) !important;
-}
-
-.df-app.theme-dark .i-close {
-  background: transparent !important;
-  border: none !important;
-  color: var(--text-muted) !important;
-}
-.df-app.theme-dark .i-close:hover {
-  color: var(--text-main) !important;
-}
   border: 1px solid var(--border-soft) !important;
   box-shadow: 0 24px 56px rgba(0,0,0,0.48) !important;
 }
@@ -12263,22 +12199,6 @@ body.df-resizing, body.df-resizing * {
 .df-app.theme-dark .df-utility-body small {
   color: var(--text-muted) !important;
 }
-.df-app.theme-dark .df-utility-check input[type="checkbox"] {
-  accent-color: var(--accent-active);
-}
-
-/* Theme setting + select — dark */
-.df-app.theme-dark .df-utility-select {
-  border-color: rgba(255,255,255,0.10) !important;
-}
-.df-app.theme-dark .df-theme-setting {
-  background: rgba(255,255,255,0.03) !important;
-  border-color: rgba(255,255,255,0.10) !important;
-}
-.df-app.theme-dark .df-theme-setting strong {
-  color: var(--text-main) !important;
-}
-
 
 .df-app.theme-dark .df-utility-panel input:not([type="checkbox"]),
 .df-app.theme-dark .df-utility-panel select,
@@ -12301,67 +12221,9 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-active) 18%, transparent) !important;
 }
 
-.df-app.theme-dark .df-settings-name-input {
-  color: var(--text-main) !important;
-  border-bottom-color: rgba(255,255,255,0.12) !important;
-  background: transparent !important;
-}
-.df-app.theme-dark .df-settings-name-input:focus {
-  border-bottom-color: var(--accent-active) !important;
-}
-
-.df-app.theme-dark .df-settings-profile {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-}
-.df-app.theme-dark .df-settings-avatar {
-  background: rgba(255,255,255,0.08) !important;
-  color: var(--text-main) !important;
-}
-.df-app.theme-dark .df-settings-profile small {
-  color: var(--text-muted) !important;
-}
-
 .df-app.theme-dark .df-theme-setting .df-project-color-picker {
   background: var(--surface-card) !important;
   border: 1px solid var(--border-soft) !important;
-}
-
-/* Settings controls — dark */
-.df-app.theme-dark .df-utility-body button:not(.i-close) {
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  color: var(--text-main) !important;
-}
-.df-app.theme-dark .df-utility-body button:not(.i-close):hover {
-  background: rgba(255,255,255,0.12) !important;
-  border-color: rgba(255,255,255,0.18) !important;
-}
-.df-app.theme-dark .df-settings-about,
-.df-app.theme-dark .df-settings-logout {
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  color: var(--text-main) !important;
-}
-.df-app.theme-dark .df-settings-about:hover,
-.df-app.theme-dark .df-settings-logout:hover {
-  background: rgba(255,255,255,0.12) !important;
-}
-.df-app.theme-dark .df-settings-logout {
-  background: rgba(239,68,68,0.12) !important;
-  border: 1px solid rgba(239,68,68,0.22) !important;
-  color: #FCA5A5 !important;
-}
-.df-app.theme-dark .df-settings-logout:hover {
-  background: rgba(239,68,68,0.22) !important;
-}
-.df-app.theme-dark .df-utility-select select {
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  color: var(--text-main) !important;
-}
-.df-app.theme-dark .df-utility-select select:focus {
-  border-color: var(--accent-active) !important;
 }
 
 .df-app.theme-dark .df-project-popover,
@@ -12380,12 +12242,6 @@ body.df-resizing, body.df-resizing * {
   background: rgba(255,255,255,0.06) !important;
 }
 
-/* Color picker + release — dark */
-.df-app.theme-dark .df-release-item strong { color: var(--text-muted) !important; }
-.df-app.theme-dark .df-release-item span { color: var(--text-main) !important; }
-.df-app.theme-dark .df-settings-about-icon { background: rgba(255,255,255,0.10) !important; color: var(--text-main) !important; }
-
-/* Timeline */
 /* Timeline */
 .df-app.theme-dark .df-timeline-panel {
   background: var(--surface-main) !important;
@@ -12424,10 +12280,6 @@ body.df-resizing, body.df-resizing * {
   color: var(--text-main) !important;
 }
 
-.df-app.theme-dark .df-date-title.today {
-  color: var(--accent-active) !important;
-}
-
 .df-app.theme-dark .df-back-today {
   background: rgba(255,255,255,0.06) !important;
   border-color: var(--border-subtle) !important;
@@ -12458,16 +12310,6 @@ body.df-resizing, body.df-resizing * {
 .df-app.theme-dark .df-empty {
   border: none !important;
   background: transparent !important;
-}
-
-.df-app.theme-dark .df-empty-pick-btn {
-  background: rgba(255,255,255,0.08) !important;
-  border: 1px solid rgba(255,255,255,0.14) !important;
-  color: var(--text-main) !important;
-}
-.df-app.theme-dark .df-empty-pick-btn:hover {
-  background: rgba(255,255,255,0.14) !important;
-  border-color: rgba(255,255,255,0.22) !important;
 }
 
 /* View switch */
@@ -12601,21 +12443,6 @@ body.df-resizing, body.df-resizing * {
   opacity: 0.42 !important;
 }
 
-/* Quick add — dark */
-.df-app.theme-dark .df-quick-add input {
-  background: transparent !important;
-  color: var(--text-main) !important;
-  border-bottom-color: rgba(255,255,255,0.12) !important;
-}
-.df-app.theme-dark .df-quick-add input:focus {
-  border-bottom-color: var(--accent-active) !important;
-}
-.df-app.theme-dark .df-quick-add-submit {
-  background: linear-gradient(135deg, var(--accent-active), color-mix(in srgb, var(--accent-active) 72%, #7C3AED)) !important;
-  color: #FFFFFF !important;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent-active) 18%, transparent) !important;
-}
-
 /* Drawer */
 .df-app.theme-dark .df-drawer {
   background: var(--surface-main) !important;
@@ -12626,14 +12453,6 @@ body.df-resizing, body.df-resizing * {
   background: var(--surface-card) !important;
   border-color: var(--border-subtle) !important;
 }
-
-/* ── Settings deep dark cleanup ── */
-.df-app.theme-dark .df-utility-backdrop { background: rgba(0,0,0,0.45) !important; }
-.df-app.theme-dark .df-settings-profile strong,
-.df-app.theme-dark .df-settings-profile span { color: var(--text-main) !important; }
-.df-app.theme-dark .df-utility-body ul { color: var(--text-muted) !important; }
-.df-app.theme-dark .df-settings-footer { border-top-color: rgba(255,255,255,0.08) !important; }
-.df-app.theme-dark .df-release-list { border-top-color: rgba(255,255,255,0.08) !important; }
 
 /* Light base */
 .df-app.theme-light,

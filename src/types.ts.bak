@@ -1,0 +1,244 @@
+export type Category = "exam" | "uk" | "us" | "essay" | "materials" | "project" | "personal";
+export type Priority = "high" | "medium" | "low";
+
+export interface Goal {
+  id: string;
+  title: string;
+  description: string;
+  targetDate: string;
+  status: "active" | "done" | "paused";
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  category: Category;
+  notes: string;
+  completed: boolean;
+  color?: string;
+  importance?: Priority;
+  urgency?: Priority;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+  done?: boolean;
+  order?: number;
+  createdAt: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  dueDate: string;
+  category: Category;
+  priority: Priority;
+  notes: string;
+  goalId: string;
+  completed: boolean;
+  parentTaskId?: string;
+  projectId?: string;
+  importance?: Priority;
+  urgency?: Priority;
+  estimatedHours?: number;
+  order?: number;
+  subtasks?: Subtask[];
+  /** 安排到时间轴的日期 (ISO) */
+  scheduledDate?: string;
+  /** 安排开始时间 "HH:MM" */
+  scheduledStart?: string;
+  /** 安排结束时间 "HH:MM" */
+  scheduledEnd?: string;
+  /** 计划在今天推进的日期 (ISO) — 区别于 dueDate 和 scheduledDate */
+  plannedForDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LongTermTask {
+  id: string;
+  title: string;
+  targetDate: string;
+  notes: string;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  category: Category;
+  details: string;
+  imported?: boolean;
+  createdAt: string;
+}
+
+export interface Note {
+  id: string;
+  content: string;
+  createdAt: string;
+  tags: string[];
+}
+
+export interface AiMemory {
+  id: string;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlannerDraft {
+  id: string;
+  type: "task" | "event" | "project";
+  title: string;
+  projectId: string;
+  estimatedHours: number;
+  dueDate: string;
+  dueTime?: string;
+  endDate?: string;
+  endTime?: string;
+  category?: Category;
+  importance?: Priority;
+  urgency?: Priority;
+  details: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
+export interface PlannerData {
+  version: number;
+  importedSeedVersion: string;
+  generatedAt: string;
+  savedAt?: string;
+  goals: Goal[];
+  projects: Project[];
+  tasks: Task[];
+  longTasks: LongTermTask[];
+  events: CalendarEvent[];
+  notes: Note[];
+  drafts: PlannerDraft[];
+  chat: ChatMessage[];
+  aiMemories: AiMemory[];
+  taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
+}
+
+export interface Settings {
+  activeMode: "execute" | "planning";
+  defaultTimelineView?: "daily" | "3day" | "weekly" | "month";
+  planningView: "tree" | "matrix" | "split";
+  aiDockOpen: boolean;
+  appTitle: string;
+  model: string;
+  baseUrl: string;
+  hasApiKey: boolean;
+  apiKeyPreview: string;
+  displayName: string;
+  dailyFocusTime: string;
+  weekStartsOn: 0 | 1;
+  theme: "light" | "calm" | "focus" | "dark";
+  accentColor: string;
+  executeAccentColor: string;
+  planningAccentColor: string;
+  themeGradientEnabled: boolean;
+  aiTone: "direct" | "gentle" | "strict";
+  hideCompleted: boolean;
+  reminderLeadDays: number;
+  taskNoteDisplay: "summary" | "collapsed" | "full";
+  glassEnabled: boolean;
+  backgroundImagePath: string;
+  glassBlur: number;
+  glassOpacity: number;
+  backgroundDim: number;
+  collapsedPanels: string[];
+  collapsedSections: string[];
+  panelWidths: {
+    left: number;
+    right: number;
+  };
+  chatMessageMaxHeight: number;
+  aiMemoryEnabled: boolean;
+  hideAi: boolean;
+  addAdvancedOpen: boolean;
+  uiStyle: "gradient" | "neumorphic";
+  language?: "en" | "zh";
+}
+
+export interface AiAction {
+  type: "add_task" | "reschedule_task" | "add_event" | "add_note" | "add_memory";
+  title?: string;
+  dueDate?: string;
+  date?: string;
+  category?: Category;
+  priority?: Priority;
+  notes?: string;
+  content?: string;
+  tags?: string[];
+  taskId?: string;
+  details?: string;
+  goalId?: string;
+  subtasks?: { title: string }[];
+}
+
+/** Single parsed item from AI plan output — not written until user confirms */
+export interface AiPlanItem {
+  kind: "project" | "task" | "event";
+  title: string;
+  checked: boolean;
+  category?: Category;
+  priority?: Priority;
+  dueDate?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  notes?: string;
+  details?: string;
+  projectTitle?: string; // task's parent project name (AI-suggested)
+  subtaskTitles?: string[];
+}
+
+export interface PlannerApi {
+  getAuthState?: () => Promise<{ mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean }>;
+  getBootstrap?: () => Promise<{
+    auth: { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
+    data: PlannerData | null;
+    settings: Settings | null;
+  }>;
+  signUp?: (email: string, password: string) => Promise<{
+    user: { id: string; email?: string } | null;
+    message?: string;
+    requiresEmailConfirmation?: boolean;
+    email?: string;
+  }>;
+  signIn?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null }>;
+  resendConfirmation?: (email: string) => Promise<{ message?: string }>;
+  signOut?: () => Promise<void>;
+  getData: () => Promise<PlannerData>;
+  saveData: (data: PlannerData) => Promise<PlannerData>;
+  applyActions: (actions: AiAction[]) => Promise<{ data: PlannerData; applied: Array<{ type: string; id: string; title: string }> }>;
+  resetSeed: () => Promise<PlannerData>;
+  getSettings: () => Promise<Settings>;
+  saveSettings: (settings: Partial<Settings> & { apiKey?: string; clearApiKey?: boolean }) => Promise<Settings>;
+  selectBackgroundImage: () => Promise<{ path: string }>;
+  chat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
+}
+
+declare global {
+  interface Window {
+    plan
