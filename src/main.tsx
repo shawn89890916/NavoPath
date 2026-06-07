@@ -204,13 +204,13 @@ function startOfMonthGridIso(iso: string) {
 
 function monthTitle(iso: string) {
   const date = new Date(`${iso}T00:00:00`);
-  return date.toLocaleString("en-US", { month: "long", year: "numeric" });
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
 }
 
 function displayDateTitle(iso: string) {
   const date = new Date(`${iso}T00:00:00`);
-  const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][date.getDay()];
-  return `${date.getDate()} ${weekday}`;
+  const weekday = ["周日","周一","周二","周三","周四","周五","周六"][date.getDay()];
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekday}`;
 }
 
 function uid(prefix: string) {
@@ -227,10 +227,7 @@ function minutesToTime(minutes: number) {
 function hourLabel(minutes: number) {
   const h = Math.floor(minutes / 60);
   if (h === 24) return "";
-  if (h === 0) return "12am";
-  if (h < 12) return `${h}am`;
-  if (h === 12) return "12pm";
-  return `${h - 12}pm`;
+  return `${h}:00`;
 }
 
 function timeToMinutes(time = "09:00") {
@@ -1395,7 +1392,7 @@ function App() {
             </div>
             <div className="df-candidate-list">
               {visibleCandidates.length === 0 ? (
-                <div className="df-empty"><div className="blob-accent" /><strong>今天还没有选择要推进的任务。</strong><span>从规划中选择任务。</span><button className="df-empty-pick-btn" onClick={openPlanningPicker}>从规划选择</button></div>
+                <div className="df-empty"><div className="blob-accent" /><strong>今天还没有任务</strong><span>从规划页选择任务，或直接添加一个。</span><button className="df-empty-pick-btn" onClick={openPlanningPicker}>从规划选择</button></div>
               ) : visibleCandidates.map((task) => (
                 <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
                   void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
@@ -1410,7 +1407,7 @@ function App() {
               event.preventDefault();
               quickAddTask();
             }}>
-              <input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="New task #project" />
+              <input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="添加任务 #项目" />
               <QuickProjectPicker
                 projects={projects}
                 value={quickProjectId}
@@ -1424,7 +1421,7 @@ function App() {
                 onProjectColorChange={(projectId, color) => updateProject(projectId, { color })}
                 onCreate={createQuickProject}
               />
-              <button className="df-quick-add-submit" type="submit" disabled={!quickTitle.trim()}>ADD</button>
+              <button className="df-quick-add-submit" type="submit" disabled={!quickTitle.trim()}>添加</button>
             </form>
           </section>
 
@@ -1433,7 +1430,7 @@ function App() {
             <button className="df-date-arrow right" aria-label="后一段" onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
               {!settings.hideAi && <div className="df-ai-planner">
-                    <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip={drawerOpen ? "请先关闭侧边栏" : "AI 规划今天"} aria-label="AI 规划今天" disabled={aiPlanning || drawerOpen} onClick={() => void planMyDay()}>{aiPlanning ? <><i />ANALYZING TASKS...</> : "PLAN MY DAY"}</button>
+                    <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip={drawerOpen ? "请先关闭侧边栏" : "规划建议"} aria-label="AI 规划今天" disabled={aiPlanning || drawerOpen} onClick={() => void planMyDay()}>{aiPlanning ? <><i />分析中...</> : "规划建议"}</button>
                 <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label="AI 规划设置" onClick={(event) => {
                   event.stopPropagation();
                   setAiPlanMenuOpen((open) => !open);
@@ -1462,7 +1459,7 @@ function App() {
               const rangeStart = timelineView === "weekly" ? startOfWeekIso(timelineDate) : timelineDate;
               const rangeLength = timelineView === "weekly" ? 7 : 3;
               const threeDates = Array.from({ length: rangeLength }, (_, index) => addDays(rangeStart, index));
-              const weekdayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+              const weekdayShort = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
               const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
               const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
               return (
