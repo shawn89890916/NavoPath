@@ -30,13 +30,16 @@ export default function PlanningView(props: {
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onTaskCreate: (projectId: string) => void;
   onTaskDelete: (taskId: string) => void;
+  onProjectTasksClick?: (projectId: string, anchorRect: DOMRect) => void;
 }) {
-  const unassigned = props.tasks.filter((task) => !task.projectId && !task.completed);
+  const safeProjects = Array.isArray(props.projects) ? props.projects : [];
+  const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
+  const unassigned = safeTasks.filter((task) => task && !task.projectId && !task.completed);
   const pickedTasks = Object.keys(props.picks)
-    .map((id) => props.tasks.find((task) => task.id === id))
+    .map((id) => safeTasks.find((task) => task?.id === id))
     .filter(Boolean) as Task[];
   const priorityGroups: Array<[PlanPickPriority, string]> = [["must", "必须做"], ["should", "应该做"], ["could", "有空做"]];
-  const projectName = (task: Task) => props.projects.find((project) => String(project.id) === String(task.projectId || ""))?.title || "未归属";
+  const projectName = (task: Task) => safeProjects.find((project) => project && String(project.id) === String(task.projectId || ""))?.title || "未归属";
   const addSubtask = (task: Task) => {
     const title = window.prompt("子任务名称");
     if (!title?.trim()) return;
@@ -50,11 +53,11 @@ export default function PlanningView(props: {
     props.onTaskUpdate(task.id, { dueDate: date.trim() });
   };
   const moveTaskProject = (task: Task) => {
-    const options = props.projects.map((project, index) => `${index + 1}. ${project.title}`).join("\n");
+    const options = safeProjects.map((project, index) => `${index + 1}. ${project.title}`).join("\n");
     const choice = window.prompt(`移动到项目：\n0. 未归属\n${options}`, "0");
     if (choice === null) return;
     const index = Number(choice) - 1;
-    props.onTaskUpdate(task.id, { projectId: index >= 0 ? props.projects[index]?.id : undefined });
+    props.onTaskUpdate(task.id, { projectId: index >= 0 ? safeProjects[index]?.id : undefined });
   };
   const renameTask = (task: Task) => {
     const title = window.prompt("编辑名称", task.title);
@@ -67,12 +70,12 @@ export default function PlanningView(props: {
       <section className="df-mindmap no-root">
         {props.pickMode && <div className="df-pick-banner"><strong>正在从规划中选择任务</strong><span>点击任务旁的 + 加入候选框，确认后加入执行列表。</span><button onClick={props.onExitPickMode}>退出</button></div>}
         <div className="df-tree">
-          {props.projects.map((project) => {
-            const projectTasks = props.tasks.filter((task) => String(task.projectId || "") === String(project.id) && !task.completed);
+          {safeProjects.map((project) => {
+            const projectTasks = safeTasks.filter((task) => task && String(task.projectId || "") === String(project.id) && !task.completed);
             return (
               <div className="df-category-branch" key={project.id}>
                 <button className="df-collapse" onClick={() => props.setCollapsed((current) => ({ ...current, [project.id]: !current[project.id] }))}>{props.collapsed[project.id] ? "+" : "-"}</button>
-                <PlanningProjectNode title={project.title} onOpen={() => props.onProjectEdit(project)} onAddTask={() => props.onTaskCreate(project.id)} />
+                <PlanningProjectNode title={project.title} taskCount={projectTasks.length} onOpen={() => props.onProjectEdit(project)} onAddTask={() => props.onTaskCreate(project.id)} onShowTasks={props.onProjectTasksClick ? (rect) => props.onProjectTasksClick!(project.id, rect) : undefined} />
                 {!props.collapsed[project.id] && <div className="df-project-list"><div className="df-task-branch">{projectTasks.map((task) => (
                   <PlanningTaskNode key={task.id} task={task} projectName={project.title} picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
                 ))}</div></div>}
@@ -82,7 +85,7 @@ export default function PlanningView(props: {
           {unassigned.length > 0 && (
             <div className="df-category-branch">
               <button className="df-collapse" onClick={() => props.setCollapsed((current) => ({ ...current, unassigned: !current.unassigned }))}>{props.collapsed.unassigned ? "+" : "-"}</button>
-              <PlanningProjectNode title="未归属任务" onAddTask={() => props.onTaskCreate("")} />
+              <PlanningProjectNode title="未归属任务" taskCount={unassigned.length} onAddTask={() => props.onTaskCreate("")} />
               {!props.collapsed.unassigned && <div className="df-project-list"><div className="df-task-branch">{unassigned.map((task) => (
                 <PlanningTaskNode key={task.id} task={task} projectName="未归属" picked={Boolean(props.picks[task.id])} onOpen={() => props.onTaskEdit(task)} onAdd={() => props.onAddPick(task.id)} onRename={() => renameTask(task)} onAddSubtask={() => addSubtask(task)} onSetDate={() => setTaskDate(task)} onMoveProject={() => moveTaskProject(task)} onDelete={() => props.onTaskDelete(task.id)} />
               ))}</div></div>}
@@ -132,7 +135,7 @@ function PlanningTaskNode(props: {
   return (
     <div className={`df-plan-task-node ${props.picked ? "picked" : ""}`}>
       <button className="df-task-node" onClick={props.onOpen}>
-        <span>{props.task.title}</span>
+        <span className="df-task-title">{props.task.title}</span>
         {(props.task.subtasks || []).length > 0 && <small>{props.task.subtasks?.filter((sub) => sub.completed || sub.done).length}/{props.task.subtasks?.length}</small>}
         {props.picked && <em>已选</em>}
       </button>
@@ -151,10 +154,13 @@ function PlanningTaskNode(props: {
   );
 }
 
-function PlanningProjectNode(props: { title: string; onOpen?: () => void; onAddTask: () => void }) {
+function PlanningProjectNode(props: { title: string; taskCount?: number; onOpen?: () => void; onAddTask: () => void; onShowTasks?: (anchorRect: DOMRect) => void }) {
   return (
     <div className="df-plan-project-node">
       <button className="df-category-node project-root" onClick={props.onOpen}>{props.title}</button>
+      {props.onShowTasks && props.taskCount !== undefined && props.taskCount > 0 && (
+        <button className="df-plan-project-tasks" title="查看项目任务" onClick={(event) => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); props.onShowTasks!(rect); }}>{props.taskCount}</button>
+      )}
       <button className="df-plan-project-add" title="添加任务" onClick={props.onAddTask}>+</button>
     </div>
   );
