@@ -3,6 +3,25 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
 import { installBrowserFallback } from "./browserFallback";
+import {
+  getVisibleDays,
+  getTimelineMetrics,
+  pointerToDateTime,
+  eventToRect,
+  timeBlockTop,
+  timeBlockHeight,
+  todayIso as geometryTodayIso,
+  addDays as geometryAddDays,
+  startOfWeekIso as geometryStartOfWeekIso,
+  minutesToTime as geometryMinutesToTime,
+  timeToMinutes as geometryTimeToMinutes,
+  addMinutes as geometryAddMinutes,
+  SLOT_MINUTES as GEOMETRY_SLOT_MINUTES,
+  SLOT_HEIGHT as GEOMETRY_SLOT_HEIGHT,
+  TIMELINE_START as GEOMETRY_TIMELINE_START,
+  TIMELINE_END as GEOMETRY_TIMELINE_END,
+  HOUR_HEIGHT,
+} from "./timelineGeometry";
 import "./styles.css";
 import "./landing.css";
 
@@ -274,6 +293,32 @@ function replaceNextAction(notes: string, nextAction: string) {
   return [line, notes].filter(Boolean).join("\n");
 }
 
+function getDropTargetFromPointer({
+  clientX, clientY,
+  gridElement,
+  scrollElement,
+  visibleDays,
+  hourHeight = HOUR_HEIGHT,
+  startHour = TIMELINE_START,
+  snapMinutes = SLOT_MINUTES,
+  debugLabel,
+}: {
+  clientX: number;
+  clientY: number;
+  gridElement: HTMLElement;
+  scrollElement: HTMLElement;
+  visibleDays: string[];
+  hourHeight?: number;
+  startHour?: number;
+  snapMinutes?: number;
+  debugLabel?: string;
+}): { date: string; startTime: string; endTime: string; dayIndex: number; minutes: number } {
+  return pointerToDateTime({
+    clientX, clientY, gridElement, scrollElement, visibleDays,
+    hourHeight, startHour, snapMinutes, debugLabel,
+  });
+}
+
 function waitForPlannerApi() {
   return new Promise<PlannerApi>((resolve) => {
     if (window.plannerApi) {
@@ -488,12 +533,43 @@ function App() {
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
   const suppressBlockClickRef = useRef(false);
+  const dragTargetDateRef = useRef<string>("");
   const lastTimelineAutoScrollKeyRef = useRef("");
   const dataRef = useRef<PlannerData | null>(null);
   const settingsRef = useRef<Settings | null>(null);
   const pendingSaveRef = useRef<PlannerData | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const queuedSaveIdRef = useRef(0);
+  const colsContainerRef = useRef<HTMLDivElement | null>(null);
+  const timeGridRef = useRef<HTMLDivElement | null>(null);
+  const [multiColWidth, setMultiColWidth] = useState(0);
+
+  // Keep column width updated for multi-day overlay positioning
+  useEffect(() => {
+    const el = timeGridRef.current;
+    if (!el || (timelineView !== "3day" && timelineView !== "weekly")) return;
+    const visDays = getVisibleDays(timelineView, selectedDate);
+    const measure = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0 && visDays.length > 0) {
+        const cw = w / visDays.length;
+        setMultiColWidth(cw);
+        // ── TEMPORARY DEBUG ──
+        console.table({
+          viewMode: timelineView,
+          visibleDays: visDays,
+          gridWidth: Math.round(w),
+          columnWidth: Math.round(cw),
+          columns: visDays.length,
+        });
+        // ── END TEMPORARY DEBUG ──
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [timelineView, selectedDate]);
 
   useEffect(() => {
     dataRef.current = data;
@@ -962,15 +1038,22 @@ function App() {
   }
 
   function slotFromPointer(clientY: number, offsetMinutes = 0) {
-    const rect = timelineCanvasRef.current?.getBoundingClientRect();
-    if (!rect) return "09:00";
-    const y = clientY - rect.top;
-    const raw = TIMELINE_START * 60 + (y / SLOT_HEIGHT) * SLOT_MINUTES - offsetMinutes;
-    return minutesToTime(clampSlot(raw));
+    const { gridEl, scrollEl, visDays } = getDropGridAndDays();
+    if (!gridEl || !scrollEl) return "09:00";
+    // Pass a dummy clientX (0) — dayIndex doesn't matter for time‑only queries
+    const target = pointerToDateTime({
+      clientX: 0, clientY,
+      gridElement: gridEl,
+      scrollElement: scrollEl,
+      visibleDays: visDays,
+    });
+    return minutesToTime(clampSlot(target.minutes - offsetMinutes));
   }
 
   function pointerOutsideTimeline(clientX: number, clientY: number) {
-    const rect = timelineCanvasRef.current?.getBoundingClientRect();
+    const rect = (timelineView === "3day" || timelineView === "weekly")
+      ? timelineRef.current?.getBoundingClientRect()
+      : timelineCanvasRef.current?.getBoundingClientRect();
     if (!rect) return false;
     return clientX < rect.left - 80 || clientX > rect.right + 80 || clientY < rect.top - 40 || clientY > rect.bottom + 40;
   }
@@ -986,15 +1069,17 @@ function App() {
       setDrag(null);
       return;
     }
+    const targetDate = dragTargetDateRef.current || timelineDate;
     updateTask(taskId, {
       plannedForDate: today,
-      scheduledDate: timelineDate,
+      scheduledDate: targetDate,
       scheduledStart: startTime,
       scheduledEnd: endTime
     });
     showToast("已安排到时间轴");
     setHoverSlot("");
     setDrag(null);
+    dragTargetDateRef.current = "";
   }
 
   function unscheduleTask(taskId: string) {
@@ -1019,6 +1104,16 @@ function App() {
     showToast("已放回规划");
   }
 
+  function getDropGridAndDays(): { gridEl: HTMLElement | null; scrollEl: HTMLElement | null; visDays: string[] } {
+    const visDays = getVisibleDays(timelineView === "weekly" ? "weekly" : timelineView === "3day" ? "3day" : "daily", timelineDate);
+    if (timelineView === "3day" || timelineView === "weekly") {
+      const gridEl = timeGridRef.current || document.querySelector('.df-time-grid');
+      const scrollEl = timelineRef.current;
+      return { gridEl: gridEl as HTMLElement | null, scrollEl, visDays };
+    }
+    return { gridEl: timelineCanvasRef.current, scrollEl: timelineRef.current, visDays };
+  }
+
   function beginBlockDrag(event: React.MouseEvent, task: Task) {
     if ((event.target as HTMLElement).closest("button,input,textarea,select")) return;
     event.preventDefault();
@@ -1040,7 +1135,25 @@ function App() {
       }
       const outsideTimeline = pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY);
       setDrag((current) => current && current.taskId === task.id ? { ...current, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline } : current);
-      setHoverSlot(outsideTimeline ? "" : slotFromPointer(moveEvent.clientY, offsetMinutes));
+      if (!outsideTimeline) {
+        const { gridEl, scrollEl, visDays } = getDropGridAndDays();
+        if (gridEl && scrollEl) {
+          const target = getDropTargetFromPointer({
+            clientX: moveEvent.clientX,
+            clientY: moveEvent.clientY,
+            gridElement: gridEl,
+            scrollElement: scrollEl,
+            visibleDays: visDays,
+            debugLabel: `block-move-${timelineView}`,
+          });
+          const adjustedTime = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
+          dragTargetDateRef.current = target.date;
+          setHoverSlot(adjustedTime);
+        }
+      } else {
+        setHoverSlot("");
+        dragTargetDateRef.current = "";
+      }
     };
     const up = (upEvent: MouseEvent) => {
       if (active) {
@@ -1048,7 +1161,21 @@ function App() {
         if ((leftPanel && upEvent.clientX >= leftPanel.left && upEvent.clientX <= leftPanel.right && upEvent.clientY >= leftPanel.top && upEvent.clientY <= leftPanel.bottom) || pointerOutsideTimeline(upEvent.clientX, upEvent.clientY)) {
           unscheduleTask(task.id);
         } else {
-          scheduleTask(task.id, slotFromPointer(upEvent.clientY, offsetMinutes));
+          const { gridEl, scrollEl, visDays } = getDropGridAndDays();
+          if (gridEl && scrollEl) {
+            const target = getDropTargetFromPointer({
+              clientX: upEvent.clientX,
+              clientY: upEvent.clientY,
+              gridElement: gridEl,
+              scrollElement: scrollEl,
+              visibleDays: visDays,
+              debugLabel: `block-up-${timelineView}`,
+            });
+            dragTargetDateRef.current = target.date;
+            scheduleTask(task.id, minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes)));
+          } else {
+            scheduleTask(task.id, slotFromPointer(upEvent.clientY, offsetMinutes));
+          }
         }
       }
       window.removeEventListener("mousemove", move);
@@ -1442,241 +1569,347 @@ function App() {
                 </span>}
               </div>}
               <div className="df-timeline-actions">
-                <div className="df-view-switch" aria-label="切换时间视图">
-                  {([
-                    ["daily", "天"],
-                    ["3day", "3天"],
-                    ["weekly", "周"],
-                    ["month", "月"]
-                  ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
-                </div>
               </div>
             </div>
-            {timelineDate !== today && (
-              <button className="df-back-today" onClick={() => setSelectedDate(today)} title="回到今天">↵</button>
-            )}
-            {(timelineView === "3day" || timelineView === "weekly") ? (() => {
-              const rangeStart = timelineView === "weekly" ? startOfWeekIso(timelineDate) : timelineDate;
-              const rangeLength = timelineView === "weekly" ? 7 : 3;
-              const threeDates = Array.from({ length: rangeLength }, (_, index) => addDays(rangeStart, index));
-              const weekdayShort = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-              const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
-              const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
-              return (
-                <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(rangeLength) } as CSSProperties}>
-                  <div className="df-timeline-3day-top">
-                    <div className="df-timeline-3day-ruler-spacer" />
-                    <div className="df-timeline-3day-dates">
-                      {threeDates.map((colDate) => {
-                        const isToday = colDate === today;
-                        const dateObj = new Date(`${colDate}T00:00:00`);
-                        return (
-                          <div key={colDate} className={`df-timeline-3day-date${isToday ? " today" : ""}`}>
-                            <span className="df-timeline-3day-date-num">{dateObj.getDate()}</span>
-                            <span className="df-timeline-3day-date-wd">{weekdayShort[dateObj.getDay()]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="df-timeline-3day-allday">
-                    <div className="df-timeline-3day-ruler-spacer">
-                      <span className="df-timeline-3day-allday-label">全天</span>
-                    </div>
-                    <div className="df-timeline-3day-dates">
-                      {threeDates.map((colDate) => {
-                        const adTasks = tasks.filter((task) => task.scheduledDate === colDate && !task.scheduledStart && !task.completed);
-                        return (
-                          <div key={colDate} className="df-timeline-3day-allday-cell" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
-                            event.preventDefault();
-                            const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
-                            if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: colDate, scheduledStart: undefined, scheduledEnd: undefined });
-                            setDrag(null);
-                          }}>
-                            {adTasks.map((task) => (
-                              <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
-                                event.dataTransfer.setData("taskId", task.id);
-                                setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                              }} onDragEnd={() => setDrag(null)} />
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="df-timeline-3day-scroll" ref={timelineRef}>
-                    <div className="df-timeline-3day-grid">
-                      <div className="df-timeline-3day-ruler">
-                        <div className="df-timeline-canvas" style={{ height: `${canvasHeight}px`, width: "52px", margin: 0, borderLeft: "none", background: "transparent" }}>
-                          {Array.from({ length: slotCount }).map((_, index) => {
-                            const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
-                            const isHour = minutes % 60 === 0;
-                            const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+            <div className="df-timeline-body">
+              <div className="df-timeline-content">
+                {timelineDate !== today && (
+                  <button className="df-back-today" onClick={() => setSelectedDate(today)} title="回到今天">↵</button>
+                )}
+                {(timelineView === "3day" || timelineView === "weekly") ? (() => {
+                  const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
+                  const weekdayShort = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+                  const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+                  const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
+                  const multiDayScheduledTasks = tasks.filter((task) => threeDates.includes(task.scheduledDate || "") && task.scheduledStart).sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+                  return (
+                    <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(threeDates.length) } as CSSProperties}>
+                      <div className="df-timeline-3day-top">
+                        <div className="df-timeline-3day-ruler-spacer" />
+                        <div className="df-timeline-3day-dates">
+                          {threeDates.map((colDate) => {
+                            const isToday = colDate === today;
+                            const dateObj = new Date(`${colDate}T00:00:00`);
                             return (
-                              <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}>
-                                {isHour ? <span>{hourLabel(minutes)}</span> : null}
+                              <div key={colDate} className={`df-timeline-3day-date${isToday ? " today" : ""}`}>
+                                <span className="df-timeline-3day-date-num">{dateObj.getDate()}</span>
+                                <span className="df-timeline-3day-date-wd">{weekdayShort[dateObj.getDay()]}</span>
                               </div>
                             );
                           })}
                         </div>
                       </div>
-                      <div className="df-timeline-3day-cols">
-                        {threeDates.map((colDate) => {
-                          const colTasks = tasks.filter((task) => task.scheduledDate === colDate && task.scheduledStart).sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
-                          const isToday = colDate === today;
-                          return (
-                            <div key={colDate} className={`df-day-col${isToday ? " is-today" : ""}`}
-                              onDragOver={(event) => { event.preventDefault(); setHoverSlot(slotFromPointer(event.clientY)); }}
-                              onDrop={(event) => {
+                      <div className="df-timeline-3day-allday">
+                        <div className="df-timeline-3day-ruler-spacer">
+                          <span className="df-timeline-3day-allday-label">全天</span>
+                        </div>
+                        <div className="df-timeline-3day-dates">
+                          {threeDates.map((colDate) => {
+                            const adTasks = tasks.filter((task) => task.scheduledDate === colDate && !task.scheduledStart && !task.completed);
+                            return (
+                              <div key={colDate} className="df-timeline-3day-allday-cell" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
                                 event.preventDefault();
                                 const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
-                                if (taskId) {
-                                  const slot = hoverSlot || slotFromPointer(event.clientY);
-                                  updateTask(taskId, { scheduledDate: colDate, scheduledStart: slot, scheduledEnd: addMinutes(slot, drag?.duration || 60) });
+                                if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: colDate, scheduledStart: undefined, scheduledEnd: undefined });
+                                setDrag(null);
+                              }}>
+                                {adTasks.map((task) => (
+                                  <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                                    event.dataTransfer.setData("taskId", task.id);
+                                    setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                                  }} onDragEnd={() => setDrag(null)} />
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="df-timeline-3day-scroll" ref={timelineRef}>
+                        <div className="df-timeline-3day-grid">
+                          <div className="df-timeline-3day-ruler">
+                            <div className="df-timeline-canvas" style={{ height: `${canvasHeight}px`, width: "52px", margin: 0, borderLeft: "none", background: "transparent" }}>
+                              {Array.from({ length: slotCount }).map((_, index) => {
+                                const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                                const isHour = minutes % 60 === 0;
+                                const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+                                return (
+                                  <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}>
+                                    {isHour ? <span>{hourLabel(minutes)}</span> : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div className="df-timeline-3day-cols" ref={colsContainerRef}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              const gridEl = colsContainerRef.current;
+                              const scrollEl = timelineRef.current;
+                              if (gridEl && scrollEl) {
+                                const target = getDropTargetFromPointer({
+                                  clientX: event.clientX, clientY: event.clientY,
+                                  gridElement: gridEl,
+                                  scrollElement: scrollEl,
+                                  visibleDays: threeDates,
+                                  debugLabel: `drag-${timelineView}`,
+                                });
+                                dragTargetDateRef.current = target.date;
+                                setHoverSlot(target.startTime);
+                              }
+                            }}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                              if (taskId) {
+                                const gridEl = colsContainerRef.current;
+                                const scrollEl = timelineRef.current;
+                                if (gridEl && scrollEl) {
+                                  const target = getDropTargetFromPointer({
+                                    clientX: event.clientX, clientY: event.clientY,
+                                    gridElement: gridEl,
+                                    scrollElement: scrollEl,
+                                    visibleDays: threeDates,
+                                  });
+                                  dragTargetDateRef.current = target.date;
+                                  const endTime = addMinutes(target.startTime, drag?.duration || 60);
+                                  if (hasScheduleConflict(target.startTime, endTime, taskId)) {
+                                    showToast("这个时间和已有安排冲突");
+                                    setHoverSlot("");
+                                    setDrag(null);
+                                    return;
+                                  }
+                                  updateTask(taskId, { plannedForDate: today, scheduledDate: target.date, scheduledStart: target.startTime, scheduledEnd: endTime });
+                                  showToast("已安排到时间轴");
+                                  setHoverSlot("");
+                                  setDrag(null);
                                 }
-                              }}
-                              onDragLeave={() => setHoverSlot("")}
-                            >
-                              <div className="df-timeline-canvas df-day-col-canvas" style={{ height: `${canvasHeight}px` }}>
+                              }
+                            }}
+                            onDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}
+                          >
+                            {/* Single time-grid: coordinate origin for ALL day columns */}
+                            <div className="df-time-grid" ref={timeGridRef} style={{ position: "relative", height: `${canvasHeight}px`, width: "100%" }}>
+                              {/* Layer 1: Shared hour lines across all columns */}
+                              <div className="df-hour-lines-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
                                 {Array.from({ length: slotCount }).map((_, index) => {
                                   const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
                                   const isHour = minutes % 60 === 0;
                                   const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
                                   return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes} />;
                                 })}
-                                {isToday && <NowLine />}
-                                {colTasks.length === 0 && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
-                                {colTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
-                                  <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
-                                    if (!suppressBlockClickRef.current) openTaskEdit(task);
-                                  }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
-                                    createProjectForTask(task.id, title);
-                                  }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
-                                ))}
                               </div>
+                              {/* Layer 2: Day column backgrounds and separators */}
+                              <div className="df-day-columns-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2 }}>
+                                {threeDates.map((colDate, ci) => {
+                                  const colPct = 100 / threeDates.length;
+                                  return (
+                                    <div key={colDate} className={`df-day-col-bg${colDate === today ? " is-today" : ""}`}
+                                      style={{
+                                        position: "absolute",
+                                        left: `${ci * colPct}%`,
+                                        width: `${colPct}%`,
+                                        top: 0, bottom: 0,
+                                        borderRight: ci < threeDates.length - 1 ? "1px solid rgba(148,163,184,.08)" : "none",
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                              {/* Layer 3: Event blocks — absolutely positioned on the time-grid */}
+                              <div className="df-event-blocks-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
+                                {multiColWidth > 0 && multiDayScheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => {
+                                  const dayIndex = threeDates.indexOf(task.scheduledDate || "");
+                                  if (dayIndex === -1) return null;
+                                  const gutter = timelineView === "weekly" ? 5 : 8;
+                                  return (
+                                    <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
+                                      if (!suppressBlockClickRef.current) openTaskEdit(task);
+                                    }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
+                                      createProjectForTask(task.id, title);
+                                    }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)}
+                                      extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, pointerEvents: "auto" }}
+                                    />
+                                  );
+                                })}
+                                {/* Preview block during drag */}
+                                {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && (() => {
+                                  const tgtDate = dragTargetDateRef.current || threeDates[0];
+                                  const dayIndex = threeDates.indexOf(tgtDate);
+                                  if (dayIndex === -1) return null;
+                                  const gutter = timelineView === "weekly" ? 5 : 8;
+                                  return (
+                                    <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
+                                      extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
+                                    />
+                                  );
+                                })()}
+                                {/* Now line — only in today's column in multi-day view */}
+                                {(() => {
+                                  const todayIdx = threeDates.indexOf(today);
+                                  if (todayIdx === -1 || multiColWidth <= 0) return null;
+                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth }} />;
+                                })()}
+                                {/* Empty state */}
+                                {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })() : timelineView === "month" ? (() => {
+                  const monthStart = startOfMonthGridIso(timelineDate);
+                  const monthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
+                  const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
+                  return (
+                    <div className="df-month-view">
+                      <div className="df-month-title">{monthTitle(timelineDate)}</div>
+                      <div className="df-month-weekdays">{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <span key={day}>{day}</span>)}</div>
+                      <div className="df-month-grid">
+                        {monthDays.map((day) => {
+                          const dateObj = new Date(`${day}T00:00:00`);
+                          const dayTasks = tasks.filter((task) => !task.completed && (task.scheduledDate === day || task.plannedForDate === day || task.dueDate === day)).slice(0, 5);
+                          return (
+                            <div key={day} className={`df-month-cell ${dateObj.getMonth() !== activeMonth ? "muted" : ""} ${day === today ? "today" : ""}`}
+                              onDragOver={(event) => event.preventDefault()}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                                if (taskId) updateTask(taskId, { plannedForDate: day, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined });
+                                setDrag(null);
+                              }}
+                              onDoubleClick={() => {
+                                if (drawerOpen) return;
+                                setSelectedDate(day);
+                                openAdd("task");
+                              }}
+                            >
+                              <strong>{dateObj.getDate()}</strong>
+                              {dayTasks.map((task) => (
+                                <button key={task.id} className="df-month-task" style={{ "--cat": projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color } as CSSProperties} onClick={() => openTaskEdit(task)}>
+                                  <span />{task.title}
+                                </button>
+                              ))}
                             </div>
                           );
                         })}
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })() : timelineView === "month" ? (() => {
-              const monthStart = startOfMonthGridIso(timelineDate);
-              const monthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
-              const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
-              return (
-                <div className="df-month-view">
-                  <div className="df-month-title">{monthTitle(timelineDate)}</div>
-                  <div className="df-month-weekdays">{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <span key={day}>{day}</span>)}</div>
-                  <div className="df-month-grid">
-                    {monthDays.map((day) => {
-                      const dateObj = new Date(`${day}T00:00:00`);
-                      const dayTasks = tasks.filter((task) => !task.completed && (task.scheduledDate === day || task.plannedForDate === day || task.dueDate === day)).slice(0, 5);
-                      return (
-                        <div key={day} className={`df-month-cell ${dateObj.getMonth() !== activeMonth ? "muted" : ""} ${day === today ? "today" : ""}`}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
-                            if (taskId) updateTask(taskId, { plannedForDate: day, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined });
-                            setDrag(null);
-                          }}
-                          onDoubleClick={() => {
-                            if (drawerOpen) return;
-                            setSelectedDate(day);
-                            openAdd("task");
-                          }}
-                        >
-                          <strong>{dateObj.getDate()}</strong>
-                          {dayTasks.map((task) => (
-                            <button key={task.id} className="df-month-task" style={{ "--cat": projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color } as CSSProperties} onClick={() => openTaskEdit(task)}>
-                              <span />{task.title}
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })() : (
-              <div className="df-timeline-daily">
-                <div className={`df-date-title${timelineDate === today ? " today" : ""}`}>
-                  {displayDateTitle(timelineDate)}
-                </div>
-                <div className="df-timeline-allday">
-                  <span className="df-timeline-allday-label">全天</span>
-                  <div className="df-timeline-allday-content" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
-                    event.preventDefault();
-                    const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
-                    if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: timelineDate, scheduledStart: undefined, scheduledEnd: undefined });
-                    setDrag(null);
-                  }} onDoubleClick={() => {
-                    if (drawerOpen || aiPlanning) return;
-                    if (quickSchedule) { setQuickSchedule(null); return; }
-                    setQuickSchedule({ startTime: "00:00", title: "", projectId: "", isAllDay: true });
-                  }}>
-                    {tasks.filter((task) => task.scheduledDate === timelineDate && !task.scheduledStart && !task.completed).map((task) => (
-                      <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
-                        event.dataTransfer.setData("taskId", task.id);
-                        setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                      }} onDragEnd={() => setDrag(null)} />
-                    ))}
-                    {quickSchedule?.isAllDay && (
-                      <div className="df-all-day-quick" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          autoFocus
-                          value={quickSchedule.title}
-                          onChange={(e) => setQuickSchedule({ ...quickSchedule, title: e.target.value })}
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickSchedule(); } }}
-                          placeholder="添加全天任务"
-                        />
-                        <button type="button" onClick={saveQuickSchedule}>✓</button>
+                  );
+                })() : (
+                  <div className="df-timeline-daily">
+                    <div className={`df-date-title${timelineDate === today ? " today" : ""}`}>
+                      {displayDateTitle(timelineDate)}
+                    </div>
+                    <div className="df-timeline-allday">
+                      <span className="df-timeline-allday-label">全天</span>
+                      <div className="df-timeline-allday-content" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+                        event.preventDefault();
+                        const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                        if (taskId) updateTask(taskId, { plannedForDate: today, scheduledDate: timelineDate, scheduledStart: undefined, scheduledEnd: undefined });
+                        setDrag(null);
+                      }} onDoubleClick={() => {
+                        if (drawerOpen || aiPlanning) return;
+                        if (quickSchedule) { setQuickSchedule(null); return; }
+                        setQuickSchedule({ startTime: "00:00", title: "", projectId: "", isAllDay: true });
+                      }}>
+                        {tasks.filter((task) => task.scheduledDate === timelineDate && !task.scheduledStart && !task.completed).map((task) => (
+                          <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                            event.dataTransfer.setData("taskId", task.id);
+                            setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
+                          }} onDragEnd={() => setDrag(null)} />
+                        ))}
+                        {quickSchedule?.isAllDay && (
+                          <div className="df-all-day-quick" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              autoFocus
+                              value={quickSchedule.title}
+                              onChange={(e) => setQuickSchedule({ ...quickSchedule, title: e.target.value })}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickSchedule(); } }}
+                              placeholder="添加全天任务"
+                            />
+                            <button type="button" onClick={saveQuickSchedule}>✓</button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                    <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
+                      event.preventDefault();
+                      const gridEl = timelineCanvasRef.current;
+                      const scrollEl = timelineRef.current;
+                      if (gridEl && scrollEl) {
+                        const target = getDropTargetFromPointer({
+                          clientX: event.clientX, clientY: event.clientY,
+                          gridElement: gridEl,
+                          scrollElement: scrollEl,
+                          visibleDays: [timelineDate],
+                          debugLabel: "drag-daily",
+                        });
+                        dragTargetDateRef.current = target.date;
+                        setHoverSlot(target.startTime);
+                      }
+                    }} onDrop={(event) => {
+                      event.preventDefault();
+                      const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
+                      if (taskId) {
+                        const gridEl = timelineCanvasRef.current;
+                        const scrollEl = timelineRef.current;
+                        if (gridEl && scrollEl) {
+                          const target = getDropTargetFromPointer({
+                            clientX: event.clientX, clientY: event.clientY,
+                            gridElement: gridEl,
+                            scrollElement: scrollEl,
+                            visibleDays: [timelineDate],
+                          });
+                          dragTargetDateRef.current = target.date;
+                          scheduleTask(taskId, target.startTime);
+                        } else {
+                          scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY));
+                        }
+                      }
+                    }} onDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}>
+                      <div ref={timelineCanvasRef} className="df-timeline-canvas" style={{ height: `${((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT}px` }} onClick={(event) => {
+                        if (drag || resizePreview) return;
+                        if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
+                        if (quickSchedule) {
+                          setQuickSchedule(null);
+                          return;
+                        }
+                        openQuickSchedule(event.clientY);
+                      }}>
+                        {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
+                          const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                          const isHour = minutes % 60 === 0;
+                          const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
+                        })}
+                        {isViewingToday && <NowLine />}
+                        {quickSchedule && <QuickScheduleInput draft={quickSchedule} projects={projects} onChange={setQuickSchedule} onSave={saveQuickSchedule} onCancel={() => setQuickSchedule(null)} onCreateProject={quickCreateProject} />}
+                        {scheduledTasks.length === 0 && suggestions.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />拖任务到这里安排时间</div>}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
+                        {suggestions.filter((item) => !item.ignored).map((suggestion) => <SuggestionBlock key={suggestion.id} suggestion={suggestion} task={tasks.find((task) => task.id === suggestion.taskId)} conflict={suggestionConflict(suggestion)} onApply={() => applySuggestion(suggestion.id)} onIgnore={() => setSuggestions((current) => current.map((item) => item.id === suggestion.id ? { ...item, ignored: true } : item))} />)}
+                        {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
+                          <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
+                            if (!suppressBlockClickRef.current) openTaskEdit(task);
+                          }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
+                            createProjectForTask(task.id, title);
+                          }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
-                  event.preventDefault();
-                  setHoverSlot(slotFromPointer(event.clientY));
-                }} onDrop={(event) => {
-                  event.preventDefault();
-                  const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
-                  if (taskId) scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY));
-                }} onDragLeave={() => setHoverSlot("")}>
-                  <div ref={timelineCanvasRef} className="df-timeline-canvas" style={{ height: `${((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT}px` }} onClick={(event) => {
-                    if (drag || resizePreview) return;
-                    if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
-                    if (quickSchedule) {
-                      setQuickSchedule(null);
-                      return;
-                    }
-                    openQuickSchedule(event.clientY);
-                  }}>
-                    {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
-                      const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
-                      const isHour = minutes % 60 === 0;
-                      const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
-                      return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
-                    })}
-                    {isViewingToday && <NowLine />}
-                    {quickSchedule && <QuickScheduleInput draft={quickSchedule} projects={projects} onChange={setQuickSchedule} onSave={saveQuickSchedule} onCancel={() => setQuickSchedule(null)} onCreateProject={quickCreateProject} />}
-                    {scheduledTasks.length === 0 && suggestions.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />拖任务到这里安排时间</div>}
-                    {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
-                    {suggestions.filter((item) => !item.ignored).map((suggestion) => <SuggestionBlock key={suggestion.id} suggestion={suggestion} task={tasks.find((task) => task.id === suggestion.taskId)} conflict={suggestionConflict(suggestion)} onApply={() => applySuggestion(suggestion.id)} onIgnore={() => setSuggestions((current) => current.map((item) => item.id === suggestion.id ? { ...item, ignored: true } : item))} />)}
-                    {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => (
-                      <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
-                        if (!suppressBlockClickRef.current) openTaskEdit(task);
-                      }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
-                        createProjectForTask(task.id, title);
-                      }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} />
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
-            )}
+              <div className="df-view-switch-vertical" aria-label="切换时间视图">
+                {([
+                  ["daily", "日"],
+                  ["3day", "3天"],
+                  ["weekly", "周"],
+                  ["month", "月"]
+                ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => setTimelineView(view)}>{label}</button>)}
+              </div>
+            </div>
           </section>
         </main>
       ) : (
@@ -1709,7 +1942,7 @@ function QuickScheduleInput({ draft, projects, onChange, onSave, onCancel, onCre
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const showProjects = /#\S*$/.test(draft.title);
   const hashDraft = draft.title.match(/#(\S*)$/)?.[1] || "";
-  const top = ((timeToMinutes(draft.startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+  const top = timeBlockTop(draft.startTime);
   function chooseProject(project: Project | null) {
     const base = draft.title.replace(/#\S*$/, "").trimEnd();
     onChange({ ...draft, title: `${base}${base ? " " : ""}#${project?.title || "Inbox"}`, projectId: project?.id || "" });
@@ -1836,17 +2069,17 @@ function formatDuration(hours: number) {
   return formatMinutes(Math.round(hours * 60));
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const start = preview?.start || task.scheduledStart || "09:00";
   const end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task));
-  const top = ((timeToMinutes(start) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-  const height = Math.max(((timeToMinutes(end) - timeToMinutes(start)) / SLOT_MINUTES) * SLOT_HEIGHT, SLOT_HEIGHT);
+  const top = timeBlockTop(start);
+  const height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT);
   const next = extractNextAction(task.notes);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   return (
-    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""}`} style={{ top, height, "--cat": stripeColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""}`} style={{ top, height, "--cat": stripeColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
       setProjectOpen(false);
     }} onMouseDown={onDragStart} onClick={onEdit} onDoubleClick={onEdit}>
@@ -1863,7 +2096,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
           {projectOpen && <div className="df-project-popover">
             <button onClick={() => { onProjectChange(""); setProjectOpen(false); }}># 未归属</button>
             {projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { onProjectChange(project.id); setProjectOpen(false); }} onColorChange={(color) => onProjectColorChange(project.id, color)} />)}
-            <div className="df-project-create-line"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={() => { onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); }}>✓</button></div>
+            <div className="df-project-create-line"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={createAndSelectProject}>✓</button></div>
           </div>}
         </span>}
       </div>
@@ -1873,17 +2106,18 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   );
 }
 
-function PreviewBlock({ task, startTime, duration, draggingBlock, conflict }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean }) {
+function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extraStyle }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean; extraStyle?: CSSProperties }) {
   if (!task) return null;
-  const top = ((timeToMinutes(startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-  const height = Math.max((duration / SLOT_MINUTES) * SLOT_HEIGHT, SLOT_HEIGHT);
-  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${conflict ? "conflict" : ""}`} style={{ top, height }}><strong>{task.title}</strong>{!draggingBlock && <span>{conflict ? "冲突" : startTime} · {Math.round(duration)}min</span>}</div>;
+  const top = timeBlockTop(startTime);
+  const endTime = addMinutes(startTime, duration);
+  const height = Math.max(timeBlockHeight(startTime, endTime), SLOT_HEIGHT);
+  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${conflict ? "conflict" : ""}`} style={{ top, height, ...extraStyle }}><strong>{task.title}</strong>{!draggingBlock && <span>{conflict ? "冲突" : startTime} · {Math.round(duration)}min</span>}</div>;
 }
 
 function SuggestionBlock({ suggestion, task, conflict, onApply, onIgnore }: { suggestion: ScheduleSuggestion; task?: Task; conflict: boolean; onApply: () => void; onIgnore: () => void }) {
   if (!task) return null;
-  const top = ((timeToMinutes(suggestion.startTime) - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-  const height = Math.max(((timeToMinutes(suggestion.endTime) - timeToMinutes(suggestion.startTime)) / SLOT_MINUTES) * SLOT_HEIGHT, 48);
+  const top = timeBlockTop(suggestion.startTime);
+  const height = Math.max(timeBlockHeight(suggestion.startTime, suggestion.endTime), 48);
   return <div className={`df-suggestion ${conflict ? "conflict" : ""}`} style={{ top, height }}>
     <button className="df-suggestion-action apply" disabled={conflict} aria-label="应用建议" onClick={onApply}>▣</button>
     <button className="df-suggestion-action ignore" aria-label="不采用建议" onClick={onIgnore}>⊘</button>
@@ -1974,14 +2208,14 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
         {projectOpen && <div className="df-project-popover">
           <button onClick={() => { onProjectChange(""); setProjectOpen(false); }}># 未归属</button>
           {projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { onProjectChange(project.id); setProjectOpen(false); }} onColorChange={(color) => onProjectColorChange(project.id, color)} />)}
-          <div className="df-project-create-line"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={() => { onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); }}>✓</button></div>
+          <div className="df-project-create-line"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onCreateProject(newProjectTitle); setNewProjectTitle(""); setProjectOpen(false); } }} /><button onClick={createAndSelectProject}>✓</button></div>
         </div>}
       </span>
     </article>
   );
 }
 
-function NowLine() {
+function NowLine({ extraStyle }: { extraStyle?: CSSProperties }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);
@@ -1989,8 +2223,8 @@ function NowLine() {
   }, []);
   const minutes = now.getHours() * 60 + now.getMinutes();
   if (minutes < TIMELINE_START * 60 || minutes > TIMELINE_END * 60) return null;
-  const top = ((minutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-  return <div className="df-now-line" style={{ top }}><span>现在</span></div>;
+  const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`);
+  return <div className="df-now-line" style={{ top, ...extraStyle }}><span>现在</span></div>;
 }
 
 function EditDrawer(props: {
@@ -2063,7 +2297,7 @@ function EditDrawer(props: {
         </section>
         <section className="df-detail-section">
           <h3>归属</h3>
-          <div className="df-detail-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}>项目：{selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 未归属</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div>
+          <div className="df-detail-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}># 未归属</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder="新项目名" onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div>
           <div className="df-detail-meta"><span>来源：规划树 / {selectedProjectTitle}</span><label>优先级<select value={f.priority} onChange={(event) => set("priority", event.target.value as Priority)}><option value="high">必须做</option><option value="medium">应该做</option><option value="low">有空做</option></select></label><label>标签<input value={categories[f.category].label} readOnly /></label></div>
         </section>
         <section className="df-detail-section">
