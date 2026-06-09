@@ -152,11 +152,10 @@ export interface Settings {
   displayName: string;
   dailyFocusTime: string;
   weekStartsOn: 0 | 1;
-  theme: "light" | "calm" | "focus" | "dark";
+  theme: "light" | "dark";
   accentColor: string;
   executeAccentColor: string;
   planningAccentColor: string;
-  themeGradientEnabled: boolean;
   aiTone: "direct" | "gentle" | "strict";
   hideCompleted: boolean;
   reminderLeadDays: number;

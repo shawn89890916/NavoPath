@@ -36,8 +36,10 @@ const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
 const PROJECT_COLOR_PRESETS = ["#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
 const COMMON_COLOR_PRESETS = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#1F2937", "#F9FAFB", "#6B7280"];
-const EXECUTE_THEME_PRESETS = ["#C69CF9", "#8B5CF6", "#7C3AED", "#A78BFA", "#EC4899", "#38BDF8"];
-const PLANNING_THEME_PRESETS = ["#CAFF72", "#8B5CF6", "#7C3AED", "#A78BFA", "#38BDF8", "#F59E0B"];
+const EXECUTE_THEME_PRESETS_LIGHT = ["#C69CF9", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
+const EXECUTE_THEME_PRESETS_DARK  = ["#C69CF9", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
+const PLANNING_THEME_PRESETS_LIGHT = ["#CAFF72", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
+const PLANNING_THEME_PRESETS_DARK  = ["#CAFF72", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
 const RELEASE_NOTES = [
   { date: "2026-06-09", summary: "优化了时间轴的快速添加栏" },
   { date: "2026-06-08", summary: "优化了部分深色模式UI不适配的问题" },
@@ -106,7 +108,6 @@ function themeVars(settings: Settings, mode: Mode) {
   const activeLight = mode === "execute" ? executeLight : planningLight;
   const { r, g, b } = hexToRgb(activeAccent);
   const isDark = settings.theme === "dark";
-  const hl = settings.themeGradientEnabled !== false;
   if (isDark) {
     return {
       "--execute-primary": execute,
@@ -127,7 +128,7 @@ function themeVars(settings: Settings, mode: Mode) {
       "--border-soft": "rgba(255,255,255,0.12)",
       "--border-subtle": "rgba(255,255,255,0.08)",
       "--shadow-soft": "0 8px 24px rgba(0,0,0,0.40)",
-      "--shadow-hl": hl ? `0 0 18px rgba(${r},${g},${b},0.12)` : "none",
+      "--shadow-hl": `0 0 18px rgba(${r},${g},${b},0.12)`,
       "--header-bg": "rgba(15,17,23,0.86)",
       "--header-border": "rgba(255,255,255,0.08)",
       "--header-fg": "#F5F7FA",
@@ -155,7 +156,7 @@ function themeVars(settings: Settings, mode: Mode) {
     "--border-soft": "#E5E7EB",
     "--border-subtle": "#EEF0F4",
     "--shadow-soft": "0 10px 30px rgba(17,24,39,0.06)",
-    "--shadow-hl": hl ? `0 0 24px rgba(${r},${g},${b},0.14)` : "none",
+    "--shadow-hl": `0 0 24px rgba(${r},${g},${b},0.14)`,
     "--header-bg": "rgba(255,255,255,0.86)",
     "--header-border": "rgba(229,231,235,0.72)",
     "--header-fg": "#111827",
@@ -890,17 +891,18 @@ function App() {
 
   // Forward wheel events from the full timeline panel area to the scroll container
   useEffect(() => {
-    const panel = document.getElementById("df-execute-timeline");
-    if (!panel) return;
+    if (mode !== "execute") return;
     const handler = (e: WheelEvent) => {
+      const panel = document.getElementById("df-execute-timeline");
+      if (!panel || !panel.contains(e.target as Node)) return;
       const scroller = panel.querySelector(".df-timeline-scroll, .df-timeline-3day-scroll") as HTMLElement | null;
       if (!scroller) return;
       e.preventDefault();
       scroller.scrollTop += e.deltaY;
     };
-    panel.addEventListener("wheel", handler, { passive: false });
-    return () => panel.removeEventListener("wheel", handler);
-  }, []);
+    document.addEventListener("wheel", handler, { capture: true, passive: false });
+    return () => document.removeEventListener("wheel", handler, { capture: true });
+  }, [mode]);
 
   useEffect(() => {
     if (!quickSchedule) return;
@@ -1315,6 +1317,22 @@ function App() {
     }
     return minutesToTime(Math.max(TIMELINE_START * 60, latestStart));
   }
+
+  // Show scrollbar only when actually scrolling
+  useEffect(() => {
+    const timers = new WeakMap<HTMLElement, number>();
+    const onScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!(target instanceof HTMLElement)) return;
+      target.classList.add("is-scrolling");
+      clearTimeout(timers.get(target)!);
+      timers.set(target, window.setTimeout(() => {
+        target.classList.remove("is-scrolling");
+      }, 500));
+    };
+    document.addEventListener("scroll", onScroll, { capture: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
+  }, []);
 
   function slotFromPointer(clientY: number, offsetMinutes = 0) {
     const { gridEl, scrollEl, visDays } = getDropGridAndDays();
@@ -1778,7 +1796,7 @@ function App() {
   if (!data || !settings) return <div className="df-loading"><ProductIcon />NavoPath 加载中...</div>;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme}${settings.themeGradientEnabled === false ? " no-highlight" : ""}`} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme}`} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
@@ -3418,14 +3436,11 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
               <select value={settings.theme} onChange={(event) => onSave({ theme: event.target.value as Settings["theme"] })}>
                 <option value="dark">深色</option>
                 <option value="light">浅色</option>
-                <option value="calm">浅色·柔和</option>
-                <option value="focus">浅色·专注</option>
               </select>
             </label>
-            <ThemeColorSetting label="执行页主色" presets={EXECUTE_THEME_PRESETS} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
-            <ThemeColorSetting label="规划页主色" presets={PLANNING_THEME_PRESETS} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <ThemeColorSetting label="执行页主色" presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
+            <ThemeColorSetting label="规划页主色" presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
             <label className="df-utility-select">默认视图<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">天</option><option value="3day">3天</option><option value="weekly">周</option><option value="month">月</option></select></label>
-            <label className="df-utility-check"><input type="checkbox" checked={settings.themeGradientEnabled !== false} onChange={(event) => onSave({ themeGradientEnabled: event.target.checked })} />突出显示</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />隐藏已完成任务</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />允许 AI 使用任务上下文</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />隐藏所有 AI 功能</label>

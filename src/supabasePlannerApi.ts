@@ -28,7 +28,6 @@ const defaultSettings: Settings = {
   accentColor: "#C69CF9",
   executeAccentColor: "#C69CF9",
   planningAccentColor: "#CAFF72",
-  themeGradientEnabled: true,
   aiTone: "direct",
   hideCompleted: false,
   reminderLeadDays: 7,

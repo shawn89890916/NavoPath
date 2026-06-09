@@ -139,7 +139,6 @@ export function installBrowserFallback() {
     accentColor: "#175cd3",
     executeAccentColor: "#C69CF9",
     planningAccentColor: "#CAFF72",
-    themeGradientEnabled: true,
     aiTone: "direct" as const,
     hideCompleted: false,
     reminderLeadDays: 7,
