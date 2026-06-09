@@ -1458,6 +1458,9 @@
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   padding: 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 20px;
   background: var(--bg-surface);
@@ -1479,6 +1482,8 @@
   display: grid;
   gap: 14px;
   color: var(--df-text);
+  overflow-y: auto;
+  flex: 1;
 }
 
 .df-utility-body label {
@@ -1998,6 +2003,97 @@
 
 .df-app.theme-dark .drag-create-quick-add input::placeholder {
   color: #8B93A3;
+}
+
+/* ── Drawer & utility dark mode ── */
+.df-app.theme-dark .df-drawer-head .i-close,
+.df-app.theme-dark .df-utility-head .i-close {
+  background: rgba(255,255,255,0.06) !important;
+  color: #a1a1aa !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+.df-app.theme-dark .df-drawer-head .i-close:hover,
+.df-app.theme-dark .df-utility-head .i-close:hover {
+  background: rgba(255,255,255,0.12) !important;
+  color: #f4f4f5 !important;
+}
+
+.df-app.theme-dark .df-segment {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.08);
+}
+.df-app.theme-dark .df-segment button {
+  color: #a1a1aa;
+  background: transparent;
+}
+.df-app.theme-dark .df-segment button:hover {
+  background: rgba(255,255,255,0.06);
+  color: #f4f4f5;
+}
+.df-app.theme-dark .df-segment .active {
+  background: rgba(198,156,249,0.18);
+  color: #f4f4f5;
+}
+
+.df-app.theme-dark .df-link {
+  color: #a1a1aa !important;
+}
+.df-app.theme-dark .df-link:hover {
+  color: #f4f4f5 !important;
+}
+
+.df-app.theme-dark .df-drawer-actions .primary {
+  background: #C69CF9 !important;
+  color: #09090b !important;
+}
+
+.df-app.theme-dark .df-release-item {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+.df-app.theme-dark .df-release-item strong {
+  color: #a1a1aa;
+}
+.df-app.theme-dark .df-release-item span,
+.df-app.theme-dark .df-release-item p {
+  color: #f4f4f5;
+}
+.df-app.theme-dark .df-about-entry {
+  color: #a1a1aa;
+}
+
+/* ── AI panel dark mode ── */
+.df-app.theme-dark .df-ai-panel {
+  background: rgba(20,22,28,0.96) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.5) !important;
+}
+.df-app.theme-dark .df-ai-panel textarea {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+  color: #f4f4f5;
+}
+.df-app.theme-dark .df-ai-panel pre {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+  color: #f4f4f5;
+}
+.df-app.theme-dark .df-ai-panel h2,
+.df-app.theme-dark .df-ai-panel strong {
+  color: #f4f4f5;
+}
+
+/* ── FAB buttons dark mode ── */
+.df-app.theme-dark .df-add-fab {
+  background: linear-gradient(135deg, var(--mode-primary-strong, #C69CF9), var(--mode-primary, #8B5CF6)) !important;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 48%, transparent) !important;
+  color: var(--mode-on-primary, #fff) !important;
+}
+.df-app.theme-dark .df-ai-fab {
+  background: linear-gradient(135deg, var(--mode-primary-strong, #C69CF9), var(--mode-primary, #8B5CF6)) !important;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 42%, transparent) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--mode-primary-strong) 38%, transparent) !important;
 }
 
 /* ================================================================
