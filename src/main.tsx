@@ -2243,9 +2243,7 @@ function App() {
                                       onCancel={() => setDragCreate(null)}
                                     />
                                   ) : (
-                                    <span className="drag-create-preview-time" style={{ position: "absolute", bottom: 4, left: 8, pointerEvents: "none" }}>
-                                      {minutesToTime(dragCreate.startMinutes)} - {minutesToTime(dragCreate.endMinutes)} · {((dragCreate.endMinutes - dragCreate.startMinutes) / 60).toFixed(1)}h
-                                    </span>
+                                    null
                                   )}
                                 </div>
                               )}
@@ -2585,9 +2583,7 @@ function App() {
                                 onCancel={() => setDragCreate(null)}
                               />
                             ) : (
-                              <span className="drag-create-preview-time" style={{ position: "absolute", bottom: 4, left: 8, pointerEvents: "none" }}>
-                                {minutesToTime(dragCreate.startMinutes)} - {minutesToTime(dragCreate.endMinutes)} · {((dragCreate.endMinutes - dragCreate.startMinutes) / 60).toFixed(1)}h
-                              </span>
+                              null
                             )}
                           </div>
                         )}
@@ -3049,12 +3045,6 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
           ))}
         </div>
       )}
-      <div style={{
-        fontSize: compact ? "9px" : "10px", color: "var(--text-muted)",
-        padding: "2px 2px 0", opacity: 0.7,
-      }}>
-        {minutesToTime(state.startMinutes)} - {minutesToTime(state.endMinutes)} · {durationH}h
-      </div>
     </div>
   );
 }

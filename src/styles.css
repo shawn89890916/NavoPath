@@ -13334,16 +13334,16 @@ body.df-resizing, body.df-resizing * {
 
 /* ── Dark mode ── */
 .df-app.theme-dark .df-quick-add-input-box {
-  background: #20242D;
-  border: 1px solid rgba(198,156,249,0.38);
-  box-shadow: 0 16px 36px rgba(0,0,0,0.34);
+  background: #20242D !important;
+  border: 1px solid rgba(198,156,249,0.38) !important;
+  box-shadow: 0 16px 36px rgba(0,0,0,0.34) !important;
 }
 .df-app.theme-dark .df-quick-add-input-box input {
-  background: transparent;
-  color: #F5F7FA;
+  background: transparent !important;
+  color: #F5F7FA !important;
 }
 .df-app.theme-dark .df-quick-add-input-box input::placeholder {
-  color: #8B93A3;
+  color: #8B93A3 !important;
 }
 .df-app.theme-dark .df-quick-add-confirm:not(:disabled) {
   background: rgba(198,156,249,0.18);
