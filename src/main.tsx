@@ -121,20 +121,20 @@ function themeVars(settings: Settings, mode: Mode) {
       "--bg-app-soft": "#14161C",
       "--surface-main": "#181B22",
       "--surface-raised": "#1E2129",
-      "--surface-card": "#20242D",
-      "--text-main": "#F5F7FA",
-      "--text-muted": "#AAB0BD",
+      "--surface-card": "#1C1F28",
+      "--text-main": "#F0F2F5",
+      "--text-muted": "#A0A7B5",
       "--text-faint": "#737A88",
-      "--border-soft": "rgba(255,255,255,0.12)",
-      "--border-subtle": "rgba(255,255,255,0.08)",
-      "--shadow-soft": "0 8px 24px rgba(0,0,0,0.40)",
-      "--shadow-hl": `0 0 18px rgba(${r},${g},${b},0.12)`,
-      "--header-bg": "rgba(15,17,23,0.86)",
-      "--header-border": "rgba(255,255,255,0.08)",
-      "--header-fg": "#F5F7FA",
-      "--header-fg-muted": "#AAB0BD",
-      "--input-bg": "#1A1D25",
-      "--input-border": "rgba(255,255,255,0.14)",
+      "--border-soft": "rgba(255,255,255,0.10)",
+      "--border-subtle": "rgba(255,255,255,0.06)",
+      "--shadow-soft": "0 8px 24px rgba(0,0,0,0.50)",
+      "--shadow-hl": `0 0 18px rgba(${r},${g},${b},0.10)`,
+      "--header-bg": "rgba(15,17,23,0.92)",
+      "--header-border": "rgba(255,255,255,0.06)",
+      "--header-fg": "#F0F2F5",
+      "--header-fg-muted": "#A0A7B5",
+      "--input-bg": "#181B22",
+      "--input-border": "rgba(255,255,255,0.12)",
     } as CSSProperties;
   }
   return {
@@ -145,24 +145,24 @@ function themeVars(settings: Settings, mode: Mode) {
     "--accent-active": activeAccent,
     "--accent-rgb": `${r}, ${g}, ${b}`,
     "--accent-on": activeLight ? "#111827" : "#FFFFFF",
-    "--bg-app": "#F8FAFC",
-    "--bg-app-soft": "#FBF7FF",
-    "--surface-main": "#FFFFFF",
+    "--bg-app": "#F3F4F7",
+    "--bg-app-soft": "#EEF0F4",
+    "--surface-main": "#F7F8FA",
     "--surface-raised": "#FFFFFF",
-    "--surface-card": "#F9FAFB",
-    "--text-main": "#111827",
+    "--surface-card": "#FFFFFF",
+    "--text-main": "#181C25",
     "--text-muted": "#6B7280",
     "--text-faint": "#9CA3AF",
-    "--border-soft": "#E5E7EB",
-    "--border-subtle": "#EEF0F4",
-    "--shadow-soft": "0 10px 30px rgba(17,24,39,0.06)",
-    "--shadow-hl": `0 0 24px rgba(${r},${g},${b},0.14)`,
-    "--header-bg": "rgba(255,255,255,0.86)",
-    "--header-border": "rgba(229,231,235,0.72)",
-    "--header-fg": "#111827",
+    "--border-soft": "#E2E5EC",
+    "--border-subtle": "#EAEDF2",
+    "--shadow-soft": "0 8px 28px rgba(17,24,39,0.05)",
+    "--shadow-hl": `0 0 20px rgba(${r},${g},${b},0.10)`,
+    "--header-bg": "rgba(243,244,247,0.88)",
+    "--header-border": "rgba(226,229,236,0.72)",
+    "--header-fg": "#181C25",
     "--header-fg-muted": "#6B7280",
     "--input-bg": "#FFFFFF",
-    "--input-border": "#E5E7EB",
+    "--input-border": "#E2E5EC",
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
@@ -2637,7 +2637,7 @@ function App() {
         </main>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy data={data} projects={projects} tasks={tasks} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} pickMode={planningPickMode} picks={planningPicks} onExitPickMode={() => setPlanningPickMode(false)} onAddPick={addPlanningPick} onUpdatePick={updatePlanningPick} onRemovePick={removePlanningPick} onClearPicks={clearPlanningPicks} onApplyPicks={applyPlanningPicks} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onProjectTasksClick={(projectId, rect) => { setSourceAnchorRect(rect); setSourceFilterProjectId(projectId); setSourceOpen(true); }} onTaskDelete={(taskId) => {
+          <PlanningViewLazy data={data} projects={projects} tasks={tasks} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} pickMode={planningPickMode} picks={planningPicks} onExitPickMode={() => setPlanningPickMode(false)} onAddPick={addPlanningPick} onUpdatePick={updatePlanningPick} onRemovePick={removePlanningPick} onClearPicks={clearPlanningPicks} onApplyPicks={applyPlanningPicks} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onTaskDelete={(taskId) => {
             void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== taskId) });
           }} />
         </Suspense>
@@ -3349,9 +3349,20 @@ function EditDrawer(props: {
   if (props.editing && props.type === "task" && props.task) {
     const isCandidate = props.task.plannedForDate === props.today && !props.task.scheduledDate;
     const isScheduled = props.task.scheduledDate === props.today || Boolean(props.task.scheduledDate && props.task.scheduledStart);
+    const showUncomplete = (props.task.completed || isScheduled);
+    function handleUncomplete() {
+      if (!props.task) return;
+      props.onTaskUpdate(props.task.id, {
+        completed: false,
+        scheduledDate: undefined,
+        scheduledStart: undefined,
+        scheduledEnd: undefined,
+        plannedForDate: props.task.completed ? undefined : props.task.plannedForDate,
+      });
+    }
     return (
       <aside className="df-drawer df-task-detail">
-        <div className="df-drawer-head"><h2>任务详情</h2><div className="df-detail-head-actions"><button className="df-icon-action i-more" data-tip="更多" aria-label="更多" onClick={() => setMoreOpen((open) => !open)} />{moreOpen && <div className="df-detail-more"><button onClick={() => { props.onCopy(); setMoreOpen(false); }}>复制任务</button><button onClick={() => setProjectPickerOpen(true)}>移动到项目</button><button className="danger" onClick={props.onDelete}>删除任务</button></div>}<button className="df-icon-action i-close" data-tip="关闭" aria-label="关闭" onClick={props.onClose} /></div></div>
+        <div className="df-drawer-head"><h2>任务详情</h2><div className="df-detail-head-actions">{showUncomplete && <button className="df-detail-uncomplete" onClick={handleUncomplete} data-tip="移回规划" aria-label="移回规划" title="移回规划"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h6" /><path d="M3 10h6" /><path d="M3 15h6" /><path d="M13 12l2 2 3-5" /></svg><span>未完成</span></button>}<button className="df-icon-action i-more" data-tip="更多" aria-label="更多" onClick={() => setMoreOpen((open) => !open)} />{moreOpen && <div className="df-detail-more"><button onClick={() => { props.onCopy(); setMoreOpen(false); }}>复制任务</button><button onClick={() => setProjectPickerOpen(true)}>移动到项目</button><button className="danger" onClick={props.onDelete}>删除任务</button></div>}<button className="df-icon-action i-close" data-tip="关闭" aria-label="关闭" onClick={props.onClose} /></div></div>
         <section className="df-detail-title">
           <input type="checkbox" checked={props.task.completed} onChange={props.onToggleDone} />
           <div>

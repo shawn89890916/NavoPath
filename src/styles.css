@@ -1,6 +1,7 @@
-/* ═══════════════════════════════════════════════════════════════════ */
-/*  NavoPath Stylesheet — Reorganized                               */
-/* ═══════════════════════════════════════════════════════════════════ */
+﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap");
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
+/*  NavoPath Stylesheet 锟斤拷 Reorganized                               */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 
 /* ============================================================ */
@@ -214,7 +215,7 @@
   margin-top: 4px;
 }
 
-/* ── Wizard: edit mode ── */
+/* 锟斤拷锟斤拷 Wizard: edit mode 锟斤拷锟斤拷 */
 .wizard-step-edit {
   padding: 16px;
   gap: 12px;
@@ -245,7 +246,7 @@
   color: var(--text);
 }
 
-/* ── Wizard: type buttons ── */
+/* 锟斤拷锟斤拷 Wizard: type buttons 锟斤拷锟斤拷 */
 .wizard-type-buttons {
   display: flex;
   gap: 8px;
@@ -375,130 +376,7 @@
   border-radius: 8px;
 }
 
-.df-planning {
 
-  display: grid;
-  grid-template-columns: 1.25fr .9fr;
-  gap: 18px;
-  padding: 18px;
-  height: calc(100vh - 64px);
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 70% 8%, color-mix(in srgb, var(--mode-primary) 24%, transparent), transparent 32%),
-    linear-gradient(135deg, var(--mode-bg-a) 0%, var(--mode-bg-b) 46%, var(--mode-bg-c) 100%);
-  animation: dfPageIn .22s ease-out;
-}
-
-.df-tree { display: grid; gap: 18px; position: relative; }
-
-.df-plan-project-node {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: max-content;
-  max-width: min(360px, 100%);
-}
-
-.df-plan-project-node .project-root {
-  min-width: 0;
-  max-width: 280px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.df-plan-project-add {
-  width: 24px;
-  height: 24px;
-  padding: 0 !important;
-  border-radius: 8px;
-  color: #4D7C0F;
-  background: rgba(255, 255, 255, .92);
-  border-color: color-mix(in srgb, var(--mode-primary) 72%, transparent);
-  box-shadow: none !important;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s ease;
-}
-
-.df-plan-project-node:hover .df-plan-project-add,
-.df-plan-project-node:focus-within .df-plan-project-add {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.df-plan-project-tasks {
-  width: 22px;
-  height: 22px;
-  padding: 0 !important;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--accent-active);
-  background: color-mix(in srgb, var(--accent-active) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-active) 30%, transparent);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .12s ease;
-}
-
-.df-plan-project-tasks:hover {
-  background: color-mix(in srgb, var(--accent-active) 22%, transparent);
-}
-
-.df-project-node, .df-task-node { text-align: left; background: #fff; }
-
-.df-project-node { display: grid; gap: 3px; width: min(260px, 100%); }
-
-.df-project-node span, .df-task-node small { color: var(--df-muted); font-size: 11px; }
-
-.df-task-node { width: min(320px, 100%); padding: 7px 10px; font-size: 12px; border: 1px solid color-mix(in srgb, var(--accent-active) 22%, #E5E7EB); border-radius: 6px; }
-
-.df-plan-task-node .df-task-node {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 34px;
-  padding-right: 10px;
-}
-
-.df-plan-task-node .df-task-node .df-task-title {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  height: 100%;
-  line-height: 1.2;
-}
-
-.df-plan-task-node .df-task-node em {
-  color: var(--mode-primary-strong);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 750;
-}
-
-.df-plan-task-node.picked .df-task-node {
-  border-color: color-mix(in srgb, var(--mode-primary-strong) 48%, transparent);
-  background: rgba(243, 255, 214, .56);
-}
-
-/* ── 18. df-plan 规划视图节点按钮 ── */
-.df-plan-project-add:hover {
-  background: color-mix(in srgb, var(--mode-primary) 22%, transparent) !important;
-  border-color: color-mix(in srgb, var(--mode-primary-strong) 72%, transparent) !important;
-}
-
-.df-plan-project-add:active {
-  transform: scale(0.90) !important;
-}
 
 .theme-neumorphic .wizard-choice-card {
   background: var(--neu-bg, #e0e5ec) !important;
@@ -518,14 +396,14 @@
   transform: translateY(1px);
 }
 
-/* ── Neumorphic Planning Layout ──────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Planning Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-planning-shell {
   background:
     radial-gradient(circle at 28% 8%, color-mix(in srgb, var(--mode-primary) 12%, transparent), transparent 30%),
     linear-gradient(135deg, var(--mode-bg-a) 0%, var(--mode-bg-b) 46%, var(--mode-bg-c) 100%) !important;
 }
 
-/* ── Neumorphic Wizard ───────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Wizard 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .wizard-summary {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -559,12 +437,12 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--mode-primary) 20%, transparent);
 }
 
-/* ── Planning Layout ─────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Planning Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-planning-shell {
   background: #F8FAFC;
 }
 
-/* ── Wizard ──────────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Wizard 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .wizard-summary {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -801,7 +679,7 @@
   opacity: .8;
 }
 
-/* ── Neumorphic Calendar ─────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Calendar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .day-cell,
 .theme-neumorphic .df-month-cell {
   background: var(--neu-bg, #e0e5ec) !important;
@@ -833,7 +711,7 @@
   box-shadow: var(--neu-convex-sm) !important;
 }
 
-/* ── Neumorphic Month Task Pill ──────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Month Task Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-month-task {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -841,7 +719,7 @@
   box-shadow: var(--neu-flat) !important;
 }
 
-/* ── Neumorphic Animation Polish ─────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Animation Polish 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 /* Unified transition duration across all interactive elements */
 .df-task-card,
 .df-icon-action,
@@ -857,7 +735,7 @@
   transition: all .18s ease !important;
 }
 
-/* ── Calendar ────────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Calendar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .day-cell,
 .df-month-cell {
   background: #FFFFFF;
@@ -892,7 +770,7 @@
   border-color: #E5E7EB;
 }
 
-/* ── Month Task Pill ─────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Month Task Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-month-task {
   background: #FAFAFA;
   border: 1px solid #EEF0F4;
@@ -900,7 +778,7 @@
   box-shadow: none;
 }
 
-/* ── Animation Polish ────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Animation Polish 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-task-card,
 .df-icon-action,
 .df-tabs button,
@@ -970,7 +848,7 @@
   z-index: 300;
 }
 
-/* ── Project popover ── */
+/* 锟斤拷锟斤拷 Project popover 锟斤拷锟斤拷 */
 .df-project-popover {
   position: absolute;
   top: calc(100% + 8px);
@@ -1030,7 +908,7 @@
   text-overflow: ellipsis;
 }
 
-/* ── Color dot ── */
+/* 锟斤拷锟斤拷 Color dot 锟斤拷锟斤拷 */
 .df-project-color-dot {
   flex: 0 0 auto;
   width: 11px;
@@ -1231,7 +1109,7 @@
   border-radius: 999px;
 }
 
-/* 主题设置里自定义色圆始终可见（不隐藏） */
+/* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟皆讹拷锟斤拷色圆始锟秸可硷拷锟斤拷锟斤拷锟斤拷锟截ｏ拷 */
 .df-theme-setting .df-project-color-custom {
   opacity: 1;
 }
@@ -1246,7 +1124,7 @@
   min-height: 20px;
 }
 
-/* 主题设置里自定义色圆始终显示当前色，用虚线圈引导点击 */
+/* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟皆讹拷锟斤拷色圆始锟斤拷锟斤拷示锟斤拷前色锟斤拷锟斤拷锟斤拷锟斤拷圈锟斤拷锟斤拷锟斤拷锟?*/
 .df-theme-setting .df-project-color-custom span {
   background: var(--project-color) !important;
   border-style: dashed !important;
@@ -1263,7 +1141,7 @@
   outline-color: #111827;
 }
 
-/* ── 17. df-project-popover / df-drawer-project-list 下拉项 ── */
+/* 锟斤拷锟斤拷 17. df-project-popover / df-drawer-project-list 锟斤拷锟斤拷锟斤拷 锟斤拷锟斤拷 */
 .df-project-popover > button:active,
 .df-drawer-project-list > button:active {
   transform: var(--ix-press);
@@ -1324,9 +1202,9 @@
   background: rgba(255,255,255,0.06) !important;
 }
 
-/* ═══════════════════════════════════════════════
-   ── Task List Popover (portal to document.body) ──
-   ═══════════════════════════════════════════════ */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   锟斤拷锟斤拷 Task List Popover (portal to document.body) 锟斤拷锟斤拷
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 /* Transparent backdrop for click-outside-to-close */
 .df-popover-backdrop {
@@ -1360,7 +1238,7 @@
   box-shadow: 0 10px 24px rgba(17, 24, 39, .18);
 }
 
-/* ── Toast ── */
+/* 锟斤拷锟斤拷 Toast 锟斤拷锟斤拷 */
 .df-toast {
   position: fixed;
   bottom: 80px;
@@ -1392,7 +1270,7 @@
   box-shadow: 0 14px 34px rgba(17, 24, 39, .22);
 }
 
-/* ── Neumorphic Toast / Notification ─────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Toast / Notification 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-toast {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -1400,7 +1278,7 @@
   box-shadow: var(--neu-convex) !important;
 }
 
-/* ── Neumorphic Tooltip ──────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Tooltip 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-icon-action[data-tip]:hover::after {
   background: var(--neu-bg, #e0e5ec) !important;
   color: var(--df-text) !important;
@@ -1408,7 +1286,7 @@
   border: 0 !important;
 }
 
-/* ── Toast / Notification ────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Toast / Notification 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-toast {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -1437,9 +1315,9 @@
 /* 14. Utility / Settings */
 /* ============================================================ */
 
-/* ═══════════════════════════════════════════════
-   ── Utility Panel (Settings/About) ────────
-   ═══════════════════════════════════════════════ */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   锟斤拷锟斤拷 Utility Panel (Settings/About) 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 .df-utility-backdrop {
   position: fixed;
@@ -1571,7 +1449,7 @@
   color: var(--df-muted);
 }
 
-/* ── Theme setting (color picker cards in settings) ── */
+/* 锟斤拷锟斤拷 Theme setting (color picker cards in settings) 锟斤拷锟斤拷 */
 .df-theme-setting {
   display: grid;
   gap: 6px;
@@ -1703,7 +1581,7 @@
 
 .df-release-item span { font-size: 13px; color: var(--text-main); }
 
-/* ── Theme setting color dot preview ── */
+/* 锟斤拷锟斤拷 Theme setting color dot preview 锟斤拷锟斤拷 */
 .df-theme-setting > div > span {
   width: 18px;
   height: 18px;
@@ -1713,13 +1591,13 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--project-color) 22%, transparent);
 }
 
-/* 主题设置预览圆浅色：黑色描边 */
+/* 锟斤拷锟斤拷锟斤拷锟斤拷预锟斤拷圆浅色锟斤拷锟斤拷色锟斤拷锟?*/
 .df-theme-setting > div > span.color-light {
   border-color: #1e293b;
   box-shadow: 0 0 0 3px rgba(17,24,39,.12);
 }
 
-/* ── UI Style Toggle (Settings) ──────────────────────────────── */
+/* 锟斤拷锟斤拷 UI Style Toggle (Settings) 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-utility-section-label {
   font-size: 11px;
   font-weight: 600;
@@ -2010,7 +1888,7 @@
   color: #8B93A3;
 }
 
-/* ── Drawer & utility dark mode ── */
+/* 锟斤拷锟斤拷 Drawer & utility dark mode 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-drawer-head .i-close,
 .df-app.theme-dark .df-utility-head .i-close {
   background: rgba(255,255,255,0.06) !important;
@@ -2067,7 +1945,7 @@
   color: #a1a1aa;
 }
 
-/* ── AI panel dark mode ── */
+/* 锟斤拷锟斤拷 AI panel dark mode 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-ai-panel {
   background: rgba(20,22,28,0.96) !important;
   border: 1px solid rgba(255,255,255,0.08) !important;
@@ -2099,7 +1977,7 @@
   color: #f4f4f5;
 }
 
-/* ── Drawer actions dark mode ── */
+/* 锟斤拷锟斤拷 Drawer actions dark mode 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-link {
   color: #a1a1aa !important;
 }
@@ -2121,7 +1999,7 @@
   color: #f4f4f5 !important;
 }
 
-/* ── FAB buttons dark mode ── */
+/* 锟斤拷锟斤拷 FAB buttons dark mode 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-add-fab {
   background: linear-gradient(135deg, var(--mode-primary-strong, #C69CF9), var(--mode-primary, #8B5CF6)) !important;
   border: 1px solid color-mix(in srgb, var(--mode-primary) 48%, transparent) !important;
@@ -2135,7 +2013,7 @@
 }
 
 /* ================================================================
-   THEME: NEUMORPHIC (Soft 3D) — Activated via .theme-neumorphic
+   THEME: NEUMORPHIC (Soft 3D) 锟斤拷 Activated via .theme-neumorphic
    ================================================================
    This entire block is scoped under .theme-neumorphic.
    Toggle by adding/removing the class on .df-app root element.
@@ -2164,7 +2042,7 @@
   --mode-bg-b: #e0e5ec;
 }
 
-/* ── Neumorphic Buttons ──────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Buttons 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic.df-app button {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2209,7 +2087,7 @@
   color: var(--df-muted);
 }
 
-/* ── Neumorphic Panels & Cards ───────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Panels & Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .add-panel {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2224,7 +2102,7 @@
   box-shadow: var(--neu-convex), 0 0 24px color-mix(in srgb, var(--mode-primary) 16%, transparent) !important;
 }
 
-/* ── Neumorphic Tabs ─────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Tabs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-tabs {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2233,7 +2111,7 @@
   padding: 4px !important;
 }
 
-/* ── Neumorphic Mode Switch ──────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Mode Switch 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-top-view-switch {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2255,7 +2133,7 @@
   box-shadow: 3px 3px 8px var(--neu-dark, #a3b1c6), -3px -3px 8px var(--neu-light, #ffffff) !important;
 }
 
-/* ── Neumorphic Stat Chips ───────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Stat Chips 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .planning-stat-chip,
 .today-count,
 .theme-neumorphic .df-status {
@@ -2270,7 +2148,7 @@
   box-shadow: 7px 7px 14px var(--neu-dark, #a3b1c6), -7px -7px 14px var(--neu-light, #ffffff) !important;
 }
 
-/* ── Neumorphic AI Panel & Dock ──────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic AI Panel & Dock 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-ai-panel {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2291,7 +2169,7 @@
   transform: translateY(-2px);
 }
 
-/* ── Neumorphic Color Picker ─────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Color Picker 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .ProjectColorPicker {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2315,7 +2193,7 @@
   transform: scale(.96);
 }
 
-/* ── Neumorphic Execute Layout ───────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Execute Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-execute {
   background:
     radial-gradient(circle at 72% 8%, color-mix(in srgb, var(--mode-primary) 12%, transparent), transparent 30%),
@@ -2327,7 +2205,7 @@
   box-shadow: var(--neu-concave), 0 0 0 2px var(--mode-primary) !important;
 }
 
-/* ── Neumorphic Tree Nodes ───────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Tree Nodes 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .tree-category-node,
 .tree-project-node,
 .theme-neumorphic .planning-task-card {
@@ -2343,7 +2221,7 @@
   box-shadow: 7px 7px 14px var(--neu-dark, #a3b1c6), -7px -7px 14px var(--neu-light, #ffffff) !important;
 }
 
-/* ── Neumorphic Settings ─────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Settings 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .settings-card {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2351,7 +2229,7 @@
   box-shadow: var(--neu-convex) !important;
 }
 
-/* ── Neumorphic Empty State ──────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Empty State 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-empty {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2359,7 +2237,7 @@
   box-shadow: var(--neu-concave-sm) !important;
 }
 
-/* ── Neumorphic Event Pill ───────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Event Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .event-pill {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2367,7 +2245,7 @@
   box-shadow: var(--neu-flat) !important;
 }
 
-/* ── Neumorphic Note Card ────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Note Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .note-card {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2375,7 +2253,7 @@
   box-shadow: var(--neu-convex) !important;
 }
 
-/* ── Neumorphic no-theme-gradient override ───────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic no-theme-gradient override 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic.df-app.no-theme-gradient {
   background: var(--neu-bg, #e0e5ec) !important;
 }
@@ -2389,7 +2267,7 @@
   box-shadow: var(--neu-convex) !important;
 }
 
-/* ── Neumorphic Dark Theme Fine-tuning ───────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Dark Theme Fine-tuning 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic.theme-dark {
   --neu-bg: #1a1a2e;
   --neu-light: #23233a;
@@ -2427,7 +2305,7 @@
   box-shadow: var(--neu-concave-sm) !important;
 }
 
-/* ── Neumorphic Glass Coexistence ────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Glass Coexistence 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 /* When glass mode is enabled, keep neumorphic shadows but add subtle blur */
 .theme-neumorphic .glass-enabled .panel,
 .theme-neumorphic .glass-enabled .df-candidate-panel,
@@ -2437,7 +2315,7 @@
   box-shadow: var(--neu-convex) !important;
 }
 
-/* ── Neumorphic Close Button ─────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Close Button 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .close-button {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2456,7 +2334,7 @@
   transform: translateY(1px);
 }
 
-/* ── Neumorphic User Avatar Menu ─────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic User Avatar Menu 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-user-menu {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2464,7 +2342,7 @@
   box-shadow: var(--neu-convex), 0 12px 28px rgba(0,0,0,.12) !important;
 }
 
-/* ── Neumorphic Panel Title Buttons ──────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Panel Title Buttons 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-panel-title button {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2484,7 +2362,7 @@
   background: var(--neu-bg, #e0e5ec) !important;
 }
 
-/* ── Neumorphic Quick Time Select ────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Quick Time Select 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-quick-time select {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -2492,7 +2370,7 @@
   box-shadow: var(--neu-concave-sm) !important;
 }
 
-/* ── Neumorphic All Day Bar ──────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic All Day Bar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-all-day-bar {
   background: color-mix(in srgb, var(--mode-primary) 8%, var(--neu-bg, #e0e5ec)) !important;
   border: 0 !important;
@@ -2500,12 +2378,12 @@
   box-shadow: var(--neu-concave-sm) !important;
 }
 
-/* ── Neumorphic Brand Icon Shadow ────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Brand Icon Shadow 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .dayflow-icon {
   filter: drop-shadow(3px 3px 6px var(--neu-dark, #a3b1c6)) drop-shadow(-1px -1px 3px var(--neu-light, #ffffff));
 }
 
-/* ── no-theme-gradient override ──────────────────────────────── */
+/* 锟斤拷锟斤拷 no-theme-gradient override 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-app.no-theme-gradient {
   background: #F8FAFC;
 }
@@ -2554,7 +2432,7 @@
   box-shadow: 0 0 18px color-mix(in srgb, var(--accent-active) 12%, transparent) !important;
 }
 
-/* ── Dark mode: completed task card ── */
+/* 锟斤拷锟斤拷 Dark mode: completed task card 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-task-card.completed {
   opacity: .85;
 }
@@ -2708,12 +2586,12 @@
   transition: opacity 120ms ease !important;
 }
 
-/* ── Dark mode: project group ── */
+/* 锟斤拷锟斤拷 Dark mode: project group 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-project-group-header {
   color: var(--text-muted) !important;
 }
 
-/* ── Dark mode: popover inner elements ── */
+/* 锟斤拷锟斤拷 Dark mode: popover inner elements 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-card-popover button {
   color: var(--text-main) !important;
   background: transparent !important;
@@ -2760,7 +2638,7 @@
   filter: brightness(1.12) !important;
 }
 
-/* View switch — blend into dark timeline panel */
+/* View switch 锟斤拷 blend into dark timeline panel */
 .df-app.theme-dark .df-view-switch,
 .df-app.theme-dark .df-view-switch-vertical {
   background: transparent !important;
@@ -2789,76 +2667,6 @@
   border-color: color-mix(in srgb, var(--accent-active) 38%, var(--border-soft)) !important;
 }
 
-/* Planning */
-.df-app.theme-dark .df-planning {
-  background: var(--bg-app) !important;
-}
-
-.df-app.theme-dark .df-category-node,
-.df-app.theme-dark .df-task-node {
-  background: var(--surface-card) !important;
-  border: 1px solid color-mix(in srgb, var(--accent-active) 24%, rgba(255,255,255,0.10)) !important;
-  color: var(--text-main) !important;
-  box-shadow: none !important;
-}
-
-.df-app.theme-dark .df-category-node.project-root {
-  background: var(--surface-raised) !important;
-  border: 1px solid var(--border-soft) !important;
-}
-
-.df-app.theme-dark .df-task-node:hover {
-  border-color: color-mix(in srgb, var(--accent-active) 38%, rgba(255,255,255,0.14)) !important;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent-active) 12%, transparent) !important;
-}
-
-.df-app.theme-dark .df-plan-more {
-  background: var(--surface-raised) !important;
-  border: 1px solid var(--border-soft) !important;
-}
-
-.df-app.theme-dark .df-plan-more button:hover {
-  background: rgba(255,255,255,0.06) !important;
-}
-
-.df-app.theme-dark .df-plan-task-node.picked .df-task-node {
-  background: color-mix(in srgb, var(--accent-active) 10%, var(--surface-card)) !important;
-  border-color: color-mix(in srgb, var(--accent-active) 58%, transparent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-active) 16%, transparent) !important;
-}
-
-.df-app.theme-dark .df-plan-project-add,
-.df-app.theme-dark .df-plan-node-actions button {
-  background: transparent !important;
-  border: 1px solid var(--border-soft) !important;
-  color: var(--text-muted) !important;
-}
-
-.df-app.theme-dark .df-plan-project-add:hover,
-.df-app.theme-dark .df-plan-node-actions button:hover {
-  border-color: color-mix(in srgb, var(--accent-active) 38%, var(--border-soft)) !important;
-}
-
-.df-app.theme-dark .df-plan-project-tasks {
-  background: color-mix(in srgb, var(--accent-active) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent-active) 36%, transparent);
-  color: color-mix(in srgb, var(--accent-active) 70%, white);
-}
-
-.df-app.theme-dark .df-category-branch::before {
-  border-top-color: color-mix(in srgb, var(--accent-active) 38%, var(--border-soft)) !important;
-  border-top-width: 2px !important;
-}
-
-.df-app.theme-dark .df-project-list {
-  border-left: 2px solid color-mix(in srgb, var(--accent-active) 36%, var(--border-soft)) !important;
-}
-
-.df-app.theme-dark .df-collapse {
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px dashed rgba(255,255,255,0.16) !important;
-  color: var(--text-muted) !important;
-}
 
 /* Pick panel */
 .df-app.theme-dark .df-pick-panel-head {
@@ -2913,7 +2721,7 @@
   opacity: 0.42 !important;
 }
 
-/* ── 3Day / Week view — dark ── */
+/* 锟斤拷锟斤拷 3Day / Week view 锟斤拷 dark 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-timeline-3day-top {
   border-bottom-color: rgba(255,255,255,0.08) !important;
 }
@@ -2965,7 +2773,7 @@
   background: rgba(255,255,255,0.02) !important;
 }
 
-/* ── Month view — dark ── */
+/* 锟斤拷锟斤拷 Month view 锟斤拷 dark 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-month-view {
   /* inherits theme variables automatically */
 }
@@ -2983,7 +2791,7 @@
   background: var(--surface-card);
 }
 
-/* ── Dark mode ── */
+/* 锟斤拷锟斤拷 Dark mode 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-quick-add-input-box {
   background: #20242D !important;
   border: 1px solid rgba(198,156,249,0.38) !important;
@@ -3063,7 +2871,7 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* ── Dark mode ── */
+/* 锟斤拷锟斤拷 Dark mode 锟斤拷锟斤拷 */
 .df-app.theme-dark .task-list-popover {
   background: var(--surface-card, #20242D);
   border: 1px solid rgba(255,255,255,0.12);
@@ -3103,22 +2911,21 @@
 /* 17. Uncategorized */
 /* ============================================================ */
 
-/* ═══════════════════════════════════════════════
-   NavoPath — Unified Design System
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   NavoPath 锟斤拷 Unified Design System
    Refined minimal / calm / student-tool aesthetic
-   ═══════════════════════════════════════════════ */
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap");
 
 :root {
-  /* ── Typography ── */
+  /* 锟斤拷锟斤拷 Typography 锟斤拷锟斤拷 */
   --df-font-brand: "Sora", Inter, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
   --df-font-ui: Inter, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
   --df-font-task: Inter, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
   font-family: var(--df-font-ui);
   font-weight: 400;
 
-  /* ── Design tokens (overridden by JS themeVars) ── */
+  /* 锟斤拷锟斤拷 Design tokens (overridden by JS themeVars) 锟斤拷锟斤拷 */
   --bg-app: #F8FAFC;
   --bg-app-soft: #FBF7FF;
   --surface-main: #FFFFFF;
@@ -3141,7 +2948,7 @@
   --accent-active: #C69CF9;
   --accent-rgb: 198, 156, 249;
 
-  /* ── Legacy compat aliases ── */
+  /* 锟斤拷锟斤拷 Legacy compat aliases 锟斤拷锟斤拷 */
   --color-primary: var(--accent-active);
   --color-primary-strong: color-mix(in srgb, var(--accent-active) 80%, #000);
   --color-primary-soft: color-mix(in srgb, var(--accent-active) 14%, #fff);
@@ -3155,7 +2962,7 @@
   --color-warning: #F59E0B;
   --color-success: #10B981;
 
-  /* ── Transition presets ── */
+  /* 锟斤拷锟斤拷 Transition presets 锟斤拷锟斤拷 */
   --nv-transition: all .15s ease;
 }
 
@@ -3784,12 +3591,12 @@ h3 {
   transform-origin: 0 0;
 }
 
-/* SVG 连接线层 */
+/* SVG 锟斤拷锟斤拷锟竭诧拷 */
 .tree-svg {
   z-index: 0;
 }
 
-/* 思维导图根节点 */
+/* 思维锟斤拷图锟斤拷锟节碉拷 */
 .tree-root-node {
   position: absolute;
   z-index: 2;
@@ -3821,7 +3628,7 @@ h3 {
   margin-top: 3px;
 }
 
-/* 思维导图项目节点 */
+/* 思维锟斤拷图锟斤拷目锟节碉拷 */
 .tree-project-node {
   position: absolute;
   z-index: 2;
@@ -3856,7 +3663,7 @@ h3 {
   margin-top: 3px;
 }
 
-/* 规划任务卡片 */
+/* 锟芥划锟斤拷锟斤拷片 */
 .planning-task-card {
   position: absolute;
   z-index: 2;
@@ -3924,7 +3731,7 @@ h3 {
   margin-top: 5px;
 }
 
-/* ── 四象限矩阵 ── */
+/* 锟斤拷锟斤拷 锟斤拷锟斤拷锟睫撅拷锟斤拷 锟斤拷锟斤拷 */
 .matrix-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4105,7 +3912,7 @@ h3 {
   transform: scale(1.12);
 }
 
-/* ── AI Dock panel ── */
+/* 锟斤拷锟斤拷 AI Dock panel 锟斤拷锟斤拷 */
 .ai-dock {
   position: fixed;
   right: 22px;
@@ -4127,7 +3934,7 @@ h3 {
   resize: both;
 }
 
-/* ── Header ── */
+/* 锟斤拷锟斤拷 Header 锟斤拷锟斤拷 */
 .ai-dock-header {
   flex: 0 0 auto;
   display: flex;
@@ -4164,7 +3971,7 @@ h3 {
   margin-top: 1px;
 }
 
-/* ── Body ── */
+/* 锟斤拷锟斤拷 Body 锟斤拷锟斤拷 */
 .ai-dock-body {
   flex: 1;
   min-height: 0;
@@ -4176,7 +3983,7 @@ h3 {
   background: var(--surface);
 }
 
-/* ── Welcome / empty state ── */
+/* 锟斤拷锟斤拷 Welcome / empty state 锟斤拷锟斤拷 */
 .chat-welcome {
   display: flex;
   flex-direction: column;
@@ -4211,7 +4018,7 @@ h3 {
   justify-content: center;
 }
 
-/* ── Chat bubble wrapper ── */
+/* 锟斤拷锟斤拷 Chat bubble wrapper 锟斤拷锟斤拷 */
 .chat-bubble-wrap {
   display: flex;
   gap: 8px;
@@ -4244,7 +4051,7 @@ h3 {
   border-color: color-mix(in srgb, var(--accent-active, #C69CF9) 30%, var(--border));
 }
 
-/* ── Bubble body ── */
+/* 锟斤拷锟斤拷 Bubble body 锟斤拷锟斤拷 */
 .chat-bubble-body {
   display: flex;
   flex-direction: column;
@@ -4277,7 +4084,7 @@ h3 {
   color: var(--faint);
 }
 
-/* ── Bubble content ── */
+/* 锟斤拷锟斤拷 Bubble content 锟斤拷锟斤拷 */
 .chat-bubble-content {
   padding: 10px 13px;
   border-radius: 14px;
@@ -4309,7 +4116,7 @@ h3 {
   max-height: none;
 }
 
-/* ── Bubble actions ── */
+/* 锟斤拷锟斤拷 Bubble actions 锟斤拷锟斤拷 */
 .chat-bubble-actions {
   display: flex;
   gap: 6px;
@@ -4317,12 +4124,12 @@ h3 {
   padding-left: 2px;
 }
 
-/* ── Message toggle ── */
+/* 锟斤拷锟斤拷 Message toggle 锟斤拷锟斤拷 */
 .message-toggle-button {
   margin-top: 4px;
 }
 
-/* ── Thinking indicator ── */
+/* 锟斤拷锟斤拷 Thinking indicator 锟斤拷锟斤拷 */
 .chat-thinking {
   display: flex;
   gap: 8px;
@@ -4377,7 +4184,7 @@ h3 {
   30% { opacity: 1; }
 }
 
-/* ── Referenced task chip ── */
+/* 锟斤拷锟斤拷 Referenced task chip 锟斤拷锟斤拷 */
 .ai-dock-body .referenced-task-chip {
   padding: 8px 12px;
   border: 1px solid var(--accent-active, #C69CF9);
@@ -4403,7 +4210,7 @@ h3 {
   white-space: nowrap;
 }
 
-/* ── Footer / Input ── */
+/* 锟斤拷锟斤拷 Footer / Input 锟斤拷锟斤拷 */
 .ai-dock-footer {
   flex: 0 0 auto;
   padding: 10px 14px 12px;
@@ -4471,7 +4278,7 @@ h3 {
   margin-top: 6px;
 }
 
-/* ── AI Planning Mode ── */
+/* 锟斤拷锟斤拷 AI Planning Mode 锟斤拷锟斤拷 */
 .ai-dock-footer-row {
   display: flex;
   justify-content: space-between;
@@ -4488,7 +4295,7 @@ h3 {
   border-radius: 6px;
 }
 
-/* ── AI 整理为计划 Modal ── */
+/* 锟斤拷锟斤拷 AI 锟斤拷锟斤拷为锟狡伙拷 Modal 锟斤拷锟斤拷 */
 .ai-plan-modal-overlay {
   position: fixed;
   inset: 0;
@@ -4563,7 +4370,7 @@ h3 {
   align-items: center;
 }
 
-/* ── AI Plan Error ── */
+/* 锟斤拷锟斤拷 AI Plan Error 锟斤拷锟斤拷 */
 .ai-plan-error {
   background: color-mix(in srgb, #dc2626 8%, transparent);
   border: 1px solid color-mix(in srgb, #dc2626 25%, transparent);
@@ -4599,7 +4406,7 @@ h3 {
   word-break: break-all;
 }
 
-/* ── AI Plan Preview ── */
+/* 锟斤拷锟斤拷 AI Plan Preview 锟斤拷锟斤拷 */
 .ai-plan-preview {
   display: flex;
   flex-direction: column;
@@ -4696,7 +4503,7 @@ h3 {
   line-height: 1.4;
 }
 
-/* ── AI Task Confirm Panel (right-side add panel) ── */
+/* 锟斤拷锟斤拷 AI Task Confirm Panel (right-side add panel) 锟斤拷锟斤拷 */
 .ai-task-confirm {
   display: flex;
   flex-direction: column;
@@ -4951,7 +4758,7 @@ h3 {
   line-height: 1;
 }
 
-/* Confirm button — compact */
+/* Confirm button 锟斤拷 compact */
 .ai-task-confirm-btn {
   font-size: 12px;
   padding: 3px 10px;
@@ -5047,7 +4854,7 @@ h3 {
   box-shadow: 0 0 0 2px var(--focus);
 }
 
-/* ── Old chat styles (keep for backward compat, phased out) ── */
+/* 锟斤拷锟斤拷 Old chat styles (keep for backward compat, phased out) 锟斤拷锟斤拷 */
 .chat-message {
   max-width: 92%;
   padding: 10px 12px;
@@ -5105,7 +4912,7 @@ h3 {
   100% { opacity: 0; }
 }
 
-/* ── Action preview (AI suggestions) ── */
+/* 锟斤拷锟斤拷 Action preview (AI suggestions) 锟斤拷锟斤拷 */
 .action-preview {
   color: var(--text);
   background: var(--surface-subtle);
@@ -5121,7 +4928,7 @@ h3 {
   font-size: 12px;
 }
 
-/* ── Subtask list inside task card ── */
+/* 锟斤拷锟斤拷 Subtask list inside task card 锟斤拷锟斤拷 */
 .subtask-list {
   margin-top: 9px;
   padding: 8px 10px;
@@ -5747,9 +5554,9 @@ h3 {
   margin-top: 8px;
 }
 
-/* ═══════════════════════════════════════════════
-   ── Inputs ────────────────────────────────
-   ═══════════════════════════════════════════════ */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   锟斤拷锟斤拷 Inputs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 input, select, textarea {
   width: 100%;
@@ -5788,7 +5595,7 @@ input:focus, select:focus, textarea:focus {
 
 .df-drafts div { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 8px; }
 
-/* ── Task detail drawer ── */
+/* 锟斤拷锟斤拷 Task detail drawer 锟斤拷锟斤拷 */
 .df-task-detail {
   width: min(440px, 94vw);
   padding: 18px 18px 14px;
@@ -5801,7 +5608,7 @@ input:focus, select:focus, textarea:focus {
   border-radius: 8px;
 }
 
-/* 任务卡片拖放视觉反馈 */
+/* 锟斤拷锟斤拷片锟较凤拷锟接撅拷锟斤拷锟斤拷 */
 .task-list {
   transition: background-color 0.2s;
 }
@@ -5811,12 +5618,12 @@ input:focus, select:focus, textarea:focus {
   border-radius: 8px;
 }
 
-/* 编辑模式样式 */
+/* 锟洁辑模式锟斤拷式 */
 .task-card.editing {
   box-shadow: 0 0 0 2px var(--accent-active, #C69CF9);
 }
 
-/* AI Dock拖放目标 — 使用 .drag-active 伪元素边框 */
+/* AI Dock锟较凤拷目锟斤拷 锟斤拷 使锟斤拷 .drag-active 伪元锟截边匡拷 */
 .ai-dock.drag-active::before {
   content: '';
   position: absolute;
@@ -5826,7 +5633,7 @@ input:focus, select:focus, textarea:focus {
   pointer-events: none;
 }
 
-/* ── Wizard AddPanel ── */
+/* 锟斤拷锟斤拷 Wizard AddPanel 锟斤拷锟斤拷 */
 .add-panel {
   display: flex;
   flex-direction: column;
@@ -7022,7 +6829,7 @@ input:focus, select:focus, textarea:focus {
   line-height: 1.45;
 }
 
-/* ── Per-action add/dismiss buttons ── */
+/* 锟斤拷锟斤拷 Per-action add/dismiss buttons 锟斤拷锟斤拷 */
 .pending-summary-row {
   display: flex;
   justify-content: space-between;
@@ -7277,7 +7084,7 @@ input[type="range"] {
   line-height: 1.35;
 }
 
-/* ── Default Theme: soft purple + lime planning whiteboard ── */
+/* 锟斤拷锟斤拷 Default Theme: soft purple + lime planning whiteboard 锟斤拷锟斤拷 */
 .app-shell,
 .loading {
   --bg: var(--color-bg);
@@ -7722,7 +7529,7 @@ input[type="range"] {
   color: var(--color-text);
 }
 
-/* ── Visual noise reduction and structured planning tree ── */
+/* 锟斤拷锟斤拷 Visual noise reduction and structured planning tree 锟斤拷锟斤拷 */
 .app-shell,
 .loading {
   background: var(--color-bg);
@@ -7979,7 +7786,7 @@ input[type="range"] {
   opacity: 0.62;
 }
 
-/* ── Page color roles: execute = purple, planning = lime ── */
+/* 锟斤拷锟斤拷 Page color roles: execute = purple, planning = lime 锟斤拷锟斤拷 */
 .execute-page {
   --page-primary: var(--color-primary);
   --page-primary-strong: var(--color-primary-strong);
@@ -8057,9 +7864,9 @@ input[type="range"] {
 }
 
 /* NavoPath rebuilt shell */
-/* ═══════════════════════════════════════════════
-   ── .df-app Root ─────────────────────────────
-   ═══════════════════════════════════════════════ */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   锟斤拷锟斤拷 .df-app Root 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 .df-app {
   --df-primary: var(--accent-active);
@@ -8087,18 +7894,18 @@ input[type="range"] {
   transition: background .42s ease;
 }
 
-/* ── Highlight toggle (only controls glow/decorations, NOT bgs) ── */
+/* 锟斤拷锟斤拷 Highlight toggle (only controls glow/decorations, NOT bgs) 锟斤拷锟斤拷 */
 .df-app.no-highlight {
   --shadow-hl: none;
 }
 
-/* ── Theme dark ── */
+/* 锟斤拷锟斤拷 Theme dark 锟斤拷锟斤拷 */
 .theme-dark.df-app {
   background: radial-gradient(circle at 50% -10%, rgba(198,156,249,0.10), transparent 30%),
               linear-gradient(180deg, #08070D 0%, #0D0A14 100%);
 }
 
-/* ── Base element styles ── */
+/* 锟斤拷锟斤拷 Base element styles 锟斤拷锟斤拷 */
 .df-app * { box-sizing: border-box; }
 
 .df-app button, .df-app input, .df-app select, .df-app textarea { font: inherit; }
@@ -8139,29 +7946,29 @@ input[type="range"] {
   pointer-events: none;
 }
 
-.df-icon-action.i-check::before { content: "✓"; font-weight: 800; }
+.df-icon-action.i-check::before { content: "\2713"; font-weight: 800; }
 
-.df-icon-action.i-branch::before { content: "⌘"; font-weight: 800; }
+.df-icon-action.i-branch::before { content: "\2318"; font-weight: 800; }
 
-.df-icon-action.i-spark::before { content: "✦"; font-weight: 800; }
+.df-icon-action.i-spark::before { content: "\2728"; font-weight: 800; }
 
 .df-icon-action.i-plus::before { content: "+"; font-size: 24px; line-height: 1; }
 
 .df-icon-action.i-ai::before { content: "AI"; font-weight: 800; font-size: 13px; }
 
-.df-icon-action.i-close::before { content: "×"; font-size: 18px; line-height: 1; }
+.df-icon-action.i-close::before { content: "\2715"; font-size: 18px; line-height: 1; }
 
-.df-icon-action.i-trash::before { content: "⌫"; font-weight: 800; }
+.df-icon-action.i-trash::before { content: "\232B"; font-weight: 800; }
 
-.df-icon-action.i-next::before { content: "→"; font-size: 20px; }
+.df-icon-action.i-next::before { content: "\2192"; font-size: 20px; }
 
-.df-icon-action.i-draft::before, .df-icon-action.i-draft-list::before { content: "□"; font-weight: 800; }
+.df-icon-action.i-draft::before, .df-icon-action.i-draft-list::before { content: "\25A1"; font-weight: 800; }
 
-.df-icon-action.i-send::before { content: "↗"; font-size: 18px; }
+.df-icon-action.i-send::before { content: "\2197"; font-size: 18px; }
 
-.df-icon-action.i-more::before { content: "..."; font-size: 18px; font-weight: 900; letter-spacing: -1px; }
+.df-icon-action.i-more::before { content: "\2026"; font-size: 18px; font-weight: 900; letter-spacing: -1px; }
 
-.df-icon-action.i-layers::before { content: "⊞"; font-weight: 800; font-size: 17px; }
+.df-icon-action.i-layers::before { content: "\22DE"; font-weight: 800; font-size: 17px; }
 
 .df-icon-action.active { background: var(--df-primary-soft); border-color: var(--df-primary); color: var(--mode-primary-strong); }
 
@@ -8177,7 +7984,7 @@ input[type="range"] {
 
 .dayflow-icon img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 0; box-shadow: none; }
 
-/* ── Tabs ── */
+/* 锟斤拷锟斤拷 Tabs 锟斤拷锟斤拷 */
 .df-tabs {
   display: inline-flex;
   padding: 3px;
@@ -8187,9 +7994,9 @@ input[type="range"] {
   border: 1px solid var(--border-subtle);
 }
 
-/* ═══════════════════════════════════════════════
-   ── Execute Page ───────────────────────────
-   ═══════════════════════════════════════════════ */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   锟斤拷锟斤拷 Execute Page 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 .df-execute {
   display: grid;
@@ -8233,7 +8040,7 @@ input[type="range"] {
   border-color: transparent !important;
 }
 
-/* ── Empty state ── */
+/* 锟斤拷锟斤拷 Empty state 锟斤拷锟斤拷 */
 .df-empty {
   min-height: 260px;
   display: grid;
@@ -8258,7 +8065,7 @@ input[type="range"] {
 
 .blob-accent::after { content: ""; position: absolute; inset: 10px; border: 2px solid rgba(255,255,255,.9); border-radius: 43% 57% 50% 50% / 56% 41% 59% 44%; transform: rotate(-8deg); }
 
-/* ── Project group ── */
+/* 锟斤拷锟斤拷 Project group 锟斤拷锟斤拷 */
 .df-project-group {
   margin-bottom: 6px;
 }
@@ -8296,7 +8103,7 @@ input[type="range"] {
 
 .df-card-strip { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 4px; height: 36px; border-radius: 999px; }
 
-/* ── Candidate accent bar (project color) & hover checkbox ── */
+/* 锟斤拷锟斤拷 Candidate accent bar (project color) & hover checkbox 锟斤拷锟斤拷 */
 .candidate-task-accent {
   position: absolute;
   left: 18px;
@@ -8408,7 +8215,7 @@ input[type="range"] {
 
 @keyframes df-spin { to { transform: rotate(360deg); } }
 
-/* ── Timeline scroll & canvas ── */
+/* 锟斤拷锟斤拷 Timeline scroll & canvas 锟斤拷锟斤拷 */
 .df-timeline-scroll {
   position: relative;
   flex: 1;
@@ -8422,7 +8229,7 @@ input[type="range"] {
   padding-left: 56px;
 }
 
-/* ── Now line ── */
+/* 锟斤拷锟斤拷 Now line 锟斤拷锟斤拷 */
 .df-now-line {
   position: absolute;
   left: -4px;
@@ -8636,162 +8443,6 @@ body.df-resizing, body.df-resizing * {
   margin-top: 6px;
 }
 
-.df-mindmap, .df-quadrants { background: #fff; border: 1px solid var(--df-border); border-radius: 14px; overflow: auto; padding: 18px; }
-
-.df-mindmap { display: grid; grid-template-columns: 170px 1fr; gap: 34px; align-items: start; background: #FFFFFF; }
-
-.df-mindmap.no-root { grid-template-columns: 1fr; }
-
-.df-root-node { position: sticky; top: 18px; min-height: 120px; display: grid; place-items: center; align-content: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--mode-primary) 70%, transparent); border-radius: 16px; background: #fff; overflow: hidden; }
-
-.df-root-node .blob-accent { position: absolute; }
-
-.df-category-branch { position: relative; padding-left: 28px; }
-
-.df-category-branch::before { content: ""; position: absolute; left: 0; top: 20px; width: 24px; border-top: 2px solid #D8C7F9; }
-
-.df-collapse {
-  position: absolute;
-  left: -8px;
-  top: 7px;
-  z-index: 3;
-  width: 22px;
-  height: 22px;
-  padding: 0 !important;
-  display: grid;
-  place-items: center;
-  border: 1px dashed color-mix(in srgb, var(--mode-primary-strong) 57%, transparent);
-  border-radius: 999px;
-  background: #FFFFFF;
-  color: #4D7C0F;
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  box-shadow: none !important;
-  transition: opacity .12s ease, transform .12s ease, border-color .12s ease;
-}
-
-.df-category-branch:hover > .df-collapse,
-.df-category-branch:focus-within > .df-collapse {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.df-collapse:hover {
-  transform: scale(1.04);
-  border-color: rgba(77, 124, 15, .72);
-  background: var(--mode-primary-soft) !important;
-}
-
-.df-category-node { display: inline-flex; padding: 8px 12px; border: 1px solid var(--border-soft); background: color-mix(in srgb, var(--accent-active) 12%, var(--bg-surface)); border-radius: 999px; color: color-mix(in srgb, var(--accent-active) 78%, #111827); font-weight: 600; font-size: 13px; }
-
-.df-project-list { margin-left: 24px; padding-left: 18px; border-left: 2px solid #D8C7F9; display: grid; gap: 12px; }
-
-.df-project-branch { display: grid; gap: 8px; }
-
-.df-task-branch { margin-left: 18px; padding-left: 14px; border-left: 1px solid #D8C7F9; display: grid; gap: 6px; }
-
-.df-pick-banner {
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px 10px;
-  align-items: center;
-  margin: -4px 0 14px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--mode-primary) 55%, transparent);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .92);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--mode-primary-strong) 8%, transparent);
-}
-
-.df-pick-banner strong {
-  font-size: 14px;
-  color: var(--mode-primary-strong);
-}
-
-.df-pick-banner span {
-  color: var(--df-muted);
-  font-size: 12px;
-}
-
-.df-pick-banner button {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-  color: var(--mode-primary-strong);
-  background: var(--mode-primary-soft);
-  border-color: color-mix(in srgb, var(--mode-primary-strong) 34%, transparent);
-}
-
-.df-plan-task-node {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-  align-items: center;
-  width: min(360px, 100%);
-}
-
-.df-plan-node-actions {
-  display: flex;
-  gap: 3px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s ease;
-}
-
-.df-plan-task-node:hover .df-plan-node-actions,
-.df-plan-task-node:focus-within .df-plan-node-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.df-plan-node-actions button {
-  width: 24px;
-  height: 24px;
-  padding: 0 !important;
-  border-radius: 8px;
-  color: #4D7C0F;
-  background: rgba(255, 255, 255, .92);
-  border-color: color-mix(in srgb, var(--mode-primary) 72%, transparent);
-  box-shadow: none !important;
-}
-
-.df-plan-more {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  display: grid;
-  gap: 3px;
-  min-width: 150px;
-  padding: 8px;
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .98);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, .12);
-}
-
-.df-plan-more button {
-  text-align: left;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 7px 8px !important;
-  font-size: 12px;
-}
-
-.df-plan-more button:hover {
-  background: var(--mode-primary-soft) !important;
-}
-
-.df-plan-more .danger {
-  color: var(--df-danger);
-}
 
 .df-pick-panel {
   display: grid;
@@ -9176,7 +8827,7 @@ body.df-resizing, body.df-resizing * {
   z-index: 49;
 }
 
-/* ── Loading ── */
+/* 锟斤拷锟斤拷 Loading 锟斤拷锟斤拷 */
 .df-loading, .df-loading-inline {
   display: grid;
   place-items: center;
@@ -9197,7 +8848,7 @@ body.df-resizing, body.df-resizing * {
   background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
 }
 
-/* ── Source modal ── */
+/* 锟斤拷锟斤拷 Source modal 锟斤拷锟斤拷 */
 .df-modal { position: fixed; inset: 0; z-index: 60; background: rgba(17,24,39,.14); display: flex; align-items: center; justify-content: center; }
 
 .df-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -9206,8 +8857,8 @@ body.df-resizing, body.df-resizing * {
 
 .df-filter-row button.active { background: var(--accent-active); color: #111827; border-color: var(--accent-active); }
 
-/* ── 1. 全局 button 基础层 ── */
-/* 补全 active（按下感）与 focus-visible（键盘导航） */
+/* 锟斤拷锟斤拷 1. 全锟斤拷 button 锟斤拷锟斤拷锟斤拷 锟斤拷锟斤拷 */
+/* 锟斤拷全 active锟斤拷锟斤拷锟铰感ｏ拷锟斤拷 focus-visible锟斤拷锟斤拷锟教碉拷锟斤拷锟斤拷 */
 .df-app button:not(:disabled) {
   transition:
     background var(--ix-dur) var(--ix-ease),
@@ -9228,7 +8879,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: var(--ix-ring) !important;
 }
 
-/* 完成勾选 checkbox 按钮 */
+/* 锟斤拷晒锟窖?checkbox 锟斤拷钮 */
 .df-candidate-check:not(:disabled):hover {
   background: color-mix(in srgb, var(--mode-primary) 8%, transparent) !important;
   border-color: var(--mode-primary-strong) !important;
@@ -9239,7 +8890,7 @@ body.df-resizing, body.df-resizing * {
   transform: scale(0.92);
 }
 
-/* ── 4. df-icon-action 图标操作按钮 ── */
+/* 锟斤拷锟斤拷 4. df-icon-action 图锟斤拷锟斤拷锟斤拷锟脚?锟斤拷锟斤拷 */
 .df-icon-action:not(.active):not(:disabled):hover {
   background: color-mix(in srgb, var(--mode-primary) 10%, transparent) !important;
   border-color: color-mix(in srgb, var(--mode-primary) 55%, transparent) !important;
@@ -9251,7 +8902,7 @@ body.df-resizing, body.df-resizing * {
   transform: scale(0.90);
 }
 
-/* ── 5. df-segment 分段选择（Drawer 内） ── */
+/* 锟斤拷锟斤拷 5. df-segment 锟街讹拷选锟斤拷Drawer 锟节ｏ拷 锟斤拷锟斤拷 */
 .df-segment button:not(.active):hover {
   background: color-mix(in srgb, var(--mode-primary) 8%, transparent) !important;
   color: var(--mode-primary-strong) !important;
@@ -9267,7 +8918,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--mode-primary-strong) 15%, transparent) !important;
 }
 
-/* ── 7. df-filter-row 筛选器标签 ── */
+/* 锟斤拷锟斤拷 7. df-filter-row 筛选锟斤拷锟斤拷签 锟斤拷锟斤拷 */
 .df-filter-row button:not(.active):hover {
   background: color-mix(in srgb, var(--mode-primary) 7%, transparent) !important;
   border-color: color-mix(in srgb, var(--mode-primary) 45%, transparent) !important;
@@ -9283,7 +8934,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 2px 6px color-mix(in srgb, var(--mode-primary-strong) 15%, transparent) !important;
 }
 
-/* ── 10. df-panel-title 按钮 ── */
+/* 锟斤拷锟斤拷 10. df-panel-title 锟斤拷钮 锟斤拷锟斤拷 */
 .df-panel-title button:hover {
   background: color-mix(in srgb, var(--mode-primary) 18%, #fff) !important;
   border-color: color-mix(in srgb, var(--mode-primary) 58%, #E5E7EB) !important;
@@ -9311,7 +8962,7 @@ body.df-resizing, body.df-resizing * {
   transform: var(--ix-press);
 }
 
-/* ── 20. df-quadrant article（规划象限卡片）── */
+/* 锟斤拷锟斤拷 20. df-quadrant article锟斤拷锟芥划锟斤拷锟睫匡拷片锟斤拷锟斤拷锟斤拷 */
 .df-quadrant article {
   transition: box-shadow var(--ix-dur) var(--ix-ease), transform var(--ix-dur) var(--ix-ease);
 }
@@ -9321,7 +8972,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--mode-primary-strong) 18%, transparent) !important;
 }
 
-/* ── 21. df-auth 登录界面按钮 ── */
+/* 锟斤拷锟斤拷 21. df-auth 锟斤拷录锟斤拷锟芥按钮 锟斤拷锟斤拷 */
 .df-auth-tabs button:not(.active):hover {
   background: color-mix(in srgb, var(--mode-primary) 8%, transparent) !important;
 }
@@ -9340,7 +8991,7 @@ body.df-resizing, body.df-resizing * {
   transform: var(--ix-press);
 }
 
-/* ── 22. df-quick-confirm 快速确认"✓"按钮 ── */
+/* 锟斤拷锟斤拷 22. df-quick-confirm 锟斤拷锟斤拷确锟斤拷"?"锟斤拷钮 锟斤拷锟斤拷 */
 .df-quick-confirm:hover {
   color: var(--mode-primary-strong) !important;
   transform: scale(1.12);
@@ -9366,7 +9017,7 @@ body.df-resizing, body.df-resizing * {
   margin: 0 auto;
 }
 
-/* ── 日期头 ── */
+/* 锟斤拷锟斤拷 锟斤拷锟斤拷头 锟斤拷锟斤拷 */
 .df-timeline-3day-top {
   display: flex;
   flex-shrink: 0;
@@ -9412,20 +9063,20 @@ body.df-resizing, body.df-resizing * {
   color: var(--mode-primary-strong);
 }
 
-/* ── 滚动 ── */
+/* 锟斤拷锟斤拷 锟斤拷锟斤拷 锟斤拷锟斤拷 */
 .df-timeline-3day-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* ── Grid ── */
+/* 锟斤拷锟斤拷 Grid 锟斤拷锟斤拷 */
 .df-timeline-3day-grid {
   display: flex;
   min-height: 100%;
 }
 
-/* ── 时间标尺 ── */
+/* 锟斤拷锟斤拷 时锟斤拷锟斤拷 锟斤拷锟斤拷 */
 .df-timeline-3day-ruler {
   flex-shrink: 0;
   width: 64px;
@@ -9436,7 +9087,7 @@ body.df-resizing, body.df-resizing * {
   border-right: 1px solid rgba(148, 163, 184, .10);
 }
 
-/* ── Multi-day: shared time-grid overlay architecture ── */
+/* 锟斤拷锟斤拷 Multi-day: shared time-grid overlay architecture 锟斤拷锟斤拷 */
 .df-timeline-3day-cols {
   flex: 1;
   position: relative;
@@ -9455,7 +9106,7 @@ body.df-resizing, body.df-resizing * {
   display: none !important;
 }
 
-/* ── Buttons — flat with hover lift ──────────────────────────── */
+/* 锟斤拷锟斤拷 Buttons 锟斤拷 flat with hover lift 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-app button {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -9502,7 +9153,7 @@ body.df-resizing, body.df-resizing * {
   color: #9CA3AF;
 }
 
-/* ── Panels & Special Cards ──────────────────────────────────── */
+/* 锟斤拷锟斤拷 Panels & Special Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .focus-hero {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -9510,7 +9161,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px color-mix(in srgb, var(--mode-primary) 8%, transparent);
 }
 
-/* ── Tabs — segmented control style ──────────────────────────── */
+/* 锟斤拷锟斤拷 Tabs 锟斤拷 segmented control style 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-tabs {
   background: #F9FAFB;
   border: 1px solid #E5E7EB;
@@ -9519,7 +9170,7 @@ body.df-resizing, body.df-resizing * {
   padding: 3px;
 }
 
-/* ── Mode Switch ─────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Mode Switch 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-top-view-switch {
   background: #F9FAFB;
   border: 1px solid #E5E7EB;
@@ -9542,7 +9193,7 @@ body.df-resizing, body.df-resizing * {
   color: #5B21B6 !important;
 }
 
-/* ── Stat Chips — pill style ─────────────────────────────────── */
+/* 锟斤拷锟斤拷 Stat Chips 锟斤拷 pill style 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .planning-stat-chip,
 .today-count,
 .df-status {
@@ -9558,7 +9209,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
-/* ── Quick Prompts ───────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Quick Prompts 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .quick-prompt-chip {
   background: #FAFAFA;
   border: 1px solid #E5E7EB;
@@ -9567,7 +9218,7 @@ body.df-resizing, body.df-resizing * {
   transition: all .15s ease;
 }
 
-/* ── AI Panel & Dock ─────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 AI Panel & Dock 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-ai-panel {
   background: #FFFFFF;
   border: 1px solid color-mix(in srgb, var(--mode-primary) 22%, #E5E7EB);
@@ -9586,7 +9237,7 @@ body.df-resizing, body.df-resizing * {
   transform: translateY(-1px);
 }
 
-/* ── Color Picker ────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Color Picker 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .ProjectColorPicker {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -9610,13 +9261,13 @@ body.df-resizing, body.df-resizing * {
   transform: scale(.96);
 }
 
-/* ── Execute Layout ──────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Execute Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-execute {
   background: #F8FAFC;
   border-radius: 0;
 }
 
-/* ── Matrix Quadrants ────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Matrix Quadrants 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .matrix-quadrant {
   background: #FAFAFA;
   border: 1px solid #E5E7EB;
@@ -9629,7 +9280,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--mode-primary) 16%, transparent);
 }
 
-/* ── Tree Nodes ──────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Tree Nodes 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .tree-category-node,
 .tree-project-node,
 .planning-task-card {
@@ -9647,7 +9298,7 @@ body.df-resizing, body.df-resizing * {
   border-color: #D1D5DB;
 }
 
-/* ── Settings Card ───────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Settings Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .settings-card {
   background: #FFFFFF;
 
@@ -9656,7 +9307,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
-/* ── Empty State ─────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Empty State 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-empty {
   background: #FAFAFA;
   border: 1px dashed #D1D5DB;
@@ -9664,7 +9315,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: none;
 }
 
-/* ── Event Pill ──────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Event Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .event-pill {
   background: #FAFAFA;
   border: 1px solid #E5E7EB;
@@ -9672,7 +9323,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: none;
 }
 
-/* ── Note Card ───────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Note Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .note-card {
   background: #FFFFFF;
 
@@ -9681,7 +9332,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
-/* ── Close Button ────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Close Button 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .close-button {
   background: transparent;
   border: 1px solid transparent;
@@ -9700,7 +9351,7 @@ body.df-resizing, body.df-resizing * {
   background: #FEE2E2;
 }
 
-/* ── User Avatar Menu ────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 User Avatar Menu 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-user-menu {
   background: #FFFFFF !important;
 
@@ -9709,7 +9360,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 8px 32px rgba(0,0,0,.1);
 }
 
-/* ── Panel Title Buttons ─────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Panel Title Buttons 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-panel-title button {
   background: transparent;
   border: 1px solid transparent;
@@ -9731,7 +9382,7 @@ body.df-resizing, body.df-resizing * {
   background: transparent;
 }
 
-/* ── Quick Time Select ───────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Quick Time Select 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-quick-time select {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -9739,7 +9390,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: none;
 }
 
-/* ── All Day Bar ─────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 All Day Bar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-all-day-bar {
   background: #FAFAFA;
   border: 1px solid #EEF0F4;
@@ -9747,7 +9398,7 @@ body.df-resizing, body.df-resizing * {
   box-shadow: none;
 }
 
-/* ── Brand Icon ──────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Brand Icon 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .dayflow-icon {
   filter: none;
 }
@@ -9868,7 +9519,7 @@ body.df-resizing, body.df-resizing * {
 }
 
 .df-plan-node-actions button:first-child::before {
-  content: "→";
+  content: "\2192";
   font-size: 14px;
   font-weight: 800;
 }
@@ -9988,12 +9639,12 @@ body.df-resizing, body.df-resizing * {
 /* ============================================================ */
 
 /* ================================================================
-   NAVOPATH — INTERACTION LAYER
-   统一所有 df- 组件的 hover / :active / focus-visible 状态
-   Design token: 过渡时间 140ms ease，focus ring: color-mix(in srgb, var(--mode-primary) 45%, transparent)
+   NAVOPATH 锟斤拷 INTERACTION LAYER
+   统一锟斤拷锟斤拷 df- 锟斤拷锟斤拷锟?hover / :active / focus-visible 状态
+   Design token: 锟斤拷锟斤拷时锟斤拷 140ms ease锟斤拷focus ring: color-mix(in srgb, var(--mode-primary) 45%, transparent)
 ================================================================ */
 
-/* ── 0. CSS 缓动变量 ── */
+/* 锟斤拷锟斤拷 0. CSS 锟斤拷锟斤拷锟斤拷锟斤拷 锟斤拷锟斤拷 */
 .df-app {
   --ix-dur:   140ms;
   --ix-ease:  ease;
@@ -10033,7 +9684,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   width: 10px;
 }
 
-/* ── Neumorphic Scrollbar ────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Scrollbar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic *::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--neu-dark, #a3b1c6) 50%, transparent);
   border: 2px solid transparent;
@@ -10051,7 +9702,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 /* 3. App Layout */
 /* ============================================================ */
 
-/* ── Mode overrides ── */
+/* 锟斤拷锟斤拷 Mode overrides 锟斤拷锟斤拷 */
 .df-app.mode-execute {
   --accent-active: var(--execute-primary, #C69CF9);
   --accent-rgb: 198, 156, 249;
@@ -10126,9 +9777,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 /* 4. Header & Navigation */
 /* ============================================================ */
 
-/* ═══════════════════════════════════════════════
-   ── Header & Navigation ────────────────────
-   ═══════════════════════════════════════════════ */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
+   锟斤拷锟斤拷 Header & Navigation 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+   锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 .df-header {
   position: relative;
@@ -10225,7 +9876,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 1px 6px rgba(0,0,0,0.07);
 }
 
-/* Tabs inside header — subtle glass */
+/* Tabs inside header 锟斤拷 subtle glass */
 .df-header .df-tabs {
   background: color-mix(in srgb, var(--accent-active) 8%, var(--bg-surface-soft));
   border-color: color-mix(in srgb, var(--accent-active) 15%, transparent);
@@ -10239,7 +9890,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   color: var(--text-main);
 }
 
-/* ── User avatar button ── */
+/* 锟斤拷锟斤拷 User avatar button 锟斤拷锟斤拷 */
 .df-user-avatar {
   width: 36px;
   height: 36px;
@@ -10260,7 +9911,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: var(--shadow-hl);
 }
 
-/* ── User avatar + dropdown menu ── */
+/* 锟斤拷锟斤拷 User avatar + dropdown menu 锟斤拷锟斤拷 */
 .df-header-right {
   position: relative;
   display: flex;
@@ -10296,7 +9947,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transform: scale(.94);
 }
 
-/* ── 2. df-tabs 顶部 Execute / Planning 切换 ── */
+/* 锟斤拷锟斤拷 2. df-tabs 锟斤拷锟斤拷 Execute / Planning 锟叫伙拷 锟斤拷锟斤拷 */
 .df-tabs button:not(.active):hover {
   background: rgba(255, 255, 255, .55) !important;
   color: color-mix(in srgb, var(--mode-primary-strong) 95%, #111827) !important;
@@ -10324,7 +9975,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: var(--neu-flat) !important;
 }
 
-/* Header tabs — keep special dark treatment */
+/* Header tabs 锟斤拷 keep special dark treatment */
 .theme-neumorphic .df-header .df-tabs {
   background: #F3ECFD !important;
   box-shadow: none !important;
@@ -10355,7 +10006,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
-/* Header tabs — clean tint */
+/* Header tabs 锟斤拷 clean tint */
 .df-header .df-tabs {
   background: rgba(198, 156, 249, 0.08);
   border: 1px solid rgba(198, 156, 249, 0.2);
@@ -10478,13 +10129,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-user-avatar svg {
-  display: none;
-}
-
-.df-user-avatar::before {
-  content: "⚙";
-  font-size: 17px;
-  line-height: 1;
+  display: block;
 }
 
 .df-header > button:not(.df-user-avatar) {
@@ -10515,7 +10160,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 /* 5. Today / Candidate Panel */
 /* ============================================================ */
 
-/* ── Panel base ── */
+/* 锟斤拷锟斤拷 Panel base 锟斤拷锟斤拷 */
 .df-candidate-panel,
 .df-timeline-panel,
 .df-drawer,
@@ -10537,7 +10182,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   animation: dfPanelPop .22s ease-out;
 }
 
-/* ── Task card ── */
+/* 锟斤拷锟斤拷 Task card 锟斤拷锟斤拷 */
 .df-task-card {
   position: relative;
   display: grid;
@@ -10659,13 +10304,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   text-align: center;
 }
 
-.df-icon-button.icon-info::before { content: "ℹ"; }
+.df-icon-button.icon-info::before { content: "\2139"; font-weight: 700; }
 
-.df-icon-button.icon-note::before { content: "📝"; }
+.df-icon-button.icon-note::before { content: "\270E"; font-size: 15px; }
 
-.df-icon-button.icon-collapse::before { content: "−"; }
+.df-icon-button.icon-collapse::before { content: "\25B2"; font-size: 12px; }
 
-/* ── Card popovers ── */
+/* 锟斤拷锟斤拷 Card popovers 锟斤拷锟斤拷 */
 .df-card-popover {
   margin-top: 8px;
   padding: 8px;
@@ -10942,14 +10587,14 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-source-main small { color: var(--text-muted); font-size: 11px; }
 
-/* ── 3. df-task-card 任务卡片 ── */
-/* 拖拽按下感 */
+/* 锟斤拷锟斤拷 3. df-task-card 锟斤拷锟斤拷片 锟斤拷锟斤拷 */
+/* 锟斤拷拽锟斤拷锟铰革拷 */
 .df-task-card:active {
   transform: translateY(0) scale(0.985);
   box-shadow: 0 2px 6px color-mix(in srgb, var(--mode-primary) 10%, transparent) !important;
 }
 
-/* ── 9. df-card-popover 列表中的按钮 ── */
+/* 锟斤拷锟斤拷 9. df-card-popover 锟叫憋拷锟叫的帮拷钮 锟斤拷锟斤拷 */
 .df-card-popover.grid button:not(.active):hover,
 .df-card-popover.duration-list button:not(.active):hover,
 .df-card-popover.project-list button:not(.active):hover {
@@ -10962,7 +10607,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--mode-primary) 16%, transparent) !important;
 }
 
-/* ── 19. df-pick-card 拾取面板按钮 ── */
+/* 锟斤拷锟斤拷 19. df-pick-card 拾取锟斤拷灏磁?锟斤拷锟斤拷 */
 .df-pick-card button:not(:disabled):hover {
   background: color-mix(in srgb, var(--mode-primary) 8%, transparent) !important;
   border-color: color-mix(in srgb, var(--mode-primary) 52%, transparent) !important;
@@ -11002,7 +10647,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-radius: 28px !important;
 }
 
-/* ── Neumorphic Task Cards ───────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Task Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-task-card,
 .mini-task-card,
 .planning-task-card,
@@ -11039,7 +10684,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transition: var(--neu-transition) !important;
 }
 
-/* ── Neumorphic Popover ──────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Popover 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-card-popover {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -11055,14 +10700,14 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 /* ================================================================
-   GRADIENT DESIGN SYSTEM — NavoPath Default Theme
+   GRADIENT DESIGN SYSTEM 锟斤拷 NavoPath Default Theme
    ================================================================
-   Aesthetic: gradient · frosted glass · structured · calm
-              high-density · subtle depth · rounded but not cute
+   Aesthetic: gradient 锟斤拷 frosted glass 锟斤拷 structured 锟斤拷 calm
+              high-density 锟斤拷 subtle depth 锟斤拷 rounded but not cute
    Reference: Linear, Notion, Things 3, macOS Sonoma
    ================================================================ */
 
-/* ── Cards & Panels — subtle shadow, thin border ─────────────── */
+/* 锟斤拷锟斤拷 Cards & Panels 锟斤拷 subtle shadow, thin border 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-candidate-panel,
 .df-timeline-panel,
 .df-drawer,
@@ -11090,7 +10735,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-radius: 14px;
 }
 
-/* ── Task Cards — clean, compact ─────────────────────────────── */
+/* 锟斤拷锟斤拷 Task Cards 锟斤拷 clean, compact 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-task-card,
 .mini-task-card,
 .planning-task-card,
@@ -11122,7 +10767,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-left: 3px solid #EF4444;
 }
 
-/* Ghost / icon buttons — transparent, no border */
+/* Ghost / icon buttons 锟斤拷 transparent, no border */
 .ghost-button,
 .df-icon-button,
 .sidebar-action,
@@ -11134,7 +10779,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transition: all .15s ease;
 }
 
-/* ── Popover ─────────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Popover 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-card-popover {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
@@ -11291,7 +10936,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   opacity: .78;
 }
 
-/* ── Dark mode: candidate accent & checkbox ── */
+/* 锟斤拷锟斤拷 Dark mode: candidate accent & checkbox 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-task-card .df-block-check {
   background: var(--surface-card) !important;
   border-color: color-mix(in srgb, var(--accent-active) 60%, rgba(255,255,255,0.18)) !important;
@@ -11316,7 +10961,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: none !important;
 }
 
-/* ── Timeline panel ── */
+/* 锟斤拷锟斤拷 Timeline panel 锟斤拷锟斤拷 */
 .df-timeline-panel {
   position: relative;
   display: flex;
@@ -11400,7 +11045,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-back-today span,
 .df-back-today kbd { display: none; }
 
-/* ── AI Planner ── */
+/* 锟斤拷锟斤拷 AI Planner 锟斤拷锟斤拷 */
 .df-ai-planner {
   position: relative;
   display: inline-flex;
@@ -11498,7 +11143,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-size: 15px;
 }
 
-/* ── View switch ── */
+/* 锟斤拷锟斤拷 View switch 锟斤拷锟斤拷 */
 .df-view-switch {
   display: inline-flex;
   align-items: center;
@@ -11540,7 +11185,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   pointer-events: none;
 }
 
-/* ── Vertical view switch ── */
+/* 锟斤拷锟斤拷 Vertical view switch 锟斤拷锟斤拷 */
 .df-view-switch-vertical {
   display: flex;
   flex-direction: column;
@@ -11641,7 +11286,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-weight: 600;
 }
 
-/* ── Time block ── */
+/* 锟斤拷锟斤拷 Time block 锟斤拷锟斤拷 */
 .df-time-block,
 .df-drop-preview,
 .df-suggestion {
@@ -11706,7 +11351,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   word-break: break-word;
 }
 
-/* ── Category strip ── */
+/* 锟斤拷锟斤拷 Category strip 锟斤拷锟斤拷 */
 .df-category-strip {
   position: absolute;
   left: 12px;
@@ -11734,7 +11379,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-time-block:hover .df-block-title-row {
-  /* Remove full-width mask — badge sits on top with its own background */
+  /* Remove full-width mask 锟斤拷 badge sits on top with its own background */
 }
 
 .df-block-project {
@@ -11777,7 +11422,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   word-break: break-word;
 }
 
-/* ── Buttons / Drag / Misc ── */
+/* 锟斤拷锟斤拷 Buttons / Drag / Misc 锟斤拷锟斤拷 */
 
 .df-resize-dot {
   position: absolute;
@@ -11902,7 +11547,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-suggestion-action:disabled { opacity: 0 !important; }
 
-/* ── 11. df-ai-plan AI规划按钮 ── */
+/* 锟斤拷锟斤拷 11. df-ai-plan AI锟芥划锟斤拷钮 锟斤拷锟斤拷 */
 .df-ai-plan:not(.thinking):not(:disabled):hover {
   filter: brightness(1.08);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--mode-primary) 38%, transparent) !important;
@@ -11913,13 +11558,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transform: var(--ix-press);
 }
 
-/* ── 13. df-date-arrow 日期前后翻页箭头 ── */
+/* 锟斤拷锟斤拷 13. df-date-arrow 锟斤拷锟斤拷前锟斤拷页锟斤拷头 锟斤拷锟斤拷 */
 .df-date-arrow:not(:disabled):active {
   transform: translateY(-50%) scale(0.88) !important;
   color: var(--mode-primary-strong) !important;
 }
 
-/* ── 14. df-block-project 时间块项目链接 ── */
+/* 锟斤拷锟斤拷 14. df-block-project 时锟斤拷锟斤拷锟侥匡拷锟斤拷锟?锟斤拷锟斤拷 */
 .df-block-project:hover {
   color: var(--mode-primary-strong) !important;
   text-decoration: underline;
@@ -11930,7 +11575,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transform: scale(0.97);
 }
 
-/* ── 23. df-suggestion AI建议块 apply/ignore ── */
+/* 锟斤拷锟斤拷 23. df-suggestion AI锟斤拷锟斤拷锟?apply/ignore 锟斤拷锟斤拷 */
 .df-suggestion-action.apply:hover { background: color-mix(in srgb, var(--mode-primary) 28%, transparent) !important; }
 
 .df-suggestion-action.ignore:hover { background: rgba(239, 68, 68, .10) !important; }
@@ -11981,7 +11626,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
     );
 }
 
-/* Layer 1: Hour/slot lines — shared across all day columns */
+/* Layer 1: Hour/slot lines 锟斤拷 shared across all day columns */
 .df-hour-lines-layer {
   position: absolute;
   inset: 0;
@@ -12017,7 +11662,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent-active) 8%, transparent) !important;
 }
 
-/* Layer 3: Event blocks — absolutely positioned on the shared time-grid */
+/* Layer 3: Event blocks 锟斤拷 absolutely positioned on the shared time-grid */
 .df-event-blocks-layer {
   position: absolute;
   inset: 0;
@@ -12179,7 +11824,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   text-align: center;
 }
 
-/* ── Neumorphic Time Slots / Ruler ───────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Time Slots / Ruler 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-slot {
   border-top-color: color-mix(in srgb, var(--neu-dark, #a3b1c6) 60%, transparent) !important;
 }
@@ -12200,7 +11845,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
     ) !important;
 }
 
-/* ── Neumorphic Time Block (3Day) ────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Time Block (3Day) 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-time-block {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -12213,7 +11858,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: var(--neu-convex-sm) !important;
 }
 
-/* ── Time Slots ──────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Time Slots 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-slot {
   border-top-color: #F3F4F6;
 }
@@ -12222,7 +11867,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-top-color: #E5E7EB;
 }
 
-/* ── Time Block (3Day) ───────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Time Block (3Day) 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-time-block {
   background: #FFFFFF;
   border: 1px solid #EEF0F4;
@@ -12261,7 +11906,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-ai-plan::before {
-  content: "✦";
+  content: "\2728";
   margin-right: 7px;
   font-size: 12px;
 }
@@ -12447,7 +12092,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   opacity: 0 !important;
 }
 
-/* ── Overlay event blocks — dark completed ── */
+/* 锟斤拷锟斤拷 Overlay event blocks 锟斤拷 dark completed 锟斤拷锟斤拷 */
 .df-app.theme-dark .df-event-blocks-layer .df-time-block.completed {
   background: rgba(255,255,255,0.035) !important;
   border-color: color-mix(in srgb, var(--accent-active) 14%, rgba(255,255,255,0.08)) !important;
@@ -12473,7 +12118,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 /* 7. All-Day Row */
 /* ============================================================ */
 
-/* ── Daily All Day 栏 ── */
+/* 锟斤拷锟斤拷 Daily All Day 锟斤拷 锟斤拷锟斤拷 */
 .df-timeline-allday {
   width: min(530px, 56%);
   margin: 0 auto;
@@ -12563,7 +12208,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-all-day-block:hover strong {
-  /* Mask removed — badge sits on top with its own background */
+  /* Mask removed 锟斤拷 badge sits on top with its own background */
 }
 
 .df-all-day-block.completed {
@@ -12623,7 +12268,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   padding-right: 10px;
 }
 
-/* ── All Day ── */
+/* 锟斤拷锟斤拷 All Day 锟斤拷锟斤拷 */
 .df-timeline-3day-allday {
   display: flex;
   flex-shrink: 0;
@@ -12738,7 +12383,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   bottom: calc(100% + 8px);
 }
 
-/* ── Quick add ── */
+/* 锟斤拷锟斤拷 Quick add 锟斤拷锟斤拷 */
 .df-quick-add {
   flex: 0 0 auto;
   z-index: 8;
@@ -12796,7 +12441,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   color: rgba(255,255,255,0.3) !important;
 }
 
-/* ── Quick project picker ── */
+/* 锟斤拷锟斤拷 Quick project picker 锟斤拷锟斤拷 */
 .df-quick-project-picker {
   position: relative;
   z-index: 50;
@@ -12830,7 +12475,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   text-overflow: ellipsis;
 }
 
-/* ── Quick schedule ── */
+/* 锟斤拷锟斤拷 Quick schedule 锟斤拷锟斤拷 */
 .df-quick-schedule {
   position: absolute;
   left: 8px;
@@ -12891,7 +12536,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent-active) 10%, transparent) !important;
 }
 
-/* ── FABs ── */
+/* 锟斤拷锟斤拷 FABs 锟斤拷锟斤拷 */
 .df-add-fab, .df-ai-fab {
   position: fixed;
   right: 28px;
@@ -12922,7 +12567,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-active) 20%, transparent), 0 8px 22px color-mix(in srgb, var(--accent-active) 22%, transparent) !important;
 }
 
-/* ── 12. df-quick-add 快速添加按钮 ── */
+/* 锟斤拷锟斤拷 12. df-quick-add 锟斤拷锟斤拷锟斤拷锟接帮拷钮 锟斤拷锟斤拷 */
 .df-quick-add-submit:not(:disabled):hover {
   filter: brightness(1.08);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--mode-primary-strong) 28%, transparent) !important;
@@ -12933,7 +12578,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transform: var(--ix-press);
 }
 
-/* ── 16. df-add-fab / df-ai-fab 浮动按钮 ── */
+/* 锟斤拷锟斤拷 16. df-add-fab / df-ai-fab 锟斤拷锟斤拷锟斤拷钮 锟斤拷锟斤拷 */
 .df-add-fab:not(:disabled):hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 32px rgba(17, 24, 39, .18) !important;
@@ -12987,7 +12632,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   color: #8B93A7;
 }
 
-/* Primary / accent buttons — colored neumorphic style */
+/* Primary / accent buttons 锟斤拷 colored neumorphic style */
 .df-tabs button.active,
 .df-ai-plan,
 .df-quick-add-submit,
@@ -13024,7 +12669,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transform: translateY(1px);
 }
 
-/* ── Neumorphic Inputs ───────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Inputs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-app input,
 .df-app select,
 .df-app textarea,
@@ -13046,7 +12691,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transition: var(--neu-transition) !important;
 }
 
-/* Override neumorphic !important on popover inputs — must come AFTER to win cascade */
+/* Override neumorphic !important on popover inputs 锟斤拷 must come AFTER to win cascade */
 .drag-create-quick-add input {
   background: transparent !important;
   border: none !important;
@@ -13055,7 +12700,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   padding: 0 !important;
 }
 
-/* ── Neumorphic Quick Add ────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Quick Add 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .theme-neumorphic .df-quick-add {
   background: var(--neu-bg, #e0e5ec) !important;
   border: 0 !important;
@@ -13064,7 +12709,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   padding: 8px 12px;
 }
 
-/* Primary buttons — brand color */
+/* Primary buttons 锟斤拷 brand color */
 .df-tabs button.active,
 .df-ai-plan,
 .df-quick-add-submit,
@@ -13103,7 +12748,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transform: translateY(0);
 }
 
-/* ── Inputs — clean, bordered ────────────────────────────────── */
+/* 锟斤拷锟斤拷 Inputs 锟斤拷 clean, bordered 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-app input,
 .df-app select,
 .df-app textarea,
@@ -13125,7 +12770,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   transition: all .15s ease;
 }
 
-/* ── Quick Add ───────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Quick Add 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-quick-add {
   background: color-mix(in srgb, var(--mode-primary) 3%, #FFFFFF);
   border: 1px solid color-mix(in srgb, var(--mode-primary) 26%, #E5E7EB);
@@ -13259,7 +12904,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border: 1px solid color-mix(in srgb, var(--mode-primary) 48%, transparent) !important;
 }
 
-/* ── Quick-add input box — independent floating layer ── */
+/* 锟斤拷锟斤拷 Quick-add input box 锟斤拷 independent floating layer 锟斤拷锟斤拷 */
 .df-quick-add-input-box {
   position: fixed;
   z-index: 99999;
@@ -13319,7 +12964,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   cursor: not-allowed;
 }
 
-/* ── Quick-add project menu — independent floating layer ── */
+/* 锟斤拷锟斤拷 Quick-add project menu 锟斤拷 independent floating layer 锟斤拷锟斤拷 */
 .df-quick-add-project-menu {
   position: fixed;
   z-index: 1000000;
@@ -13389,7 +13034,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: transparent;
 }
 
-/* ── Drawer ── */
+/* 锟斤拷锟斤拷 Drawer 锟斤拷锟斤拷 */
 .df-drawer-backdrop {
   position: fixed;
   inset: 0;
@@ -13636,6 +13281,40 @@ body:has(:active)::-webkit-scrollbar-thumb {
   gap: 6px;
 }
 
+.df-detail-uncomplete {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: background .14s ease, border-color .14s ease, color .14s ease !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+.df-app.theme-dark .df-detail-uncomplete {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  color: #F5F7FA !important;
+}
+.df-app:not(.theme-dark) .df-detail-uncomplete {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E7EB !important;
+  color: #111827 !important;
+}
+.df-app.theme-dark .df-detail-uncomplete:hover {
+  background: rgba(198,156,249,0.12) !important;
+  border-color: rgba(198,156,249,0.28) !important;
+}
+.df-app:not(.theme-dark) .df-detail-uncomplete:hover {
+  background: rgba(198,156,249,0.10) !important;
+  border-color: rgba(198,156,249,0.32) !important;
+}
+.df-app.theme-dark .df-detail-uncomplete svg { stroke: #7DB7D9 !important; }
+.df-app:not(.theme-dark) .df-detail-uncomplete svg { stroke: #3B82A0 !important; }
+
 .df-detail-more {
   position: absolute;
   top: calc(100% + 8px);
@@ -13838,7 +13517,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-weight: 760;
 }
 
-/* ── 8. df-detail-chips 详情标签选择 ── */
+/* 锟斤拷锟斤拷 8. df-detail-chips 锟斤拷锟斤拷锟角┭★拷锟?锟斤拷锟斤拷 */
 .df-detail-chips button:not(.active):hover {
   border-color: color-mix(in srgb, var(--mode-primary) 55%, transparent) !important;
   background: color-mix(in srgb, var(--mode-primary) 6%, transparent) !important;
@@ -13856,7 +13535,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 2px 5px color-mix(in srgb, var(--mode-primary-strong) 14%, transparent) !important;
 }
 
-/* ── 15. df-drawer 内 input / select / textarea focus ── */
+/* 锟斤拷锟斤拷 15. df-drawer 锟斤拷 input / select / textarea focus 锟斤拷锟斤拷 */
 .df-drawer input:focus,
 .df-drawer select:focus,
 .df-drawer textarea:focus,
@@ -13868,7 +13547,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mode-primary) 14%, transparent) !important;
 }
 
-/* ── Neumorphic Utility Panel ────────────────────────────────── */
+/* 锟斤拷锟斤拷 Neumorphic Utility Panel 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-utility-panel,
 .theme-neumorphic .df-drawer {
   background: var(--neu-bg, #e0e5ec) !important;
@@ -13877,13 +13556,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: var(--neu-convex) !important;
 }
 
-/* ── Edit Panel ──────────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Edit Panel 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .task-edit-overlay {
   background: rgba(17, 24, 39, 0.14);
   backdrop-filter: blur(4px);
 }
 
-/* ── Utility Panel ───────────────────────────────────────────── */
+/* 锟斤拷锟斤拷 Utility Panel 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 .df-utility-panel,
 .df-drawer {
   background: #FFFFFF !important;
@@ -13891,4 +13570,1259 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border: 1px solid #E5E7EB !important;
   border-radius: 14px;
   box-shadow: 0 8px 32px rgba(0,0,0,.08);
+}
+
+/* ===== § FINAL 规划视图 · 树状图布局 (v2 - dark minimal tree) ===== */
+
+/* ━━ 画布 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-planning,
+.df-app.theme-dark .df-planning,
+.df-app:not(.theme-dark) .df-planning {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 8px 8px 10px !important;
+  height: calc(100vh - 64px) !important;
+  overflow: hidden !important;
+  background: var(--bg-app) !important;
+  min-height: 0 !important;
+}
+
+.df-app .df-mindmap,
+.df-app.theme-dark .df-mindmap,
+.df-app:not(.theme-dark) .df-mindmap {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding: 32px 40px !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  display: block !important;
+}
+/* dark canvas */
+.df-app.theme-dark .df-mindmap {
+  background: #151A22 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+/* light canvas */
+.df-app:not(.theme-dark) .df-mindmap {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.10) !important;
+}
+
+.df-app .df-mindmap.no-root,
+.df-app.theme-dark .df-mindmap.no-root,
+.df-app:not(.theme-dark) .df-mindmap.no-root {
+  display: block !important;
+}
+
+.df-app .df-tree-wrap,
+.df-app.theme-dark .df-tree-wrap,
+.df-app:not(.theme-dark) .df-tree-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.df-app .df-tree,
+.df-app.theme-dark .df-tree,
+.df-app:not(.theme-dark) .df-tree {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+
+/* ━━ 项目组 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-category-branch,
+.df-app.theme-dark .df-category-branch,
+.df-app:not(.theme-dark) .df-category-branch {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  margin-bottom: 44px !important;
+  position: relative !important;
+  padding-left: 0 !important;
+}
+
+/* ━━ 项目节点 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-plan-project-node,
+.df-app.theme-dark .df-plan-project-node,
+.df-app:not(.theme-dark) .df-plan-project-node {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 300px !important;
+  max-width: 340px !important;
+  min-width: 280px !important;
+  height: 52px !important;
+  padding: 0 14px 0 48px !important;
+  border-radius: 14px !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+  cursor: default !important;
+  transition: border-color .14s ease, background .14s ease, box-shadow .14s ease !important;
+}
+.df-app.theme-dark .df-plan-project-node {
+  background: #1A2029 !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.20) !important;
+}
+.df-app:not(.theme-dark) .df-plan-project-node {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(30,40,60,0.08) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+.df-app.theme-dark .df-plan-project-node:hover {
+  border-color: rgba(255,255,255,0.18) !important;
+  box-shadow: 0 4px 16px rgba(198,156,249,0.08) !important;
+}
+.df-app:not(.theme-dark) .df-plan-project-node:hover {
+  border-color: rgba(30,40,60,0.16) !important;
+  box-shadow: 0 4px 16px rgba(198,156,249,0.06) !important;
+}
+
+/* Left color bar */
+.df-app .df-plan-project-node::before,
+.df-app.theme-dark .df-plan-project-node::before,
+.df-app:not(.theme-dark) .df-plan-project-node::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 4px !important;
+  height: 30px !important;
+  border-radius: 999px !important;
+  background: var(--project-color, var(--accent-active)) !important;
+  opacity: 0.85 !important;
+  pointer-events: none !important;
+}
+
+/* Hide old color bar span */
+.df-app .df-project-color-bar,
+.df-app.theme-dark .df-project-color-bar,
+.df-app:not(.theme-dark) .df-project-color-bar {
+  display: none !important;
+}
+
+/* Project name */
+.df-app .df-project-name,
+.df-app.theme-dark .df-project-name,
+.df-app:not(.theme-dark) .df-project-name {
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  cursor: pointer !important;
+}
+.df-app.theme-dark .df-project-name { color: #F5F7FA !important; }
+.df-app:not(.theme-dark) .df-project-name { color: #111827 !important; }
+
+/* Badge */
+.df-app .df-project-badge,
+.df-app.theme-dark .df-project-badge,
+.df-app:not(.theme-dark) .df-project-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  padding: 0 7px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  flex-shrink: 0 !important;
+}
+.df-app.theme-dark .df-project-badge {
+  background: color-mix(in srgb, var(--project-color, var(--accent-active)) 16%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--project-color, var(--accent-active)) 36%, transparent) !important;
+  color: color-mix(in srgb, var(--project-color, var(--accent-active)) 85%, white) !important;
+}
+.df-app:not(.theme-dark) .df-project-badge {
+  background: color-mix(in srgb, var(--project-color, var(--accent-active)) 10%, #FFFFFF) !important;
+  border: 1px solid color-mix(in srgb, var(--project-color, var(--accent-active)) 24%, #E5E7EB) !important;
+  color: color-mix(in srgb, var(--project-color, var(--accent-active)) 70%, #374151) !important;
+}
+
+/* Project actions */
+.df-app .df-project-node-actions,
+.df-app.theme-dark .df-project-node-actions,
+.df-app:not(.theme-dark) .df-project-node-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-left: auto !important;
+  opacity: 0.4 !important;
+  transition: opacity 0.18s ease !important;
+}
+.df-app .df-plan-project-node:hover .df-project-node-actions,
+.df-app .df-plan-project-node:focus-within .df-project-node-actions,
+.df-app.theme-dark .df-plan-project-node:hover .df-project-node-actions,
+.df-app.theme-dark .df-plan-project-node:focus-within .df-project-node-actions,
+.df-app:not(.theme-dark) .df-plan-project-node:hover .df-project-node-actions,
+.df-app:not(.theme-dark) .df-plan-project-node:focus-within .df-project-node-actions {
+  opacity: 1 !important;
+}
+
+/* ━━ 任务列表（缩进在项目下方） ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-project-tasks,
+.df-app.theme-dark .df-project-tasks,
+.df-app:not(.theme-dark) .df-project-tasks {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  margin-top: 14px !important;
+  margin-left: 56px !important;
+  padding-left: 0 !important;
+}
+
+/* ━━ 任务节点 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-plan-task-node,
+.df-app.theme-dark .df-plan-task-node,
+.df-app:not(.theme-dark) .df-plan-task-node {
+  position: relative !important;
+  width: 480px !important;
+  max-width: 560px !important;
+  min-width: 420px !important;
+  flex-shrink: 0 !important;
+}
+
+.df-app .df-task-node-inner,
+.df-app.theme-dark .df-task-node-inner,
+.df-app:not(.theme-dark) .df-task-node-inner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-height: 46px !important;
+  padding: 10px 14px 10px 48px !important;
+  border-radius: 12px !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  transition: border-color .14s ease, background .14s ease, box-shadow .14s ease !important;
+}
+.df-app.theme-dark .df-task-node-inner {
+  background: #18202C !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+}
+.df-app:not(.theme-dark) .df-task-node-inner {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(30,40,60,0.08) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+}
+.df-app.theme-dark .df-task-node-inner:hover {
+  background: #202733 !important;
+  border-color: rgba(198,156,249,0.24) !important;
+  box-shadow: 0 4px 16px rgba(198,156,249,0.06) !important;
+}
+.df-app:not(.theme-dark) .df-task-node-inner:hover {
+  background: rgba(198,156,249,0.04) !important;
+  border-color: rgba(198,156,249,0.20) !important;
+  box-shadow: 0 4px 16px rgba(198,156,249,0.04) !important;
+}
+
+/* Picked state */
+.df-app .df-plan-task-node.picked .df-task-node-inner,
+.df-app.theme-dark .df-plan-task-node.picked .df-task-node-inner,
+.df-app:not(.theme-dark) .df-plan-task-node.picked .df-task-node-inner {
+  background: color-mix(in srgb, var(--accent-active) 6%, var(--surface-card)) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 34%, var(--border-subtle)) !important;
+}
+
+/* Left color stripe */
+.df-app .df-task-node-inner::before,
+.df-app.theme-dark .df-task-node-inner::before,
+.df-app:not(.theme-dark) .df-task-node-inner::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 4px !important;
+  height: 28px !important;
+  border-radius: 999px !important;
+  background: var(--project-color, var(--accent-active)) !important;
+  opacity: 0.7 !important;
+  pointer-events: none !important;
+}
+
+/* Task title */
+.df-app .df-task-title,
+.df-app.theme-dark .df-task-title,
+.df-app:not(.theme-dark) .df-task-title {
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+}
+.df-app.theme-dark .df-task-title { color: #F5F7FA !important; }
+.df-app:not(.theme-dark) .df-task-title { color: #111827 !important; }
+
+/* Subtask progress badge */
+.df-app .df-subtask-progress,
+.df-app.theme-dark .df-subtask-progress,
+.df-app:not(.theme-dark) .df-subtask-progress {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  flex-shrink: 0 !important;
+}
+.df-app.theme-dark .df-subtask-progress {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: #AAB0BD !important;
+}
+.df-app:not(.theme-dark) .df-subtask-progress {
+  background: rgba(0,0,0,0.03) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: #6B7280 !important;
+}
+
+/* Task actions */
+.df-app .df-task-node-actions,
+.df-app.theme-dark .df-task-node-actions,
+.df-app:not(.theme-dark) .df-task-node-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  opacity: 1 !important;
+}
+
+/* Chevron & Icon buttons */
+.df-app .df-task-chevron,
+.df-app .df-tree-icon-button,
+.df-app.theme-dark .df-tree-icon-button,
+.df-app.theme-dark .df-task-chevron,
+.df-app:not(.theme-dark) .df-tree-icon-button,
+.df-app:not(.theme-dark) .df-task-chevron {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  font-size: 16px !important;
+  transition: color .14s ease, background .14s ease !important;
+}
+.df-app.theme-dark .df-task-chevron,
+.df-app.theme-dark .df-tree-icon-button {
+  color: rgba(255,255,255,0.35) !important;
+}
+.df-app:not(.theme-dark) .df-task-chevron,
+.df-app:not(.theme-dark) .df-tree-icon-button {
+  color: rgba(0,0,0,0.30) !important;
+}
+.df-app.theme-dark .df-task-chevron:hover,
+.df-app.theme-dark .df-tree-icon-button:hover {
+  background: rgba(198,156,249,0.12) !important;
+  color: rgba(255,255,255,0.70) !important;
+}
+.df-app:not(.theme-dark) .df-task-chevron:hover,
+.df-app:not(.theme-dark) .df-tree-icon-button:hover {
+  background: rgba(198,156,249,0.10) !important;
+  color: rgba(0,0,0,0.60) !important;
+}
+
+.df-app .df-task-chevron,
+.df-app.theme-dark .df-task-chevron,
+.df-app:not(.theme-dark) .df-task-chevron {
+  opacity: 1 !important;
+}
+
+/* ━━ 任务分支 & 子任务列表 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-task-branch,
+.df-app.theme-dark .df-task-branch,
+.df-app:not(.theme-dark) .df-task-branch {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.df-app .df-subtask-list,
+.df-app.theme-dark .df-subtask-list,
+.df-app:not(.theme-dark) .df-subtask-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-top: 6px !important;
+  margin-left: 36px !important;
+  padding-left: 0 !important;
+  position: relative !important;
+  width: auto !important;
+}
+
+/* ━━ 子任务节点 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-plan-subtask-node,
+.df-app.theme-dark .df-plan-subtask-node,
+.df-app:not(.theme-dark) .df-plan-subtask-node {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 420px !important;
+  max-width: 440px !important;
+  min-width: 320px !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 12px 0 36px !important;
+  border-radius: 10px !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  transition: border-color .14s ease, background .14s ease !important;
+}
+.df-app.theme-dark .df-plan-subtask-node {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+.df-app:not(.theme-dark) .df-plan-subtask-node {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.08) !important;
+}
+.df-app.theme-dark .df-plan-subtask-node:hover {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-plan-subtask-node:hover {
+  background: #FFFFFF !important;
+  border-color: color-mix(in srgb, var(--accent-active) 28%, rgba(15,23,42,0.12)) !important;
+}
+
+.df-app .df-plan-subtask-node.done,
+.df-app.theme-dark .df-plan-subtask-node.done,
+.df-app:not(.theme-dark) .df-plan-subtask-node.done {
+  opacity: 0.45 !important;
+}
+.df-app .df-plan-subtask-node.done .df-subtask-title,
+.df-app.theme-dark .df-plan-subtask-node.done .df-subtask-title,
+.df-app:not(.theme-dark) .df-plan-subtask-node.done .df-subtask-title {
+  text-decoration: line-through !important;
+  color: var(--text-faint) !important;
+}
+
+/* Subtask left indicator (subtle) */
+.df-app .df-plan-subtask-node::before,
+.df-app.theme-dark .df-plan-subtask-node::before,
+.df-app:not(.theme-dark) .df-plan-subtask-node::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 2px !important;
+  height: 18px !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--project-color, var(--accent-active)) 45%, transparent) !important;
+  pointer-events: none !important;
+}
+
+/* Subtask checkbox */
+.df-app .df-subtask-check,
+.df-app.theme-dark .df-subtask-check,
+.df-app:not(.theme-dark) .df-subtask-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  padding: 0 !important;
+  transition: border-color 0.15s ease, background 0.15s ease !important;
+}
+.df-app.theme-dark .df-subtask-check {
+  border: 1.5px solid rgba(255,255,255,0.20) !important;
+  background: transparent !important;
+  color: transparent !important;
+}
+.df-app:not(.theme-dark) .df-subtask-check {
+  border: 1.5px solid rgba(0,0,0,0.20) !important;
+  background: transparent !important;
+  color: transparent !important;
+}
+.df-app.theme-dark .df-subtask-check:hover {
+  border-color: rgba(255,255,255,0.40) !important;
+}
+.df-app:not(.theme-dark) .df-subtask-check:hover {
+  border-color: rgba(0,0,0,0.40) !important;
+}
+.df-app .df-subtask-check.done,
+.df-app.theme-dark .df-subtask-check.done,
+.df-app:not(.theme-dark) .df-subtask-check.done {
+  background: var(--project-color, var(--accent-active)) !important;
+  border-color: transparent !important;
+  color: #FFFFFF !important;
+}
+
+/* Subtask title */
+.df-app .df-subtask-title,
+.df-app.theme-dark .df-subtask-title,
+.df-app:not(.theme-dark) .df-subtask-title {
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+}
+.df-app.theme-dark .df-subtask-title { color: #D8DCE6 !important; }
+.df-app:not(.theme-dark) .df-subtask-title { color: #4B5563 !important; }
+
+/* ━━ Show more button ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-subtask-show-more,
+.df-app.theme-dark .df-subtask-show-more,
+.df-app:not(.theme-dark) .df-subtask-show-more {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px 12px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  cursor: pointer !important;
+  transition: border-color .14s ease, color .14s ease !important;
+  background: transparent !important;
+  margin-left: 36px !important;
+}
+.df-app.theme-dark .df-subtask-show-more {
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: rgba(255,255,255,0.40) !important;
+}
+.df-app:not(.theme-dark) .df-subtask-show-more {
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.40) !important;
+}
+.df-app .df-subtask-show-more:hover,
+.df-app.theme-dark .df-subtask-show-more:hover,
+.df-app:not(.theme-dark) .df-subtask-show-more:hover {
+  border-color: color-mix(in srgb, var(--accent-active) 35%, var(--border-subtle)) !important;
+  color: color-mix(in srgb, var(--accent-active) 80%, var(--text-main)) !important;
+}
+
+/* ━━ SVG 连接线 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-tree-svg,
+.df-app.theme-dark .df-tree-svg,
+.df-app:not(.theme-dark) .df-tree-svg {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  overflow: visible !important;
+}
+.df-app .df-tree-line,
+.df-app.theme-dark .df-tree-line,
+.df-app:not(.theme-dark) .df-tree-line {
+  fill: none !important;
+  stroke-width: 1px !important;
+}
+.df-app.theme-dark .df-tree-line.trunk {
+  stroke: rgba(190,220,140,0.16) !important;
+}
+.df-app:not(.theme-dark) .df-tree-line.trunk {
+  stroke: rgba(120,140,90,0.16) !important;
+}
+.df-app.theme-dark .df-tree-line.branch {
+  stroke: rgba(190,220,140,0.10) !important;
+}
+.df-app:not(.theme-dark) .df-tree-line.branch {
+  stroke: rgba(120,140,90,0.10) !important;
+}
+.df-app.theme-dark .df-tree-line.subtask-line {
+  stroke: rgba(255,255,255,0.08) !important;
+}
+.df-app:not(.theme-dark) .df-tree-line.subtask-line {
+  stroke: rgba(0,0,0,0.08) !important;
+}
+
+/* ━━ Tooltip ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-tree-tooltip,
+.df-app.theme-dark .df-tree-tooltip,
+.df-app:not(.theme-dark) .df-tree-tooltip {
+  position: fixed !important;
+  transform: translate(-50%, -100%) !important;
+  padding: 5px 10px !important;
+  border-radius: 7px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  max-width: 360px !important;
+}
+.df-app.theme-dark .df-tree-tooltip {
+  background: #20242D !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: #F5F7FA !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.40) !important;
+}
+.df-app:not(.theme-dark) .df-tree-tooltip {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E7EB !important;
+  color: #111827 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+}
+
+/* ━━ 右键菜单 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-app .df-tree-menu,
+.df-app.theme-dark .df-tree-menu,
+.df-app:not(.theme-dark) .df-tree-menu {
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  right: 0 !important;
+  z-index: 200 !important;
+  min-width: 160px !important;
+  padding: 4px !important;
+  border-radius: 12px !important;
+}
+.df-app.theme-dark .df-tree-menu {
+  background: #20242D !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: 0 16px 36px rgba(0,0,0,0.32) !important;
+}
+.df-app:not(.theme-dark) .df-tree-menu {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E7EB !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
+}
+
+.df-app .df-tree-menu button,
+.df-app.theme-dark .df-tree-menu button,
+.df-app:not(.theme-dark) .df-tree-menu button {
+  display: block !important;
+  width: 100% !important;
+  padding: 7px 12px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  font-size: 13px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: background .1s ease !important;
+}
+.df-app.theme-dark .df-tree-menu button { color: #F5F7FA !important; }
+.df-app:not(.theme-dark) .df-tree-menu button { color: #111827 !important; }
+.df-app.theme-dark .df-tree-menu button:hover {
+  background: rgba(198,156,249,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-tree-menu button:hover {
+  background: rgba(198,156,249,0.08) !important;
+}
+.df-app .df-tree-menu button.danger,
+.df-app.theme-dark .df-tree-menu button.danger,
+.df-app:not(.theme-dark) .df-tree-menu button.danger {
+  color: #EF4444 !important;
+}
+
+
+.df-app .df-pick-panel,
+.df-app.theme-dark .df-pick-panel,
+.df-app:not(.theme-dark) .df-pick-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  padding: 16px 18px !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--surface-main) !important;
+  border: 1px solid var(--border-subtle) !important;
+  box-shadow: var(--shadow-soft) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  min-height: 0 !important;
+}
+
+.df-app .df-pick-panel-head,
+.df-app.theme-dark .df-pick-panel-head,
+.df-app:not(.theme-dark) .df-pick-panel-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+.df-app .df-pick-panel-head strong,
+.df-app.theme-dark .df-pick-panel-head strong,
+.df-app:not(.theme-dark) .df-pick-panel-head strong {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+}
+
+.df-app .df-pick-panel-head span,
+.df-app.theme-dark .df-pick-panel-head span,
+.df-app:not(.theme-dark) .df-pick-panel-head span {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.df-app .df-pick-empty,
+.df-app.theme-dark .df-pick-empty,
+.df-app:not(.theme-dark) .df-pick-empty {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 100px !important;
+  padding: 24px 20px !important;
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
+  border: 1px dashed var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  background: transparent !important;
+  margin: 0 !important;
+}
+
+.df-app .df-pick-group,
+.df-app.theme-dark .df-pick-group,
+.df-app:not(.theme-dark) .df-pick-group {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+  padding-right: 2px !important;
+}
+
+.df-app .df-pick-group h3,
+.df-app.theme-dark .df-pick-group h3,
+.df-app:not(.theme-dark) .df-pick-group h3 {
+  margin: 0 0 6px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+}
+
+.df-app .df-pick-group small,
+.df-app.theme-dark .df-pick-group small,
+.df-app:not(.theme-dark) .df-pick-group small {
+  display: block !important;
+  margin-bottom: 8px !important;
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.df-app .df-pick-card,
+.df-app.theme-dark .df-pick-card,
+.df-app:not(.theme-dark) .df-pick-card {
+  padding: 10px 12px !important;
+  margin-bottom: 6px !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 22%, var(--border-subtle)) !important;
+  background: var(--surface-card) !important;
+  transition: border-color .14s ease !important;
+}
+.df-app .df-pick-card:hover,
+.df-app.theme-dark .df-pick-card:hover,
+.df-app:not(.theme-dark) .df-pick-card:hover {
+  border-color: color-mix(in srgb, var(--accent-active) 42%, var(--border-subtle)) !important;
+}
+
+.df-app .df-pick-card strong,
+.df-app.theme-dark .df-pick-card strong,
+.df-app:not(.theme-dark) .df-pick-card strong {
+  display: block !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+}
+
+.df-app .df-pick-card span,
+.df-app.theme-dark .df-pick-card span,
+.df-app:not(.theme-dark) .df-pick-card span {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.df-app .df-pick-card select,
+.df-app .df-pick-card button,
+.df-app.theme-dark .df-pick-card select,
+.df-app.theme-dark .df-pick-card button,
+.df-app:not(.theme-dark) .df-pick-card select,
+.df-app:not(.theme-dark) .df-pick-card button {
+  padding: 4px 8px !important;
+  border-radius: 7px !important;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 24%, var(--border-subtle)) !important;
+  background: var(--surface-card) !important;
+  color: var(--text-main) !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+}
+
+/* 鈹€鈹€ 鍊欓€夐潰鏉垮簳閮ㄦ寜锟?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.df-app .df-pick-actions,
+.df-app.theme-dark .df-pick-actions,
+.df-app:not(.theme-dark) .df-pick-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--border-subtle) !important;
+  flex-shrink: 0 !important;
+}
+
+.df-app .df-pick-actions button,
+.df-app.theme-dark .df-pick-actions button,
+.df-app:not(.theme-dark) .df-pick-actions button {
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-soft) !important;
+  background: var(--surface-card) !important;
+  color: var(--text-main) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: background .12s ease, border-color .12s ease !important;
+}
+.df-app .df-pick-actions button:hover:not(:disabled),
+.df-app.theme-dark .df-pick-actions button:hover:not(:disabled),
+.df-app:not(.theme-dark) .df-pick-actions button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-active) 10%, var(--surface-card)) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 34%, var(--border-soft)) !important;
+}
+
+.df-app .df-pick-actions button.primary,
+.df-app.theme-dark .df-pick-actions button.primary,
+.df-app:not(.theme-dark) .df-pick-actions button.primary {
+  background: var(--accent-active) !important;
+  color: var(--accent-on, #111827) !important;
+  border-color: var(--accent-active) !important;
+  font-weight: 600 !important;
+}
+
+.df-app .df-pick-actions button.light,
+.df-app.theme-dark .df-pick-actions button.light,
+.df-app:not(.theme-dark) .df-pick-actions button.light {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  border-color: transparent !important;
+}
+
+.df-app .df-pick-actions button:disabled,
+.df-app.theme-dark .df-pick-actions button:disabled,
+.df-app:not(.theme-dark) .df-pick-actions button:disabled {
+  opacity: .4 !important;
+  cursor: not-allowed !important;
+}
+
+/* 鈹€鈹€ 鎸戦€夋ā寮忔í锟?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.df-app .df-pick-banner,
+.df-app.theme-dark .df-pick-banner,
+.df-app:not(.theme-dark) .df-pick-banner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  margin-bottom: 12px !important;
+  border-radius: var(--radius-md) !important;
+  background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-card)) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 22%, var(--border-subtle)) !important;
+}
+
+.df-app .df-pick-banner strong,
+.df-app.theme-dark .df-pick-banner strong,
+.df-app:not(.theme-dark) .df-pick-banner strong {
+  display: block !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+}
+
+.df-app .df-pick-banner span,
+.df-app.theme-dark .df-pick-banner span,
+.df-app:not(.theme-dark) .df-pick-banner span {
+  display: block !important;
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+  margin-top: 2px !important;
+}
+
+.df-app .df-pick-banner button,
+.df-app.theme-dark .df-pick-banner button,
+.df-app:not(.theme-dark) .df-pick-banner button {
+  padding: 6px 14px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-soft) !important;
+  background: var(--surface-card) !important;
+  color: var(--text-main) !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+
+/* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?
+   闅愯棌鏃犵敤鐨勬棫鏍峰紡閫夋嫨锟?
+   鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?*/
+.df-app .df-plan-project-node .project-root,
+.df-app .df-project-title-btn,
+.df-app .df-planning .df-picked-badge,
+.df-app .df-planning .pending-task-badge,
+.df-app .df-planning .project-root,
+.df-app .df-planning .tree-project-edit-hit,
+.df-app .df-planning .tree-collapse-control,
+.df-app .df-planning .mindmap-subtasks,
+.df-app .df-planning .structured-tree-board,
+.df-app .df-planning .structured-tree-inner {
+  display: none !important;
+}
+
+/* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?
+   鍝嶅簲锟?
+   鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?*/
+@media (max-width: 1280px) {
+  .df-app .df-plan-task-node,
+  .df-app.theme-dark .df-plan-task-node,
+  .df-app:not(.theme-dark) .df-plan-task-node {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .df-app .df-plan-subtask-node,
+  .df-app.theme-dark .df-plan-subtask-node,
+  .df-app:not(.theme-dark) .df-plan-subtask-node {
+    width: calc(100% - 24px) !important;
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .df-app .df-mindmap.no-root,
+  .df-app.theme-dark .df-mindmap.no-root,
+  .df-app:not(.theme-dark) .df-mindmap.no-root {
+    display: block !important;
+  }
+}
+
+/* ===== 规划页浅色模式精调 ===== */
+.df-app:not(.theme-dark) .df-planning {
+  background: #FAFBFC !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-panel {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.10) !important;
+  box-shadow: 0 8px 20px rgba(15,23,42,0.04) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-task-node-inner {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.10) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-plan-project-node {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.12) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-plan-subtask-node {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.08) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-plan-subtask-node:hover {
+  background: #FFFFFF !important;
+  border-color: color-mix(in srgb, var(--accent-active) 28%, rgba(15,23,42,0.12)) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-tree-line.trunk {
+  stroke: rgba(15,23,42,0.16) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-tree-line.branch {
+  stroke: rgba(15,23,42,0.10) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-tree-line.subtask-line {
+  stroke: rgba(15,23,42,0.08) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-category-branch {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-tree-menu {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.12) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-tree-menu button {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-tree-menu button:hover {
+  background: color-mix(in srgb, var(--accent-active) 8%, #FFFFFF) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-card {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.10) !important;
+  box-shadow: 0 8px 20px rgba(15,23,42,0.04) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-panel-head strong {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-group h3 {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-card strong {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-task-title {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-project-name {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-subtask-title {
+  color: #4B5563 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-banner {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.10) !important;
+  box-shadow: 0 4px 16px rgba(15,23,42,0.04) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-banner button {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-subtask-progress {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.10) !important;
+  color: #4B5563 !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-actions button {
+  background: #FFFFFF !important;
+  border-color: rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-planning .df-pick-actions button.primary {
+  border-color: var(--accent-active) !important;
+}
+
+/* ===== 浅色模式全局组件统一 (白底+细描边) ===== */
+.df-app:not(.theme-dark) input[type="text"],
+.df-app:not(.theme-dark) input[type="search"],
+.df-app:not(.theme-dark) input[type="date"],
+.df-app:not(.theme-dark) input[type="time"],
+.df-app:not(.theme-dark) textarea,
+.df-app:not(.theme-dark) select {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.12) !important;
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-detail-more {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.12) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-detail-more button {
+  background: transparent !important;
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-detail-more button:hover {
+  background: color-mix(in srgb, var(--accent-active) 8%, #FFFFFF) !important;
+}
+.df-app:not(.theme-dark) .df-drawer-project-list {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.12) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-drawer-project-list button {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-drawer-project-list button:hover {
+  background: color-mix(in srgb, var(--accent-active) 8%, #FFFFFF) !important;
+}
+.df-app:not(.theme-dark) .df-detail-section {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.10) !important;
+}
+
+/* ===== 执行页浅色模式 (候选卡片 + 快速添加) ===== */
+.df-app:not(.theme-dark) .df-task-card {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.10) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+.df-app:not(.theme-dark) .df-task-card:hover {
+  background: #FFFFFF !important;
+  border-color: color-mix(in srgb, var(--accent-active) 35%, rgba(15,23,42,0.12)) !important;
+  box-shadow: 0 8px 22px rgba(15,23,42,0.06) !important;
+}
+.df-app:not(.theme-dark) .df-candidate-panel {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.10) !important;
+  box-shadow: 0 8px 20px rgba(15,23,42,0.04) !important;
+}
+.df-app:not(.theme-dark) .df-candidate-title,
+.df-app:not(.theme-dark) .df-task-card strong {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.10) !important;
+  box-shadow: 0 -4px 16px rgba(15,23,42,0.04) !important;
+}
+.df-app:not(.theme-dark) .df-quick-add input {
+  background: transparent !important;
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add input::placeholder {
+  color: #8B93A7 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add select {
+  color: #4B5563 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-submit:disabled {
+  background: #FFFFFF !important;
+  color: rgba(15,23,42,0.30) !important;
+  border: 1px solid rgba(15,23,42,0.08) !important;
+  box-shadow: none !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-input-box {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.12) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-input-box input {
+  background: transparent !important;
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-input-box input::placeholder {
+  color: #8B93A7 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-project-menu {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15,23,42,0.12) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,0.12) !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-project-menu button {
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-project-menu button:hover {
+  background: color-mix(in srgb, var(--accent-active) 8%, #FFFFFF) !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-confirm:not(:disabled) {
+  background: var(--accent-active) !important;
+  color: #FFFFFF !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-confirm:disabled {
+  opacity: 0.30 !important;
+  cursor: not-allowed !important;
+}
+
+.df-app:not(.theme-dark) .df-timeline-allday {
+  background: #FFFFFF;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+}
+.df-app:not(.theme-dark) .df-timeline-allday.drag-over {
+  background: #FFFFFF;
+  border-bottom-color: rgba(15, 23, 42, 0.16);
+}
+.df-app:not(.theme-dark) .df-timeline-allday-label {
+  background: #FFFFFF;
+  color: #64748B;
+}
+
+/* ===== 全天栏浅色模式 ===== */
+.df-app:not(.theme-dark) .df-all-day-bar {
+  background: #FFFFFF;
+  border: 0;
+  border-bottom: 1px solid rgba(15,23,42,0.10);
+  border-radius: 0;
+  box-shadow: none;
+}
+.df-app:not(.theme-dark) .df-all-day-block {
+  background: #FFFFFF;
+  border: 1px solid rgba(15,23,42,0.10);
+}
+.df-app:not(.theme-dark) .df-all-day-block:hover {
+  background: #FFFFFF;
+  border-color: color-mix(in srgb, var(--accent-active) 30%, rgba(15,23,42,0.12));
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+.df-app:not(.theme-dark) .df-timeline-3day-allday {
+  background: #FFFFFF;
+  border: 0;
+  border-bottom: 1px solid rgba(15,23,42,0.10);
+}
+.df-app:not(.theme-dark) .df-all-day-quick {
+  background: #FFFFFF;
+  border: 1px solid rgba(15,23,42,0.10);
+}
+
+/* ===== 分栏拖拽分隔条 ===== */
+.df-app .df-planning-body,
+.df-app.theme-dark .df-planning-body,
+.df-app:not(.theme-dark) .df-planning-body {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+.df-app .df-mindmap.no-root,
+.df-app.theme-dark .df-mindmap.no-root,
+.df-app:not(.theme-dark) .df-mindmap.no-root {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: auto !important;
+  position: relative !important;
+}
+.df-app .df-splitter,
+.df-app.theme-dark .df-splitter,
+.df-app:not(.theme-dark) .df-splitter {
+  width: 10px !important;
+  cursor: col-resize !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 20 !important;
+  background: transparent !important;
+  margin: 0 -2px !important;
+  user-select: none !important;
+}
+.df-app .df-splitter::before,
+.df-app.theme-dark .df-splitter::before,
+.df-app:not(.theme-dark) .df-splitter::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 2px !important;
+  background: color-mix(in srgb, var(--accent-active) 8%, var(--border-subtle)) !important;
+  border-radius: 2px !important;
+  transition: background .14s ease !important;
+}
+.df-app .df-splitter:hover::before,
+.df-app .df-splitter:active::before,
+.df-app.theme-dark .df-splitter:hover::before,
+.df-app.theme-dark .df-splitter:active::before,
+.df-app:not(.theme-dark) .df-splitter:hover::before,
+.df-app:not(.theme-dark) .df-splitter:active::before {
+  background: color-mix(in srgb, var(--accent-active) 38%, var(--text-muted)) !important;
+}
+.df-app .df-pick-panel,
+.df-app.theme-dark .df-pick-panel,
+.df-app:not(.theme-dark) .df-pick-panel {
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
 }
