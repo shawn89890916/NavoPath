@@ -2628,15 +2628,18 @@ function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNul
   const [input, setInput] = useState("");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectQuery, setProjectQuery] = useState("");
-  const popupRef = useRef<HTMLDivElement>(null);
+  const inputBoxRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Dismiss on click outside
+  // Dismiss on click outside BOTH input box and project menu
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) onCancel();
+      const t = e.target as Node;
+      if (inputBoxRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      onCancel();
     };
     const timer = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
     return () => { window.clearTimeout(timer); document.removeEventListener("mousedown", handler); };
@@ -2679,71 +2682,52 @@ function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNul
   const placeholder = compact ? "任务名" : "输入任务名，#选择项目";
 
   // Clamp popup position to viewport; use column-aligned width
-  const POPUP_H = compact ? 38 : 48;
+  const INPUT_H = 36;
   const GAP = 8;
   const popW = Math.min(add.width || 300, window.innerWidth - GAP * 2);
   let left = Math.min(add.left, window.innerWidth - popW - GAP);
   left = Math.max(left, GAP);
-  let top = Math.min(add.top, window.innerHeight - POPUP_H - 60);
+  let top = Math.min(add.top, window.innerHeight - INPUT_H - 60);
   top = Math.max(top, GAP);
 
+  // Project menu position (sibling, below input box)
+  const MENU_LEFT = left;
+  const menuTop = top + INPUT_H + 6;
+  const menuWidth = Math.max(220, popW);
+  let menuLeft = MENU_LEFT;
+  if (menuLeft + menuWidth > window.innerWidth - 8) {
+    menuLeft = window.innerWidth - menuWidth - 8;
+  }
+
   return (
-    <div ref={popupRef} className="df-floating-quick-add"
-      style={{
-        position: "fixed", top, left, width: popW, zIndex: 999999,
-        background: "var(--surface-card)",
-        border: "1px solid color-mix(in srgb, var(--accent-active) 28%, var(--border-subtle))",
-        boxShadow: "0 16px 36px rgba(0,0,0,0.32)",
-        borderRadius: "14px", padding: compact ? "4px 6px" : "10px 12px",
-        overflow: "hidden",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: compact ? "3px" : "8px", minWidth: 0 }}>
+    <>
+      {/* Input box — independent floating layer */}
+      <div ref={inputBoxRef} className="df-quick-add-input-box"
+        style={{
+          position: "fixed", top, left, width: popW, height: INPUT_H, zIndex: 999999,
+        }}
+      >
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
-          placeholder={placeholder}
-          style={{
-            flex: 1, minWidth: 0,
-            border: "none",
-            borderBottom: `2px solid color-mix(in srgb, var(--accent-active) 50%, transparent)`,
-            background: "transparent", color: "var(--text-main)",
-            fontSize: compact ? "12px" : "14px", padding: compact ? "2px 0" : "4px 0", outline: "none",
-            borderRadius: 0,
-          }} />
+          placeholder={placeholder} />
         <button onClick={handleSave}
           disabled={!input.replace(/#[^\s#]+/g, "").trim()}
-          style={{
-            width: compact ? "22px" : "30px", height: compact ? "22px" : "30px",
-            minWidth: compact ? "22px" : "30px",
-            border: "none", borderRadius: "50%",
-            background: input.replace(/#[^\s#]+/g, "").trim() ? "var(--accent-active)" : "var(--border-soft)",
-            color: input.replace(/#[^\s#]+/g, "").trim() ? "var(--accent-on, #fff)" : "var(--text-faint)",
-            fontSize: compact ? "13px" : "16px", cursor: "pointer", display: "flex",
-            alignItems: "center", justifyContent: "center", flexShrink: 0,
-            padding: 0,
-          }}>✓</button>
+          className="df-quick-add-confirm">✓</button>
       </div>
+      {/* Project menu — independent floating layer (sibling, not child) */}
       {showProjectMenu && filtered.length > 0 && (
-        <div style={{
-          position: "absolute", top: "100%", left: "12px", right: "12px",
-          marginTop: "4px", background: "var(--surface-card)",
-          border: "1px solid var(--border-soft)", borderRadius: "10px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.18)", maxHeight: "200px", overflowY: "auto", zIndex: 10000,
-        }}>
+        <div ref={menuRef} className="df-quick-add-project-menu"
+          style={{
+            position: "fixed", top: menuTop, left: menuLeft, width: menuWidth, zIndex: 1000000,
+          }}
+        >
           {filtered.map((p) => (
             <button key={p.id} onMouseDown={(e) => { e.preventDefault(); selectProject(p); }}
-              style={{
-                display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
-                border: "none", background: "transparent", color: "var(--text-main)",
-                cursor: "pointer", fontSize: "14px",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "color-mix(in srgb, var(--accent-active) 12%, var(--surface-card))")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >#{p.title}</button>
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -2752,14 +2736,17 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
   const [input, setInput] = useState("");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectQuery, setProjectQuery] = useState("");
-  const popupRef = useRef<HTMLDivElement>(null);
+  const inputBoxRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) onCancel();
+      const t = e.target as Node;
+      if (inputBoxRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      onCancel();
     };
     const timer = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
     return () => { window.clearTimeout(timer); document.removeEventListener("mousedown", handler); };
@@ -2798,7 +2785,7 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
     : [];
 
   // Align popover with the column
-  const POPUP_H = 42;
+  const INPUT_H = 36;
   let pos: "absolute" | "fixed" | "relative" = "fixed";
   let top: number | undefined;
   let left: number | string | undefined;
@@ -2813,23 +2800,29 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
     top = add.top;
     left = add.left;
     width = add.width;
-    if (top! + POPUP_H + 60 > window.innerHeight) {
-      top = add.top - POPUP_H - 8;
+    if (top! + INPUT_H + 60 > window.innerHeight) {
+      top = add.top - INPUT_H - 8;
     }
     top = Math.max(top!, 8);
   }
 
-  // Compact mode: narrow column (week view) → tighter UI
+  // Compact mode
   const compact = !absolute && typeof width === "number" && width < 110;
   const placeholder = compact ? "任务名" : "输入任务名，#选择项目";
 
+  // Menu position (independent sibling layer)
+  const menuTop = typeof top === "number" ? top + INPUT_H + 6 : 0;
+  const menuWidth = typeof width === "number" ? Math.max(220, width) : 220;
+  let menuLeft = typeof left === "number" ? left : 8;
+  if (menuLeft + menuWidth > window.innerWidth - 8) {
+    menuLeft = window.innerWidth - menuWidth - 8;
+  }
+
   const popup = (
-    <div ref={popupRef} className="df-quick-add-popover"
-      style={{
-        position: pos, top, left, width, zIndex: 999999,
-      } as React.CSSProperties}
-    >
-      <div className={`df-quick-add-row${compact ? " compact" : ""}`}>
+    <>
+      <div ref={inputBoxRef} className="df-quick-add-input-box"
+        style={{ position: pos, top, left, width, height: INPUT_H, zIndex: 999999 } as React.CSSProperties}
+      >
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
           placeholder={placeholder} />
@@ -2838,14 +2831,18 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
           className="df-quick-add-confirm">✓</button>
       </div>
       {showProjectMenu && filtered.length > 0 && (
-        <div className="df-quick-add-project-menu">
+        <div ref={menuRef} className="df-quick-add-project-menu"
+          style={{
+            position: "fixed", top: menuTop, left: menuLeft, width: menuWidth, zIndex: 1000000,
+          }}
+        >
           {filtered.map((p) => (
             <button key={p.id} onMouseDown={(e) => { e.preventDefault(); selectProject(p); }}
             >#{p.title}</button>
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 
   if (absolute) return popup;
