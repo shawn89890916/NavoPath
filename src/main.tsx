@@ -888,6 +888,20 @@ function App() {
     container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
   }, [mode, data, selectedDate, timelineView]);
 
+  // Forward wheel events from the full timeline panel area to the scroll container
+  useEffect(() => {
+    const panel = document.getElementById("df-execute-timeline");
+    if (!panel) return;
+    const handler = (e: WheelEvent) => {
+      const scroller = panel.querySelector(".df-timeline-scroll, .df-timeline-3day-scroll") as HTMLElement | null;
+      if (!scroller) return;
+      e.preventDefault();
+      scroller.scrollTop += e.deltaY;
+    };
+    panel.addEventListener("wheel", handler, { passive: false });
+    return () => panel.removeEventListener("wheel", handler);
+  }, []);
+
   useEffect(() => {
     if (!quickSchedule) return;
     const cancelQuickSchedule = (event: MouseEvent) => {
@@ -1867,7 +1881,7 @@ function App() {
             </form>
           </section>
 
-          <section className="df-timeline-panel">
+          <section className="df-timeline-panel" id="df-execute-timeline">
             <button className="df-date-arrow left" aria-label="前一段" onClick={() => shiftTimeline(-1)}>‹</button>
             <button className="df-date-arrow right" aria-label="后一段" onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">

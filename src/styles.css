@@ -2082,6 +2082,39 @@
 .df-app.theme-dark .df-ai-panel strong {
   color: #f4f4f5;
 }
+.df-app.theme-dark .df-ai-panel .df-icon-action,
+.df-app.theme-dark .df-ai-panel button:not([class*="primary"]) {
+  background: rgba(255,255,255,0.06);
+  color: #a1a1aa;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.df-app.theme-dark .df-ai-panel .df-icon-action:hover,
+.df-app.theme-dark .df-ai-panel button:not([class*="primary"]):hover {
+  background: rgba(255,255,255,0.12);
+  color: #f4f4f5;
+}
+
+/* ── Drawer actions dark mode ── */
+.df-app.theme-dark .df-link {
+  color: #a1a1aa !important;
+}
+.df-app.theme-dark .df-link:hover {
+  color: #c69cf9 !important;
+}
+.df-app.theme-dark .df-drawer-actions .primary {
+  background: var(--mode-primary, #C69CF9) !important;
+  color: #09090b !important;
+  border: 1px solid var(--mode-primary, #C69CF9) !important;
+}
+.df-app.theme-dark .df-icon-action.i-next {
+  background: rgba(255,255,255,0.06) !important;
+  color: #a1a1aa !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+.df-app.theme-dark .df-icon-action.i-next:hover {
+  background: rgba(255,255,255,0.12) !important;
+  color: #f4f4f5 !important;
+}
 
 /* ── FAB buttons dark mode ── */
 .df-app.theme-dark .df-add-fab {
