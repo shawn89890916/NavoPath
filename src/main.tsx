@@ -2827,55 +2827,20 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
     <div ref={popupRef} className="df-quick-add-popover"
       style={{
         position: pos, top, left, width, zIndex: 999999,
-        background: "var(--surface-card)",
-        border: "1px solid color-mix(in srgb, var(--accent-active) 28%, var(--border-subtle))",
-        boxShadow: "0 16px 36px rgba(0,0,0,0.32)",
-        borderRadius: "12px", padding: compact ? "4px 6px" : "8px 10px",
-        overflow: "hidden",
-        "--quick-add-width": typeof width === "number" ? `${width}px` : width,
       } as React.CSSProperties}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: compact ? "3px" : "6px", minWidth: 0 }}>
+      <div className={`df-quick-add-row${compact ? " compact" : ""}`}>
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
-          placeholder={placeholder}
-          style={{
-            flex: 1, minWidth: 0,
-            borderTop: "none", borderRight: "none", borderLeft: "none",
-            borderBottom: "2px solid color-mix(in srgb, var(--accent-active) 50%, transparent)",
-            background: "transparent", color: "var(--text-main)",
-            fontSize: compact ? "12px" : "13px", padding: compact ? "2px 0" : "3px 0", outline: "none",
-            borderRadius: 0,
-          }} />
+          placeholder={placeholder} />
         <button onClick={handleSave}
           disabled={!input.trim()}
-          style={{
-            width: compact ? "22px" : "28px", height: compact ? "22px" : "28px", minWidth: compact ? "22px" : "28px",
-            border: "none", borderRadius: "50%",
-            background: input.trim() ? "var(--accent-active)" : "var(--surface-soft, #242936)",
-            color: input.trim() ? "var(--accent-on, #fff)" : "var(--text-faint)",
-            fontSize: "14px", cursor: "pointer", display: "flex",
-            alignItems: "center", justifyContent: "center", flexShrink: 0,
-            padding: 0, lineHeight: 1,
-          }}>✓</button>
+          className="df-quick-add-confirm">✓</button>
       </div>
       {showProjectMenu && filtered.length > 0 && (
-        <div style={{
-          position: "absolute", top: "100%", left: "10px", right: "10px",
-          marginTop: "4px", background: "var(--surface-card)",
-          border: "1px solid color-mix(in srgb, var(--accent-active) 22%, var(--border-subtle))",
-          borderRadius: "8px",
-          boxShadow: "0 12px 28px rgba(0,0,0,0.28)", maxHeight: "180px", overflowY: "auto", zIndex: 1000000,
-        }}>
+        <div className="df-quick-add-project-menu">
           {filtered.map((p) => (
             <button key={p.id} onMouseDown={(e) => { e.preventDefault(); selectProject(p); }}
-              style={{
-                display: "block", width: "100%", textAlign: "left", padding: "6px 10px",
-                border: "none", background: "transparent", color: "var(--text-main)",
-                cursor: "pointer", fontSize: "13px",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "color-mix(in srgb, var(--accent-active) 12%, var(--surface-card))")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >#{p.title}</button>
           ))}
         </div>
