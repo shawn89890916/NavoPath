@@ -9787,9 +9787,8 @@ body.df-resizing, body.df-resizing * {
   border: 1px solid color-mix(in srgb, var(--accent-active) 42%, #E5E7EB);
   box-shadow: 0 8px 24px rgba(17,24,39,0.10);
   border-radius: 12px;
-  pointer-events: none;
   z-index: 99998;
-  overflow: hidden;
+  overflow: visible;
 }
 .df-app.theme-dark .drag-create-preview {
   background: color-mix(in srgb, var(--accent-active) 14%, var(--surface-card, #20242D));
@@ -9797,9 +9796,6 @@ body.df-resizing, body.df-resizing * {
   box-shadow: 0 14px 30px rgba(0,0,0,0.28);
 }
 .drag-create-preview-time {
-  position: absolute;
-  top: 6px;
-  left: 10px;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-secondary, #6B7280);
@@ -9813,11 +9809,28 @@ body.df-resizing, body.df-resizing * {
   color: var(--text-secondary, #9CA3AF);
 }
 
-/* Quick-add popover shown after drag-create commits */
+/* Quick-add shown ON TOP of drag-create preview box (nested inside it) */
 .drag-create-quick-add {
-  border-radius: 12px;
+  border-radius: 12px 12px 0 0;
   z-index: 99999;
-  overflow: hidden;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+  color: #111827;
+}
+.df-app.theme-dark .drag-create-quick-add {
+  background: #20242D;
+  color: #F5F7FA;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.drag-create-quick-add input {
+  background: transparent;
+  color: inherit;
+}
+.drag-create-quick-add input::placeholder {
+  color: #8B93A7;
+}
+.df-app.theme-dark .drag-create-quick-add input::placeholder {
+  color: #8B93A3;
 }
 
 .blob-accent,

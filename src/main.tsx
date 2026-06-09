@@ -2217,30 +2217,36 @@ function App() {
                                 {/* Empty state */}
                                 {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
                               </div>
-                              {dragCreate && dragCreate.committed && (
-                                <DragCreateQuickAdd state={dragCreate} projects={projects}
-                                  onSave={(title, projectId) => {
-                                    if (!data) return;
-                                    const { date, startMinutes, endMinutes } = dragCreate;
-                                    const startTime = minutesToTime(startMinutes);
-                                    const endTime = minutesToTime(endMinutes);
-                                    const estimatedH = (endMinutes - startMinutes) / 60;
-                                    const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
-                                    void saveData({
-                                      ...data,
-                                      tasks: [...data.tasks, { ...task, plannedForDate: date, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
-                                    });
-                                    setDragCreate(null);
-                                    showToast("已添加到时间轴");
-                                  }}
-                                  onCancel={() => setDragCreate(null)}
-                                />
-                              )}
-                              {dragCreate && !dragCreate.committed && (
-                                <div className="drag-create-preview"
-                                  style={{ position: "absolute", pointerEvents: "none", zIndex: 99998, borderRadius: "12px",
-                                    top: `${dragCreate.top}px`, left: `${dragCreate.left}px`, width: `${dragCreate.width}px`, height: `${dragCreate.height}px` }}>
-                                  <span className="drag-create-preview-time">{minutesToTime(dragCreate.startMinutes)} - {minutesToTime(dragCreate.endMinutes)} · {((dragCreate.endMinutes - dragCreate.startMinutes) / 60).toFixed(1)}h</span>
+                              {dragCreate && (
+                                <div className="drag-create-preview" style={{
+                                  position: "absolute", zIndex: 99998, borderRadius: "12px",
+                                  overflow: "visible",
+                                  top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
+                                  width: `${dragCreate.width}px`, height: `${dragCreate.height}px`,
+                                }}>
+                                  {dragCreate.committed ? (
+                                    <DragCreateQuickAdd state={dragCreate} projects={projects}
+                                      onSave={(title, projectId) => {
+                                        if (!data) return;
+                                        const { date, startMinutes, endMinutes } = dragCreate;
+                                        const startTime = minutesToTime(startMinutes);
+                                        const endTime = minutesToTime(endMinutes);
+                                        const estimatedH = (endMinutes - startMinutes) / 60;
+                                        const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
+                                        void saveData({
+                                          ...data,
+                                          tasks: [...data.tasks, { ...task, plannedForDate: date, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
+                                        });
+                                        setDragCreate(null);
+                                        showToast("已添加到时间轴");
+                                      }}
+                                      onCancel={() => setDragCreate(null)}
+                                    />
+                                  ) : (
+                                    <span className="drag-create-preview-time" style={{ position: "absolute", bottom: 4, left: 8, pointerEvents: "none" }}>
+                                      {minutesToTime(dragCreate.startMinutes)} - {minutesToTime(dragCreate.endMinutes)} · {((dragCreate.endMinutes - dragCreate.startMinutes) / 60).toFixed(1)}h
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -2553,30 +2559,36 @@ function App() {
                             }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} extraStyle={extraStyle} />
                           );
                         })}
-                        {dragCreate && dragCreate.committed && (
-                          <DragCreateQuickAdd state={dragCreate} projects={projects}
-                            onSave={(title, projectId) => {
-                              if (!data) return;
-                              const { date, startMinutes, endMinutes } = dragCreate;
-                              const startTime = minutesToTime(startMinutes);
-                              const endTime = minutesToTime(endMinutes);
-                              const estimatedH = (endMinutes - startMinutes) / 60;
-                              const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
-                              void saveData({
-                                ...data,
-                                tasks: [...data.tasks, { ...task, plannedForDate: date, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
-                              });
-                              setDragCreate(null);
-                              showToast("已添加到时间轴");
-                            }}
-                            onCancel={() => setDragCreate(null)}
-                          />
-                        )}
-                        {dragCreate && !dragCreate.committed && (
-                          <div className="drag-create-preview"
-                            style={{ position: "absolute", pointerEvents: "none", zIndex: 99998, borderRadius: "12px",
-                              top: `${dragCreate.top}px`, left: `${dragCreate.left}px`, width: `${dragCreate.width}px`, height: `${dragCreate.height}px` }}>
-                            <span className="drag-create-preview-time">{minutesToTime(dragCreate.startMinutes)} - {minutesToTime(dragCreate.endMinutes)} · {((dragCreate.endMinutes - dragCreate.startMinutes) / 60).toFixed(1)}h</span>
+                        {dragCreate && (
+                          <div className="drag-create-preview" style={{
+                            position: "absolute", zIndex: 99998, borderRadius: "12px",
+                            overflow: "visible",
+                            top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
+                            width: `${dragCreate.width}px`, height: `${dragCreate.height}px`,
+                          }}>
+                            {dragCreate.committed ? (
+                              <DragCreateQuickAdd state={dragCreate} projects={projects}
+                                onSave={(title, projectId) => {
+                                  if (!data) return;
+                                  const { date, startMinutes, endMinutes } = dragCreate;
+                                  const startTime = minutesToTime(startMinutes);
+                                  const endTime = minutesToTime(endMinutes);
+                                  const estimatedH = (endMinutes - startMinutes) / 60;
+                                  const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
+                                  void saveData({
+                                    ...data,
+                                    tasks: [...data.tasks, { ...task, plannedForDate: date, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
+                                  });
+                                  setDragCreate(null);
+                                  showToast("已添加到时间轴");
+                                }}
+                                onCancel={() => setDragCreate(null)}
+                              />
+                            ) : (
+                              <span className="drag-create-preview-time" style={{ position: "absolute", bottom: 4, left: 8, pointerEvents: "none" }}>
+                                {minutesToTime(dragCreate.startMinutes)} - {minutesToTime(dragCreate.endMinutes)} · {((dragCreate.endMinutes - dragCreate.startMinutes) / 60).toFixed(1)}h
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2992,48 +3004,38 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
     <div ref={containerRef} className="drag-create-quick-add"
       style={{
         position: "absolute", zIndex: 99999,
-        top: `${Math.max(0, state.top - (compact ? 32 : 40))}px`,
-        left: `${state.left}px`, width: `${state.width}px`,
+        top: 0, left: 0, width: "100%", height: 36,
+        display: "flex", alignItems: "center",
+        boxSizing: "border-box", padding: "4px 6px",
+        borderRadius: "12px 12px 0 0",
       }}>
       <div style={{
         display: "flex", alignItems: "center", gap: compact ? "3px" : "6px",
-        background: "var(--surface-card)",
-        border: "1px solid color-mix(in srgb, var(--accent-active) 28%, var(--border-subtle))",
-        boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
-        borderRadius: "10px", padding: compact ? "3px 5px" : "6px 8px",
-        minWidth: 0,
+        flex: 1, minWidth: 0,
       }}>
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
           placeholder={compact ? "任务名" : "输入任务名，#选择项目"}
           style={{
             flex: 1, minWidth: 0, border: "none",
-            borderBottom: "2px solid color-mix(in srgb, var(--accent-active) 50%, transparent)",
-            background: "transparent", color: "var(--text-main)",
-            fontSize: compact ? "11px" : "13px", padding: compact ? "2px 0" : "3px 0", outline: "none",
-            borderRadius: 0,
+            background: "transparent", color: "inherit",
+            fontSize: compact ? "11px" : "13px", padding: 0, outline: "none",
           }} />
         <button onClick={handleSave}
           disabled={!input.replace(/#[^\s#]+/g, "").trim()}
-          style={{
-            width: compact ? "22px" : "28px", height: compact ? "22px" : "28px", minWidth: compact ? "22px" : "28px",
-            border: "none", borderRadius: "50%",
-            background: input.trim() ? "var(--accent-active)" : "var(--surface-soft, #242936)",
-            color: input.trim() ? "var(--accent-on, #fff)" : "var(--text-faint)",
-            fontSize: compact ? "12px" : "14px", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>✓</button>
+          className="df-quick-add-confirm">✓</button>
       </div>
       {showProjectMenu && filtered.length > 0 && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100000,
-          background: "var(--surface-card)",
-          border: "1px solid var(--border-subtle)",
+          background: "var(--surface-card, #fff)",
+          border: "1px solid var(--border-subtle, #cbd5e1)",
           borderRadius: "8px", padding: "4px", marginTop: "4px",
           boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+          maxHeight: "200px", overflowY: "auto",
         }}>
           {filtered.map((p) => (
-            <button key={p.id} onClick={() => {
+            <button key={p.id} onMouseDown={(e) => { e.preventDefault();
               setSelectedProject(p);
               const base = input.replace(/#[^\s#]*$/, "").trimEnd();
               setInput(`${base}${base ? " " : ""}#${p.title}`);
