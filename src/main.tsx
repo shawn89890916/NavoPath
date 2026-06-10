@@ -1682,17 +1682,16 @@ function App() {
   }
 
   async function sendAi() {
-    if (!settings || !aiInput.trim()) return;
+    if (!aiInput.trim()) return;
     const task = tasks.find((item) => item.id === referencedTaskId);
     setAiBusy(true);
     try {
-      const response = await window.plannerApi.chat({
-        messages: [
-          { role: "system", content: "你是 NavoPath 的升学任务教练。只给具体下一步，不自动修改用户数据。" },
-          { role: "user", content: JSON.stringify({ question: aiInput, task }) }
-        ]
+      const result = await callAiAssistant({
+        mode: "chat",
+        message: aiInput,
+        context: task ? { taskId: task.id, taskTitle: task.title } : undefined,
       });
-      setAiReply(response.reply);
+      setAiReply(result.reply);
     } catch (error) {
       setAiReply(error instanceof Error ? error.message : "AI 请求失败");
     } finally {
@@ -1702,23 +1701,21 @@ function App() {
 
   async function generateNextAction() {
     const task = editingId ? tasks.find((item) => item.id === editingId) : null;
-    if (!settings?.hasApiKey) {
+    try {
+      const result = await callAiAssistant({
+        mode: "parse_task",
+        message: "帮我明确这个任务的下一步具体行动",
+        context: { title: form.title, project: projects.find((project) => project.id === form.projectId)?.title, date: form.dueDate, estimatedHours: form.estimatedHours, notes: form.details, subtasks: task?.subtasks || [] },
+      });
+      const nextAction = result.reply || "先打开相关材料，完成的最小可检查版本。";
+      setForm((current) => ({ ...current, details: replaceNextAction(current.details, nextAction) }));
+    } catch {
       setForm((current) => ({ ...current, details: replaceNextAction(current.details, `先打开相关材料，完成「${current.title}」的最小可检查版本。`) }));
-      return;
     }
-    const response = await window.plannerApi.chat({
-      messages: [
-        { role: "system", content: "返回 JSON：{\"nextAction\":\"...\"}。下一步必须具体、可执行。" },
-        { role: "user", content: JSON.stringify({ title: form.title, project: projects.find((project) => project.id === form.projectId)?.title, date: form.dueDate, estimatedHours: form.estimatedHours, notes: form.details, subtasks: task?.subtasks || [] }) }
-      ]
-    });
-    const match = response.reply.match(/\{[\s\S]*\}/);
-    const nextAction = match ? JSON.parse(match[0]).nextAction : response.reply.trim();
-    setForm((current) => ({ ...current, details: replaceNextAction(current.details, nextAction) }));
   }
 
   async function planMyDay() {
-    if (!settings || todayCandidates.length === 0) {
+    if (todayCandidates.length === 0) {
       alert("今天还没有候选任务。请先从规划中选择任务，或快速添加一个任务。");
       return;
     }
@@ -1735,20 +1732,20 @@ function App() {
         return { id: uid("suggestion"), taskId: task.id, startTime, endTime, reason: "基于今日候选和预计用时生成。", nextAction: extractNextAction(task.notes) || `先完成「${task.title}」的最小可交付版本。` };
       });
     };
-    if (!settings.hasApiKey) {
-      setSuggestions(localFallback());
-      setAiPlanning(false);
-      return;
-    }
     try {
-      const response = await window.plannerApi.chat({
-        messages: [
-          { role: "system", content: "只返回 JSON：{\"suggestions\":[{\"taskId\":\"xxx\",\"startTime\":\"15:30\",\"endTime\":\"16:30\",\"reason\":\"...\",\"nextAction\":\"...\"}]}。不要覆盖已有时间块，使用 15 分钟粒度。" },
-          { role: "user", content: JSON.stringify({ today, candidates: todayCandidates, scheduled: todayScheduled, projects, preferences: aiPlanPrefs }) }
-        ]
+      const result = await callAiAssistant({
+        mode: "plan_day",
+        message: "帮我规划今天的时间安排",
+        context: { today, candidates: todayCandidates.map((t) => ({ id: t.id, title: t.title, estimatedHours: t.estimatedHours })), scheduled: todayScheduled.map((t) => ({ id: t.id, title: t.title, scheduledStart: t.scheduledStart, scheduledEnd: t.scheduledEnd })) },
       });
-      const json = JSON.parse((response.reply.match(/\{[\s\S]*\}/)?.[0]) || "{}");
-      setSuggestions((json.suggestions || []).map((item: any) => ({ id: uid("suggestion"), ...item })));
+      if (result.actions.length === 0) {
+        setSuggestions(localFallback());
+      } else {
+        setSuggestions(result.actions.filter((a) => a.type === "plan_day").flatMap((a: any) => (a.suggestions || []).map((s: any) => ({ id: uid("suggestion"), ...s }))));
+        if (result.actions.filter((a) => a.type === "plan_day").length === 0) {
+          setSuggestions(localFallback());
+        }
+      }
     } catch {
       setSuggestions(localFallback());
     } finally {
