@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
 import { callAiAssistant } from "./aiAssistantApi";
+import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
 import {
   getVisibleDays,
@@ -70,7 +71,31 @@ const categoryOrder: Category[] = ["exam", "project", "essay", "materials", "uk"
 type Mode = "execute" | "planning";
 type AddType = "task" | "project" | "event";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
-type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "simple" | "priority" | "deadline" };
+type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
+
+/**
+ * SchedulePreview — single source of truth for a preview block.
+ * One preview = one real task (no splitting). On accept, a new cloned task
+ * with `clonedTaskId` is appended to `data.tasks`. The source task stays in
+ * 今日候选 until then.
+ */
+type SchedulePreview = {
+  id: string;
+  sourceTaskId: string;
+  clonedTaskId: string;
+  title: string;
+  projectId?: string;
+  scheduledDate: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  durationMinutes: number;
+  priority: Priority;
+  reason: string;
+};
+
+/** Auto-schedule state machine. */
+type AutoScheduleState = "idle" | "generating" | "preview" | "committing" | "error";
+
 type DragState = { taskId: string; kind: "candidate" | "block"; duration: number; offsetMinutes?: number; pointer?: { x: number; y: number }; outsideTimeline?: boolean } | null;
 
 function normalizeHexColor(value: string, fallback: string) {
@@ -168,7 +193,7 @@ function themeVars(settings: Settings, mode: Mode) {
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
-type ScheduleSuggestion = { id: string; taskId: string; startTime: string; endTime: string; reason: string; nextAction?: string; ignored?: boolean };
+type ScheduleSuggestion = SchedulePreview; // legacy alias kept for compatibility; replaced by SchedulePreview
 type QuickSchedule = { startTime: string; title: string; projectId: string; isAllDay?: boolean } | null;
 /** Floating popup for time‑slot quick‑add on timeline (used by day / 3‑day / week views) */
 type FloatingTimeAdd = { date: string; startTime: string; endTime: string; top: number; left: number; width: number } | null;
@@ -680,10 +705,11 @@ function App() {
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiReply, setAiReply] = useState("");
-  const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([]);
-  const [aiPlanning, setAiPlanning] = useState(false);
+  // ── Auto-schedule: single source of truth ──
+  const [schedulePreviews, setSchedulePreviews] = useState<SchedulePreview[]>([]);
+  const [autoScheduleState, setAutoScheduleState] = useState<AutoScheduleState>("idle");
   const [aiPlanMenuOpen, setAiPlanMenuOpen] = useState(false);
-  const [aiPlanPrefs, setAiPlanPrefs] = useState<AiPlanPrefs>({ source: "today", scope: "day", strategy: "simple" });
+  const [aiPlanPrefs, setAiPlanPrefs] = useState<AiPlanPrefs>({ source: "today", scope: "day", strategy: "longShort" });
   const [timelineView, setTimelineView] = useState<TimelineView>("daily");
   const [quickSchedule, setQuickSchedule] = useState<QuickSchedule>(null);
   const [allDayQuickAdd, setAllDayQuickAdd] = useState<AllDayQuickAdd>(null);
@@ -699,6 +725,10 @@ function App() {
   const [planningPickMode, setPlanningPickMode] = useState(false);
   const [planningPicks, setPlanningPicks] = useState<Record<string, PlanPickPriority>>({});
   const [toast, setToast] = useState("");
+  // Enhanced toast with optional undo action (5-second window)
+  const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const undoSnapshotRef = useRef<{ committedTaskIds: string[]; clearedSourceTaskIds: string[]; removedFromCandidate: Set<string> } | null>(null);
   const [showCompletedCandidates, setShowCompletedCandidates] = useState(false);
   const [groupByProject, setGroupByProject] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
@@ -960,9 +990,70 @@ function App() {
   const isViewingToday = timelineDate === today;
   const projects = data?.projects || [];
   const tasks = data?.tasks || [];
+
+  /**
+   * Build "virtual" Task objects for each active preview block. These are
+   * rendered alongside real `scheduledTasks` so the timeline shows previews
+   * using the same `TimeBlock` component and `computeConflictLayout` as real
+   * events. The source task is NEVER modified.
+   *
+   * IMPORTANT: The virtual task uses the SAME `clonedTaskId` that will be
+   * committed as a real task. So on accept, the block visually does NOT
+   * change — only the `data-preview` attribute is removed. After accept,
+   * the same id appears in `data.tasks` and edit/drag/resize work normally.
+   */
+  const previewTasks = useMemo<Task[]>(() => {
+    if (schedulePreviews.length === 0) return [];
+    return schedulePreviews.map((p) => {
+      const source = tasks.find((t) => t.id === p.sourceTaskId);
+      return {
+        id: p.clonedTaskId,
+        title: source?.title || p.title,
+        dueDate: p.scheduledDate,
+        category: source?.category || "personal",
+        priority: p.priority,
+        importance: p.priority,
+        urgency: p.priority,
+        notes: source?.notes || "",
+        goalId: source?.goalId || "",
+        completed: false,
+        projectId: source?.projectId || p.projectId,
+        parentTaskId: p.sourceTaskId,
+        estimatedHours: p.durationMinutes / 60,
+        scheduledDate: p.scheduledDate,
+        scheduledStart: p.scheduledStart,
+        scheduledEnd: p.scheduledEnd,
+        plannedForDate: p.scheduledDate,
+        subtasks: source?.subtasks || [],
+        order: Date.now(),
+        createdAt: p.id,
+        updatedAt: p.id,
+      } as Task;
+    });
+  }, [schedulePreviews, tasks]);
+
+  // Map of clonedTaskId → previewId, used by TimeBlock to know which blocks
+  // are previews (and thus should show accept/cancel buttons, dashed border).
+  // A clonedTaskId is a preview ONLY if it is NOT yet in data.tasks.
+  const previewIdByClonedId = useMemo(() => {
+    const realTaskIds = new Set(tasks.map((t) => t.id));
+    const m = new Map<string, string>();
+    for (const p of schedulePreviews) {
+      if (!realTaskIds.has(p.clonedTaskId)) m.set(p.clonedTaskId, p.id);
+    }
+    return m;
+  }, [schedulePreviews, tasks]);
+
+  // Real scheduled tasks for current timeline date, augmented with preview
+  // tasks. Previews are not in `data.tasks` yet — they live in React state and
+  // are appended to the persisted `tasks` array only on accept.
   const scheduledTasks = useMemo(
-    () => tasks.filter((task) => task.scheduledDate === timelineDate && task.scheduledStart).sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
-    [tasks, timelineDate]
+    () => {
+      const real = tasks.filter((task) => task.scheduledDate === timelineDate && task.scheduledStart);
+      const virtual = previewTasks.filter((task) => task.scheduledDate === timelineDate);
+      return [...real, ...virtual].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+    },
+    [tasks, timelineDate, previewTasks],
   );
   // Measure daily canvas width for conflict layout.
   // Must be placed AFTER scheduledTasks declaration (above) so it can
@@ -1069,6 +1160,18 @@ function App() {
     });
   }
 
+  function batchUpdateTasks(updates: { taskId: string; patch: Partial<Task> }[]) {
+    if (!data || updates.length === 0) return;
+    const map = new Map(updates.map((u) => [u.taskId, u.patch]));
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => {
+        const p = map.get(task.id);
+        return p ? { ...task, ...p, updatedAt: new Date().toISOString() } : task;
+      }),
+    });
+  }
+
   function updateProject(projectId: string, patch: Partial<Project>) {
     if (!data) return;
     void saveData({
@@ -1079,7 +1182,40 @@ function App() {
 
   function showToast(message: string) {
     setToast(message);
-    window.setTimeout(() => setToast((current) => current === message ? "" : current), 2600);
+    setToastAction(null);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast((current) => current === message ? "" : current);
+      setToastAction(null);
+    }, 2600);
+  }
+
+  /**
+   * Show a toast with an undo action. The action button is clickable for 5
+   * seconds. If clicked, the onClick callback fires and the toast is dismissed.
+   * If ignored, the toast disappears automatically.
+   */
+  function showUndoToast(message: string, actionLabel: string, onUndo: () => void) {
+    setToast(message);
+    setToastAction({ label: actionLabel, onClick: () => { onUndo(); dismissToast(); } });
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast("");
+      setToastAction(null);
+      undoSnapshotRef.current = null;
+    }, 5000);
+  }
+
+  function dismissToast() {
+    setToast("");
+    setToastAction(null);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
   }
 
   function openPlanningPicker() {
@@ -1715,66 +1851,301 @@ function App() {
   }
 
   async function planMyDay() {
-    if (todayCandidates.length === 0) {
-      alert("今天还没有候选任务。请先从规划中选择任务，或快速添加一个任务。");
+    if (autoScheduleState === "generating" || autoScheduleState === "committing") return;
+
+    const sourceTasks = aiPlanPrefs.source === "all"
+      ? tasks.filter((t) => !t.completed && !t.scheduledStart)
+      : todayCandidates;
+    if (sourceTasks.length === 0) {
+      alert(aiPlanPrefs.source === "all" ? "没有可安排的任务。" : "今天还没有候选任务。请先从规划中选择任务，或快速添加一个任务。");
       return;
     }
-    setAiPlanning(true);
+    setSchedulePreviews([]);
+    setAutoScheduleState("generating");
     setSelectedDate(today);
-    const todayScheduled = tasks.filter((task) => task.scheduledDate === today && task.scheduledStart);
-    const localFallback = () => {
-      let cursor = Math.max(9 * 60, clampSlot(new Date().getHours() * 60 + new Date().getMinutes()));
-      return todayCandidates.slice(0, 5).map((task) => {
-        const duration = taskDuration(task);
-        const startTime = minutesToTime(cursor);
-        const endTime = minutesToTime(cursor + duration);
-        cursor += duration + 15;
-        return { id: uid("suggestion"), taskId: task.id, startTime, endTime, reason: "基于今日候选和预计用时生成。", nextAction: extractNextAction(task.notes) || `先完成「${task.title}」的最小可交付版本。` };
-      });
-    };
-    try {
-      const result = await callAiAssistant({
-        mode: "plan_day",
-        message: "帮我规划今天的时间安排",
-        context: { today, candidates: todayCandidates.map((t) => ({ id: t.id, title: t.title, estimatedHours: t.estimatedHours })), scheduled: todayScheduled.map((t) => ({ id: t.id, title: t.title, scheduledStart: t.scheduledStart, scheduledEnd: t.scheduledEnd })) },
-      });
-      if (result.actions.length === 0) {
-        setSuggestions(localFallback());
-      } else {
-        setSuggestions(result.actions.filter((a) => a.type === "plan_day").flatMap((a: any) => (a.suggestions || []).map((s: any) => ({ id: uid("suggestion"), ...s }))));
-        if (result.actions.filter((a) => a.type === "plan_day").length === 0) {
-          setSuggestions(localFallback());
-        }
+
+    const dateRange = aiPlanPrefs.scope === "3day"
+      ? [today, addDays(today, 1), addDays(today, 2)]
+      : [today];
+
+    const scheduledInRange = tasks.filter((t) => t.scheduledStart && dateRange.includes(t.scheduledDate || ""));
+    const existingEvents = scheduledInRange.map((t) => ({
+      id: t.id, taskId: t.id, title: t.title,
+      scheduledDate: t.scheduledDate, scheduledStart: t.scheduledStart, scheduledEnd: t.scheduledEnd,
+    }));
+
+    const tasksForSchedule = sourceTasks.map((t) => ({
+      id: t.id, title: t.title,
+      priority: (t.priority || "medium") as "high" | "medium" | "low",
+      estimatedMinutes: t.estimatedHours ? Math.round(t.estimatedHours * 60) : undefined,
+      dueDate: t.dueDate, projectId: t.projectId, completed: t.completed,
+      scheduledDate: t.scheduledDate, scheduledStart: t.scheduledStart, scheduledEnd: t.scheduledEnd,
+    }));
+
+    tasksForSchedule.sort((a, b) => (b.estimatedMinutes || 30) - (a.estimatedMinutes || 30));
+    if (aiPlanPrefs.strategy === "random") {
+      for (let i = tasksForSchedule.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tasksForSchedule[i], tasksForSchedule[j]] = [tasksForSchedule[j], tasksForSchedule[i]];
       }
-    } catch {
-      setSuggestions(localFallback());
-    } finally {
-      setAiPlanning(false);
+    } else if (aiPlanPrefs.strategy === "byProject") {
+      tasksForSchedule.sort((a, b) => (a.projectId || "").localeCompare(b.projectId || ""));
+    } else if (aiPlanPrefs.strategy === "longShort") {
+      const sorted = [...tasksForSchedule].sort((a, b) => (b.estimatedMinutes || 30) - (a.estimatedMinutes || 30));
+      const result: typeof tasksForSchedule = [];
+      let l = 0, r = sorted.length - 1;
+      while (l <= r) {
+        if (l <= r) result.push(sorted[l++]);
+        if (l <= r) result.push(sorted[r--]);
+      }
+      tasksForSchedule.length = 0;
+      tasksForSchedule.push(...result);
+    } else if (aiPlanPrefs.strategy === "alternativeProject") {
+      const byProject = new Map<string, typeof tasksForSchedule>();
+      tasksForSchedule.forEach((t) => {
+        const key = t.projectId || "__none__";
+        if (!byProject.has(key)) byProject.set(key, []);
+        byProject.get(key)!.push(t);
+      });
+      tasksForSchedule.length = 0;
+      const keys = [...byProject.keys()];
+      let idx = 0;
+      while (tasksForSchedule.length < sourceTasks.length) {
+        const key = keys[idx % keys.length];
+        const group = byProject.get(key);
+        if (group && group.length > 0) tasksForSchedule.push(group.shift()!);
+        idx++;
+      }
+    }
+
+    const result = autoScheduleTasks({
+      tasks: tasksForSchedule,
+      scheduledEvents: existingEvents,
+      dateRange,
+    });
+
+    // One task = one preview block. NO splitting.
+    const previews: SchedulePreview[] = result.proposedEvents.map((ev) => {
+      const source = tasks.find((t) => t.id === ev.taskId);
+      return {
+        id: ev.id,
+        sourceTaskId: ev.taskId,
+        clonedTaskId: ev.clonedTaskId,
+        title: source?.title || ev.title,
+        projectId: ev.projectId,
+        scheduledDate: ev.scheduledDate,
+        scheduledStart: ev.scheduledStart,
+        scheduledEnd: ev.scheduledEnd,
+        durationMinutes: ev.durationMinutes,
+        priority: ev.priority,
+        reason: ev.reason,
+      };
+    });
+
+    setSchedulePreviews(previews);
+    setAutoScheduleState(previews.length > 0 ? "preview" : "idle");
+    if (previews.length === 0 && result.unscheduledTasks.length > 0) {
+      showToast(`没有连续空档可安排 ${result.unscheduledTasks.length} 个任务`);
     }
   }
 
-  function suggestionConflict(suggestion: ScheduleSuggestion) {
-    const start = timeToMinutes(suggestion.startTime);
-    const end = timeToMinutes(suggestion.endTime);
+  /**
+   * Cancel all auto-schedule previews. Does NOT touch real data.
+   */
+  function cancelAutoSchedule() {
+    setSchedulePreviews([]);
+    setAutoScheduleState("idle");
+    dismissToast();
+  }
+
+  /**
+   * Cancel a single preview by id. Does NOT touch real data.
+   * If the cancelled preview is the last one, return to idle.
+   */
+  function cancelOnePreview(previewId: string) {
+    setSchedulePreviews((current) => {
+      const next = current.filter((p) => p.id !== previewId);
+      if (next.length === 0) setAutoScheduleState("idle");
+      return next;
+    });
+  }
+
+  /**
+   * Pure helper used by both per-preview accept and accept-all. Builds a
+   * fully-formed real Task instance — the SAME shape that manual drag-to-timeline
+   * produces (it is a NEW task with the source as parentTaskId, NOT a mutation
+   * of the source task).
+   *
+   * Returns: the new task, ready to be appended to data.tasks.
+   */
+  function buildCommittedTask(p: SchedulePreview, source: Task | undefined, nowIso: string): Task {
+    return {
+      id: p.clonedTaskId,
+      title: source?.title || p.title,
+      dueDate: source?.dueDate || p.scheduledDate,
+      category: source?.category || "personal",
+      priority: p.priority,
+      importance: p.priority,
+      urgency: p.priority,
+      notes: source?.notes || "",
+      goalId: source?.goalId || "",
+      completed: false,
+      projectId: source?.projectId || p.projectId,
+      parentTaskId: p.sourceTaskId,
+      estimatedHours: p.durationMinutes / 60,
+      scheduledDate: p.scheduledDate,
+      scheduledStart: p.scheduledStart,
+      scheduledEnd: p.scheduledEnd,
+      plannedForDate: p.scheduledDate,
+      order: Date.now(),
+      subtasks: source?.subtasks || [],
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+  }
+
+  /**
+   * Accept a single preview. Identical to manual-drag behavior:
+   * 1. Build a real Task instance (clone of source) with same id as preview
+   *    `clonedTaskId`.
+   * 2. Append to `tasks`.
+   * 3. Remove the source task from 今日候选 (clear plannedForDate).
+   * 4. Remove this preview from previews.
+   * 5. Show 5-second undo toast.
+   */
+  function acceptOnePreview(previewId: string) {
+    if (!data) return;
+    const preview = schedulePreviews.find((p) => p.id === previewId);
+    if (!preview) return;
+    const source = data.tasks.find((t) => t.id === preview.sourceTaskId);
+    const now = new Date().toISOString();
+
+    // If the clonedTaskId already exists (very rare), don't duplicate
+    if (data.tasks.some((t) => t.id === preview.clonedTaskId)) {
+      setSchedulePreviews((current) => current.filter((p) => p.id !== previewId));
+      showToast("已采纳 1 个安排");
+      return;
+    }
+
+    const newTask = buildCommittedTask(preview, source, now);
+    const tasksAfter = data.tasks.map((t) => {
+      if (t.id === preview.sourceTaskId && t.plannedForDate) {
+        return { ...t, plannedForDate: undefined, updatedAt: now };
+      }
+      return t;
+    });
+    tasksAfter.push(newTask);
+
+    undoSnapshotRef.current = {
+      committedTaskIds: [preview.clonedTaskId],
+      clearedSourceTaskIds: [preview.sourceTaskId],
+      removedFromCandidate: new Set([preview.sourceTaskId]),
+    };
+
+    void saveData({ ...data, tasks: tasksAfter });
+    setSchedulePreviews((current) => {
+      const next = current.filter((p) => p.id !== previewId);
+      if (next.length === 0) setAutoScheduleState("idle");
+      return next;
+    });
+    showUndoToast("已采纳 1 个安排", "撤回", () => undoLastCommit([preview.clonedTaskId], [preview.sourceTaskId]));
+  }
+
+  /**
+   * Accept ALL previews. Same per-preview logic but batched:
+   * 1. Build all N real task instances in one pass.
+   * 2. Append to `tasks` atomically.
+   * 3. Remove all source tasks from 今日候选.
+   * 4. Clear all previews.
+   * 5. Show 5-second undo toast.
+   */
+  function acceptAllPreviews() {
+    if (!data || autoScheduleState === "committing") return;
+    const active = schedulePreviews;
+    if (active.length === 0) return;
+    setAutoScheduleState("committing");
+
+    const now = new Date().toISOString();
+    const existingIds = new Set(data.tasks.map((t) => t.id));
+    const toAdd: Task[] = [];
+    const sourceIdsToClear: string[] = [];
+    for (const p of active) {
+      if (existingIds.has(p.clonedTaskId)) continue;
+      const source = data.tasks.find((t) => t.id === p.sourceTaskId);
+      toAdd.push(buildCommittedTask(p, source, now));
+      sourceIdsToClear.push(p.sourceTaskId);
+    }
+
+    const tasksAfter = data.tasks.map((t) => {
+      if (sourceIdsToClear.includes(t.id) && t.plannedForDate) {
+        return { ...t, plannedForDate: undefined, updatedAt: now };
+      }
+      return t;
+    });
+    tasksAfter.push(...toAdd);
+
+    undoSnapshotRef.current = {
+      committedTaskIds: toAdd.map((t) => t.id),
+      clearedSourceTaskIds: [...sourceIdsToClear],
+      removedFromCandidate: new Set(sourceIdsToClear),
+    };
+
+    // DEV invariant check
+    if (import.meta.env.DEV) {
+      const expectedAdd = toAdd.length;
+      const actualAdd = tasksAfter.length - data.tasks.length;
+      // eslint-disable-next-line no-console
+      console.assert(expectedAdd === actualAdd, `[autoSchedule] commit invariant violated: expected +${expectedAdd}, got +${actualAdd}`);
+      // eslint-disable-next-line no-console
+      console.log("[autoSchedule] commit-all", {
+        committedCount: toAdd.length,
+        tasksBefore: data.tasks.length,
+        tasksAfter: tasksAfter.length,
+        committedIds: toAdd.map((t) => t.id),
+        clearedSourceTaskIds: sourceIdsToClear,
+      });
+    }
+
+    void saveData({ ...data, tasks: tasksAfter });
+    setSchedulePreviews([]);
+    setAutoScheduleState("idle");
+    showUndoToast(
+      `已采纳 ${toAdd.length} 个安排`,
+      "撤回",
+      () => undoLastCommit(toAdd.map((t) => t.id), sourceIdsToClear),
+    );
+  }
+
+  /**
+   * Undo the most recent auto-schedule commit. Removes committed tasks from
+   * `tasks` and restores the source tasks' `plannedForDate` so they reappear
+   * in 今日候选. Does NOT touch any tasks the user manually created after
+   * the commit (those have a different id, not in committedTaskIds).
+   */
+  function undoLastCommit(committedTaskIds: string[], clearedSourceTaskIds: string[]) {
+    if (!data) return;
+    const idsToRemove = new Set(committedTaskIds);
+    const tasksAfter = data.tasks
+      .filter((t) => !idsToRemove.has(t.id))
+      .map((t) => {
+        if (clearedSourceTaskIds.includes(t.id) && !t.plannedForDate) {
+          return { ...t, plannedForDate: today, updatedAt: new Date().toISOString() };
+        }
+        return t;
+      });
+    void saveData({ ...data, tasks: tasksAfter });
+    undoSnapshotRef.current = null;
+    showToast("已撤回");
+  }
+
+  function previewConflict(preview: SchedulePreview) {
+    const start = timeToMinutes(preview.scheduledStart);
+    const end = timeToMinutes(preview.scheduledEnd);
     return scheduledTasks.some((task) => {
       const a = timeToMinutes(task.scheduledStart);
       const b = timeToMinutes(task.scheduledEnd);
       return start < b && end > a;
     });
-  }
-
-  function applySuggestion(id: string) {
-    const suggestion = suggestions.find((item) => item.id === id);
-    const task = tasks.find((item) => item.id === suggestion?.taskId);
-    if (!suggestion || !task || suggestionConflict(suggestion)) return;
-    updateTask(task.id, {
-      plannedForDate: today,
-      scheduledDate: today,
-      scheduledStart: suggestion.startTime,
-      scheduledEnd: suggestion.endTime,
-      notes: suggestion.nextAction ? replaceNextAction(task.notes || "", suggestion.nextAction) : task.notes
-    });
-    setSuggestions((current) => current.filter((item) => item.id !== id));
   }
 
   function shiftTimeline(direction: -1 | 1) {
@@ -1903,18 +2274,30 @@ function App() {
             <button className="df-date-arrow right" aria-label="后一段" onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
               {!settings.hideAi && <div className="df-ai-planner">
-                    <button className={`df-ai-plan ${aiPlanning ? "thinking" : ""}`} data-tip={drawerOpen ? "请先关闭侧边栏" : "规划建议"} aria-label="AI 规划今天" disabled={aiPlanning || drawerOpen} onClick={() => void planMyDay()}>{aiPlanning ? <><i />分析中...</> : "规划建议"}</button>
+                <button className={`df-ai-plan ${autoScheduleState === "generating" ? "thinking" : ""} ${autoScheduleState === "committing" ? "committing" : ""}`} data-tip={drawerOpen ? "请先关闭侧边栏" : "规划建议"} aria-label="AI 规划今天" disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen} onClick={() => void planMyDay()}>
+                  {autoScheduleState === "generating" ? <><i />分析中...</>
+                    : autoScheduleState === "committing" ? <><i />采纳中...</>
+                    : autoScheduleState === "preview" ? "重新生成"
+                    : "规划建议"}
+                </button>
                 <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label="AI 规划设置" onClick={(event) => {
                   event.stopPropagation();
                   setAiPlanMenuOpen((open) => !open);
                 }}>⌄</button>
+                {schedulePreviews.length > 0 && autoScheduleState === "preview" && <>
+                  <button className="df-ai-plan-confirm" onClick={() => acceptAllPreviews()} title="全部采纳">✓</button>
+                  <button className="df-ai-plan-cancel" onClick={() => cancelAutoSchedule()} title="取消全部预览">✕</button>
+                </>}
                 {aiPlanMenuOpen && <span className="df-ai-plan-menu open" onClick={(event) => event.stopPropagation()}>
                   <label>任务来源<select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">今日候选</option><option value="all">全部未完成</option></select></label>
                   <label>安排范围<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">天</option><option value="3day">3天</option></select></label>
-                  <label>规划策略<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="simple">顺序安排</option><option value="priority">优先级优先</option><option value="deadline">截止日优先</option></select></label>
+                  <label>规划策略<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="alternativeProject">按项目交替</option><option value="byProject">按项目安排</option><option value="longShort">长短任务交替</option><option value="random">随机安排</option></select></label>
                 </span>}
               </div>}
               <div className="df-timeline-actions">
+                {autoScheduleState === "preview" && schedulePreviews.length > 0 && (
+                  <span className="df-ai-plan-summary">预览 {schedulePreviews.length} 个安排</span>
+                )}
               </div>
             </div>
             <div className="df-timeline-body">
@@ -1927,7 +2310,7 @@ function App() {
                   const weekdayShort = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
                   const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
                   const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
-                  const multiDayScheduledTasks = tasks.filter((task) => threeDates.includes(task.scheduledDate || "") && task.scheduledStart).sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+                  const multiDayScheduledTasks = [...tasks.filter((task) => threeDates.includes(task.scheduledDate || "") && task.scheduledStart), ...previewTasks.filter((task) => threeDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
                   return (
                     <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(threeDates.length) } as CSSProperties}>
                       <div className="df-timeline-3day-top">
@@ -1983,7 +2366,7 @@ function App() {
                             return (
                               <div key={colDate} className="df-timeline-3day-allday-cell"
                                 onClick={(event) => {
-                                  if (drawerOpen || drag || resizePreview || aiPlanning) return;
+                                  if (drawerOpen || drag || resizePreview || autoScheduleState === "generating") return;
                                   if ((event.target as HTMLElement).closest("button,.df-all-day-block,.df-all-day-quick")) return;
                                   const cellRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
                                   const parentGrid = (event.currentTarget as HTMLElement).closest(".df-timeline-3day-dates");
@@ -2070,7 +2453,7 @@ function App() {
                             {/* Single time-grid: coordinate origin for ALL day columns */}
                             <div className="df-time-grid" ref={timeGridRef} style={{ position: "relative", height: `${canvasHeight}px`, width: "100%" }}
                               onMouseDown={(event) => {
-                                if (drag || resizePreview || aiPlanning) return;
+                                if (drag || resizePreview || autoScheduleState === "generating") return;
                                 if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule,.df-all-day-block,.df-month-task")) return;
                                 if ((event.target as HTMLElement).closest(".drag-create-preview,.drag-create-quick-add")) return;
                                 const gridEl = timeGridRef.current;
@@ -2134,7 +2517,7 @@ function App() {
                               }}
                               onClick={(event) => {
                                 if (dragCreateSuppressClickRef.current) { dragCreateSuppressClickRef.current = false; return; }
-                                if (drag || resizePreview || aiPlanning) return;
+                                if (drag || resizePreview || autoScheduleState === "generating") return;
                                 if (suppressBlockClickRef.current) return;
                                 if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule,.df-all-day-block,.df-month-task")) return;
                                 if (floatingTimeAdd) { setFloatingTimeAdd(null); return; }
@@ -2217,13 +2600,16 @@ function App() {
                                     width = cs.width;
                                     if (cs.isNarrow) overflow = "hidden";
                                   }
+                                  const isPreview = previewIdByClonedId.has(task.id);
                                   return (
                                     <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
                                       if (!suppressBlockClickRef.current) openTaskEdit(task);
                                     }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
                                     }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)}
-                                      extraStyle={{ position: "absolute", left, width, pointerEvents: "auto", overflow }}
+                                      extraStyle={{ position: "absolute", left, width, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
+                                      onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
+                                      onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                     />
                                   );
                                 })}
@@ -2418,7 +2804,7 @@ function App() {
                       <span className="df-timeline-allday-label">全天</span>
                       <div className="df-timeline-allday-content"
                         onClick={(event) => {
-                          if (drawerOpen || drag || resizePreview || aiPlanning) return;
+                          if (drawerOpen || drag || resizePreview || autoScheduleState === "generating") return;
                           if ((event.target as HTMLElement).closest(".df-all-day-block,.df-all-day-quick")) return;
                           const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
                           const gutter = 6;
@@ -2474,7 +2860,7 @@ function App() {
                     }} onDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}>
                       <div ref={timelineCanvasRef} className="df-timeline-canvas" style={{ height: `${((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT}px` }}
                         onMouseDown={(event) => {
-                          if (drag || resizePreview || aiPlanning) return;
+                          if (drag || resizePreview || autoScheduleState === "generating") return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
                           if ((event.target as HTMLElement).closest(".df-all-day-block,.df-all-day-quick")) return;
                           const gridEl = timelineCanvasRef.current;
@@ -2563,9 +2949,8 @@ function App() {
                           return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
                         })}
                         {isViewingToday && <NowLine />}
-                        {scheduledTasks.length === 0 && suggestions.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />拖任务到这里安排时间</div>}
+                        {scheduledTasks.length === 0 && schedulePreviews.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />拖任务到这里安排时间</div>}
                         {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
-                        {suggestions.filter((item) => !item.ignored).map((suggestion) => <SuggestionBlock key={suggestion.id} suggestion={suggestion} task={tasks.find((task) => task.id === suggestion.taskId)} conflict={suggestionConflict(suggestion)} onApply={() => applySuggestion(suggestion.id)} onIgnore={() => setSuggestions((current) => current.map((item) => item.id === suggestion.id ? { ...item, ignored: true } : item))} />)}
                         {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => {
                           // Use dailyCanvasWidth from ResizeObserver if available,
                           // otherwise fall back to synchronously reading the DOM ref.
@@ -2580,12 +2965,16 @@ function App() {
                           const width = cs ? cs.width : innerW;
                           const extraStyle: CSSProperties | undefined = innerW > 0 ? { left, width } : undefined;
 
+                          const isPreview = previewIdByClonedId.has(task.id);
                           return (
                             <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
                               if (!suppressBlockClickRef.current) openTaskEdit(task);
                             }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                               createProjectForTask(task.id, title);
-                            }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} extraStyle={extraStyle} />
+                            }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} extraStyle={{ ...extraStyle, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
+                              onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
+                              onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
+                            />
                           );
                         })}
                         {dragCreate && (
@@ -2651,7 +3040,14 @@ function App() {
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" ? (() => void handleSignOut()) : undefined} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={tasks.find((task) => task.id === drag.taskId)} pointer={drag.pointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
-      {toast && <div className="df-toast">{toast}</div>}
+      {toast && (
+        <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
+          <span className="df-toast-message">{toast}</span>
+          {toastAction && (
+            <button className="df-toast-undo-btn" onClick={toastAction.onClick}>{toastAction.label}</button>
+          )}
+        </div>
+      )}
       {sourceOpen && <SourceModal tasks={tasks} projects={projects} today={today} anchorRect={sourceAnchorRect} defaultFilter={sourceFilterProjectId || undefined} onClose={() => { setSourceOpen(false); setSourceFilterProjectId(null); setSourceAnchorRect(null); }} onJoin={(taskIds) => { taskIds.forEach((id) => addPlanningPick(id)); showToast(`已添加 ${taskIds.length} 个任务到候选`); setSourceOpen(false); setSourceFilterProjectId(null); setSourceAnchorRect(null); }} />}
     </div>
   );
@@ -3080,7 +3476,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
@@ -3098,10 +3494,12 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
       setBadgeWidth(0);
     }
   }, [hovered]);
+  const isPreview = Boolean(extraStyle && (extraStyle as Record<string, unknown>)["--df-preview" as string]);
   return (
-    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""}`} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""}`} data-preview={isPreview ? "true" : undefined} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onMouseDown={onDragStart} onClick={onEdit} onDoubleClick={onEdit}>
+      {isPreview && <span className="df-preview-badge">待确认</span>}
       <button className="df-resize-dot top" aria-label="调整开始时间" onMouseDown={(event) => onResizeStart(event, "start")} />
       <div className="df-category-strip" />
       <button className={`df-block-check ${task.completed ? "completed" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
@@ -3110,6 +3508,12 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
       }} aria-label={task.completed ? "标记未完成" : "标记完成"}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}</button>
       <div className="df-block-title-row">
         <strong title={task.title}>{task.title}</strong>
+        {isPreview && (
+          <span className="df-preview-actions">
+            <button className="df-preview-action accept" onClick={(e) => { e.stopPropagation(); onAcceptPreview?.(); }} aria-label="采纳" title="采纳">✓</button>
+            <button className="df-preview-action cancel" onClick={(e) => { e.stopPropagation(); onCancelPreview?.(); }} aria-label="取消" title="取消">✕</button>
+          </span>
+        )}
       </div>
       {hovered && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => {
@@ -3154,17 +3558,6 @@ function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extr
   const endTime = addMinutes(startTime, duration);
   const height = Math.max(timeBlockHeight(startTime, endTime), SLOT_HEIGHT);
   return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${conflict ? "conflict" : ""}`} style={{ top, height, ...extraStyle }}><strong>{task.title}</strong>{!draggingBlock && <span>{conflict ? "冲突" : startTime} · {Math.round(duration)}min</span>}</div>;
-}
-
-function SuggestionBlock({ suggestion, task, conflict, onApply, onIgnore }: { suggestion: ScheduleSuggestion; task?: Task; conflict: boolean; onApply: () => void; onIgnore: () => void }) {
-  if (!task) return null;
-  const top = timeBlockTop(suggestion.startTime);
-  const height = Math.max(timeBlockHeight(suggestion.startTime, suggestion.endTime), 48);
-  return <div className={`df-suggestion ${conflict ? "conflict" : ""}`} style={{ top, height }}>
-    <button className="df-suggestion-action apply" disabled={conflict} aria-label="应用建议" onClick={onApply}>▣</button>
-    <button className="df-suggestion-action ignore" aria-label="不采用建议" onClick={onIgnore}>⊘</button>
-    <span>AI 建议 {conflict && "· 冲突"}</span><strong>{task.title}</strong><small>{suggestion.reason}</small>{suggestion.nextAction && <em>下一步：{suggestion.nextAction}</em>}
-  </div>;
 }
 
 function ProjectColorPicker({ value, onChange, compact = false, presets = PROJECT_COLOR_PRESETS }: { value: string; onChange: (color: string) => void; compact?: boolean; presets?: string[] }) {

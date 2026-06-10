@@ -11109,6 +11109,42 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-ai-plan-toggle.active { opacity: 1; transform: translateX(0); }
 
+.df-ai-plan-confirm,
+.df-ai-plan-cancel {
+  width: 28px;
+  height: 28px;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  transition: background .14s ease;
+}
+.df-ai-plan-confirm {
+  background: rgba(202,255,114,0.16) !important;
+  color: #CAFF72 !important;
+}
+.df-ai-plan-cancel {
+  background: rgba(239,68,68,0.12) !important;
+  color: #EF4444 !important;
+}
+.df-ai-plan-confirm:hover { background: rgba(202,255,114,0.30) !important; }
+.df-ai-plan-cancel:hover { background: rgba(239,68,68,0.24) !important; }
+.df-app:not(.theme-dark) .df-ai-plan-confirm {
+  background: rgba(34,197,94,0.10) !important;
+  color: #16A34A !important;
+}
+.df-app:not(.theme-dark) .df-ai-plan-cancel {
+  background: rgba(239,68,68,0.08) !important;
+  color: #DC2626 !important;
+}
+.df-app:not(.theme-dark) .df-ai-plan-confirm:hover { background: rgba(34,197,94,0.20) !important; }
+.df-app:not(.theme-dark) .df-ai-plan-cancel:hover { background: rgba(239,68,68,0.18) !important; }
+
 .df-ai-plan-menu {
   position: absolute;
   top: 0;
@@ -11546,6 +11582,98 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-suggestion-action.ignore { right: 0; color: #EF4444 !important; }
 
 .df-suggestion-action:disabled { opacity: 0 !important; }
+
+/* Suggestion preview block (auto-schedule) */
+.df-suggestion {
+  border: 1px dashed color-mix(in srgb, var(--accent-active) 44%, transparent) !important;
+  background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-card)) !important;
+  opacity: 0.82;
+  padding: 8px 12px 8px 44px !important;
+}
+.df-suggestion::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 12px !important;
+  top: 12px !important;
+  bottom: 12px !important;
+  width: 3px !important;
+  border-radius: 999px !important;
+  background: var(--project-color, var(--accent-active)) !important;
+  opacity: 0.7 !important;
+}
+.df-app:not(.theme-dark) .df-suggestion {
+  background: #FFFFFF !important;
+  border: 1px dashed rgba(124,58,237,0.35) !important;
+  opacity: 0.88;
+}
+.df-suggestion strong {
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  color: var(--text-main) !important;
+}
+.df-suggestion-time {
+  font-size: 11px !important;
+  color: var(--accent-active) !important;
+  font-weight: 600 !important;
+}
+.df-suggestion-badge {
+  position: absolute !important;
+  right: 50px !important;
+  top: 6px !important;
+  font-size: 10px !important;
+  padding: 1px 6px !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--accent-active) 20%, transparent) !important;
+  color: var(--accent-active) !important;
+  font-weight: 700 !important;
+  letter-spacing: .03em !important;
+}
+
+/* Confirmation bar above suggestions */
+.df-suggestion-bar {
+  position: absolute;
+  top: -36px;
+  left: 48px;
+  right: 16px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-soft);
+  z-index: 10;
+  font-size: 12px;
+  color: var(--text-main);
+}
+.df-app:not(.theme-dark) .df-suggestion-bar {
+  background: #FFFFFF;
+  border: 1px solid rgba(15,23,42,0.12);
+}
+.df-suggestion-bar span {
+  flex: 1;
+  font-weight: 500;
+}
+.df-suggestion-bar-confirm {
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  background: var(--accent-active) !important;
+  color: #FFFFFF !important;
+  border: 0 !important;
+  cursor: pointer !important;
+}
+.df-suggestion-bar-cancel {
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  background: transparent !important;
+  border: 1px solid var(--border-soft) !important;
+  color: var(--text-muted) !important;
+  cursor: pointer !important;
+}
 
 /* 锟斤拷锟斤拷 11. df-ai-plan AI锟芥划锟斤拷钮 锟斤拷锟斤拷 */
 .df-ai-plan:not(.thinking):not(:disabled):hover {
@@ -14945,3 +15073,154 @@ body:has(:active)::-webkit-scrollbar-thumb {
   flex-direction: column !important;
   min-height: 0 !important;
 }
+
+/* ━━━ Auto-schedule preview (variant on real TimeBlock) ━━━━━━━━━━━━━━ */
+/* Preview tasks are rendered by the same TimeBlock component as real
+ * tasks. The only visual difference is the dashed border + "待确认" badge. */
+
+.df-time-block[data-preview="true"],
+.df-time-block[style*="--df-preview:1"] {
+  opacity: 0.92;
+  border-style: dashed !important;
+  border-width: 1.5px !important;
+}
+.df-app:not(.theme-dark) .df-time-block[data-preview="true"],
+.df-app:not(.theme-dark) .df-time-block[style*="--df-preview:1"] {
+  background: #FFFFFF !important;
+  border: 1.5px dashed rgba(124, 58, 237, 0.45) !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06) !important;
+}
+.df-app.theme-dark .df-time-block[data-preview="true"],
+.df-app.theme-dark .df-time-block[style*="--df-preview:1"] {
+  background: rgba(198, 156, 249, 0.10) !important;
+  border: 1.5px dashed rgba(198, 156, 249, 0.55) !important;
+}
+.df-time-block .df-preview-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.18);
+  color: #7C3AED;
+  pointer-events: none;
+  z-index: 2;
+}
+.df-app.theme-dark .df-time-block .df-preview-badge {
+  background: rgba(202, 255, 114, 0.20);
+  color: #CAFF72;
+}
+
+.df-ai-plan-summary {
+  font-size: 12px;
+  color: var(--text-muted, #64748B);
+  margin-left: 12px;
+  font-weight: 500;
+}
+.df-ai-plan.committing {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* ━━━ Per-preview action buttons (accept / cancel) ━━━━━━━━━━━━━━━━━ */
+.df-time-block .df-preview-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+.df-time-block .df-preview-action {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: background .14s ease, transform .12s ease;
+}
+.df-time-block .df-preview-action:hover { transform: scale(1.08); }
+.df-app:not(.theme-dark) .df-time-block .df-preview-action.accept {
+  background: rgba(34, 197, 94, 0.18) !important;
+  color: #15803D !important;
+}
+.df-app:not(.theme-dark) .df-time-block .df-preview-action.accept:hover {
+  background: rgba(34, 197, 94, 0.32) !important;
+}
+.df-app:not(.theme-dark) .df-time-block .df-preview-action.cancel {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #B91C1C !important;
+}
+.df-app:not(.theme-dark) .df-time-block .df-preview-action.cancel:hover {
+  background: rgba(239, 68, 68, 0.22) !important;
+}
+.df-app.theme-dark .df-time-block .df-preview-action.accept {
+  background: rgba(202, 255, 114, 0.20) !important;
+  color: #CAFF72 !important;
+}
+.df-app.theme-dark .df-time-block .df-preview-action.cancel {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #FCA5A5 !important;
+}
+
+/* ━━━ Undo toast (5-second window) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.df-toast.df-toast-undo {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  font-weight: 500;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+  min-width: 240px;
+  max-width: 360px;
+}
+.df-app:not(.theme-dark) .df-toast.df-toast-undo {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+  color: #111827 !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12) !important;
+}
+.df-app.theme-dark .df-toast.df-toast-undo {
+  background: #1A2029 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #F5F7FA !important;
+}
+.df-toast-message {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.df-toast-undo-btn {
+  padding: 4px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 0;
+  cursor: pointer;
+  background: var(--accent-active);
+  color: #FFFFFF;
+  flex-shrink: 0;
+  transition: opacity .14s ease, transform .12s ease;
+}
+.df-toast-undo-btn:hover { transform: translateY(-1px); }
+.df-app:not(.theme-dark) .df-toast-undo-btn {
+  background: #C69CF9;
+  color: #FFFFFF;
+}
+
