@@ -13452,6 +13452,125 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: var(--surface-card);
 }
 
+/* AI suggestion card inside task detail drawer */
+.df-ai-suggestion-card {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-soft);
+}
+.df-app:not(.theme-dark) .df-ai-suggestion-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(15,23,42,0.10);
+}
+.df-ai-suggestion-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.df-ai-suggestion-head strong {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-main);
+}
+.df-ai-suggestion-head span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.df-ai-suggestion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.df-ai-suggestion-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-active) 6%, var(--bg-app-soft));
+}
+.df-app:not(.theme-dark) .df-ai-suggestion-list li {
+  background: rgba(198,156,249,0.06);
+}
+.df-ai-suggestion-list li small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.df-ai-subtask-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-active);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.df-ai-suggestion-actions {
+  display: flex;
+  gap: 8px;
+}
+.df-ai-suggestion-actions button.primary {
+  background: var(--accent-active);
+  color: #111827;
+  border-color: var(--accent-active);
+  font-weight: 600;
+}
+.df-ai-suggestion-actions button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-card);
+  color: var(--text-main);
+  cursor: pointer;
+}
+.df-app:not(.theme-dark) .df-ai-suggestion-actions button {
+  background: #FFFFFF;
+  border: 1px solid rgba(15,23,42,0.12);
+  color: #111827;
+}
+.df-app:not(.theme-dark) .df-ai-suggestion-actions button:hover {
+  border-color: color-mix(in srgb, var(--accent-active) 30%, rgba(15,23,42,0.12));
+}
+.df-ai-notice {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.df-ai-notice.error {
+  background: color-mix(in srgb, #EF4444 10%, var(--surface-card));
+  border: 1px solid color-mix(in srgb, #EF4444 25%, transparent);
+  color: var(--text-main);
+}
+.df-app:not(.theme-dark) .df-ai-notice.error {
+  background: #FFF5F5;
+  border: 1px solid rgba(239,68,68,0.20);
+  color: #111827;
+}
+.df-ai-notice button {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .df-detail-project-picker {
   position: relative;
 }

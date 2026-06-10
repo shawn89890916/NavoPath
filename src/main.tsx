@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
+import { callAiAssistant } from "./aiAssistantApi";
 import { installBrowserFallback } from "./browserFallback";
 import {
   getVisibleDays,
@@ -41,6 +42,7 @@ const EXECUTE_THEME_PRESETS_DARK  = ["#C69CF9", "#A78BFA", "#EC4899", "#F59E0B",
 const PLANNING_THEME_PRESETS_LIGHT = ["#CAFF72", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
 const PLANNING_THEME_PRESETS_DARK  = ["#CAFF72", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
 const RELEASE_NOTES = [
+  { date: "2026-06-10", summary: "优化了规划栏的交互和结果展示" },
   { date: "2026-06-09", summary: "优化了时间轴的快速添加栏" },
   { date: "2026-06-08", summary: "优化了部分深色模式UI不适配的问题" },
   { date: "2026-06-08", summary: "优化了 3天 / 周 / 月视图和'全天'栏的体验，并支持任务堆叠" },
@@ -3307,6 +3309,67 @@ function EditDrawer(props: {
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{ reply: string; subtasks: { title: string; estimateMinutes?: number }[] } | null>(null);
+  const [aiError, setAiError] = useState("");
+  async function handleAiBreakdown() {
+    if (!props.task) return;
+    setAiLoading(true);
+    setAiError("");
+    setAiSuggestion(null);
+    try {
+      const result = await callAiAssistant({
+        mode: "suggest_subtasks",
+        message: "帮我拆解这个任务：" + props.task.title,
+        context: {
+          taskId: props.task.id,
+          taskTitle: props.task.title,
+          projectId: props.task.projectId,
+          existingSubtasks: props.task.subtasks ?? [],
+        },
+      });
+      const subtaskActions = result.actions.filter((a) => a.type === "create_subtasks" && Array.isArray((a as any).subtasks) && (a as any).subtasks.length > 0);
+      const allSubtasks = subtaskActions.flatMap((a) => ((a as any).subtasks || []) as { title: string; estimateMinutes?: number }[]);
+      if (allSubtasks.length === 0) {
+        setAiError(result.reply || "AI 未返回子任务建议");
+      } else {
+        setAiSuggestion({ reply: result.reply, subtasks: allSubtasks });
+      }
+    } catch {
+      setAiError("AI 请求失败，请稍后重试");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+  function confirmAiSubtasks() {
+    if (!props.task || !aiSuggestion) return;
+    const existing = props.task.subtasks || [];
+    const existingTitleSet = new Set(existing.map((s) => s.title.trim()));
+    const newSubtasks = aiSuggestion.subtasks
+      .filter((s) => !existingTitleSet.has(s.title.trim()))
+      .map((s) => ({
+        id: uid("subtask"),
+        title: s.title.trim(),
+        completed: false,
+        done: false,
+        order: Date.now(),
+        createdAt: new Date().toISOString(),
+      }));
+    if (newSubtasks.length === 0) {
+      setAiError("所有建议子任务已存在");
+      setAiSuggestion(null);
+      return;
+    }
+    props.onTaskUpdate(props.task.id, {
+      subtasks: [...existing, ...newSubtasks],
+    });
+    setAiSuggestion(null);
+    setAiError("");
+  }
+  function dismissAiSuggestion() {
+    setAiSuggestion(null);
+    setAiError("");
+  }
   const f = props.form;
   const set = (key: keyof FormState, value: FormState[keyof FormState]) => props.setForm((current) => ({ ...current, [key]: value }));
   const selectedProjectTitle = props.projects.find((project) => String(project.id) === String(f.projectId))?.title || "未归属";
@@ -3388,7 +3451,25 @@ function EditDrawer(props: {
         <section className="df-detail-section">
           <h3>子任务</h3>
           <div className="df-subtask-list">{(props.task.subtasks || []).map((subtask) => <div className="df-subtask-row" key={subtask.id}><input type="checkbox" checked={Boolean(subtask.completed || subtask.done)} onChange={(event) => updateSubtask(subtask.id, { completed: event.target.checked })} /><input value={subtask.title} onChange={(event) => updateSubtask(subtask.id, { title: event.target.value })} /></div>)}</div>
-          <div className="df-detail-chips"><button onClick={addSubtask}>+ 添加子任务</button><button onClick={props.onNextAction}>AI 拆成小步骤</button></div>
+          <div className="df-detail-chips"><button onClick={addSubtask}>+ 添加子任务</button><button onClick={handleAiBreakdown} disabled={aiLoading}>{aiLoading ? "AI 思考中…" : "AI 拆解"}</button></div>
+          {aiError && <div className="df-ai-notice error">{aiError}<button onClick={dismissAiSuggestion}>关闭</button></div>}
+          {aiSuggestion && (
+            <div className="df-ai-suggestion-card">
+              <div className="df-ai-suggestion-head">
+                <strong>AI 建议添加这些子任务</strong>
+                <span>{aiSuggestion.reply}</span>
+              </div>
+              <ul className="df-ai-suggestion-list">
+                {aiSuggestion.subtasks.map((s, i) => (
+                  <li key={i}><span className="df-ai-subtask-bullet" />{s.title}{s.estimateMinutes ? <small> · ~{s.estimateMinutes}分钟</small> : null}</li>
+                ))}
+              </ul>
+              <div className="df-ai-suggestion-actions">
+                <button onClick={confirmAiSubtasks} className="primary">全部添加</button>
+                <button onClick={dismissAiSuggestion}>取消</button>
+              </div>
+            </div>
+          )}
         </section>
         <section className="df-detail-section">
           <h3>备注</h3>
