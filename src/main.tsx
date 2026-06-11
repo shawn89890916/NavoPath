@@ -2335,10 +2335,6 @@ function App() {
     if (hasRecurringRule(resolveOwningTask(task) || task)) return;
     event.preventDefault();
     const target = event.currentTarget as HTMLElement;
-    // Pointer capture: keep receiving events even outside the element
-    if (target.setPointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
-      target.setPointerCapture((event.nativeEvent as PointerEvent).pointerId);
-    }
     target.classList.add("is-dragging");
     const startX = event.clientX;
     const startY = event.clientY;
@@ -2407,9 +2403,6 @@ function App() {
             setHoverSlot("");
             dragTargetDateRef.current = "";
             target.classList.remove("is-dragging");
-            if (target.releasePointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
-              target.releasePointerCapture((event.nativeEvent as PointerEvent).pointerId);
-            }
             window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
             return;
           }
@@ -2441,9 +2434,6 @@ function App() {
       setHoverSlot("");
       dragTargetDateRef.current = "";
       target.classList.remove("is-dragging");
-      if (target.releasePointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
-        try { target.releasePointerCapture((event.nativeEvent as PointerEvent).pointerId); } catch {}
-      }
       window.setTimeout(() => {
         suppressBlockClickRef.current = false;
       }, 0);
@@ -2455,11 +2445,6 @@ function App() {
   function beginBlockResize(event: React.MouseEvent, task: Task, edge: "start" | "end") {
     event.preventDefault();
     event.stopPropagation();
-    const target = event.currentTarget as HTMLElement;
-    if (target.setPointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
-      target.setPointerCapture((event.nativeEvent as PointerEvent).pointerId);
-    }
-    target.classList.add("is-dragging");
     suppressBlockClickRef.current = true;
     setDragCreate(null);
     document.body.classList.add("df-resizing");
@@ -2478,32 +2463,58 @@ function App() {
       }
     };
     const up = (upEvent: MouseEvent) => {
+      if (!data) return;
       const slot = slotFromPointer(upEvent.clientY);
       const slotMin = timeToMinutes(slot);
       const start = timeToMinutes(task.scheduledStart);
       const end = timeToMinutes(task.scheduledEnd);
+      const now = new Date().toISOString();
+      let nextData = data;
       if (edge === "start") {
         const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
         const nextEnd = task.scheduledEnd || minutesToTime(end);
-        updateTimelineRecord(task.id, { scheduledStart: nextStart });
-        // Also update real task's estimatedHours
+        nextData = {
+          ...data,
+          tasks: data.tasks.map((t) => {
+            const records = t.timelineRecords;
+            if (!records) return t;
+            const idx = records.findIndex((r) => r.id === task.id);
+            if (idx === -1) return t;
+            const updated = [...records];
+            updated[idx] = { ...updated[idx], scheduledStart: nextStart };
+            return { ...t, timelineRecords: updated, updatedAt: now };
+          }),
+        };
         const realTask = recordToTaskMap.get(task.id);
-        if (realTask) updateTask(realTask.id, { estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 });
+        if (realTask) nextData = { ...nextData, tasks: nextData.tasks.map((t) => t.id === realTask.id ? { ...t, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 } : t) };
         showToast("已调整时长");
       } else {
         const nextStart = task.scheduledStart || minutesToTime(start);
         const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
-        updateTimelineRecord(task.id, { scheduledEnd: nextEnd });
+        nextData = {
+          ...data,
+          tasks: data.tasks.map((t) => {
+            const records = t.timelineRecords;
+            if (!records) return t;
+            const idx = records.findIndex((r) => r.id === task.id);
+            if (idx === -1) return t;
+            const updated = [...records];
+            updated[idx] = { ...updated[idx], scheduledEnd: nextEnd };
+            return { ...t, timelineRecords: updated, updatedAt: now };
+          }),
+        };
         const realTask2 = recordToTaskMap.get(task.id);
-        if (realTask2) updateTask(realTask2.id, { estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 });
+        if (realTask2) nextData = { ...nextData, tasks: nextData.tasks.map((t) => t.id === realTask2.id ? { ...t, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 } : t) };
         showToast("已调整时长");
       }
+      // Direct setData for immediate visual update, saveData for persistence
+      dataRef.current = nextData;
+      setData(nextData);
+      saveData(nextData);
       setResizePreview(null);
       document.body.classList.remove("df-resizing");
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
-      target.classList.remove("is-dragging");
-      try { target.releasePointerCapture((event.nativeEvent as PointerEvent).pointerId); } catch {}
       window.setTimeout(() => {
         suppressBlockClickRef.current = false;
       }, 0);
@@ -3932,6 +3943,7 @@ function App() {
                         }}
                         onClick={(event) => {
                           if (dragCreateSuppressClickRef.current) { dragCreateSuppressClickRef.current = false; return; }
+                          if (suppressBlockClickRef.current) return;
                           if (drag || resizePreview) return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
                           if (floatingTimeAdd) { setFloatingTimeAdd(null); return; }
@@ -5238,14 +5250,7 @@ function EditDrawer(props: {
       <aside className="df-drawer df-task-detail" onMouseDown={(event) => event.stopPropagation()}>
         {/* ── Hero title area ── */}
         <section className="df-detail-hero-trevor">
-          <button className={`df-detail-check-dot ${props.task.completed ? "completed" : ""}`} onClick={props.onToggleDone}>
-            {props.task.completed ? <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 7l3 3 5-6" /></svg> : ""}
-          </button>
-          <textarea className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder="未命名任务" />
-          <div className="df-detail-meta-trevor">
-            <span className="df-detail-meta-item">{props.task.completed ? "✓ 已完成" : isScheduled ? "⏱ 已安排" : isCandidate ? "○ 今日候选" : "未安排"}</span>
-            {isScheduled && <span className="df-detail-meta-item">{scheduleText(props.task)}</span>}
-          </div>
+          <textarea className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder="未命名任务" spellCheck={false} />
         </section>
 
         {/* ── Project tag + action row ── */}
@@ -5351,8 +5356,6 @@ function EditDrawer(props: {
           </section>
         )}
 
-        <div className="df-detail-sep" />
-
         {/* ── Sub-tasks ── */}
         <section className="df-detail-subtasks-new">
           <div className="df-detail-section-head">
@@ -5373,8 +5376,6 @@ function EditDrawer(props: {
             ))}
           </div>
         </section>
-
-        <div className="df-detail-sep" />
 
         {/* ── Notes ── */}
         <section className="df-detail-notes-new">
