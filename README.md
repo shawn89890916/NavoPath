@@ -5,6 +5,12 @@ NavoPath is a planning tool for turning long-term goals into concrete daily acti
 
 It combines tree-based project planning with timeline-based execution, so you can break large projects into smaller tasks, decide what matters today, and place that work onto a realistic schedule.
 
+## Screenshots
+
+![NavoPath main workspace](./navo-dark.png)
+
+![NavoPath settings and customization](./navo-settings.png)
+
 ## Core Workflow
 
 ### 1. Plan in trees
