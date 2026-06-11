@@ -31,6 +31,17 @@ export interface Subtask {
   createdAt: string;
 }
 
+/** 时间轴排程记录 — 支持同一任务多次排程，每条记录独立管理状态 */
+export interface TimelineRecord {
+  id: string;
+  taskId: string;
+  scheduledDate: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  executionStatus: "scheduled" | "completed" | "returned_unfinished";
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -47,14 +58,16 @@ export interface Task {
   estimatedHours?: number;
   order?: number;
   subtasks?: Subtask[];
-  /** 安排到时间轴的日期 (ISO) */
+  /** [DEPRECATED] Use timelineRecords instead */
   scheduledDate?: string;
-  /** 安排开始时间 "HH:MM" */
   scheduledStart?: string;
-  /** 安排结束时间 "HH:MM" */
   scheduledEnd?: string;
   /** 计划在今天推进的日期 (ISO) — 区别于 dueDate 和 scheduledDate */
   plannedForDate?: string;
+  /** [DEPRECATED] Use timelineRecords[].executionStatus instead */
+  executionStatus?: "scheduled" | "completed" | "returned_unfinished";
+  /** 时间轴排程记录 — 每条记录独立管理，同一任务可同时有 scheduled + returned_unfinished 等多条记录 */
+  timelineRecords?: TimelineRecord[];
   createdAt: string;
   updatedAt: string;
 }

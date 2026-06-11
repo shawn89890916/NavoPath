@@ -2,8 +2,8 @@
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task } from "./types";
-import { callAiAssistant } from "./aiAssistantApi";
+import type { CalendarEvent, Category, PlannerApi, PlannerData, Priority, Project, Settings, Task, TimelineRecord } from "./types";
+import { callAiAssistant, type AiAction, type AiStep } from "./aiAssistantApi";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
 import {
@@ -367,7 +367,23 @@ function replaceNextAction(notes: string, nextAction: string) {
  *    - count: total columns in the group (= max overlap depth)
  *    - Non-conflicting tasks are NOT included (use default full-width layout)
  */
-function computeConflictLayout(tasks: Task[]): Map<string, { index: number; count: number }> {
+/** Maximum collision columns per view mode. Beyond this, force overlap stacking. */
+const MAX_COLLISION_COLUMNS: Record<string, number> = {
+  daily: 4,
+  "3day": 3,
+  weekly: 3,
+  month: 2,
+};
+
+/** Minimum event width per view mode, in pixels. */
+const MIN_EVENT_WIDTH: Record<string, number> = {
+  daily: 90,
+  "3day": 80,
+  weekly: 96,
+  month: 48,
+};
+
+function computeConflictLayout(tasks: Task[], maxColumns = Infinity): Map<string, { index: number; count: number }> {
   if (tasks.length <= 1) return new Map();
 
   // Build intervals
@@ -438,10 +454,10 @@ function computeConflictLayout(tasks: Task[]): Map<string, { index: number; coun
       assignments.push({ taskId: iv.taskId, col: assignedCol });
     }
 
-    // Now store results with the FINAL column count
-    const finalCount = columns.length;
+    // Now store results with the FINAL column count (clamped by maxColumns)
+    const finalCount = Math.min(columns.length, maxColumns);
     for (const a of assignments) {
-      result.set(a.taskId, { index: a.col, count: finalCount });
+      result.set(a.taskId, { index: Math.min(a.col, finalCount - 1), count: finalCount });
     }
   }
 
@@ -460,14 +476,15 @@ function computeConflictStyle(
   innerWidth: number,
   baseLeft: number,
   gap: number,
+  viewMode = "daily",
 ): { left: number; width: number; isNarrow: boolean } | null {
   const cl = layout.get(taskId);
   if (!cl || cl.count <= 1) return null;
 
   const slotW = (innerWidth - gap * (cl.count - 1)) / cl.count;
-  const MIN_READABLE = 90;
+  const minReadable = MIN_EVENT_WIDTH[viewMode] || 90;
 
-  if (slotW >= MIN_READABLE) {
+  if (slotW >= minReadable) {
     // Strict side‑by‑side columns
     return {
       left: baseLeft + cl.index * (slotW + gap),
@@ -476,7 +493,7 @@ function computeConflictStyle(
     };
   } else {
     // Overlap‑offset layout for narrow columns
-    const overlapW = Math.max(80, innerWidth * 0.78);
+    const overlapW = Math.max(minReadable, innerWidth * 0.78);
     const offsetPx = cl.index * 14;
     return {
       left: baseLeft + offsetPx,
@@ -698,6 +715,7 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addType, setAddType] = useState<AddType>("task");
   const [editingId, setEditingId] = useState("");
+  const [editingRecordId, setEditingRecordId] = useState<string | undefined>(undefined);
   const [form, setForm] = useState<FormState>(defaultForm());
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -705,6 +723,9 @@ function App() {
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiReply, setAiReply] = useState("");
+  const [aiActions, setAiActions] = useState<AiAction[]>([]);
+  const [aiSteps, setAiSteps] = useState<AiStep[]>([]);
+  const [aiMsg, setAiMsg] = useState(""); // user message shown as bubble
   // ── Auto-schedule: single source of truth ──
   const [schedulePreviews, setSchedulePreviews] = useState<SchedulePreview[]>([]);
   const [autoScheduleState, setAutoScheduleState] = useState<AutoScheduleState>("idle");
@@ -809,6 +830,23 @@ function App() {
     const nextData = bootstrap.data || cached?.data;
     const nextSettings = bootstrap.settings || cached?.settings;
     if (!nextData || !nextSettings) return;
+    // Migrate legacy task scheduling fields into timelineRecords
+    if (nextData.tasks) {
+      nextData.tasks = nextData.tasks.map((task) => {
+        if (task.timelineRecords && task.timelineRecords.length > 0) return task;
+        if (!task.scheduledDate || !task.scheduledStart) return task;
+        const record: TimelineRecord = {
+          id: task.id + "_rec_0",
+          taskId: task.id,
+          scheduledDate: task.scheduledDate,
+          scheduledStart: task.scheduledStart,
+          scheduledEnd: task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)),
+          executionStatus: task.executionStatus || "scheduled",
+          createdAt: task.updatedAt || new Date().toISOString(),
+        };
+        return { ...task, timelineRecords: [record], scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined, executionStatus: undefined };
+      });
+    }
     writeBootstrapCache(nextData, nextSettings, auth.user?.id);
     dataRef.current = nextData;
     settingsRef.current = nextSettings;
@@ -1044,14 +1082,71 @@ function App() {
     return m;
   }, [schedulePreviews, tasks]);
 
-  // Real scheduled tasks for current timeline date, augmented with preview
-  // tasks. Previews are not in `data.tasks` yet — they live in React state and
-  // are appended to the persisted `tasks` array only on accept.
+  // Helper: expand timelineRecords into virtual Task objects for a list of dates.
+  // Returns Task objects where id = record.id (record-level identity).
+  function expandTimelineRecords(dates: Set<string>): Task[] {
+    const result: Task[] = [];
+    for (const task of tasks) {
+      for (const record of (task.timelineRecords || [])) {
+        if (dates.has(record.scheduledDate)) {
+          result.push({
+            ...task,
+            id: record.id,
+            scheduledDate: record.scheduledDate,
+            scheduledStart: record.scheduledStart,
+            scheduledEnd: record.scheduledEnd,
+            executionStatus: record.executionStatus,
+          } as Task);
+        }
+      }
+    }
+    return result;
+  }
+
+  // Record ID → real task resolution map (for operations like project change, note save)
+  const recordToTaskMap = useMemo(() => {
+    const map = new Map<string, Task>();
+    for (const task of tasks) {
+      for (const record of (task.timelineRecords || [])) {
+        map.set(record.id, task);
+      }
+    }
+    return map;
+  }, [tasks]);
+
+  // Record ID → record data map (for operations like uncomplete, toggleDone)
+  const recordByIdMap = useMemo(() => {
+    const map = new Map<string, TimelineRecord>();
+    for (const task of tasks) {
+      for (const record of (task.timelineRecords || [])) {
+        map.set(record.id, record);
+      }
+    }
+    return map;
+  }, [tasks]);
+
+  // Real scheduled tasks for current timeline date, expanded from timelineRecords.
+  // Each timeline record becomes a virtual Task with id = record.id.
+  // Previews are appended but not in data.tasks yet.
   const scheduledTasks = useMemo(
     () => {
-      const real = tasks.filter((task) => task.scheduledDate === timelineDate && task.scheduledStart);
+      const expanded: Task[] = [];
+      for (const task of tasks) {
+        for (const record of (task.timelineRecords || [])) {
+          if (record.scheduledDate === timelineDate) {
+            expanded.push({
+              ...task,
+              id: record.id,
+              scheduledDate: record.scheduledDate,
+              scheduledStart: record.scheduledStart,
+              scheduledEnd: record.scheduledEnd,
+              executionStatus: record.executionStatus,
+            } as Task);
+          }
+        }
+      }
       const virtual = previewTasks.filter((task) => task.scheduledDate === timelineDate);
-      return [...real, ...virtual].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+      return [...expanded, ...virtual].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
     },
     [tasks, timelineDate, previewTasks],
   );
@@ -1073,24 +1168,34 @@ function App() {
 
   const todayCandidates = useMemo(
     () => tasks.filter((task) => {
-      if (task.completed || task.scheduledDate) return false;
+      if (task.completed) return false;
+      // A task is scheduled if it has any "scheduled" status record (not returned_unfinished)
+      const hasActiveSchedule = (task.timelineRecords || []).some((r) => r.executionStatus === "scheduled");
+      if (hasActiveSchedule) return false;
       return task.plannedForDate === today || Boolean(task.plannedForDate && task.plannedForDate < today);
     }).sort((a, b) => (a.order || 0) - (b.order || 0)),
     [tasks, today]
   );
   const completedCandidates = useMemo(
-    () => tasks.filter((task) => task.completed && task.plannedForDate === today && !task.scheduledDate).sort((a, b) => (a.order || 0) - (b.order || 0)),
+    () => tasks.filter((task) => task.completed && task.plannedForDate === today && !(task.timelineRecords || []).some((r) => r.executionStatus === "scheduled")).sort((a, b) => (a.order || 0) - (b.order || 0)),
     [tasks, today]
   );
   // Conflict layout: maps taskId → { index, count } for overlapping tasks
   const conflictLayout = useMemo(() => {
     const map = new Map<string, { index: number; count: number }>();
     if (timelineView === "daily") {
-      computeConflictLayout(scheduledTasks).forEach((v, k) => map.set(k, v));
+      computeConflictLayout(scheduledTasks, MAX_COLLISION_COLUMNS.daily).forEach((v, k) => map.set(k, v));
     } else {
       const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
-      const dayTasks = tasks.filter((t) => threeDates.includes(t.scheduledDate || "") && t.scheduledStart)
-        .sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+      const dayTasks: Task[] = [];
+      for (const task of tasks) {
+        for (const record of (task.timelineRecords || [])) {
+          if (threeDates.includes(record.scheduledDate)) {
+            dayTasks.push({ ...task, id: record.id, scheduledDate: record.scheduledDate, scheduledStart: record.scheduledStart, scheduledEnd: record.scheduledEnd, executionStatus: record.executionStatus } as Task);
+          }
+        }
+      }
+      dayTasks.sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
       const byDate = new Map<string, Task[]>();
       for (const t of dayTasks) {
         const d = t.scheduledDate || "";
@@ -1098,7 +1203,7 @@ function App() {
         byDate.get(d)!.push(t);
       }
       for (const [, group] of byDate) {
-        computeConflictLayout(group).forEach((v, k) => map.set(k, v));
+        computeConflictLayout(group, MAX_COLLISION_COLUMNS[timelineView] || 4).forEach((v, k) => map.set(k, v));
       }
     }
     return map;
@@ -1134,14 +1239,22 @@ function App() {
   const visibleCandidates = showCompletedCandidates ? [...todayCandidates, ...completedCandidates] : todayCandidates;
   const executeStats = useMemo(() => {
     const planned = tasks.filter((task) => !task.completed && task.plannedForDate === today);
-    const scheduled = planned.filter((task) => task.scheduledDate === today && task.scheduledStart);
-    const scheduledHours = scheduled.reduce((sum, task) => sum + taskDuration(task) / 60, 0);
+    const scheduled = planned.filter((task) =>
+      (task.timelineRecords || []).some((r) => r.scheduledDate === today && r.executionStatus === "scheduled")
+    );
+    const scheduledHours = scheduled.reduce((sum, task) => {
+      const active = (task.timelineRecords || []).find((r) => r.scheduledDate === today && r.executionStatus === "scheduled");
+      if (!active) return sum;
+      return sum + (timeToMinutes(active.scheduledEnd) - timeToMinutes(active.scheduledStart)) / 60;
+    }, 0);
     const totalHours = planned.reduce((sum, task) => sum + (task.estimatedHours || 0.5), 0);
     return { planned, scheduled, scheduledHours, totalHours };
   }, [tasks, today]);
 
   function projectName(task: Task) {
-    return projects.find((project) => String(project.id) === String(task.projectId || ""))?.title || "未归属";
+    // Resolve real task if task.id is a record ID (from expanded timeline tasks)
+    const realTask = recordToTaskMap.get(task.id) || task;
+    return projects.find((project) => String(project.id) === String(realTask.projectId || ""))?.title || "未归属";
   }
 
   function projectSnapshot(list: Project[], title: string, color = PROJECT_COLOR_PRESETS[0]) {
@@ -1158,6 +1271,67 @@ function App() {
       ...data,
       tasks: data.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
     });
+  }
+
+  /** Update a specific TimelineRecord by recordId. Finds the owning task. */
+  function updateTimelineRecord(recordId: string, patch: Partial<TimelineRecord>) {
+    if (!data) return;
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => {
+        const records = task.timelineRecords;
+        if (!records) return task;
+        const idx = records.findIndex((r) => r.id === recordId);
+        if (idx === -1) return task;
+        const updated = [...records];
+        updated[idx] = { ...updated[idx], ...patch };
+        return { ...task, timelineRecords: updated, updatedAt: new Date().toISOString() };
+      }),
+    });
+  }
+
+  /** Delete a TimelineRecord by recordId. */
+  function deleteTimelineRecord(recordId: string) {
+    if (!data) return;
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => {
+        const records = task.timelineRecords;
+        if (!records) return task;
+        const filtered = records.filter((r) => r.id !== recordId);
+        if (filtered.length === records.length) return task;
+        return { ...task, timelineRecords: filtered, updatedAt: new Date().toISOString() };
+      }),
+    });
+  }
+
+  function toggleTaskDone(taskId: string) {
+    if (!data) return;
+    // Check if taskId is a record ID (from expanded timeline tasks)
+    const realTask = recordToTaskMap.get(taskId);
+    if (realTask) {
+      // This is a record ID → update the record's executionStatus
+      const record = recordByIdMap.get(taskId);
+      if (record) {
+        const nextStatus = record.executionStatus === "completed" ? "scheduled" : "completed";
+        updateTimelineRecord(record.id, { executionStatus: nextStatus });
+      }
+      // Also update the real task's completed flag
+      const nextCompleted = !realTask.completed;
+      updateTask(realTask.id, { completed: nextCompleted });
+      return;
+    }
+    // Legacy: direct task ID
+    const task = data.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const nextCompleted = !task.completed;
+    const patch: Partial<Task> = { completed: nextCompleted };
+    if (task.executionStatus === "returned_unfinished" && nextCompleted) {
+      patch.executionStatus = "completed";
+    } else if (!nextCompleted && task.executionStatus === "completed") {
+      patch.executionStatus = "scheduled";
+    }
+    updateTask(taskId, patch);
   }
 
   function batchUpdateTasks(updates: { taskId: string; patch: Partial<Task> }[]) {
@@ -1301,11 +1475,12 @@ function App() {
 
   function createProjectForTask(taskId: string, title: string) {
     if (!data || !title.trim()) return "";
+    const realTaskId = recordToTaskMap.get(taskId)?.id || taskId;
     const snapshot = projectSnapshot(data.projects, title);
     void saveData({
       ...data,
       projects: snapshot.projects,
-      tasks: data.tasks.map((task) => task.id === taskId ? { ...task, projectId: snapshot.projectId, updatedAt: new Date().toISOString() } : task)
+      tasks: data.tasks.map((task) => task.id === realTaskId ? { ...task, projectId: snapshot.projectId, updatedAt: new Date().toISOString() } : task)
     });
     showToast(snapshot.created ? "已创建并归属项目" : "已归属到已有项目");
     return snapshot.projectId;
@@ -1416,7 +1591,31 @@ function App() {
   }
 
   function makeAllDay(taskId: string, targetDate: string) {
-    updateTask(taskId, { plannedForDate: targetDate, scheduledDate: targetDate, scheduledStart: undefined, scheduledEnd: undefined });
+    // If taskId is a record ID (from expanded timeline), convert the record to all-day
+    const realTask = recordToTaskMap.get(taskId);
+    if (realTask && data) {
+      // Update the record: remove start/end times (mark as all-day)
+      void saveData({
+        ...data,
+        tasks: data.tasks.map((t) =>
+          t.id === realTask.id
+            ? {
+                ...t,
+                plannedForDate: targetDate,
+                timelineRecords: (t.timelineRecords || []).map((r) =>
+                  r.id === taskId
+                    ? { ...r, scheduledDate: targetDate, scheduledStart: "", scheduledEnd: "" }
+                    : r
+                ),
+                updatedAt: new Date().toISOString(),
+              }
+            : t
+        ),
+      });
+    } else {
+      // Legacy: direct task ID
+      updateTask(taskId, { plannedForDate: targetDate, scheduledDate: targetDate, scheduledStart: undefined, scheduledEnd: undefined });
+    }
     showToast("已设为全天任务");
     setDrag(null);
   }
@@ -1494,16 +1693,28 @@ function App() {
   }
 
   function scheduleTask(taskId: string, startTime: string) {
-    const task = tasks.find((item) => item.id === taskId);
-    if (!task) return;
+    const task = data?.tasks.find((item) => item.id === taskId);
+    if (!task || !data) return;
     const duration = taskDuration(task);
     const endTime = addMinutes(startTime, duration);
     const targetDate = dragTargetDateRef.current || timelineDate;
-    updateTask(taskId, {
-      plannedForDate: today,
+    const now = new Date().toISOString();
+    const record: TimelineRecord = {
+      id: taskId + "_rec_" + Date.now().toString(36),
+      taskId: task.id,
       scheduledDate: targetDate,
       scheduledStart: startTime,
-      scheduledEnd: endTime
+      scheduledEnd: endTime,
+      executionStatus: "scheduled",
+      createdAt: now,
+    };
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((t) =>
+        t.id === taskId
+          ? { ...t, plannedForDate: today, timelineRecords: [...(t.timelineRecords || []), record], updatedAt: now }
+          : t
+      ),
     });
     showToast("已安排到时间轴");
     setHoverSlot("");
@@ -1512,11 +1723,21 @@ function App() {
   }
 
   function unscheduleTask(taskId: string) {
-    updateTask(taskId, {
-      plannedForDate: today,
-      scheduledDate: undefined,
-      scheduledStart: undefined,
-      scheduledEnd: undefined
+    if (!data) return;
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              plannedForDate: today,
+              timelineRecords: (t.timelineRecords || []).filter(
+                (r) => r.executionStatus !== "scheduled"
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : t
+      ),
     });
     showToast("已移回今日候选");
     setDrag(null);
@@ -1543,15 +1764,49 @@ function App() {
     return { gridEl: timelineCanvasRef.current, scrollEl: timelineRef.current, visDays };
   }
 
+  /** Move a TimelineRecord to a new start time, preserving duration. */
+  function moveTimelineRecord(recordId: string, newStart: string, newDate?: string) {
+    if (!data) return;
+    const now = new Date().toISOString();
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => {
+        const records = task.timelineRecords;
+        if (!records) return task;
+        const idx = records.findIndex((r) => r.id === recordId);
+        if (idx === -1) return task;
+        const updated = [...records];
+        const oldEnd = updated[idx].scheduledEnd;
+        const oldStart = updated[idx].scheduledStart;
+        const duration = timeToMinutes(oldEnd) - timeToMinutes(oldStart);
+        const newEnd = minutesToTime(timeToMinutes(newStart) + duration);
+        updated[idx] = {
+          ...updated[idx],
+          scheduledStart: newStart,
+          scheduledEnd: newEnd,
+          scheduledDate: newDate || updated[idx].scheduledDate,
+        };
+        return { ...task, timelineRecords: updated, updatedAt: now };
+      }),
+    });
+  }
+
   function beginBlockDrag(event: React.MouseEvent, task: Task) {
     if ((event.target as HTMLElement).closest("button,input,textarea,select")) return;
     event.preventDefault();
+    const target = event.currentTarget as HTMLElement;
+    // Pointer capture: keep receiving events even outside the element
+    if (target.setPointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
+      target.setPointerCapture((event.nativeEvent as PointerEvent).pointerId);
+    }
+    target.classList.add("is-dragging");
     const startX = event.clientX;
     const startY = event.clientY;
     const duration = taskDuration(task);
     const rect = event.currentTarget.getBoundingClientRect();
     const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
     const offsetMinutes = Math.min(Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0), Math.max(duration - SLOT_MINUTES, 0));
+    const realTaskId = recordToTaskMap.get(task.id)?.id || task.id;
     let active = false;
     suppressBlockClickRef.current = false;
     const move = (moveEvent: MouseEvent) => {
@@ -1608,13 +1863,20 @@ function App() {
             makeAllDay(task.id, targetDate);
             window.removeEventListener("mousemove", move);
             window.removeEventListener("mouseup", up);
+            setDrag(null);
+            setHoverSlot("");
+            dragTargetDateRef.current = "";
+            target.classList.remove("is-dragging");
+            if (target.releasePointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
+              target.releasePointerCapture((event.nativeEvent as PointerEvent).pointerId);
+            }
             window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
             return;
           }
         }
         const leftPanel = document.querySelector(".df-candidate-panel")?.getBoundingClientRect();
         if ((leftPanel && upEvent.clientX >= leftPanel.left && upEvent.clientX <= leftPanel.right && upEvent.clientY >= leftPanel.top && upEvent.clientY <= leftPanel.bottom) || pointerOutsideTimeline(upEvent.clientX, upEvent.clientY)) {
-          unscheduleTask(task.id);
+          deleteTimelineRecord(task.id);
         } else {
           const { gridEl, scrollEl, visDays } = getDropGridAndDays();
           if (gridEl && scrollEl) {
@@ -1627,14 +1889,21 @@ function App() {
               debugLabel: `block-up-${timelineView}`,
             });
             dragTargetDateRef.current = target.date;
-            scheduleTask(task.id, minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes)));
+            moveTimelineRecord(task.id, minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes)), target.date);
           } else {
-            scheduleTask(task.id, slotFromPointer(upEvent.clientY, offsetMinutes));
+            moveTimelineRecord(task.id, slotFromPointer(upEvent.clientY, offsetMinutes));
           }
         }
       }
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
+      setDrag(null);
+      setHoverSlot("");
+      dragTargetDateRef.current = "";
+      target.classList.remove("is-dragging");
+      if (target.releasePointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
+        try { target.releasePointerCapture((event.nativeEvent as PointerEvent).pointerId); } catch {}
+      }
       window.setTimeout(() => {
         suppressBlockClickRef.current = false;
       }, 0);
@@ -1646,6 +1915,11 @@ function App() {
   function beginBlockResize(event: React.MouseEvent, task: Task, edge: "start" | "end") {
     event.preventDefault();
     event.stopPropagation();
+    const target = event.currentTarget as HTMLElement;
+    if (target.setPointerCapture && (event.nativeEvent as PointerEvent).pointerId !== undefined) {
+      target.setPointerCapture((event.nativeEvent as PointerEvent).pointerId);
+    }
+    target.classList.add("is-dragging");
     suppressBlockClickRef.current = true;
     setDragCreate(null);
     document.body.classList.add("df-resizing");
@@ -1671,24 +1945,25 @@ function App() {
       if (edge === "start") {
         const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
         const nextEnd = task.scheduledEnd || minutesToTime(end);
-        updateTask(task.id, {
-          scheduledStart: nextStart,
-          estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60
-        });
+        updateTimelineRecord(task.id, { scheduledStart: nextStart });
+        // Also update real task's estimatedHours
+        const realTask = recordToTaskMap.get(task.id);
+        if (realTask) updateTask(realTask.id, { estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 });
         showToast("已调整时长");
       } else {
         const nextStart = task.scheduledStart || minutesToTime(start);
         const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
-        updateTask(task.id, {
-          scheduledEnd: nextEnd,
-          estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60
-        });
+        updateTimelineRecord(task.id, { scheduledEnd: nextEnd });
+        const realTask2 = recordToTaskMap.get(task.id);
+        if (realTask2) updateTask(realTask2.id, { estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 });
         showToast("已调整时长");
       }
       setResizePreview(null);
       document.body.classList.remove("df-resizing");
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
+      target.classList.remove("is-dragging");
+      try { target.releasePointerCapture((event.nativeEvent as PointerEvent).pointerId); } catch {}
       window.setTimeout(() => {
         suppressBlockClickRef.current = false;
       }, 0);
@@ -1705,22 +1980,26 @@ function App() {
   }
 
   function openTaskEdit(task: Task) {
+    // Resolve real task if task.id is a record ID (from expanded timeline tasks)
+    const realTask = recordToTaskMap.get(task.id) || task;
+    const editingRecordId = recordToTaskMap.has(task.id) ? task.id : undefined;
     setAddType("task");
-    setEditingId(task.id);
+    setEditingId(realTask.id);
+    setEditingRecordId(editingRecordId);
     setForm({
-      title: task.title,
-      projectId: task.projectId || "",
+      title: realTask.title,
+      projectId: realTask.projectId || "",
       projectColor: "#C69CF9",
-      dueDate: task.dueDate || today,
+      dueDate: realTask.dueDate || today,
       dueTime: "",
-      endDate: task.dueDate || today,
+      endDate: realTask.dueDate || today,
       endTime: "",
-      category: task.category,
-      priority: task.priority,
-      importance: task.importance || task.priority,
-      urgency: task.urgency || "low",
-      estimatedHours: task.estimatedHours || 0.5,
-      details: task.notes || ""
+      category: realTask.category,
+      priority: realTask.priority,
+      importance: realTask.importance || realTask.priority,
+      urgency: realTask.urgency || "low",
+      estimatedHours: realTask.estimatedHours || 0.5,
+      details: realTask.notes || ""
     });
     setDrawerOpen(true);
   }
@@ -1773,6 +2052,7 @@ function App() {
       void saveData({ ...data, events: [...data.events, makeEvent(form)] });
     }
     setEditingId("");
+    setEditingRecordId(undefined);
     setForm(defaultForm("task"));
     setAddType("task");
     setDrawerOpen(false);
@@ -1820,19 +2100,104 @@ function App() {
   async function sendAi() {
     if (!aiInput.trim()) return;
     const task = tasks.find((item) => item.id === referencedTaskId);
+    const msg = aiInput.trim();
+    setAiMsg(msg);
+    setAiInput("");
     setAiBusy(true);
+    setAiActions([]);
+    setAiReply("");
+    setAiSteps([{ label: "正在分析你的请求...", status: "running" }]);
+
+    // Build rich context for the AI
+    const scheduledToday = tasks.filter((t) => t.scheduledDate === today && t.scheduledStart);
+    const context: Record<string, unknown> = {
+      currentViewDate: today,
+      page: "execute",
+      projects: projects.map((p) => ({ id: p.id, title: p.title, color: p.color })),
+      scheduledToday: scheduledToday.map((t) => ({ title: t.title, start: t.scheduledStart, end: t.scheduledEnd, projectId: t.projectId })),
+    };
+    if (task) {
+      context.taskId = task.id;
+      context.taskTitle = task.title;
+    }
+
     try {
       const result = await callAiAssistant({
         mode: "chat",
-        message: aiInput,
-        context: task ? { taskId: task.id, taskTitle: task.title } : undefined,
+        message: msg,
+        context,
       });
+      setAiSteps(result.steps && result.steps.length > 0
+        ? result.steps
+        : [{ label: "已生成安排", status: "done" }]);
       setAiReply(result.reply);
+      if (result.actions && result.actions.length > 0) {
+        setAiActions(result.actions);
+      }
     } catch (error) {
-      setAiReply(error instanceof Error ? error.message : "AI 请求失败");
+      setAiReply(error instanceof Error ? error.message : "网络异常，请稍后重试。");
+      setAiSteps([{ label: "请求失败", status: "error" }]);
     } finally {
       setAiBusy(false);
     }
+  }
+
+  async function confirmAiAction(action: AiAction) {
+    if (!data) return;
+    // Handle create_scheduled_task (TrevorAI-style) and create_task as the same flow
+    if ((action.type === "create_scheduled_task" || action.type === "create_task") && action.title) {
+      const a = action as Record<string, unknown>;
+      const dur = (a.durationMinutes as number) || 60;
+      const startTime = (a.start as string) || "09:00";
+      const endTime = (a.end as string) || addMinutes(startTime, dur);
+      const newTask: Task = {
+        id: `ai_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`,
+        title: action.title,
+        category: "personal",
+        priority: "medium",
+        importance: "medium",
+        urgency: "medium",
+        notes: (a.reason as string) || "",
+        goalId: "",
+        completed: false,
+        projectId: (a.projectId as string) || undefined,
+        dueDate: (a.date as string) || today,
+        estimatedHours: dur / 60,
+        scheduledDate: (a.date as string) || today,
+        scheduledStart: startTime,
+        scheduledEnd: endTime,
+        subtasks: [],
+        order: Date.now(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Task;
+      const updatedTasks = [...tasks, newTask];
+      await saveData({ ...data, version: data.version || 1, tasks: updatedTasks });
+      showUndoToast(`已创建「${action.title}」`, "撤回", () => {
+        void saveData({ ...data, version: data.version || 1, tasks });
+      });
+      // Mark action as accepted
+      setAiActions((prev) => prev.map((act) => act === action ? { ...act, type: "none" as const, reason: "已采纳" } : act));
+      return;
+    }
+    if (action.type === "schedule_task" && action.taskId && action.date) {
+      const a = action as Record<string, unknown>;
+      const updatedTasks = tasks.map((t) =>
+        t.id === action.taskId
+          ? { ...t, scheduledDate: action.date, scheduledStart: (a.start as string) || t.scheduledStart, scheduledEnd: (a.end as string) || t.scheduledEnd }
+          : t
+      );
+      await saveData({ ...data, version: data.version || 1, tasks: updatedTasks });
+      showUndoToast(`已安排任务到 ${action.date}`, "撤回", () => {
+        void saveData({ ...data, version: data.version || 1, tasks });
+      });
+    }
+    // Dismiss the action card
+    setAiActions((prev) => prev.filter((a) => a !== action));
+  }
+
+  function dismissAiAction(action: AiAction) {
+    setAiActions((prev) => prev.filter((a) => a !== action));
   }
 
   async function generateNextAction() {
@@ -2224,27 +2589,27 @@ function App() {
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
                         {tasks.map((task) => (
-                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
+                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(recordToTaskMap.get(task.id)?.id || task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
                             void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
                             showToast("已删除任务");
                           }} onClick={() => openTaskEdit(task)} onDragStart={(event) => {
                             event.dataTransfer.setData("taskId", task.id);
                             setDragCreate(null);
                             setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                          }} onDragEnd={() => setDrag(null)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} />
+                          }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} onToggleDone={() => toggleTaskDone(task.id)} />
                         ))}
                       </div>
                     );
                   })
               ) : visibleCandidates.map((task) => (
-                <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
+                <TaskCard key={task.id} task={task} projects={projects} focusDate={today} projectName={projectName(task)} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(recordToTaskMap.get(task.id)?.id || task.id, { projectId: projectId || undefined })} onReturnPlanning={() => returnToPlanning(task.id)} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
                   void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
                   showToast("已删除任务");
                 }} onClick={() => openTaskEdit(task)} onDragStart={(event) => {
                   event.dataTransfer.setData("taskId", task.id);
                   setDragCreate(null);
                   setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                }} onDragEnd={() => setDrag(null)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} />
+                }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} onToggleDone={() => toggleTaskDone(task.id)} />
               ))}
             </div>
             <form className="df-quick-add" onSubmit={(event) => {
@@ -2310,7 +2675,7 @@ function App() {
                   const weekdayShort = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
                   const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
                   const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
-                  const multiDayScheduledTasks = [...tasks.filter((task) => threeDates.includes(task.scheduledDate || "") && task.scheduledStart), ...previewTasks.filter((task) => threeDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+                  const multiDayScheduledTasks = [...expandTimelineRecords(new Set(threeDates)), ...previewTasks.filter((task) => threeDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
                   return (
                     <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(threeDates.length) } as CSSProperties}>
                       <div className="df-timeline-3day-top">
@@ -2382,11 +2747,11 @@ function App() {
                                   <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, colDate, null)} onCancel={() => setAllDayQuickAdd(null)} />
                                 )}
                                 {adTasks.map((task) => (
-                                  <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                                  <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(recordToTaskMap.get(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
                                     event.dataTransfer.setData("taskId", task.id);
                                     setDragCreate(null);
                                     setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                                  }} onDragEnd={() => setDrag(null)} />
+                                  }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} />
                                 ))}
                               </div>
                             );
@@ -2591,7 +2956,7 @@ function App() {
                                   const gap = timelineView === "weekly" ? 3 : 4;
                                   const baseLeft = dayIndex * multiColWidth + gutter;
                                   const innerW = multiColWidth - gutter * 2;
-                                  const cs = computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap);
+                                  const cs = computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap, timelineView);
                                   let left = baseLeft;
                                   let width = innerW;
                                   let overflow: CSSProperties["overflow"] = undefined;
@@ -2604,12 +2969,13 @@ function App() {
                                   return (
                                     <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
                                       if (!suppressBlockClickRef.current) openTaskEdit(task);
-                                    }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
+                                    }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(recordToTaskMap.get(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
                                     }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)}
                                       extraStyle={{ position: "absolute", left, width, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                                       onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
+                                      viewMode={timelineView}
                                     />
                                   );
                                 })}
@@ -2620,7 +2986,7 @@ function App() {
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
-                                    <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
+                                    <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
                                     />
                                   );
@@ -2678,7 +3044,12 @@ function App() {
                   const weeks: string[][] = [];
                   for (let w = 0; w < 6; w++) weeks.push(allMonthDays.slice(w * 7, w * 7 + 7));
                   function getDayTasks(day: string) {
-                    return tasks.filter((task) => task.scheduledDate === day || task.plannedForDate === day || task.dueDate === day);
+                    return tasks.filter((task) =>
+                      task.scheduledDate === day ||
+                      (task.timelineRecords || []).some((r) => r.scheduledDate === day) ||
+                      task.plannedForDate === day ||
+                      task.dueDate === day
+                    );
                   }
                   const baseDayH = 88, taskH = 28, taskGap = 6, weekPad = 18;
                   return (
@@ -2752,7 +3123,7 @@ function App() {
                                               setDragCreate(null);
                                               setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
                                             }}
-                                            onDragEnd={() => setDrag(null)}
+                                            onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }}
                                           ><span />{task.scheduledStart ? <time>{task.scheduledStart}</time> : null}{task.title}</button>
                                         ))}
                                         {monthQuickAdd && !drag && monthQuickAdd.date === day && (
@@ -2815,11 +3186,11 @@ function App() {
                           <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, allDayQuickAdd.date, null)} onCancel={() => setAllDayQuickAdd(null)} />
                         )}
                         {tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineDate).map((task) => (
-                          <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
+                          <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(recordToTaskMap.get(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
                             event.dataTransfer.setData("taskId", task.id);
                             setDragCreate(null);
                             setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                          }} onDragEnd={() => setDrag(null)} />
+                          }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} />
                         ))}
                       </div>
                     </div>
@@ -2950,7 +3321,7 @@ function App() {
                         })}
                         {isViewingToday && <NowLine />}
                         {scheduledTasks.length === 0 && schedulePreviews.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />拖任务到这里安排时间</div>}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={tasks.find((task) => task.id === drag.taskId)} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
                         {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => {
                           // Use dailyCanvasWidth from ResizeObserver if available,
                           // otherwise fall back to synchronously reading the DOM ref.
@@ -2960,7 +3331,7 @@ function App() {
                           const innerW = avail > 0 ? avail - 16 : 0;
                           const baseLeft = 8;
                           const gap = 4;
-                          const cs = innerW > 0 ? computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap) : null;
+                          const cs = innerW > 0 ? computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap, "daily") : null;
                           const left = cs ? cs.left : baseLeft;
                           const width = cs ? cs.width : innerW;
                           const extraStyle: CSSProperties | undefined = innerW > 0 ? { left, width } : undefined;
@@ -2969,11 +3340,12 @@ function App() {
                           return (
                             <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} onHover={setHoveredBlock} onEdit={() => {
                               if (!suppressBlockClickRef.current) openTaskEdit(task);
-                            }} onToggleDone={() => updateTask(task.id, { completed: !task.completed })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
+                            }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(recordToTaskMap.get(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                               createProjectForTask(task.id, title);
                             }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} extraStyle={{ ...extraStyle, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                               onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                               onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
+                              viewMode="daily"
                             />
                           );
                         })}
@@ -3035,10 +3407,10 @@ function App() {
       {!settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip="问Navo" aria-label="问Navo" onClick={() => setAiOpen((open) => !open)} />}
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => setDrawerOpen(false)} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} />}
-      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} reply={aiReply} busy={aiBusy} onSend={() => void sendAi()} onClose={() => setAiOpen(false)} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => setDrawerOpen(false)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} data={data} saveData={saveData} />}
+      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} reply={aiReply} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); setAiActions([]); setAiSteps([]); setAiMsg(""); }} actions={aiActions} onConfirmAction={(action) => void confirmAiAction(action)} onDismissAction={dismissAiAction} steps={aiSteps} userMsg={aiMsg} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} />}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" ? (() => void handleSignOut()) : undefined} />}
-      {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={tasks.find((task) => task.id === drag.taskId)} pointer={drag.pointer} />}
+      {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
@@ -3476,10 +3848,29 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void }) {
+/** Icon for tasks that were returned to planning but still show on timeline.
+ *  Three horizontal bars + a checkmark in the bottom-right.
+ *  Uses the project color for fill/stroke via currentColor. */
+function ReturnedToPlanIcon({ color }: { color?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" style={color ? { color } : undefined}>
+      {/* Soft background circle using project color at low opacity */}
+      <circle cx="11.5" cy="11.5" r="3.5" fill="currentColor" opacity="0.14" />
+      {/* Three horizontal bars — thick, solid */}
+      <rect x="1.5" y="2.5" width="9" height="2.2" rx="1.1" fill="currentColor" opacity="0.95" />
+      <rect x="1.5" y="6.2" width="7" height="2.2" rx="1.1" fill="currentColor" opacity="0.72" />
+      <rect x="1.5" y="9.9" width="5" height="2.2" rx="1.1" fill="currentColor" opacity="0.50" />
+      {/* Checkmark in bottom-right */}
+      <path d="M10.2 11.5L11.2 12.5L13 10.7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview, viewMode }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.MouseEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly" }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
+  const isWeekView = viewMode === "weekly";
   const start = preview?.start || task.scheduledStart || "09:00";
   const end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task));
   const top = timeBlockTop(start);
@@ -3495,26 +3886,31 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
     }
   }, [hovered]);
   const isPreview = Boolean(extraStyle && (extraStyle as Record<string, unknown>)["--df-preview" as string]);
+  const isReturnedUnfinished = task.executionStatus === "returned_unfinished";
   return (
-    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""}`} data-preview={isPreview ? "true" : undefined} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 38 ? "short-block" : ""}`} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
-    }} onMouseDown={onDragStart} onClick={onEdit} onDoubleClick={onEdit}>
+    }} onMouseDown={isReturnedUnfinished ? undefined : onDragStart} onClick={onEdit} onDoubleClick={onEdit} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
       {isPreview && <span className="df-preview-badge">待确认</span>}
-      <button className="df-resize-dot top" aria-label="调整开始时间" onMouseDown={(event) => onResizeStart(event, "start")} />
-      <div className="df-category-strip" />
-      <button className={`df-block-check ${task.completed ? "completed" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
-        event.stopPropagation();
-        onToggleDone();
-      }} aria-label={task.completed ? "标记未完成" : "标记完成"}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}</button>
+      {!isReturnedUnfinished && <button className="df-resize-dot top" aria-label="调整开始时间" onMouseDown={(event) => onResizeStart(event, "start")} />}
+      {!isWeekView && !isReturnedUnfinished && <div className="df-category-strip" />}
+      {!isWeekView && (
+        <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
+          event.stopPropagation();
+          onToggleDone();
+        }} aria-label={task.completed ? "标记未完成" : "标记完成"}>
+          {task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}
+        </button>
+      )}
       <div className="df-block-title-row">
-        <strong title={task.title}>{task.title}</strong>
-        {isPreview && (
-          <span className="df-preview-actions">
-            <button className="df-preview-action accept" onClick={(e) => { e.stopPropagation(); onAcceptPreview?.(); }} aria-label="采纳" title="采纳">✓</button>
-            <button className="df-preview-action cancel" onClick={(e) => { e.stopPropagation(); onCancelPreview?.(); }} aria-label="取消" title="取消">✕</button>
-          </span>
-        )}
+        <strong title={task.title} style={isWeekView ? { color: stripeColor } : undefined}>{task.title}</strong>
       </div>
+      {isPreview && (
+        <span className="df-preview-actions">
+          <button className="df-preview-action accept" onClick={(e) => { e.stopPropagation(); onAcceptPreview?.(); }} aria-label="采纳" title="采纳">✓</button>
+          <button className="df-preview-action cancel" onClick={(e) => { e.stopPropagation(); onCancelPreview?.(); }} aria-label="取消" title="取消">✕</button>
+        </span>
+      )}
       {hovered && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => {
           event.stopPropagation();
@@ -3522,7 +3918,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
         }}># {projectName}</button>
       </span>}
       {next && <span className="df-next">下一步：{next}</span>}
-      <button className="df-resize-dot bottom" aria-label="调整结束时间" onMouseDown={(event) => onResizeStart(event, "end")} />
+      {!isReturnedUnfinished && <button className="df-resize-dot bottom" aria-label="调整结束时间" onMouseDown={(event) => onResizeStart(event, "end")} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{
@@ -3557,7 +3953,8 @@ function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extr
   const top = timeBlockTop(startTime);
   const endTime = addMinutes(startTime, duration);
   const height = Math.max(timeBlockHeight(startTime, endTime), SLOT_HEIGHT);
-  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${conflict ? "conflict" : ""}`} style={{ top, height, ...extraStyle }}><strong>{task.title}</strong>{!draggingBlock && <span>{conflict ? "冲突" : startTime} · {Math.round(duration)}min</span>}</div>;
+  const color = categories[task.category]?.color || "#888";
+  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""}`} style={{ top, height, "--cat": color, ...extraStyle } as CSSProperties}><strong>{task.title}</strong>{!draggingBlock && <span>{startTime} · {Math.round(duration)}min</span>}</div>;
 }
 
 function ProjectColorPicker({ value, onChange, compact = false, presets = PROJECT_COLOR_PRESETS }: { value: string; onChange: (color: string) => void; compact?: boolean; presets?: string[] }) {
@@ -3633,6 +4030,7 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   const isShortName = task.title.length <= 6;
+  const isReturnedUnfinished = task.executionStatus === "returned_unfinished";
   const [badgeWidth, setBadgeWidth] = useState(0);
   useLayoutEffect(() => {
     if (hovered && projectBtnRef.current) {
@@ -3642,12 +4040,12 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
     }
   }, [hovered]);
   return (
-    <article className={`df-all-day-block ${task.completed ? "completed" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}`} draggable style={{ "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }}>
-      <div className="df-category-strip" />
-      <button className={`df-block-check ${task.completed ? "completed" : ""}`} onClick={(event) => {
+    <article className={`df-all-day-block ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}`} draggable={!isReturnedUnfinished} style={{ "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onDragStart={isReturnedUnfinished ? undefined : onDragStart} onDragEnd={onDragEnd} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+      {!isReturnedUnfinished && <div className="df-category-strip" />}
+      <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onClick={(event) => {
         event.stopPropagation();
         onToggleDone();
-      }}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}</button>
+      }}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}</button>
       <strong title={task.title}>{task.title}</strong>
       {hovered && <span className="df-block-project-wrap" onClick={(event) => event.stopPropagation()}>
         <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => { event.stopPropagation(); setProjectOpen((open) => !open); }}># {projectName}</button>
@@ -3695,6 +4093,7 @@ function NowLine({ extraStyle }: { extraStyle?: CSSProperties }) {
 
 function EditDrawer(props: {
   type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
+  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>;
 }) {
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -3794,24 +4193,62 @@ function EditDrawer(props: {
     });
   }
   function scheduleText(task: Task) {
-    if (task.scheduledDate && task.scheduledStart && task.scheduledEnd) return `${task.scheduledDate} ${task.scheduledStart} - ${task.scheduledEnd} · ${formatDuration(taskDuration(task) / 60)}`;
+    const activeRecord = props.editingRecordId
+      ? (task.timelineRecords || []).find((r) => r.id === props.editingRecordId)
+      : null;
+    const sd = activeRecord?.scheduledDate || task.scheduledDate;
+    const ss = activeRecord?.scheduledStart || task.scheduledStart;
+    const se = activeRecord?.scheduledEnd || task.scheduledEnd;
+    if (sd && ss && se) {
+      const dur = (timeToMinutes(se) - timeToMinutes(ss)) / 60;
+      return `${sd} ${ss} - ${se} · ${formatDuration(dur)}`;
+    }
     if (task.plannedForDate === props.today) return "今天 · 未安排具体时间";
     if (task.dueDate) return `${task.dueDate} · ${formatDuration(f.estimatedHours || 0.5)}`;
     return "未安排";
   }
   if (props.editing && props.type === "task" && props.task) {
-    const isCandidate = props.task.plannedForDate === props.today && !props.task.scheduledDate;
-    const isScheduled = props.task.scheduledDate === props.today || Boolean(props.task.scheduledDate && props.task.scheduledStart);
-    const showUncomplete = (props.task.completed || isScheduled);
+    const activeRecord = props.editingRecordId
+      ? (props.task.timelineRecords || []).find((r) => r.id === props.editingRecordId)
+      : null;
+    const isCandidate = props.task.plannedForDate === props.today && !activeRecord && !(props.task.timelineRecords || []).some((r) => r.executionStatus === "scheduled");
+    const isScheduled = activeRecord
+      ? (activeRecord.scheduledDate === props.today || Boolean(activeRecord.scheduledDate && activeRecord.scheduledStart))
+      : Boolean(props.task.scheduledDate && props.task.scheduledStart);
+    const recordStatus = activeRecord?.executionStatus;
+    const showUncomplete = (
+      props.task.completed ||
+      (isScheduled && recordStatus !== "returned_unfinished")
+    );
     function handleUncomplete() {
-      if (!props.task) return;
-      props.onTaskUpdate(props.task.id, {
-        completed: false,
-        scheduledDate: undefined,
-        scheduledStart: undefined,
-        scheduledEnd: undefined,
-        plannedForDate: props.task.completed ? undefined : props.task.plannedForDate,
-      });
+      if (!props.task || !props.data || !props.saveData) return;
+      if (props.editingRecordId) {
+        // Update the specific timeline record, not the task
+        const now = new Date().toISOString();
+        void props.saveData({
+          ...props.data,
+          tasks: props.data.tasks.map((t) =>
+            t.id === props.task!.id
+              ? {
+                  ...t,
+                  completed: false,
+                  plannedForDate: props.task!.plannedForDate || props.today,
+                  timelineRecords: (t.timelineRecords || []).map((r) =>
+                    r.id === props.editingRecordId ? { ...r, executionStatus: "returned_unfinished" as const } : r
+                  ),
+                  updatedAt: now,
+                }
+              : t
+          ),
+        });
+      } else {
+        // Legacy: no specific record, update the task directly
+        props.onTaskUpdate(props.task.id, {
+          completed: false,
+          plannedForDate: props.task.plannedForDate || props.today,
+        });
+      }
+      if (props.setEditingRecordId) props.setEditingRecordId(undefined);
     }
     return (
       <aside className="df-drawer df-task-detail">
@@ -3820,13 +4257,14 @@ function EditDrawer(props: {
           <input type="checkbox" checked={props.task.completed} onChange={props.onToggleDone} />
           <div>
             <input value={f.title} onChange={(event) => set("title", event.target.value)} />
-            <span>{props.task.completed ? "已完成" : "未完成"} · {isScheduled ? "今日执行" : isCandidate ? "今天" : "未安排"} · {priorityText}</span>
+            <span>{props.task.completed ? "已完成" : recordStatus === "returned_unfinished" ? "未完成 · 已回到规划" : "未完成"} · {isScheduled && recordStatus !== "returned_unfinished" ? "今日执行" : isCandidate ? "今天" : "未安排"} · {priorityText}</span>
           </div>
         </section>
         <section className="df-detail-context">
           {!isCandidate && !isScheduled && <><span>这个任务还没有安排</span><button onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: props.today, scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined })}>加入候选</button></>}
           {isCandidate && <><span>已加入候选任务</span><select value={f.priority} onChange={(event) => { set("priority", event.target.value as Priority); props.onTaskUpdate(props.task!.id, { priority: event.target.value as Priority }); }}><option value="high">必须做</option><option value="medium">应该做</option><option value="low">有空做</option></select><button onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: undefined })}>移出候选</button></>}
-          {isScheduled && <span>已加入今日执行 · {scheduleText(props.task)}</span>}
+          {isScheduled && recordStatus !== "returned_unfinished" && <span>已加入今日执行 · {scheduleText(props.task)}</span>}
+          {isScheduled && recordStatus === "returned_unfinished" && <span>曾安排于今日 · {scheduleText(props.task)} · 已回到规划中</span>}
         </section>
         <section className="df-detail-section">
           <h3>安排</h3>
@@ -3885,8 +4323,106 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, reply, busy, onSend, onClose }: { input: string; setInput: (v: string) => void; reply: string; busy: boolean; onSend: () => void; onClose: () => void }) {
-  return <aside className="df-ai-panel"><div><strong>NavoPath AI</strong><button className="df-icon-action i-close" data-tip="关闭" aria-label="关闭" onClick={onClose} /></div><textarea value={input} onChange={(event) => setInput(event.target.value)} /><button className="df-icon-action i-send" data-tip={busy ? "思考中" : "发送"} aria-label={busy ? "思考中" : "发送"} onClick={onSend} disabled={busy || !input.trim()} />{reply && <pre>{reply}</pre>}</aside>;
+function AiPanel({ input, setInput, reply, busy, onSend, onClose, actions, onConfirmAction, onDismissAction, steps, userMsg, projectList }: { input: string; setInput: (v: string) => void; reply: string; busy: boolean; onSend: () => void; onClose: () => void; actions?: AiAction[]; onConfirmAction?: (action: AiAction) => void; onDismissAction?: (action: AiAction) => void; steps?: AiStep[]; userMsg?: string; projectList?: { id: string; title: string; color?: string }[] }) {
+  const projects = projectList || [];
+  return <aside className="df-ai-panel">
+    {/* Header */}
+    <div className="df-ai-panel-head">
+      <strong>NavoPath AI</strong>
+      <button className="df-icon-action i-close" data-tip="关闭" aria-label="关闭" onClick={onClose} />
+    </div>
+
+    {/* Scrollable content */}
+    <div className="df-ai-panel-body">
+      {/* User message bubble */}
+      {userMsg && (
+        <div className="df-ai-msg-bubble user">
+          <span>{userMsg}</span>
+        </div>
+      )}
+
+      {/* Step feedback */}
+      {steps && steps.length > 0 && (
+        <div className="df-ai-steps">
+          {steps.map((s, i) => (
+            <div key={i} className={`df-ai-step ${s.status}`}>
+              <span className="df-ai-step-icon">
+                {s.status === "done" ? "✓" : s.status === "error" ? "✕" : s.status === "running" ? "●" : "○"}
+              </span>
+              <span className="df-ai-step-label">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Action cards */}
+      {actions && actions.length > 0 && (
+        <div className="df-ai-actions">
+          <div className="df-ai-action-header">Create scheduled tasks</div>
+          {actions.map((action, i) => {
+            const a = action as Record<string, unknown>;
+            const title = a.title as string || a.type as string;
+            const date = a.date as string | undefined;
+            const start = a.start as string | undefined;
+            const end = a.end as string | undefined;
+            const dur = a.durationMinutes as number | undefined;
+            const projectName = (a.projectName as string) || undefined;
+            const projectId = (a.projectId as string) || undefined;
+            const reason = typeof a.reason === 'string' ? a.reason : undefined;
+            const isAccepted = action.type === "none";
+            const proj = projectId ? projects.find((p: any) => String(p.id) === String(projectId)) : null;
+            const finalProjectName = projectName || proj?.title || "未归属任务";
+            const projColor = proj?.color;
+            return (
+            <div key={i} className={`df-ai-task-card ${isAccepted ? "accepted" : ""}`}>
+              {projColor && <span className="df-ai-task-strip" style={{ background: projColor }} />}
+              <div className="df-ai-task-body">
+                <div className="df-ai-task-row-top">
+                  <strong>{title}</strong>
+                  {start && end && <time>{start} - {end}</time>}
+                </div>
+                <div className="df-ai-task-row-mid">
+                  <span className="df-ai-task-project"># {finalProjectName}</span>
+                </div>
+                <div className="df-ai-task-row-bot">
+                  {dur && <span className="df-ai-task-dur">{dur} min</span>}
+                  {reason && <small>{reason}</small>}
+                </div>
+              </div>
+              {!isAccepted && (
+                <div className="df-ai-task-actions">
+                  <button className="df-ai-task-accept" onClick={() => onConfirmAction?.(action)} title="采纳">✓</button>
+                  <button className="df-ai-task-cancel" onClick={() => onDismissAction?.(action)} title="取消">✕</button>
+                </div>
+              )}
+              {isAccepted && <span className="df-ai-task-done">已采纳</span>}
+            </div>
+          );})}
+        </div>
+      )}
+
+      {/* AI reply text */}
+      {reply && <div className="df-ai-reply">{reply}</div>}
+    </div>
+
+    {/* Input area */}
+    <div className="df-ai-panel-foot">
+      <textarea
+        value={input}
+        onChange={(event) => setInput(event.target.value)}
+        placeholder="例如：今天晚上设计火箭模型 #准备ESAT"
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
+      />
+      <button
+        className="df-ai-send-btn"
+        onClick={onSend}
+        disabled={busy || !input.trim()}
+        title={busy ? "思考中" : "发送"}
+      >
+        {busy ? "●" : "↑"}
+      </button>
+    </div>
+  </aside>;
 }
 
 function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout, onSignOut }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onShowAbout: () => void; onSignOut?: () => void }) {

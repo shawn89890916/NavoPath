@@ -6,6 +6,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day";
 
+export type AiStep = {
+  label: string;
+  status: "pending" | "running" | "done" | "error";
+};
+
 export type AiAction =
   | {
       type: "create_subtasks";
@@ -32,6 +37,17 @@ export type AiAction =
       reason?: string;
     }
   | {
+      type: "create_scheduled_task";
+      title?: string;
+      projectId?: string;
+      projectName?: string;
+      date?: string;
+      start?: string;
+      end?: string;
+      durationMinutes?: number;
+      reason?: string;
+    }
+  | {
       type: "plan_day";
       reason?: string;
     }
@@ -43,6 +59,7 @@ export type AiAction =
 export type AiAssistantResponse = {
   reply: string;
   actions: AiAction[];
+  steps?: AiStep[];
 };
 
 function uid(prefix: string) {
@@ -72,46 +89,62 @@ export async function callAiAssistant(params: {
   const client = getClient();
   if (!client) {
     return {
-      reply: "AI 服务未部署",
+      reply: "AI 服务未配置，请在设置中连接 Supabase。",
       actions: [],
+      steps: [{ label: "连接 AI 服务", status: "error" }],
     };
   }
 
+  // Always include current date context for date parsing
+  const currentDate = new Date().toISOString().slice(0, 10);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const enrichedContext = {
+    currentDate,
+    timezone,
+    ...(params.context as Record<string, unknown> || {}),
+  };
+
   try {
     const { data, error } = await client.functions.invoke("ai-assistant", {
-      body: params,
+      body: { ...params, context: enrichedContext },
     });
 
     if (error) {
       console.error("AI Assistant edge function error:", error);
       const msg = error.message || "";
       if (msg.includes("Missing DEEPSEEK_API_KEY")) {
-        return { reply: "AI 服务未配置 API Key", actions: [] };
+        return { reply: "AI 服务未配置 API Key，请联系管理员。", actions: [], steps: [{ label: "验证 API Key", status: "error" }] };
       }
       if (msg.includes("function not found") || msg.includes("not deployed")) {
-        return { reply: "AI 服务未部署", actions: [] };
+        return { reply: "AI 服务未部署，请在 Supabase 部署 ai-assistant 函数。", actions: [], steps: [{ label: "连接 AI 服务", status: "error" }] };
       }
-      return { reply: "AI 请求失败，请稍后重试", actions: [] };
+      return { reply: "AI 请求失败，请稍后重试。", actions: [], steps: [{ label: "请求 AI 服务", status: "error" }] };
     }
 
     if (!data) {
-      return { reply: "AI 未返回有效内容", actions: [] };
+      return {
+        reply: "AI 返回格式异常，请重试。",
+        actions: [],
+        steps: [{ label: "解析 AI 响应", status: "error" }],
+      };
     }
 
     if (typeof data === "string") {
-      return { reply: data, actions: [] };
+      return { reply: data, actions: [], steps: [{ label: "AI 回复", status: "done" }] };
     }
 
-    const result = data as AiAssistantResponse;
+    const result = data as AiAssistantResponse & { steps?: AiStep[] };
     return {
       reply: result.reply || "完成",
       actions: Array.isArray(result.actions) ? result.actions : [],
+      steps: Array.isArray(result.steps) ? result.steps : [],
     };
   } catch (err) {
     console.error("AI Assistant network error:", err);
     return {
-      reply: "网络异常，请重试",
+      reply: "网络异常，请检查连接后重试。",
       actions: [],
+      steps: [{ label: "网络连接", status: "error" }],
     };
   }
 }
