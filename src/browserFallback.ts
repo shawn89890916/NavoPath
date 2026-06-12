@@ -342,6 +342,7 @@ export function installBrowserFallback() {
   const defaultSettings: Settings = {
     activeMode: "execute",
     defaultTimelineView: "daily",
+    language: "en",
     planningView: "tree",
     aiDockOpen: false,
     appTitle: "NavoPath",

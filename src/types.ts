@@ -177,9 +177,12 @@ export interface PlannerData {
   taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
 }
 
+export type Language = "en" | "zh";
+
 export interface Settings {
   activeMode: "execute" | "planning";
   defaultTimelineView?: "daily" | "3day" | "weekly" | "month";
+  language: Language;
   planningView: "tree" | "matrix" | "split";
   aiDockOpen: boolean;
   appTitle: string;

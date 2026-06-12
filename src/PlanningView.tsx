@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PlannerData, Project, Subtask, Task } from "./types";
+import { t, priLabels, type Language } from "./i18n";
 
 type PlanPickPriority = "must" | "should" | "could";
 
@@ -162,6 +163,7 @@ function TreeMenu(props: {
 }
 
 function PlanningSubtaskNode(props: {
+  lang: Language;
   subtask: Subtask;
   projectColor: string;
   onToggle: (subtaskId: string) => void;
@@ -183,7 +185,7 @@ function PlanningSubtaskNode(props: {
         <button
           className={`df-subtask-check ${done ? "done" : ""}`}
           onClick={() => props.onToggle(props.subtask.id)}
-          aria-label={done ? "标记未完成" : "标记完成"}
+          aria-label={done ? t(props.lang, "planning.markIncomplete") : t(props.lang, "planning.markComplete")}
           style={done ? { "--project-color": props.projectColor } as React.CSSProperties : undefined}
         >
           {done && <CheckIcon size={10} />}
@@ -207,8 +209,8 @@ function PlanningSubtaskNode(props: {
               event.stopPropagation();
               props.onPromote(props.subtask.id);
             }}
-            aria-label="移到规划"
-            title="移到规划"
+            aria-label={t(props.lang, "planning.moveToPlanning")}
+            title={t(props.lang, "planning.moveToPlanning")}
           >
             <ArrowRightIcon />
           </button>
@@ -218,8 +220,8 @@ function PlanningSubtaskNode(props: {
               event.stopPropagation();
               setMenuOpen((open) => !open);
             }}
-            aria-label="更多"
-            title="更多"
+            aria-label={t(props.lang, "planning.more")}
+            title={t(props.lang, "planning.more")}
           >
             <MoreIcon />
           </button>
@@ -228,10 +230,10 @@ function PlanningSubtaskNode(props: {
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
           actions={[
-            { label: "编辑名称", onClick: () => props.onRename(props.subtask.id) },
-            { label: "设置日期", onClick: () => props.onSetDate(props.subtask.id) },
-            { label: "移动到项目", onClick: () => props.onMoveProject(props.subtask.id) },
-            { label: "删除", danger: true, onClick: () => props.onDelete(props.subtask.id) },
+            { label: t(props.lang, "planning.editName"), onClick: () => props.onRename(props.subtask.id) },
+            { label: t(props.lang, "planning.setDate"), onClick: () => props.onSetDate(props.subtask.id) },
+            { label: t(props.lang, "planning.moveToProject"), onClick: () => props.onMoveProject(props.subtask.id) },
+            { label: t(props.lang, "planning.delete"), danger: true, onClick: () => props.onDelete(props.subtask.id) },
           ]}
         />
       </div>
@@ -240,6 +242,7 @@ function PlanningSubtaskNode(props: {
 }
 
 function PlanningTaskNode(props: {
+  lang: Language;
   task: Task;
   picked: boolean;
   projectColor: string;
@@ -286,7 +289,7 @@ function PlanningTaskNode(props: {
                 event.stopPropagation();
                 props.onToggleCollapse();
               }}
-              aria-label={props.collapsed ? "展开子任务" : "折叠子任务"}
+              aria-label={props.collapsed ? t(props.lang, "planning.expandSubtasks") : t(props.lang, "planning.collapseSubtasks")}
             >
               <ChevronIcon open={!props.collapsed} />
             </button>
@@ -298,8 +301,8 @@ function PlanningTaskNode(props: {
                 event.stopPropagation();
                 props.onAddToPick();
               }}
-              aria-label="加入候选"
-              title="加入候选"
+              aria-label={t(props.lang, "planning.addToCandidate")}
+              title={t(props.lang, "planning.addToCandidate")}
             >
               <ArrowRightIcon />
             </button>
@@ -309,8 +312,8 @@ function PlanningTaskNode(props: {
                 event.stopPropagation();
                 setMenuOpen((open) => !open);
               }}
-              aria-label="更多"
-              title="更多"
+              aria-label={t(props.lang, "planning.more")}
+              title={t(props.lang, "planning.more")}
             >
               <MoreIcon />
             </button>
@@ -319,11 +322,11 @@ function PlanningTaskNode(props: {
             open={menuOpen}
             onClose={() => setMenuOpen(false)}
             actions={[
-              { label: "编辑名称", onClick: props.onRename },
-              { label: "添加子任务", onClick: props.onAddSubtask },
-              { label: "设置日期", onClick: props.onSetDate },
-              { label: "移动到项目", onClick: props.onMoveProject },
-              { label: "删除", danger: true, onClick: props.onDelete },
+              { label: t(props.lang, "planning.editName"), onClick: props.onRename },
+              { label: t(props.lang, "planning.addSubtask"), onClick: props.onAddSubtask },
+              { label: t(props.lang, "planning.setDate"), onClick: props.onSetDate },
+              { label: t(props.lang, "planning.moveToProject"), onClick: props.onMoveProject },
+              { label: t(props.lang, "planning.delete"), danger: true, onClick: props.onDelete },
             ]}
           />
         </div>
@@ -333,6 +336,7 @@ function PlanningTaskNode(props: {
 }
 
 function PlanningProjectNode(props: {
+  lang: Language;
   project: Project;
   taskCount: number;
   collapsed: boolean;
@@ -373,10 +377,10 @@ function PlanningProjectNode(props: {
         </span>
         <span className="df-project-badge">{props.taskCount}</span>
         <div className="df-project-node-actions">
-          <button className="df-tree-icon-button df-project-add-btn" onClick={props.onAddTask} aria-label="添加任务" title="添加任务">
+          <button className="df-tree-icon-button df-project-add-btn" onClick={props.onAddTask} aria-label={t(props.lang, "planning.addTask")} title={t(props.lang, "planning.addTask")}>
             <PlusIcon />
           </button>
-          <button className="df-tree-icon-button df-collapse-btn" onClick={props.onToggleCollapse} aria-label={props.collapsed ? "展开项目" : "折叠项目"}>
+          <button className="df-tree-icon-button df-collapse-btn" onClick={props.onToggleCollapse} aria-label={props.collapsed ? t(props.lang, "planning.expandProject") : t(props.lang, "planning.collapseProject")}>
             <ChevronIcon open={!props.collapsed} />
           </button>
         </div>
@@ -572,6 +576,7 @@ function useTreeLines(
 }
 
 export default function PlanningView(props: {
+  lang: Language;
   data: PlannerData;
   projects: Project[];
   tasks: Task[];
@@ -630,25 +635,25 @@ export default function PlanningView(props: {
 
   const unassigned = safeTasks.filter((task) => task && !task.projectId && !task.completed);
 
-  const priorityGroups: Array<[PlanPickPriority, string]> = [
-    ["must", "必须做"],
-    ["should", "应该做"],
-    ["could", "有空做"],
-  ];
+  const priorityGroups: Array<[PlanPickPriority, string]> = useMemo(() => [
+    ["must", priLabels(props.lang)[0]],
+    ["should", priLabels(props.lang)[1]],
+    ["could", priLabels(props.lang)[2]],
+  ], [props.lang]);
 
   const projectName = useCallback(
-    (task: Task) => safeProjects.find((project) => String(project.id) === String(task.projectId || ""))?.title || "未归属",
-    [safeProjects],
+    (task: Task) => safeProjects.find((project) => String(project.id) === String(task.projectId || ""))?.title || t(props.lang, "planning.unassigned"),
+    [safeProjects, props.lang],
   );
 
   const renameTask = useCallback((task: Task) => {
-    const title = window.prompt("编辑名称", task.title);
+    const title = window.prompt(t(props.lang, "planning.editName"), task.title);
     if (!title?.trim()) return;
     props.onTaskUpdate(task.id, { title: title.trim() });
   }, [props]);
 
   const addSubtask = useCallback((task: Task) => {
-    const title = window.prompt("子任务名称");
+    const title = window.prompt(t(props.lang, "planning.addSubtask"));
     if (!title?.trim()) return;
     props.onTaskUpdate(task.id, {
       subtasks: [
@@ -659,14 +664,19 @@ export default function PlanningView(props: {
   }, [props]);
 
   const setTaskDate = useCallback((task: Task) => {
-    const date = window.prompt("设置日期 YYYY-MM-DD", task.dueDate || todayIso());
+    const date = window.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
     if (!date?.trim()) return;
     props.onTaskUpdate(task.id, { dueDate: date.trim() });
   }, [props]);
 
   const moveTaskProject = useCallback((task: Task) => {
     const options = safeProjects.map((project, index) => `${index + 1}. ${project.title}`).join("\n");
-    const choice = window.prompt(`移动到项目：\n0. 未归属\n${options}`, "0");
+    const choice = window.prompt(
+      props.lang === "zh"
+        ? `移动到项目：\n0. 未归属\n${options}`
+        : `Move to project:\n0. Unassigned\n${options}`,
+      "0",
+    );
     if (choice === null) return;
     const index = Number(choice) - 1;
     props.onTaskUpdate(task.id, { projectId: index >= 0 ? safeProjects[index]?.id : undefined });
@@ -688,7 +698,7 @@ export default function PlanningView(props: {
     for (const task of safeTasks) {
       const subtask = (task.subtasks || []).find((s) => s.id === subtaskId);
       if (subtask) {
-        const title = window.prompt("编辑子任务名称", subtask.title);
+        const title = window.prompt(t(props.lang, "planning.editName"), subtask.title);
         if (!title?.trim()) return;
         props.onTaskUpdate(task.id, {
           subtasks: (task.subtasks || []).map((s) =>
@@ -701,7 +711,7 @@ export default function PlanningView(props: {
   }, [safeTasks, props]);
 
   const deleteSubtask = useCallback((subtaskId: string) => {
-    if (!window.confirm("确定删除此子任务？")) return;
+    if (!window.confirm(props.lang === "zh" ? "确定删除此子任务？" : "Delete this subtask?")) return;
     for (const task of safeTasks) {
       if ((task.subtasks || []).some((s) => s.id === subtaskId)) {
         props.onTaskUpdate(task.id, {
@@ -720,7 +730,7 @@ export default function PlanningView(props: {
     for (const task of safeTasks) {
       const subtask = (task.subtasks || []).find((s) => s.id === subtaskId);
       if (subtask) {
-        const date = window.prompt("设置日期 YYYY-MM-DD", task.dueDate || todayIso());
+        const date = window.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
         if (!date?.trim()) return;
         props.onTaskUpdate(task.id, {
           subtasks: (task.subtasks || []).map((s) =>
@@ -736,7 +746,12 @@ export default function PlanningView(props: {
     for (const task of safeTasks) {
       if ((task.subtasks || []).some((s) => s.id === subtaskId)) {
         const options = safeProjects.map((p, i) => `${i + 1}. ${p.title}`).join("\n");
-        const choice = window.prompt(`移动父任务到项目：\n0. 未归属\n${options}`, "0");
+        const choice = window.prompt(
+          props.lang === "zh"
+            ? `移动父任务到项目：\n0. 未归属\n${options}`
+            : `Move parent task to project:\n0. Unassigned\n${options}`,
+          "0",
+        );
         if (choice === null) return;
         const index = Number(choice) - 1;
         props.onTaskUpdate(task.id, { projectId: index >= 0 ? safeProjects[index]?.id : undefined });
@@ -763,10 +778,10 @@ export default function PlanningView(props: {
           {props.pickMode && (
             <div className="df-pick-banner">
               <div>
-                <strong>正在从规划中选择任务</strong>
-                <span>点击任务旁的 → 加入候选框，确认后加入执行列表。</span>
+                <strong>{t(props.lang, "planning.selectingTasks")}</strong>
+                <span>{t(props.lang, "planning.selectInstruction")}</span>
               </div>
-              <button onClick={props.onExitPickMode}>退出</button>
+              <button onClick={props.onExitPickMode}>{t(props.lang, "planning.exit")}</button>
             </div>
           )}
 
@@ -775,6 +790,7 @@ export default function PlanningView(props: {
             {visibleProjects.map(({ project, tasks }) => (
               <div className="df-category-branch" key={project.id} data-project-id={project.id}>
                 <PlanningProjectNode
+                  lang={props.lang}
                   project={project}
                   taskCount={tasks.length}
                   collapsed={Boolean(props.collapsed[project.id])}
@@ -787,6 +803,7 @@ export default function PlanningView(props: {
                     {tasks.map((task) => (
                       <div className="df-task-branch" key={task.id}>
                         <PlanningTaskNode
+                          lang={props.lang}
                           task={task}
                           picked={Boolean(props.picks[task.id])}
                           projectColor={project.color || DEFAULT_PROJECT_COLOR}
@@ -805,6 +822,7 @@ export default function PlanningView(props: {
                           <div className="df-subtask-list" data-parent-id={task.id}>
                             {(task.subtasks || []).map((subtask) => (
                               <PlanningSubtaskNode
+                                lang={props.lang}
                                 key={subtask.id}
                                 subtask={subtask}
                                 projectColor={project.color || DEFAULT_PROJECT_COLOR}
@@ -828,7 +846,8 @@ export default function PlanningView(props: {
             {unassigned.length > 0 && (
               <div className="df-category-branch" data-project-id="__unassigned__">
                 <PlanningProjectNode
-                  project={createProjectShell("未归属任务")}
+                  lang={props.lang}
+                  project={createProjectShell(t(props.lang, "planning.unassignedTasks"))}
                   taskCount={unassigned.length}
                   collapsed={Boolean(props.collapsed.unassigned)}
                   onToggleCollapse={() => props.setCollapsed((current) => ({ ...current, unassigned: !current.unassigned }))}
@@ -840,6 +859,7 @@ export default function PlanningView(props: {
                     {unassigned.map((task) => (
                       <div className="df-task-branch" key={task.id}>
                         <PlanningTaskNode
+                          lang={props.lang}
                           task={task}
                           picked={Boolean(props.picks[task.id])}
                           projectColor={UNASSIGNED_COLOR}
@@ -858,6 +878,7 @@ export default function PlanningView(props: {
                           <div className="df-subtask-list" data-parent-id={task.id}>
                             {(task.subtasks || []).map((subtask) => (
                               <PlanningSubtaskNode
+                                lang={props.lang}
                                 key={subtask.id}
                                 subtask={subtask}
                                 projectColor={UNASSIGNED_COLOR}
@@ -885,12 +906,12 @@ export default function PlanningView(props: {
 
       <section className="df-pick-panel" style={{ flex: `${100 - leftRatio}%`, minWidth: 0 }}>
           <div className="df-pick-panel-head">
-            <strong>候选任务</strong>
-            <span>{pickedTasks.length} 项</span>
+            <strong>{t(props.lang, "planning.candidateTasks")}</strong>
+            <span>{pickedTasks.length}{t(props.lang, "planning.countItems")}</span>
           </div>
 
           {pickedTasks.length === 0 ? (
-            <div className="df-pick-empty">从左侧选择几个今天想做的任务</div>
+            <div className="df-pick-empty">{t(props.lang, "planning.selectPrompt")}</div>
           ) : (
             priorityGroups.map(([priority, label]) => {
               const groupTasks = pickedTasks.filter((task) => props.picks[task.id] === priority);
@@ -898,7 +919,7 @@ export default function PlanningView(props: {
                 <div className="df-pick-group" key={priority}>
                   <h3>{label}</h3>
                   {groupTasks.length === 0 ? (
-                    <small>暂无</small>
+                    <small>{t(props.lang, "planning.none")}</small>
                   ) : (
                     groupTasks.map((task) => (
                       <article key={task.id} className="df-pick-card">
@@ -907,11 +928,11 @@ export default function PlanningView(props: {
                           <span># {projectName(task)}</span>
                         </div>
                         <select value={props.picks[task.id]} onChange={(event) => props.onUpdatePick(task.id, event.target.value as PlanPickPriority)}>
-                          <option value="must">必须做</option>
-                          <option value="should">应该做</option>
-                          <option value="could">有空做</option>
+                          <option value="must">{priLabels(props.lang)[0]}</option>
+                          <option value="should">{priLabels(props.lang)[1]}</option>
+                          <option value="could">{priLabels(props.lang)[2]}</option>
                         </select>
-                        <button onClick={() => props.onRemovePick(task.id)}>移除</button>
+                        <button onClick={() => props.onRemovePick(task.id)}>{t(props.lang, "planning.remove")}</button>
                       </article>
                     ))
                   )}
@@ -921,9 +942,9 @@ export default function PlanningView(props: {
           )}
 
           <div className="df-pick-actions">
-            <button className="primary" disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("today")}>加入今日执行</button>
-            <button disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("week")}>加入本周计划</button>
-            <button className="light" disabled={pickedTasks.length === 0} onClick={props.onClearPicks}>清空候选</button>
+            <button className="primary" disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("today")}>{t(props.lang, "planning.addToToday")}</button>
+            <button disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("week")}>{t(props.lang, "planning.addToWeek")}</button>
+            <button className="light" disabled={pickedTasks.length === 0} onClick={props.onClearPicks}>{t(props.lang, "planning.clearCandidates")}</button>
           </div>
         </section>
       </div>

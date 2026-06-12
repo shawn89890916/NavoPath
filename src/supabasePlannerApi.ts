@@ -14,6 +14,7 @@ function now() {
 
 const defaultSettings: Settings = {
   activeMode: "execute",
+  language: "en",
   planningView: "tree",
   aiDockOpen: false,
   appTitle: "NavoPath",
