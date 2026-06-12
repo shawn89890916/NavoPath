@@ -133,6 +133,8 @@ export const TR = {
       deletedTask: "已删除任务",
       addPlaceholder: "添加任务 #项目",
       add: "添加",
+      collapse: "收起面板",
+      expand: "展开面板",
     },
     en: {
       title: "Today's Candidates",
@@ -147,6 +149,8 @@ export const TR = {
       deletedTask: "Deleted task",
       addPlaceholder: "Add task #project",
       add: "Add",
+      collapse: "Collapse Panel",
+      expand: "Expand Panel",
     },
   },
 
@@ -663,6 +667,7 @@ export const TR = {
       addToToday: "加入今日执行",
       addToWeek: "加入本周计划",
       clearCandidates: "清空候选",
+      showAdded: "显示已添加",
     },
     en: {
       markIncomplete: "Mark Incomplete",
@@ -693,6 +698,7 @@ export const TR = {
       addToToday: "Add to Today's Execution",
       addToWeek: "Add to Weekly Plan",
       clearCandidates: "Clear Candidates",
+      showAdded: "Show Added",
     },
   },
 

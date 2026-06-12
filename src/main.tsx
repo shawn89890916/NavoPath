@@ -873,6 +873,7 @@ function App() {
   const [quickProjectOpen, setQuickProjectOpen] = useState(false);
   const [quickProjectTitle, setQuickProjectTitle] = useState("");
   const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
+  const [candidatePanelCollapsed, setCandidatePanelCollapsed] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -916,6 +917,11 @@ function App() {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  // Auto-expand candidate panel when switching away from weekly view
+  useEffect(() => {
+    if (timelineView !== "weekly") setCandidatePanelCollapsed(false);
+  }, [timelineView]);
 
   async function loadInitial() {
     const api = await waitForPlannerApi();
@@ -3164,15 +3170,25 @@ function App() {
       <div id="df-portal-target" />
 
       {mode === "execute" ? (
-        <main className="df-execute">
-          <section className="df-candidate-panel" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+        <main className={`df-execute${candidatePanelCollapsed && timelineView === "weekly" ? " candidate-collapsed" : ""}`}>
+          <section className={`df-candidate-panel${candidatePanelCollapsed && timelineView === "weekly" ? " collapsed" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
             if (taskId) unscheduleTask(taskId);
           }}>
+            {candidatePanelCollapsed && timelineView === "weekly" ? (
+              <div className="df-candidate-collapsed-strip">
+                <button className="df-candidate-expand-btn" title={t(lang, "candidate.title")} aria-label={t(lang, "candidate.title")} onClick={() => setCandidatePanelCollapsed(false)}>&#9654;</button>
+                <span className="df-candidate-collapsed-label">{t(lang, "candidate.title")}</span>
+              </div>
+            ) : (
+              <>
             <div className="df-panel-title">
               <h2>{t(lang, "candidate.title")}</h2>
               <div>
+                {timelineView === "weekly" && (
+                  <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => setCandidatePanelCollapsed(true)} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
+                )}
                 <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
                 <button className="df-icon-action i-branch" data-tip={t(lang, "candidate.pickFromPlanning")} aria-label={t(lang, "candidate.pickFromPlanning")} onClick={openPlanningPicker} />
@@ -3247,6 +3263,8 @@ function App() {
               />
               <button className="df-quick-add-submit" type="submit" disabled={!quickTitle.trim()}>{t(lang, "candidate.add")}</button>
             </form>
+              </>
+            )}
           </section>
 
           <section className="df-timeline-panel" id="df-execute-timeline">
@@ -3688,12 +3706,17 @@ function App() {
                   const weeks: string[][] = [];
                   for (let w = 0; w < 6; w++) weeks.push(allMonthDays.slice(w * 7, w * 7 + 7));
                   function getDayTasks(day: string) {
-                    return tasks.filter((task) =>
-                      task.scheduledDate === day ||
-                      (task.timelineRecords || []).some((r) => r.scheduledDate === day) ||
-                      task.plannedForDate === day ||
-                      task.dueDate === day
-                    );
+                    const seen = new Set<string>();
+                    return tasks.filter((task) => {
+                      if (seen.has(task.id)) return false;
+                      const match =
+                        task.scheduledDate === day ||
+                        (task.timelineRecords || []).some((r) => r.scheduledDate === day) ||
+                        task.plannedForDate === day ||
+                        task.dueDate === day;
+                      if (match) seen.add(task.id);
+                      return match;
+                    });
                   }
                   const baseDayH = 88, taskH = 28, taskGap = 6, weekPad = 18;
                   return (

@@ -600,6 +600,7 @@ export default function PlanningView(props: {
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
   const [collapsedSubtasks, setCollapsedSubtasks] = useState<Record<string, boolean>>({});
   const [leftRatio, setLeftRatio] = useState(66);
+  const [showAddedTasks, setShowAddedTasks] = useState(false);
   const treeRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -633,7 +634,9 @@ export default function PlanningView(props: {
     .map((id) => safeTasks.find((task) => task?.id === id))
     .filter(Boolean) as Task[];
 
-  const unassigned = safeTasks.filter((task) => task && !task.projectId && !task.completed);
+  const today = todayIso();
+
+  const unassigned = safeTasks.filter((task) => task && !task.projectId && !task.completed && (showAddedTasks || task.plannedForDate !== today));
 
   const priorityGroups: Array<[PlanPickPriority, string]> = useMemo(() => [
     ["must", priLabels(props.lang)[0]],
@@ -763,9 +766,9 @@ export default function PlanningView(props: {
   const visibleProjects = useMemo(
     () => safeProjects.map((project) => ({
       project,
-      tasks: safeTasks.filter((task) => String(task.projectId || "") === String(project.id) && !task.completed),
+      tasks: safeTasks.filter((task) => String(task.projectId || "") === String(project.id) && !task.completed && (showAddedTasks || task.plannedForDate !== today)),
     })),
-    [safeProjects, safeTasks],
+    [safeProjects, safeTasks, showAddedTasks],
   );
 
   const svgLines = useTreeLines(treeRef, safeProjects, safeTasks, props.collapsed, collapsedSubtasks);
@@ -784,6 +787,12 @@ export default function PlanningView(props: {
               <button onClick={props.onExitPickMode}>{t(props.lang, "planning.exit")}</button>
             </div>
           )}
+
+          <div className="df-planning-filter-bar">
+            <button className={`df-filter-toggle${showAddedTasks ? " active" : ""}`} onClick={() => setShowAddedTasks((v) => !v)}>
+              {t(props.lang, "planning.showAdded")}
+            </button>
+          </div>
 
           <div className="df-tree" ref={treeRef}>
             {svgLines}

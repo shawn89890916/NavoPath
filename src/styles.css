@@ -10197,6 +10197,89 @@ body:has(:active)::-webkit-scrollbar-thumb {
   animation: dfPanelPop .22s ease-out;
 }
 
+/* Candidate panel collapsed (week view) */
+.df-candidate-panel.collapsed {
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  transition: padding .18s ease, min-width .18s ease;
+}
+
+.df-candidate-collapsed-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px 6px;
+  height: 100%;
+}
+
+.df-candidate-expand-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 14%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-active) 8%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.df-candidate-expand-btn:hover {
+  background: color-mix(in srgb, var(--accent-active) 18%, transparent);
+  color: var(--accent-active);
+  border-color: color-mix(in srgb, var(--accent-active) 32%, transparent);
+}
+
+.df-candidate-collapsed-label {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Dark mode: stronger contrast for collapsed strip */
+.df-app.theme-dark .df-candidate-collapsed-strip {
+  background: var(--surface-main);
+}
+.df-app.theme-dark .df-candidate-expand-btn {
+  border-color: var(--border-soft);
+  background: var(--surface-raised);
+  color: var(--text-faint);
+}
+.df-app.theme-dark .df-candidate-expand-btn:hover {
+  background: color-mix(in srgb, var(--accent-active) 18%, transparent);
+  color: var(--accent-active);
+  border-color: color-mix(in srgb, var(--accent-active) 30%, transparent);
+}
+.df-app.theme-dark .df-candidate-collapsed-label {
+  color: var(--text-faint);
+}
+
+/* Light mode: softer borders */
+.df-app:not(.theme-dark) .df-candidate-expand-btn {
+  border-color: color-mix(in srgb, var(--accent-active) 16%, #E5E7EB);
+  background: color-mix(in srgb, var(--accent-active) 6%, #F9FAFB);
+}
+.df-app:not(.theme-dark) .df-candidate-expand-btn:hover {
+  background: color-mix(in srgb, var(--accent-active) 14%, #F3F4F6);
+  border-color: color-mix(in srgb, var(--accent-active) 28%, #D1D5DB);
+}
+
+/* Grid adjustment for collapsed candidate panel */
+.df-execute.candidate-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
 /* 锟斤拷锟斤拷 Task card 锟斤拷锟斤拷 */
 .df-task-card {
   position: relative;
@@ -15510,6 +15593,37 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-app:not(.theme-dark) .df-planning .df-pick-banner button {
   background: #FFFFFF !important;
   border-color: rgba(15,23,42,0.12) !important;
+}
+
+/* Planning filter bar (show added toggle) */
+.df-planning-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 6px 8px;
+}
+
+.df-filter-toggle {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease, border-color .14s ease;
+}
+
+.df-filter-toggle:hover {
+  background: color-mix(in srgb, var(--accent-active) 8%, transparent);
+  color: var(--text-main);
+}
+
+.df-filter-toggle.active {
+  background: color-mix(in srgb, var(--accent-active) 16%, transparent);
+  color: var(--accent-active);
+  border-color: color-mix(in srgb, var(--accent-active) 30%, transparent);
 }
 .df-app:not(.theme-dark) .df-planning .df-subtask-progress {
   background: #FFFFFF !important;
