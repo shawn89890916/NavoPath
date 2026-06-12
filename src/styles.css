@@ -8022,6 +8022,7 @@ input[type="range"] {
   overflow: hidden;
   background: var(--bg-app);
   animation: dfPageIn .22s ease-out;
+  transition: grid-template-columns .24s cubic-bezier(.22, 1, .36, 1), gap .24s ease, padding .24s ease;
 }
 
 .df-candidate-list {
@@ -8216,6 +8217,7 @@ input[type="range"] {
 .df-timeline-content {
   flex: 1;
   min-width: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -10195,6 +10197,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   display: flex;
   flex-direction: column;
   animation: dfPanelPop .22s ease-out;
+  transition: opacity .18s ease, transform .24s cubic-bezier(.22, 1, .36, 1), padding .24s ease, border-width .18s ease;
 }
 
 /* Candidate panel collapsed (week view) */
@@ -10211,8 +10214,16 @@ body:has(:active)::-webkit-scrollbar-thumb {
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
-  padding: 14px 6px;
+  padding: 14px 6px 16px;
   height: 100%;
+}
+
+.df-candidate-collapsed-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .df-candidate-expand-btn {
@@ -10228,6 +10239,34 @@ body:has(:active)::-webkit-scrollbar-thumb {
   align-items: center;
   justify-content: center;
   transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.df-candidate-strip-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 14%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-active) 8%, transparent);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.df-candidate-strip-btn:hover {
+  background: color-mix(in srgb, var(--accent-active) 18%, transparent);
+  color: var(--accent-active);
+  border-color: color-mix(in srgb, var(--accent-active) 32%, transparent);
+  transform: translateY(-1px);
+}
+
+.df-candidate-strip-btn.active {
+  background: color-mix(in srgb, var(--accent-active) 18%, transparent);
+  color: var(--accent-active);
+  border-color: color-mix(in srgb, var(--accent-active) 36%, transparent);
 }
 
 .df-candidate-expand-btn:hover {
@@ -10251,12 +10290,15 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-app.theme-dark .df-candidate-collapsed-strip {
   background: var(--surface-main);
 }
-.df-app.theme-dark .df-candidate-expand-btn {
+.df-app.theme-dark .df-candidate-expand-btn,
+.df-app.theme-dark .df-candidate-strip-btn {
   border-color: var(--border-soft);
   background: var(--surface-raised);
   color: var(--text-faint);
 }
-.df-app.theme-dark .df-candidate-expand-btn:hover {
+.df-app.theme-dark .df-candidate-expand-btn:hover,
+.df-app.theme-dark .df-candidate-strip-btn:hover,
+.df-app.theme-dark .df-candidate-strip-btn.active {
   background: color-mix(in srgb, var(--accent-active) 18%, transparent);
   color: var(--accent-active);
   border-color: color-mix(in srgb, var(--accent-active) 30%, transparent);
@@ -10270,14 +10312,230 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-color: color-mix(in srgb, var(--accent-active) 16%, #E5E7EB);
   background: color-mix(in srgb, var(--accent-active) 6%, #F9FAFB);
 }
+.df-app:not(.theme-dark) .df-candidate-strip-btn {
+  border-color: color-mix(in srgb, var(--accent-active) 16%, #E5E7EB);
+  background: color-mix(in srgb, var(--accent-active) 6%, #F9FAFB);
+}
 .df-app:not(.theme-dark) .df-candidate-expand-btn:hover {
+  background: color-mix(in srgb, var(--accent-active) 14%, #F3F4F6);
+  border-color: color-mix(in srgb, var(--accent-active) 28%, #D1D5DB);
+}
+.df-app:not(.theme-dark) .df-candidate-strip-btn:hover,
+.df-app:not(.theme-dark) .df-candidate-strip-btn.active {
   background: color-mix(in srgb, var(--accent-active) 14%, #F3F4F6);
   border-color: color-mix(in srgb, var(--accent-active) 28%, #D1D5DB);
 }
 
 /* Grid adjustment for collapsed candidate panel */
 .df-execute.candidate-collapsed {
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+/* Fullscreen mode: hide candidate panel completely */
+.df-execute.fullscreen {
+  grid-template-columns: 0 minmax(0, 1fr) !important;
+  gap: 0 !important;
+}
+
+.df-candidate-panel.hidden {
+  width: 0;
+  min-width: 0;
+  padding: 0 !important;
+  border-width: 0 !important;
+  opacity: 0;
+  transform: translateX(-18px);
+  pointer-events: none;
+}
+
+/* Simple view: remove completion controls and give titles the full block width. */
+.df-execute.simple-view .df-task-card .df-block-check,
+.df-execute.simple-view .df-time-block .df-block-check,
+.df-execute.simple-view .df-all-day-block .df-block-check {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none !important;
+  transform: scale(.72);
+}
+
+.df-execute.simple-view .df-task-card {
+  padding-left: 12px !important;
+}
+
+.df-execute.simple-view .df-task-card .candidate-task-accent {
+  width: 3px !important;
+}
+
+.df-execute.simple-view .df-time-block,
+.df-execute.simple-view .df-event-blocks-layer .df-time-block {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.df-execute.simple-view .df-time-block .df-block-title-row,
+.df-execute.simple-view .df-time-block .df-block-title-row strong {
+  width: 100%;
+  max-width: none;
+}
+
+.df-execute.simple-view .df-all-day-block {
+  padding-left: 8px !important;
+}
+
+.df-time-block,
+.df-event-blocks-layer .df-time-block,
+.df-all-day-block,
+.df-task-card {
+  transition:
+    padding .2s cubic-bezier(.22, 1, .36, 1),
+    box-shadow .14s ease,
+    border-color .14s ease,
+    background .14s ease;
+}
+
+.df-time-block .df-block-title-row,
+.df-time-block .df-block-title-row strong {
+  transition: width .2s cubic-bezier(.22, 1, .36, 1), max-width .2s cubic-bezier(.22, 1, .36, 1);
+}
+
+.df-exit-fullscreen-btn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 24%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-card) 86%, transparent);
+  color: var(--text-main);
+  padding: 8px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  opacity: .76;
+  animation: dfFullscreenControlIn .22s cubic-bezier(.22, 1, .36, 1);
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease, opacity .16s ease;
+}
+
+.df-exit-fullscreen-btn svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.df-exit-fullscreen-btn:hover {
+  background: color-mix(in srgb, var(--accent-active) 14%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--accent-active) 34%, var(--border-soft));
+  color: var(--accent-active);
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+.df-app.theme-dark .df-exit-fullscreen-btn {
+  background: color-mix(in srgb, var(--surface-raised) 92%, rgba(11, 18, 32, 0.85));
+  border-color: color-mix(in srgb, var(--accent-active) 18%, var(--border-soft));
+  color: var(--text-main);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+}
+
+.df-execute.fullscreen .df-timeline-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+@keyframes dfFullscreenControlIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.94); }
+  to { opacity: .76; transform: translateY(0) scale(1); }
+}
+
+/* Timeline focus mode: leave only the dated all-day row and scrollable time grid. */
+.df-app.is-timeline-fullscreen {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.df-app.is-timeline-fullscreen .df-header {
+  height: 0;
+  min-height: 0;
+  padding-block: 0;
+  border-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.df-header {
+  transition:
+    height .24s cubic-bezier(.22, 1, .36, 1),
+    min-height .24s cubic-bezier(.22, 1, .36, 1),
+    padding .24s cubic-bezier(.22, 1, .36, 1),
+    opacity .16s ease,
+    border-color .2s ease,
+    background .2s ease;
+}
+
+.df-app.is-timeline-fullscreen .df-header-fade,
+.df-app.is-timeline-fullscreen .df-execute-top,
+.df-app.is-timeline-fullscreen .df-date-arrow,
+.df-app.is-timeline-fullscreen .df-view-switch-vertical,
+.df-app.is-timeline-fullscreen .df-add-fab,
+.df-app.is-timeline-fullscreen .df-ai-fab {
+  display: none !important;
+}
+
+.df-app.is-timeline-fullscreen .df-execute {
+  height: 100vh;
+  padding: 0;
+  background: var(--bg-app) !important;
+}
+
+.df-app.is-timeline-fullscreen .df-timeline-panel {
+  height: 100vh;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: var(--bg-app) !important;
+  animation: dfTimelineFocusIn .26s cubic-bezier(.22, 1, .36, 1);
+}
+
+.df-app.is-timeline-fullscreen .df-timeline-body,
+.df-app.is-timeline-fullscreen .df-timeline-content,
+.df-app.is-timeline-fullscreen .df-timeline-3day,
+.df-app.is-timeline-fullscreen .df-month-view,
+.df-app.is-timeline-fullscreen .df-month-body {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+@keyframes dfTimelineFocusIn {
+  from { opacity: .72; transform: scale(.992); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot {
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 10px;
+  transform: none;
+}
+
+.df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot.top {
+  top: -1px;
+}
+
+.df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot.bottom {
+  bottom: -1px;
+}
+
+.df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot::after {
+  width: min(24px, calc(100% - 8px));
 }
 
 /* 锟斤拷锟斤拷 Task card 锟斤拷锟斤拷 */
@@ -10673,6 +10931,66 @@ body:has(:active)::-webkit-scrollbar-thumb {
     flex-direction: column;
     gap: 4px;
   }
+}
+
+/* Final focus/simple-view overrides: keep these after legacy theme rules. */
+.df-app.is-timeline-fullscreen .df-execute {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.df-app.is-timeline-fullscreen .df-timeline-panel,
+.df-app.is-timeline-fullscreen .df-timeline-body,
+.df-app.is-timeline-fullscreen .df-timeline-content,
+.df-app.is-timeline-fullscreen .df-timeline-3day {
+  inset: auto;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.df-app.is-timeline-fullscreen .df-timeline-panel {
+  min-height: 100vh;
+}
+
+.df-app.is-timeline-fullscreen .df-timeline-body,
+.df-app.is-timeline-fullscreen .df-timeline-content {
+  min-height: 0;
+}
+
+.df-app .df-execute.simple-view .df-week-view .df-time-block .df-block-check,
+.df-app .df-execute.simple-view .df-week-view .df-event-blocks-layer .df-time-block .df-block-check,
+.df-app .df-execute.simple-view .df-time-block .df-block-check,
+.df-app .df-execute.simple-view .df-all-day-block .df-block-check {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transform: scale(.72) !important;
+}
+
+.df-app .df-execute.simple-view .df-week-view .df-time-block.df-time-block-week,
+.df-app .df-execute.simple-view .df-week-view .df-event-blocks-layer .df-time-block,
+.df-app .df-execute.simple-view .df-time-block {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.df-app .df-execute.simple-view .df-time-block .df-block-title-row,
+.df-app .df-execute.simple-view .df-time-block .df-block-title-row strong {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.df-app .df-execute.simple-view .df-month-task time {
+  display: none;
+}
+
+.df-app .df-execute.simple-view .df-now-line span {
+  display: none;
 }
 
 .df-card-popover.duration-list {
@@ -12335,6 +12653,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-event-blocks-layer .df-time-block {
   position: absolute;
   pointer-events: auto;
+  min-width: 0;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -12518,7 +12837,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-week-view .df-time-block.df-time-block-week,
 .df-week-view .df-event-blocks-layer .df-time-block {
   padding: 6px 8px 6px 30px !important;
-  min-width: 60px;
+  min-width: 0;
   border-radius: 6px;
   overflow: hidden;
   background: rgba(24, 30, 42, 0.92);

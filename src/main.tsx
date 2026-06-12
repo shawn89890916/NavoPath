@@ -478,21 +478,8 @@ function replaceNextAction(notes: string, nextAction: string) {
  *    - count: total columns in the group (= max overlap depth)
  *    - Non-conflicting tasks are NOT included (use default full-width layout)
  */
-/** Maximum collision columns per view mode. Beyond this, force overlap stacking. */
-const MAX_COLLISION_COLUMNS: Record<string, number> = {
-  daily: 4,
-  "3day": 3,
-  weekly: 3,
-  month: 2,
-};
-
-/** Minimum event width per view mode, in pixels. */
-const MIN_EVENT_WIDTH: Record<string, number> = {
-  daily: 90,
-  "3day": 80,
-  weekly: 96,
-  month: 48,
-};
+/** Preserve the existing daily-view column limit; multi-day views never stack. */
+const MAX_DAILY_COLLISION_COLUMNS = 4;
 
 function computeConflictLayout(tasks: Task[], maxColumns = Infinity): Map<string, { index: number; count: number }> {
   if (tasks.length <= 1) return new Map();
@@ -577,9 +564,8 @@ function computeConflictLayout(tasks: Task[], maxColumns = Infinity): Map<string
 
 /**
  * Compute CSS left/width for a conflict‑laid‑out time block.
- * Supports two modes:
- * 1. Strict columns — when slotWidth >= MIN_READABLE (90px)
- * 2. Overlap‑offset — when slotWidth < MIN_READABLE (narrow weekly columns)
+ * Always uses strict side-by-side columns so overlapping tasks never cover
+ * each other, including in narrow multi-day and fullscreen layouts.
  */
 function computeConflictStyle(
   taskId: string,
@@ -592,26 +578,13 @@ function computeConflictStyle(
   const cl = layout.get(taskId);
   if (!cl || cl.count <= 1) return null;
 
-  const slotW = (innerWidth - gap * (cl.count - 1)) / cl.count;
-  const minReadable = MIN_EVENT_WIDTH[viewMode] || 90;
-
-  if (slotW >= minReadable) {
-    // Strict side‑by‑side columns
-    return {
-      left: baseLeft + cl.index * (slotW + gap),
-      width: slotW,
-      isNarrow: false,
-    };
-  } else {
-    // Overlap‑offset layout for narrow columns
-    const overlapW = Math.max(minReadable, innerWidth * 0.78);
-    const offsetPx = cl.index * 14;
-    return {
-      left: baseLeft + offsetPx,
-      width: Math.min(overlapW, innerWidth - offsetPx),
-      isNarrow: true,
-    };
-  }
+  const effectiveGap = Math.min(gap, innerWidth / Math.max(cl.count * 2, 1));
+  const slotW = Math.max(0, (innerWidth - effectiveGap * (cl.count - 1)) / cl.count);
+  return {
+    left: baseLeft + cl.index * (slotW + effectiveGap),
+    width: slotW,
+    isNarrow: viewMode !== "daily" && slotW < 80,
+  };
 }
 
 function getDropTargetFromPointer({
@@ -874,6 +847,8 @@ function App() {
   const [quickProjectTitle, setQuickProjectTitle] = useState("");
   const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
   const [candidatePanelCollapsed, setCandidatePanelCollapsed] = useState(false);
+  const [simpleView, setSimpleView] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -918,10 +893,28 @@ function App() {
     settingsRef.current = settings;
   }, [settings]);
 
-  // Auto-expand candidate panel when switching away from weekly view
+  // Daily view resets range-only panel controls.
   useEffect(() => {
-    if (timelineView !== "weekly") setCandidatePanelCollapsed(false);
+    const supportsRangeControls = timelineView === "3day" || timelineView === "weekly" || timelineView === "month";
+    if (!supportsRangeControls) {
+      setCandidatePanelCollapsed(false);
+      setFullscreen(false);
+    }
   }, [timelineView]);
+
+  // In multi-day views, simple view follows the collapsed state of the
+  // candidate panel. It is always off in daily view.
+  useEffect(() => {
+    const supportsRangeControls = timelineView === "3day" || timelineView === "weekly" || timelineView === "month";
+    setSimpleView(supportsRangeControls && candidatePanelCollapsed);
+  }, [timelineView, candidatePanelCollapsed]);
+
+  useEffect(() => {
+    if (mode !== "execute") {
+      setSimpleView(false);
+      setFullscreen(false);
+    }
+  }, [mode]);
 
   async function loadInitial() {
     const api = await waitForPlannerApi();
@@ -1450,7 +1443,7 @@ function App() {
   const conflictLayout = useMemo(() => {
     const map = new Map<string, { index: number; count: number }>();
     if (timelineView === "daily") {
-      computeConflictLayout(scheduledTasks, MAX_COLLISION_COLUMNS.daily).forEach((v, k) => map.set(k, v));
+      computeConflictLayout(scheduledTasks, MAX_DAILY_COLLISION_COLUMNS).forEach((v, k) => map.set(k, v));
     } else {
       const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
       const dayTasks: Task[] = expandedVisibleTimelineTasks.filter((task) => threeDates.includes(task.scheduledDate || ""));
@@ -1462,7 +1455,7 @@ function App() {
         byDate.get(d)!.push(t);
       }
       for (const [, group] of byDate) {
-        computeConflictLayout(group, MAX_COLLISION_COLUMNS[timelineView] || 4).forEach((v, k) => map.set(k, v));
+        computeConflictLayout(group).forEach((v, k) => map.set(k, v));
       }
     }
     return map;
@@ -1563,6 +1556,15 @@ function App() {
       ...data,
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
+        if ((!records || records.length === 0) && task.id === recordId && task.scheduledDate) {
+          return {
+            ...task,
+            scheduledDate: undefined,
+            scheduledStart: undefined,
+            scheduledEnd: undefined,
+            updatedAt: new Date().toISOString(),
+          };
+        }
         if (!records) return task;
         const filtered = records.filter((r) => r.id !== recordId);
         if (filtered.length === records.length) return task;
@@ -1845,6 +1847,7 @@ function App() {
       dueDate: timelineDate,
       estimatedHours: 1
     });
+    const scheduledRecord = createScheduledRecord(task, timelineDate, quickSchedule.startTime, 60);
     void saveData({
       ...data,
       projects: nextProjects,
@@ -1852,12 +1855,10 @@ function App() {
         ...task,
         plannedForDate: timelineDate,
         executionLane: undefined,
-        scheduledDate: timelineDate,
-        scheduledStart: quickSchedule.startTime,
-        scheduledEnd: endTime
+        timelineRecords: [scheduledRecord],
       }]
     });
-    requestTimelineFocus({ date: timelineDate, startTime: quickSchedule.startTime, taskId: task.id, source: "schedule" });
+    requestTimelineFocus({ date: timelineDate, startTime: quickSchedule.startTime, taskId: scheduledRecord.id, source: "schedule" });
     setQuickSchedule(null);
     showToast(t(lang, "toast.addedToTimeline"));
   }
@@ -1914,12 +1915,14 @@ function App() {
   function saveFloatingTimeAdd(title: string, projectId: string | null) {
     if (!data || !floatingTimeAdd) return;
     const { date, startTime, endTime } = floatingTimeAdd;
-    const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: 0.5 });
+    const durationMinutes = timeToMinutes(endTime) - timeToMinutes(startTime);
+    const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: durationMinutes / 60 });
+    const scheduledRecord = createScheduledRecord(task, date, startTime, durationMinutes);
     void saveData({
       ...data,
-      tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
+      tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
     });
-    requestTimelineFocus({ date, startTime, taskId: task.id, source: "schedule" });
+    requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
     setFloatingTimeAdd(null);
     showToast(t(lang, "toast.addedToTimeline"));
   }
@@ -2311,6 +2314,16 @@ function App() {
       ...data,
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
+        if ((!records || records.length === 0) && task.id === recordId && task.scheduledStart) {
+          const duration = timeToMinutes(task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task))) - timeToMinutes(task.scheduledStart);
+          return {
+            ...task,
+            scheduledDate: newDate || task.scheduledDate,
+            scheduledStart: newStart,
+            scheduledEnd: addMinutes(newStart, duration),
+            updatedAt: now,
+          };
+        }
         if (!records) return task;
         const idx = records.findIndex((r) => r.id === recordId);
         if (idx === -1) return task;
@@ -2477,6 +2490,9 @@ function App() {
           ...data,
           tasks: data.tasks.map((t) => {
             const records = t.timelineRecords;
+            if ((!records || records.length === 0) && t.id === task.id) {
+              return { ...t, scheduledStart: nextStart, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60, updatedAt: now };
+            }
             if (!records) return t;
             const idx = records.findIndex((r) => r.id === task.id);
             if (idx === -1) return t;
@@ -2495,6 +2511,9 @@ function App() {
           ...data,
           tasks: data.tasks.map((t) => {
             const records = t.timelineRecords;
+            if ((!records || records.length === 0) && t.id === task.id) {
+              return { ...t, scheduledEnd: nextEnd, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60, updatedAt: now };
+            }
             if (!records) return t;
             const idx = records.findIndex((r) => r.id === task.id);
             if (idx === -1) return t;
@@ -3151,7 +3170,7 @@ function App() {
   if (!data || !settings) return <div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme}`} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme}${fullscreen ? " is-timeline-fullscreen" : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
@@ -3170,24 +3189,29 @@ function App() {
       <div id="df-portal-target" />
 
       {mode === "execute" ? (
-        <main className={`df-execute${candidatePanelCollapsed && timelineView === "weekly" ? " candidate-collapsed" : ""}`}>
-          <section className={`df-candidate-panel${candidatePanelCollapsed && timelineView === "weekly" ? " collapsed" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+        <main className={`df-execute${candidatePanelCollapsed ? " candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
+          <section className={`df-candidate-panel${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
             if (taskId) unscheduleTask(taskId);
           }}>
-            {candidatePanelCollapsed && timelineView === "weekly" ? (
+            {candidatePanelCollapsed ? (
               <div className="df-candidate-collapsed-strip">
-                <button className="df-candidate-expand-btn" title={t(lang, "candidate.title")} aria-label={t(lang, "candidate.title")} onClick={() => setCandidatePanelCollapsed(false)}>&#9654;</button>
+                <button className="df-candidate-expand-btn" title={t(lang, "candidate.expand")} aria-label={t(lang, "candidate.expand")} onClick={() => {
+                  setCandidatePanelCollapsed(false);
+                }}>&#9654;</button>
                 <span className="df-candidate-collapsed-label">{t(lang, "candidate.title")}</span>
+                <div className="df-candidate-collapsed-actions">
+                  <button className={`df-candidate-strip-btn${fullscreen ? " active" : ""}`} title={t(lang, "candidate.fullscreen")} aria-label={t(lang, "candidate.fullscreen")} onClick={() => setFullscreen((value) => !value)}>⛶</button>
+                </div>
               </div>
             ) : (
               <>
             <div className="df-panel-title">
               <h2>{t(lang, "candidate.title")}</h2>
               <div>
-                {timelineView === "weekly" && (
-                  <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => setCandidatePanelCollapsed(true)} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
+                {(timelineView === "3day" || timelineView === "weekly" || timelineView === "month") && (
+                  <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => { setCandidatePanelCollapsed(true); setFullscreen(false); }} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
                 )}
                 <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
@@ -3300,6 +3324,19 @@ function App() {
             </div>
             <div className="df-timeline-body">
               <div className="df-timeline-content">
+                {fullscreen && (
+                  <button
+                    className="df-exit-fullscreen-btn"
+                    type="button"
+                    aria-label={lang === "zh" ? "退出全屏" : "Exit Fullscreen"}
+                    title={lang === "zh" ? "退出全屏" : "Exit Fullscreen"}
+                    onClick={() => setFullscreen(false)}
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M8 3v5H3M12 3v5h5M8 17v-5H3M12 17v-5h5" />
+                    </svg>
+                  </button>
+                )}
                 {timelineDate !== today && (
                   <button className="df-back-today" onClick={() => setSelectedDate(today)} title={t(lang, "timeline.backToToday")}>↵</button>
                 )}
@@ -3678,10 +3715,12 @@ function App() {
                                         const endTime = minutesToTime(endMinutes);
                                         const estimatedH = (endMinutes - startMinutes) / 60;
                                         const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
+                                        const scheduledRecord = createScheduledRecord(task, date, startTime, endMinutes - startMinutes);
                                         void saveData({
                                           ...data,
-                                          tasks: [...data.tasks, { ...task, plannedForDate: date, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
+                                          tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
                                         });
+                                        requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
                                         setDragCreate(null);
                                         showToast(t(lang, "timeline.addedToTimeline"));
                                       }}
@@ -3701,22 +3740,32 @@ function App() {
                 })() : timelineView === "month" ? (() => {
                   const monthStart = startOfMonthGridIso(timelineDate);
                   const allMonthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
+                  const visibleMonthDays = new Set(allMonthDays);
                   const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
                   // Group into 6 weeks
                   const weeks: string[][] = [];
                   for (let w = 0; w < 6; w++) weeks.push(allMonthDays.slice(w * 7, w * 7 + 7));
+                  function getPrimaryMonthDate(task: Task) {
+                    const recordDate = [...(task.timelineRecords || [])]
+                      .map((record) => record.scheduledDate)
+                      .filter((date): date is string => Boolean(date) && visibleMonthDays.has(date))
+                      .sort()[0];
+                    if (recordDate) return recordDate;
+                    if (task.scheduledDate && visibleMonthDays.has(task.scheduledDate)) return task.scheduledDate;
+                    if (task.plannedForDate && visibleMonthDays.has(task.plannedForDate)) return task.plannedForDate;
+                    if (task.dueDate && visibleMonthDays.has(task.dueDate)) return task.dueDate;
+                    return "";
+                  }
+                  const monthTaskBuckets = tasks.reduce((map, task) => {
+                    const primaryDate = getPrimaryMonthDate(task);
+                    if (!primaryDate) return map;
+                    const bucket = map.get(primaryDate);
+                    if (bucket) bucket.push(task);
+                    else map.set(primaryDate, [task]);
+                    return map;
+                  }, new Map<string, Task[]>());
                   function getDayTasks(day: string) {
-                    const seen = new Set<string>();
-                    return tasks.filter((task) => {
-                      if (seen.has(task.id)) return false;
-                      const match =
-                        task.scheduledDate === day ||
-                        (task.timelineRecords || []).some((r) => r.scheduledDate === day) ||
-                        task.plannedForDate === day ||
-                        task.dueDate === day;
-                      if (match) seen.add(task.id);
-                      return match;
-                    });
+                    return monthTaskBuckets.get(day) || [];
                   }
                   const baseDayH = 88, taskH = 28, taskGap = 6, weekPad = 18;
                   return (
@@ -4043,10 +4092,12 @@ function App() {
                                   const endTime = minutesToTime(endMinutes);
                                   const estimatedH = (endMinutes - startMinutes) / 60;
                                   const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
+                                  const scheduledRecord = createScheduledRecord(task, date, startTime, endMinutes - startMinutes);
                                   void saveData({
                                     ...data,
-                                    tasks: [...data.tasks, { ...task, plannedForDate: date, scheduledDate: date, scheduledStart: startTime, scheduledEnd: endTime }]
+                                    tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
                                   });
+                                  requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
                                   setDragCreate(null);
                                   showToast(t(lang, "timeline.addedToTimeline"));
                                 }}

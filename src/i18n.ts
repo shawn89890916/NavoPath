@@ -135,6 +135,8 @@ export const TR = {
       add: "添加",
       collapse: "收起面板",
       expand: "展开面板",
+      simpleView: "简洁显示",
+      fullscreen: "全屏",
     },
     en: {
       title: "Today's Candidates",
@@ -151,6 +153,8 @@ export const TR = {
       add: "Add",
       collapse: "Collapse Panel",
       expand: "Expand Panel",
+      simpleView: "Simple View",
+      fullscreen: "Fullscreen",
     },
   },
 

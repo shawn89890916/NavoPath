@@ -790,7 +790,7 @@ export default function PlanningView(props: {
 
           <div className="df-planning-filter-bar">
             <button className={`df-filter-toggle${showAddedTasks ? " active" : ""}`} onClick={() => setShowAddedTasks((v) => !v)}>
-              {t(props.lang, "planning.showAdded")}
+              {showAddedTasks ? t(props.lang, "sourceModal.hideAdded") : t(props.lang, "planning.showAdded")}
             </button>
           </div>
 
