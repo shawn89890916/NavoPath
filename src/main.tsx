@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, ExecutionLane, Language, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Task, TaskRecurrence, TimelineRecord } from "./types";
 import { callAiAssistant, type AiAction, type AiStep } from "./aiAssistantApi";
-import { ATTACHMENT_ACCEPT, parseAttachment, type ParsedAttachment } from "./fileParser";
+import type { ParsedAttachment } from "./fileParser";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
 import {
@@ -28,6 +28,7 @@ import {
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, releaseNote, formatDateTitle, monthTitle, nowLabel, weekdayName } from "./i18n";
 import "./styles.css";
+import "./app-redesign.css";
 import "./landing.css";
 
 installBrowserFallback();
@@ -38,6 +39,7 @@ const TIMELINE_END = 24;
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
+const ATTACHMENT_ACCEPT = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
 const PROJECT_COLOR_PRESETS = ["#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
 const COMMON_COLOR_PRESETS = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#1F2937", "#F9FAFB", "#6B7280"];
 const RECURRENCE_OCCURRENCE_MARKER = "__occ__";
@@ -2904,6 +2906,7 @@ function App() {
   async function handleAiAttachment(file: File) {
     setAiAttachmentStatus("正在本地解析文件...");
     try {
+      const { parseAttachment } = await import("./fileParser");
       const parsed = await parseAttachment(file);
       setAiAttachment(parsed);
       setAiAttachmentStatus(parsed.truncated ? "文本已提取，超过 60,000 字符的部分已截断" : "文本已提取，仅文本会发送给 AI");
@@ -3459,7 +3462,7 @@ function App() {
     <div className={`df-app mode-${mode} theme-${settings.theme}${fullscreen ? " is-timeline-fullscreen" : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
-          <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
+          <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong><span>{mode === "execute" ? "Daily execution" : "Project planning"}</span></div></div>
           <div className="df-header-right">
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>

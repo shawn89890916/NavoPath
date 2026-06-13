@@ -1,58 +1,81 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { ProductIcon } from "./main";
 
 type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
 
-function localizeAuthMessage(message: string, lang: Lang) {
-  if (!message) return "";
-  if (lang === "zh") return message;
-  if (message.includes("邮箱或密码不正确")) return "Incorrect email or password.";
-  if (message.includes("邮箱还没有完成确认")) return "Your email is not confirmed yet. Open the confirmation link in your inbox first.";
-  if (message.includes("这个邮箱已经注册过")) return "This email is already registered. Sign in instead.";
-  if (message.includes("密码强度不够")) return "Password is too weak. Use at least 6 characters.";
-  if (message.includes("请求过于频繁")) return "Too many requests. Please try again later.";
-  if (message.includes("确认邮件已重新发送")) return "Confirmation email has been sent again.";
-  if (message.includes("邮箱确认完成后，请直接登录")) return "After confirming your email, sign in with your password.";
-  return message;
-}
-
-const t = {
+const copy = {
   en: {
-    nav: { features: "Features", projects: "Projects", contact: "Contact", login: "Log In" },
-    hero: { title: "Navigate your next step.", subtitle: "The planning tool for turning goals into action.", getStarted: "Get Started", signIn: "Sign In" },
-    features: { badge: "What it does", title: "From Planning to Execution", subtitle: "Break down complex long-term projects into actionable daily plans", items: [
-      { title: "Tree Planning", desc: "Organize long-term projects in a tree structure. Break complex goals into manageable steps.", icon: "🌳" },
-      { title: "Timeline Execution", desc: "Drag tasks to the timeline. Precisely schedule your day's action plan.", icon: "📅" },
-      { title: "AI Assisted", desc: "Smart daily planning based on priority and deadlines. Let AI handle the scheduling.", icon: "🤖" },
-      { title: "Cloud Sync", desc: "Data stored securely in the cloud. Access from any device, anywhere.", icon: "☁️" },
-    ]},
-    work: { badge: "Built on", title: "Tech Stack & Open Source", subtitle: "Built with modern technology. Fully open source. Contributions welcome.", items: [
-      { title: "Navo AI", desc: "ESP32-S3 voice assistant with serial protocol hacking and MCP-integrated servo control", tags: ["Hardware", "Voice", "IoT"] },
-      { title: "OpenClaw Soul", desc: "AI Agent self-evolution framework with three-layer memory architecture and autonomous reflection", tags: ["TypeScript", "MCP", "Memory"] },
-    ]},
-    cta: { title: "Ready to plan?", subtitle: "Start organizing your projects and time with NavoPath.", button: "Get Started" },
-    auth: { signin: "Sign In", signup: "Sign Up", email: "Email", displayName: "Display Name", password: "Password (6+ chars)", signingIn: "Signing in...", signingUp: "Signing up...", note: "Account data is stored independently. Repeated signups may trigger email rate limiting." },
-    footer: "© 2026 NavoPath by 陈潇杨. Built with 🟣",
+    nav: ["Workflow", "Features", "Principles"],
+    login: "Log in",
+    eyebrow: "Planning for people who build",
+    title: "Turn ambitious goals into",
+    titleAccent: "today's next move.",
+    intro: "NavoPath connects long-range project thinking with a realistic daily timeline, so your plans survive contact with the day.",
+    start: "Start planning",
+    signIn: "Open workspace",
+    proof: ["Tree-based planning", "Timeline execution", "AI-assisted scheduling"],
+    workflowTitle: "One continuous path from intention to action.",
+    workflowIntro: "Planning and execution stay connected. Select the work that matters, then give it a real place in your day.",
+    steps: [
+      ["01", "Map the project", "Break complex goals into projects, tasks, and concrete next actions."],
+      ["02", "Choose today's progress", "Pull only the right tasks into a focused daily candidate list."],
+      ["03", "Make time real", "Place work on the timeline, resolve conflicts, and adapt without losing the plan."],
+    ],
+    featureTitle: "Calm enough to think. Precise enough to execute.",
+    features: [
+      ["Structure", "A visual planning tree keeps the relationship between projects and next actions clear."],
+      ["Time", "Day, three-day, week, and month views show what your workload actually looks like."],
+      ["Adaptation", "Drag, resize, re-plan, and return tasks to Planning without breaking context."],
+      ["Assistance", "Navo AI can turn selected tasks into a draft schedule you remain in control of."],
+    ],
+    principlesTitle: "Designed around the work, not the dashboard.",
+    principles: ["Planning and execution are different modes of thought.", "Your timeline should reflect reality, not aspiration.", "AI proposes. You decide."],
+    ctaTitle: "Give the next important thing a place to happen.",
+    ctaBody: "Start with the project. End with a day you can actually complete.",
+    footer: "NavoPath · Plan the path. Execute today.",
   },
   zh: {
-    nav: { features: "功能", projects: "项目", contact: "联系", login: "登录" },
-    hero: { title: "导航你的下一步。", subtitle: "面向工程学生的时间管理工具。", getStarted: "立即开始", signIn: "登录" },
-    features: { badge: "核心功能", title: "从规划到执行，一步到位", subtitle: "把长期项目的复杂任务拆解为每天可执行的行动计划", items: [
-      { title: "项目树规划", desc: "用树形结构组织长期项目，拆解复杂任务为可执行的小步骤", icon: "🌳" },
-      { title: "时间轴执行", desc: "拖拽任务到时间轴，精确安排每天的行动计划", icon: "📅" },
-      { title: "AI 辅助", desc: "智能规划今天要做什么，基于优先级和截止日自动安排", icon: "🤖" },
-      { title: "数据同步", desc: "云端存储，多设备访问，数据安全加密", icon: "☁️" },
-    ]},
-    work: { badge: "技术栈", title: "技术栈与开源", subtitle: "现代技术栈构建，完全开源，欢迎贡献", items: [
-      { title: "Navo AI", desc: "ESP32-S3 语音助手，串口协议破解，MCP 集成舵机控制", tags: ["硬件黑客", "语音识别", "IoT"] },
-      { title: "OpenClaw Soul", desc: "AI Agent 自我进化框架，三层记忆架构，目标管理，自主反思", tags: ["TypeScript", "MCP", "记忆架构"] },
-    ]},
-    cta: { title: "准备开始了吗？", subtitle: "开始用 NavoPath 管理你的项目和时间。", button: "立即开始" },
-    auth: { signin: "登录", signup: "注册", email: "邮箱", displayName: "用户名", password: "密码（至少6位）", signingIn: "登录中...", signingUp: "注册中...", note: "每个账号的数据独立保存。连续注册会触发邮件安全限流。" },
-    footer: "© 2026 NavoPath by 陈潇杨. Built with 🟣",
-  }
+    nav: ["工作流", "功能", "原则"],
+    login: "登录",
+    eyebrow: "为创造者设计的规划工具",
+    title: "把宏大的目标变成",
+    titleAccent: "今天的下一步。",
+    intro: "NavoPath 将长期项目思考与真实日程连接起来，让计划经得起每一天的变化。",
+    start: "开始规划",
+    signIn: "打开工作区",
+    proof: ["树状项目规划", "时间轴执行", "AI 辅助排程"],
+    workflowTitle: "从目标到行动，一条连续的路径。",
+    workflowIntro: "规划与执行始终相连。先选择真正重要的工作，再为它安排真实的时间。",
+    steps: [
+      ["01", "搭建项目结构", "把复杂目标拆解为项目、任务和清晰的下一步行动。"],
+      ["02", "选择今日推进项", "只把今天值得推进的任务带入候选列表。"],
+      ["03", "让时间变得真实", "把任务放入时间轴，解决冲突，并随变化重新安排。"],
+    ],
+    featureTitle: "足够安静，便于思考；足够精确，支持执行。",
+    features: [
+      ["结构", "可视化规划树清楚呈现项目、任务与下一步行动之间的关系。"],
+      ["时间", "日、三日、周和月视图，让工作量真正可见。"],
+      ["调整", "拖拽、调整时长、重新规划或退回任务，同时保留上下文。"],
+      ["辅助", "Navo AI 根据选定任务生成日程草案，最终决定始终由你掌握。"],
+    ],
+    principlesTitle: "围绕工作本身设计，而不是堆砌仪表盘。",
+    principles: ["规划与执行是两种不同的思考模式。", "时间轴应该反映现实，而不是愿望。", "AI 提议，你决定。"],
+    ctaTitle: "为下一件重要的事，留出真正发生的时间。",
+    ctaBody: "从项目开始，以一个能够完成的今天结束。",
+    footer: "NavoPath · 规划路径，执行今天。",
+  },
 };
+
+function Glyph({ name }: { name: "tree" | "timeline" | "spark" | "sync" }) {
+  const paths = {
+    tree: <><path d="M12 4v16M12 8H6v4M12 12h6v4M6 12v4M18 16v4M6 16v4"/><circle cx="12" cy="4" r="2"/><circle cx="6" cy="20" r="2"/><circle cx="18" cy="20" r="2"/></>,
+    timeline: <><path d="M5 4v16M9 7h10M9 12h7M9 17h10"/><circle cx="5" cy="7" r="1.5"/><circle cx="5" cy="12" r="1.5"/><circle cx="5" cy="17" r="1.5"/></>,
+    spark: <><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z"/><path d="m19 16 .7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z"/></>,
+    sync: <><path d="M20 7h-6V1"/><path d="M20 7a9 9 0 0 0-15.5-3M4 17h6v6"/><path d="M4 17a9 9 0 0 0 15.5 3"/></>,
+  };
+  return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
 
 export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm, busy, error, notice }: {
   onLogin: (email: string, password: string, displayName: string, intent: AuthIntent) => void;
@@ -70,304 +93,99 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   const [displayName, setDisplayName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const content = t[lang];
+  const c = copy[lang];
   const passwordMismatch = authIntent === "signup" && password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
-  const visibleError = localizeAuthMessage(error, lang);
 
-  // Scroll reveal
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const revealRefs = useRef<Map<string, HTMLElement>>(new Map());
-
-  useEffect(() => {
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    revealRefs.current.forEach((el) => observerRef.current?.observe(el));
-
-    return () => observerRef.current?.disconnect();
-  }, []);
-
-  function setRevealRef(id: string) {
-    return (el: HTMLElement | null) => {
-      if (el) {
-        revealRefs.current.set(id, el);
-        observerRef.current?.observe(el);
-      }
-    };
-  }
-
-  function handleAuthSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (passwordMismatch) return;
-    onLogin(email.trim(), password, displayName.trim(), authIntent);
-  }
-
-  const techTags = ["React", "Vite", "TypeScript", "Electron", "GitHub Actions", "Cloudflare Pages"];
+  const openAuth = (intent: AuthIntent) => {
+    setAuthIntent(intent);
+    setShowAuth(true);
+  };
 
   return (
     <div className="landing" lang={lang}>
-      {/* Particle Canvas */}
-      <ParticleBackground />
-
-      {/* Navigation */}
       <nav className="landing-nav">
-        <div className="landing-nav-inner">
-          <div className="landing-nav-brand">
-            <ProductIcon compact />
-            <span>NavoPath</span>
-          </div>
-          <div className="landing-nav-links">
-            <a href="#features">{content.nav.features}</a>
-            <a href="#work">{content.nav.projects}</a>
-            <a href="#contact">{content.nav.contact}</a>
-          </div>
-          <div className="landing-nav-actions">
-            <div className="landing-lang-switch">
-              <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>EN</button>
-              <button className={lang === "zh" ? "active" : ""} onClick={() => setLang("zh")}>中</button>
-            </div>
-            <button
-              className="landing-cta-pill small"
-              onClick={() => { setAuthIntent("signin"); setShowAuth(true); }}
-            >{content.nav.login}</button>
-          </div>
+        <a className="landing-brand" href="#top"><ProductIcon compact /><span>NavoPath</span></a>
+        <div className="landing-nav-links">
+          {c.nav.map((item, index) => <a key={item} href={`#${["workflow", "features", "principles"][index]}`}>{item}</a>)}
+        </div>
+        <div className="landing-nav-actions">
+          <button className="landing-lang" onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button>
+          <button className="landing-button quiet small" onClick={() => openAuth("signin")}>{c.login}</button>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="landing-hero">
-        <div className="landing-hero-content">
-          <h1>
-            <span className="hero-name">NavoPath</span>
-            <br />
-            <span className="hero-tagline">{content.hero.title}</span>
-          </h1>
-          <p>{content.hero.subtitle}</p>
-          <div className="landing-hero-buttons">
-            <button
-              className="landing-cta-pill primary"
-              onClick={() => { setAuthIntent("signup"); setShowAuth(true); }}
-            >{content.hero.getStarted}</button>
-            <button
-              className="landing-cta-pill secondary"
-              onClick={() => { setAuthIntent("signin"); setShowAuth(true); }}
-            >{content.hero.signIn}</button>
+      <main>
+        <section className="landing-hero" id="top">
+          <div className="landing-orbit landing-orbit-one" />
+          <div className="landing-orbit landing-orbit-two" />
+          <div className="landing-hero-copy">
+            <span className="landing-kicker"><i />{c.eyebrow}</span>
+            <h1>{c.title}<br /><em>{c.titleAccent}</em></h1>
+            <p>{c.intro}</p>
+            <div className="landing-actions">
+              <button className="landing-button primary" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
+              <button className="landing-button quiet" onClick={() => openAuth("signin")}>{c.signIn}</button>
+            </div>
+            <div className="landing-proof">{c.proof.map((item) => <span key={item}><i />{item}</span>)}</div>
           </div>
-        </div>
-      </section>
-
-      {/* Auth Modal */}
-      {showAuth && (
-        <div className="landing-auth-overlay" onClick={() => setShowAuth(false)}>
-          <div className="landing-auth-card" onClick={(e) => e.stopPropagation()}>
-            <button className="landing-auth-close" onClick={() => setShowAuth(false)}>×</button>
-            <div className="landing-auth-tabs">
-              <button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>{content.auth.signin}</button>
-              <button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{content.auth.signup}</button>
-            </div>
-            <form onSubmit={handleAuthSubmit}>
-              {authIntent === "signup" && <input type="text" placeholder={lang === "en" ? "Display Name" : "用户名"} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={64} />}
-              <input type="email" placeholder={content.auth.email} value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <input type={showPassword ? "text" : "password"} placeholder={content.auth.password} value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} maxLength={128} required />
-              {authIntent === "signup" && <input type={showPassword ? "text" : "password"} placeholder={lang === "en" ? "Confirm password" : "确认密码"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} maxLength={128} required />}
-              <label className="landing-auth-check">
-                <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />
-                <span>{lang === "en" ? "Show password" : "显示密码"}</span>
-              </label>
-              {notice?.type === "confirm-email" && (
-                <div className="landing-auth-notice">
-                  <strong>{lang === "en" ? "Check your inbox" : "请检查邮箱"}</strong>
-                  <p>{lang === "en" ? `We've sent a confirmation email to ${notice.email}. Confirm it, then sign in.` : `确认邮件已发送到 ${notice.email}。完成确认后再登录。`}</p>
-                  <div className="landing-auth-notice-actions">
-                    <button type="button" className="landing-auth-secondary" onClick={() => onResend(notice.email)}>{lang === "en" ? "Resend email" : "重发邮件"}</button>
-                    <button type="button" className="landing-auth-secondary" onClick={() => { setAuthIntent("signin"); onContinueAfterConfirm(notice.email); }}>{lang === "en" ? "I've confirmed, go to sign in" : "我已确认，去登录"}</button>
-                  </div>
-                </div>
-              )}
-              {passwordMismatch && <p className="landing-auth-error">{lang === "en" ? "Passwords do not match." : "两次输入的密码不一致。"}</p>}
-              <button type="submit" disabled={busy || passwordMismatch} className="landing-cta-pill primary full">
-                {busy ? (authIntent === "signin" ? content.auth.signingIn : content.auth.signingUp) : (authIntent === "signin" ? content.auth.signin : content.auth.signup)}
-              </button>
-              {visibleError && <p className="landing-auth-error">{visibleError}</p>}
-            </form>
-            <p className="landing-auth-note">{content.auth.note}</p>
+          <div className="landing-product-frame">
+            <div className="landing-frame-bar"><span /><span /><span /><b>NavoPath / Execute</b></div>
+            <img src="/navo-dark.png" alt="NavoPath Execute workspace" />
           </div>
-        </div>
-      )}
+        </section>
 
-      {/* Features Section */}
-      <section id="features" className="landing-section">
-        <div className="landing-section-header" ref={setRevealRef("features-header")}>
-          <span className="landing-badge">{content.features.badge}</span>
-          <h2>{content.features.title}</h2>
-          <p>{content.features.subtitle}</p>
-        </div>
-        <div className="landing-features-grid">
-          {content.features.items.map((f, i) => (
-            <div key={f.title} className="landing-feature-card" ref={setRevealRef(`feat-${i}`)} style={{ transitionDelay: `${i * 0.08}s` }}>
-              <span className="landing-feature-icon">{f.icon}</span>
-              <h3>{f.title}</h3>
-              <p>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Projects Section */}
-      <section id="work" className="landing-section">
-        <div className="landing-section-header" ref={setRevealRef("work-header")}>
-          <span className="landing-badge">{content.work.badge}</span>
-          <h2>{content.work.title}</h2>
-          <p>{content.work.subtitle}</p>
-        </div>
-        <div className="landing-projects-grid">
-          <div className="landing-project-card featured" ref={setRevealRef("proj-navopath")}>
-            <div className="landing-project-glare" />
-            <div className="landing-project-content">
-              <span className="landing-project-version">v0.4.1</span>
-              <h3>NavoPath</h3>
-              <p>{lang === "en" ? "Time management tool for engineering students. Break down long-term projects into daily execution with AI assistance." : "面向工程学生的时间管理工具。从长期项目拆解到每日执行，AI辅助规划。"}</p>
-              <div className="landing-project-tags">
-                {techTags.map((t) => <span key={t} className="landing-tag">{t}</span>)}
-              </div>
-            </div>
+        <section className="landing-section" id="workflow">
+          <header className="landing-section-head"><span>01 / Workflow</span><h2>{c.workflowTitle}</h2><p>{c.workflowIntro}</p></header>
+          <div className="landing-workflow">
+            {c.steps.map(([number, title, body]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></article>)}
           </div>
-          {content.work.items.map((p, i) => (
-            <div key={p.title} className="landing-project-card" ref={setRevealRef(`proj-${i}`)} style={{ transitionDelay: `${i * 0.08}s` }}>
-              <div className="landing-project-stripe" />
-              <h3>{p.title}</h3>
-              <p>{p.desc}</p>
-              <div className="landing-project-tags">
-                {p.tags.map((t) => <span key={t} className="landing-tag">{t}</span>)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+          <div className="landing-planning-frame">
+            <div><span>Planning</span><strong>Think in outcomes.<br />Move in next actions.</strong></div>
+            <img src="/navo-settings.png" alt="NavoPath settings and theme controls" />
+          </div>
+        </section>
 
-      {/* Footer CTA */}
-      <section id="contact" className="landing-section landing-footer">
-        <div className="landing-section-header" ref={setRevealRef("footer")}>
-          <h2>{content.cta.title}</h2>
-          <p>{content.cta.subtitle}</p>
-          <button
-            className="landing-cta-pill primary"
-            style={{ marginTop: 24 }}
-            onClick={() => { setAuthIntent("signup"); setShowAuth(true); }}
-          >{content.cta.button}</button>
-        </div>
-        <div className="landing-footer-meta">
-          <span>{content.footer}</span>
-        </div>
-      </section>
+        <section className="landing-section" id="features">
+          <header className="landing-section-head"><span>02 / System</span><h2>{c.featureTitle}</h2></header>
+          <div className="landing-feature-grid">
+            {c.features.map(([title, body], index) => <article key={title}><div className="landing-glyph"><Glyph name={(["tree", "timeline", "sync", "spark"] as const)[index]} /></div><span>0{index + 1}</span><h3>{title}</h3><p>{body}</p></article>)}
+          </div>
+        </section>
+
+        <section className="landing-section landing-principles" id="principles">
+          <header className="landing-section-head"><span>03 / Principles</span><h2>{c.principlesTitle}</h2></header>
+          <ol>{c.principles.map((item, index) => <li key={item}><span>0{index + 1}</span><strong>{item}</strong></li>)}</ol>
+        </section>
+
+        <section className="landing-cta">
+          <ProductIcon />
+          <h2>{c.ctaTitle}</h2>
+          <p>{c.ctaBody}</p>
+          <button className="landing-button primary" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
+        </section>
+      </main>
+
+      <footer className="landing-footer"><span>{c.footer}</span><span>© 2026 Xiaoyang Chen</span></footer>
+
+      {showAuth && <div className="landing-auth-overlay" onMouseDown={() => setShowAuth(false)}>
+        <section className="landing-auth-card" onMouseDown={(event) => event.stopPropagation()}>
+          <button className="landing-auth-close" onClick={() => setShowAuth(false)}>×</button>
+          <ProductIcon /><span className="landing-auth-label">NavoPath account</span>
+          <h2>{authIntent === "signin" ? (lang === "en" ? "Welcome back." : "欢迎回来。") : (lang === "en" ? "Start your path." : "开始你的路径。")}</h2>
+          <div className="landing-auth-tabs"><button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>Sign in</button><button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>Sign up</button></div>
+          <form onSubmit={(event) => { event.preventDefault(); if (!passwordMismatch) onLogin(email.trim(), password, displayName.trim(), authIntent); }}>
+            {authIntent === "signup" && <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name" maxLength={64} />}
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (6+ characters)" minLength={6} required />
+            {authIntent === "signup" && <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm password" minLength={6} required />}
+            <label className="landing-auth-check"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />Show password</label>
+            {notice && <div className="landing-auth-notice"><strong>Check your inbox</strong><p>Confirm the email sent to {notice.email}, then sign in.</p><button type="button" onClick={() => onResend(notice.email)}>Resend email</button><button type="button" onClick={() => onContinueAfterConfirm(notice.email)}>Continue to sign in</button></div>}
+            {passwordMismatch && <p className="landing-auth-error">Passwords do not match.</p>}
+            {error && <p className="landing-auth-error">{error}</p>}
+            <button className="landing-button primary full" disabled={busy || passwordMismatch}>{busy ? "Working…" : authIntent === "signin" ? "Open workspace" : "Create account"}</button>
+          </form>
+        </section>
+      </div>}
     </div>
   );
-}
-
-function ParticleBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const particlesRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; opacity: number; radius: number }>>([]);
-  const mouseRef = useRef({ x: -9999, y: -9999 });
-  const animRef = useRef(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    function resize() {
-      canvas!.width = window.innerWidth;
-      canvas!.height = window.innerHeight;
-    }
-    resize();
-    window.addEventListener("resize", resize);
-
-    const maxParticles = Math.min(Math.floor((canvas.width * canvas.height) / 18000), 100);
-    const particles: typeof particlesRef.current = [];
-    for (let i = 0; i < maxParticles; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        opacity: 0.15 + Math.random() * 0.25,
-        radius: 0.4 + Math.random() * 0.8,
-      });
-    }
-    particlesRef.current = particles;
-
-    function onMouseMove(e: MouseEvent) {
-      mouseRef.current = { x: e.clientX, y: e.clientY };
-    }
-    window.addEventListener("mousemove", onMouseMove);
-
-    function animate() {
-      if (!canvas || !ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const mx = mouseRef.current.x;
-      const my = mouseRef.current.y;
-
-      for (let i = 0; i < particles.length; i++) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
-
-        const dx = mx - p.x;
-        const dy = my - p.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        let particleOpacity = p.opacity;
-        if (dist < 180) {
-          const force = (1 - dist / 180) * 0.3;
-          p.vx += dx * force * 0.001;
-          p.vy += dy * force * 0.001;
-          particleOpacity = Math.min(p.opacity + (1 - dist / 180) * 0.5, 0.9);
-        }
-        p.vx = Math.max(-0.5, Math.min(0.5, p.vx));
-        p.vy = Math.max(-0.5, Math.min(0.5, p.vy));
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(198, 156, 249, ${particleOpacity.toFixed(3)})`;
-        ctx.fill();
-
-        for (let j = i + 1; j < particles.length; j++) {
-          const p2 = particles[j];
-          const d2 = Math.hypot(p.x - p2.x, p.y - p2.y);
-          if (d2 < 120) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(198, 156, 249, ${(0.08 * (1 - d2 / 120)).toFixed(4)})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      }
-      animRef.current = requestAnimationFrame(animate);
-    }
-
-    animate();
-
-    return () => {
-      window.removeEventListener("resize", resize);
-      window.removeEventListener("mousemove", onMouseMove);
-      cancelAnimationFrame(animRef.current);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} className="landing-particles" />;
 }
