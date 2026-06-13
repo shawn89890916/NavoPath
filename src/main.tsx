@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, ExecutionLane, Language, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Task, TaskRecurrence, TimelineRecord } from "./types";
 import { callAiAssistant, type AiAction, type AiStep } from "./aiAssistantApi";
+import { ATTACHMENT_ACCEPT, parseAttachment, type ParsedAttachment } from "./fileParser";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
 import {
@@ -230,6 +231,34 @@ type DragCreateState = {
 type PlanPickPriority = "must" | "should" | "could";
 type AuthState = { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
 type AuthNotice = { type: "confirm-email"; email: string } | null;
+type AiAttachmentSnapshot = {
+  name: string;
+  size: number;
+  pageCount?: number;
+  truncated?: boolean;
+  status: "ready" | "error";
+  statusText: string;
+  summary: string;
+};
+type AiSessionMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  status?: "thinking" | "done" | "error";
+  attachment?: AiAttachmentSnapshot;
+  steps?: AiStep[];
+  actions?: AiAction[];
+  selectedActions?: Record<number, boolean>;
+  actionState?: "pending" | "adopted" | "rejected" | "undone";
+  importCommit?: {
+    focus?: TimelineFocusTarget;
+    addedCount: number;
+    addedTaskIds: string[];
+    addedEventIds: string[];
+    previousTasks: Task[];
+  };
+};
 type FormState = {
   title: string;
   projectId: string;
@@ -244,6 +273,7 @@ type FormState = {
   urgency: Priority;
   estimatedHours: number;
   details: string;
+  recurrence?: TaskRecurrence;
 };
 
 const PlanningViewLazy = lazy(() => import("./PlanningView"));
@@ -358,6 +388,52 @@ function getExecutionLane(task: Task): ExecutionLane | undefined {
 
 function hasRecurringRule(task: Task) {
   return Boolean(task.recurrence && task.recurrence.frequency !== "none");
+}
+
+function validCategory(value: unknown): Category {
+  return ["exam", "uk", "us", "essay", "materials", "project", "personal"].includes(String(value))
+    ? value as Category
+    : "personal";
+}
+
+function validPriority(value: unknown): Priority {
+  return ["high", "medium", "low"].includes(String(value)) ? value as Priority : "medium";
+}
+
+function validIsoDate(value: unknown) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+}
+
+function validTime(value: unknown) {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function normalizeAiRecurrence(value: unknown, date: string, startTime?: string, durationMinutes?: number): TaskRecurrence | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const frequencies: RecurrenceFrequency[] = ["daily", "weekdays", "weekends", "weekly", "biweekly", "monthly", "quarterly"];
+  if (!frequencies.includes(raw.frequency as RecurrenceFrequency)) return undefined;
+  const normalizedStart = validIsoDate(raw.startDate) ? String(raw.startDate) : date;
+  const normalizedTime = validTime(raw.startTime) ? String(raw.startTime) : validTime(startTime) ? startTime : "";
+  return {
+    mode: normalizedTime ? "scheduled" : "flexible",
+    frequency: raw.frequency as RecurrenceFrequency,
+    startDate: normalizedStart,
+    startTime: normalizedTime || undefined,
+    durationMinutes: normalizedTime ? Math.max(Number(raw.durationMinutes) || durationMinutes || 60, 15) : undefined,
+    endDate: validIsoDate(raw.endDate) ? String(raw.endDate) : undefined,
+    count: Number.isFinite(Number(raw.count)) && Number(raw.count) > 0 ? Number(raw.count) : undefined,
+  };
+}
+
+function isValidAiAction(action: AiAction) {
+  if (action.type !== "import_schedule_item") return true;
+  const raw = action as Record<string, unknown>;
+  return (raw.kind === "task" || raw.kind === "event") &&
+    typeof raw.title === "string" && raw.title.trim().length > 0 &&
+    validIsoDate(raw.date) &&
+    (!raw.startTime || validTime(raw.startTime)) &&
+    (!raw.endTime || validTime(raw.endTime));
 }
 
 function isRecurringScheduledTask(task: Task) {
@@ -665,7 +741,8 @@ function defaultForm(type: AddType = "task"): FormState {
     importance: "high",
     urgency: "low",
     estimatedHours: 0.5,
-    details: ""
+    details: "",
+    recurrence: undefined,
   };
 }
 
@@ -720,6 +797,7 @@ function makeEvent(form: FormState): CalendarEvent {
     endTime: form.endTime,
     category: form.category,
     details: form.details,
+    recurrence: form.recurrence,
     createdAt: new Date().toISOString()
   };
 }
@@ -808,10 +886,9 @@ function App() {
   const [referencedTaskId, setReferencedTaskId] = useState("");
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiReply, setAiReply] = useState("");
-  const [aiActions, setAiActions] = useState<AiAction[]>([]);
-  const [aiSteps, setAiSteps] = useState<AiStep[]>([]);
-  const [aiMsg, setAiMsg] = useState(""); // user message shown as bubble
+  const [aiMessages, setAiMessages] = useState<AiSessionMessage[]>([]);
+  const [aiAttachment, setAiAttachment] = useState<ParsedAttachment | null>(null);
+  const [aiAttachmentStatus, setAiAttachmentStatus] = useState("");
   // ── Auto-schedule: single source of truth ──
   const [schedulePreviews, setSchedulePreviews] = useState<SchedulePreview[]>([]);
   const [autoScheduleState, setAutoScheduleState] = useState<AutoScheduleState>("idle");
@@ -1211,6 +1288,7 @@ function App() {
   const isViewingToday = timelineDate === today;
   const projects = data?.projects || [];
   const tasks = data?.tasks || [];
+  const events = data?.events || [];
 
   /**
    * Build "virtual" Task objects for each active preview block. These are
@@ -1348,6 +1426,31 @@ function App() {
     return { tasks: expanded, ownerMap };
   }
 
+  function expandEventOccurrences(dates: Set<string>) {
+    const ownerMap = new Map<string, CalendarEvent>();
+    const expanded: Task[] = [];
+    for (const event of events) {
+      const occurrenceDates = event.recurrence
+        ? enumerateRecurrenceDates(event.recurrence, dates)
+        : [...dates].filter((date) => date >= (event.startDate || event.date) && date <= (event.endDate || event.startDate || event.date));
+      for (const date of occurrenceDates) {
+        const id = `event_occ_${event.id}_${date}_${event.startTime || "all"}`;
+        const start = event.startTime || undefined;
+        const duration = start
+          ? Math.max(event.recurrence?.durationMinutes || (event.endTime ? timeToMinutes(event.endTime) - timeToMinutes(start) : 60), 15)
+          : 30;
+        expanded.push({
+          id, title: event.title, dueDate: date, category: event.category, priority: "medium",
+          notes: event.details, goalId: "", completed: false, estimatedHours: duration / 60,
+          scheduledDate: date, scheduledStart: start, scheduledEnd: start ? addMinutes(start, duration) : undefined,
+          recurrence: event.recurrence, createdAt: event.createdAt, updatedAt: event.createdAt,
+        });
+        ownerMap.set(id, event);
+      }
+    }
+    return { tasks: expanded, ownerMap };
+  }
+
   const explicitVisibleTimelineTasks = useMemo(
     () => expandTimelineRecords(visibleTimelineDates),
     [tasks, visibleTimelineDates],
@@ -1357,9 +1460,11 @@ function App() {
     return expandRecurrenceOccurrences(visibleTimelineDates);
   }, [tasks, visibleTimelineDates]);
 
+  const eventVisibleTimeline = useMemo(() => expandEventOccurrences(visibleTimelineDates), [events, visibleTimelineDates]);
+
   const expandedVisibleTimelineTasks = useMemo(
-    () => [...explicitVisibleTimelineTasks, ...recurrenceVisibleTimeline.tasks].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
-    [explicitVisibleTimelineTasks, recurrenceVisibleTimeline.tasks],
+    () => [...explicitVisibleTimelineTasks, ...recurrenceVisibleTimeline.tasks, ...eventVisibleTimeline.tasks.filter((item) => item.scheduledStart)].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
+    [explicitVisibleTimelineTasks, recurrenceVisibleTimeline.tasks, eventVisibleTimeline.tasks],
   );
 
   // Record ID → real task resolution map (for operations like project change, note save)
@@ -1385,6 +1490,7 @@ function App() {
   }, [tasks]);
 
   const occurrenceToTaskMap = recurrenceVisibleTimeline.ownerMap;
+  const occurrenceToEventMap = eventVisibleTimeline.ownerMap;
 
   function resolveOwningTask(taskOrId: Task | string) {
     const id = typeof taskOrId === "string" ? taskOrId : taskOrId.id;
@@ -2552,6 +2658,11 @@ function App() {
   }
 
   function openTaskEdit(task: Task) {
+    const event = occurrenceToEventMap.get(task.id) || events.find((item) => task.id.startsWith(`event_occ_${item.id}_`));
+    if (event) {
+      openEventEdit(event);
+      return;
+    }
     const realTask = resolveOwningTask(task) || task;
     const recordId = recordByIdMap.has(task.id) ? task.id : undefined;
     const occurrence = parseRecurrenceOccurrenceId(task.id);
@@ -2595,7 +2706,7 @@ function App() {
     setEditingId(event.id);
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
-    setForm({ ...defaultForm("event"), title: event.title, dueDate: event.startDate || event.date, endDate: event.endDate || event.date, dueTime: event.startTime || "", endTime: event.endTime || "", category: event.category, details: event.details });
+    setForm({ ...defaultForm("event"), title: event.title, dueDate: event.startDate || event.date, endDate: event.endDate || event.date, dueTime: event.startTime || "", endTime: event.endTime || "", category: event.category, details: event.details, recurrence: event.recurrence });
     setDrawerOpen(true);
   }
 
@@ -2624,7 +2735,7 @@ function App() {
       } else if (addType === "project") {
         void saveData({ ...data, projects: data.projects.map((project) => project.id === editingId ? { ...project, title: form.title.trim(), category: form.category, color: form.projectColor || categories[form.category].color, notes: form.details, importance: form.importance, urgency: form.urgency, updatedAt: now } : project) });
       } else {
-        void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details } : event) });
+        void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details, recurrence: form.recurrence } : event) });
       }
     } else if (addType === "task") {
       void saveData({ ...data, tasks: [...data.tasks, makeTask(form)] });
@@ -2726,15 +2837,28 @@ function App() {
   }
 
   async function sendAi() {
-    if (!aiInput.trim()) return;
+    if (!aiInput.trim() && !aiAttachment) return;
     const task = tasks.find((item) => item.id === referencedTaskId);
-    const msg = aiInput.trim();
-    setAiMsg(msg);
+    const msg = aiInput.trim() || "解析附件中的任务和事件";
+    const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
+      name: aiAttachment.name,
+      size: aiAttachment.size,
+      pageCount: aiAttachment.pageCount,
+      truncated: aiAttachment.truncated,
+      status: "ready",
+      statusText: aiAttachmentStatus,
+      summary: aiAttachment.text.slice(0, 180).replace(/\s+/g, " ").trim(),
+    } : undefined;
+    const userMessage: AiSessionMessage = { id: uid("ai_user"), role: "user", content: msg, attachment: attachmentSnapshot, createdAt: new Date().toISOString() };
+    const assistantId = uid("ai_assistant");
+    const assistantMessage: AiSessionMessage = {
+      id: assistantId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "thinking",
+      steps: [{ label: aiAttachment ? "正在读取引用文件..." : "正在分析你的请求...", status: "running" }],
+    };
+    setAiMessages((current) => [...current, userMessage, assistantMessage]);
     setAiInput("");
     setAiBusy(true);
-    setAiActions([]);
-    setAiReply("");
-    setAiSteps([{ label: "正在分析你的请求...", status: "running" }]);
+    clearAiAttachment();
 
     // Build rich context for the AI
     const scheduledToday = tasks.filter((t) => t.scheduledDate === today && t.scheduledStart);
@@ -2751,27 +2875,183 @@ function App() {
 
     try {
       const result = await callAiAssistant({
-        mode: "chat",
-        message: msg,
+        mode: attachmentSnapshot ? "import_schedule" : "chat",
+        message: aiAttachment ? `${msg}\n\n附件：${aiAttachment.name}\n\n${aiAttachment.text}` : msg,
         context,
       });
-      setAiSteps(result.steps && result.steps.length > 0
-        ? result.steps
-        : [{ label: "已生成安排", status: "done" }]);
-      setAiReply(result.reply);
-      if (result.actions && result.actions.length > 0) {
-        setAiActions(result.actions);
-      }
+      const validActions = (result.actions || []).filter(isValidAiAction);
+      setAiMessages((current) => current.map((message) => message.id === assistantId ? {
+        ...message,
+        status: "done",
+        content: result.reply,
+        steps: result.steps && result.steps.length > 0 ? result.steps : [{ label: "已生成安排", status: "done" }],
+        actions: validActions,
+        selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
+        actionState: validActions.length ? "pending" : undefined,
+      } : message));
     } catch (error) {
-      setAiReply(error instanceof Error ? error.message : "网络异常，请稍后重试。");
-      setAiSteps([{ label: "请求失败", status: "error" }]);
+      setAiMessages((current) => current.map((message) => message.id === assistantId ? {
+        ...message,
+        status: "error",
+        content: error instanceof Error ? error.message : "网络异常，请稍后重试。",
+        steps: [{ label: "请求失败", status: "error" }],
+      } : message));
     } finally {
       setAiBusy(false);
     }
   }
 
-  async function confirmAiAction(action: AiAction) {
+  async function handleAiAttachment(file: File) {
+    setAiAttachmentStatus("正在本地解析文件...");
+    try {
+      const parsed = await parseAttachment(file);
+      setAiAttachment(parsed);
+      setAiAttachmentStatus(parsed.truncated ? "文本已提取，超过 60,000 字符的部分已截断" : "文本已提取，仅文本会发送给 AI");
+    } catch (error) {
+      setAiAttachmentStatus(error instanceof Error ? error.message : "文件解析失败");
+    }
+  }
+
+  function clearAiAttachment() {
+    setAiAttachment(null);
+    setAiAttachmentStatus("");
+  }
+
+  async function adoptSelectedAiActions(messageId: string) {
     if (!data) return;
+    const message = aiMessages.find((item) => item.id === messageId);
+    const selected = (message?.actions || []).filter((_, index) => message?.selectedActions?.[index] !== false);
+    if (selected.length === 0) return;
+    const now = new Date().toISOString();
+    const nextTasks = [...data.tasks];
+    const nextEvents = [...data.events];
+    const addedTaskIds: string[] = [];
+    const addedEventIds: string[] = [];
+    const previousTasks: Task[] = [];
+    let focus: TimelineFocusTarget | undefined;
+    for (const action of selected) {
+      if (action.type === "import_schedule_item" && action.title && action.date) {
+        const a = action as Record<string, any>;
+        if (a.kind === "event") {
+          const eventId = uid("event");
+          nextEvents.push({
+            id: eventId, title: action.title, date: a.date, startDate: a.date, endDate: a.endDate || a.date,
+            startTime: a.startTime || "", endTime: a.endTime || "", category: validCategory(a.category),
+            details: a.notes || "", recurrence: normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes),
+            imported: true, createdAt: now,
+          });
+          addedEventIds.push(eventId);
+          focus ||= { date: a.date, startTime: a.startTime || "09:00", source: "schedule" };
+        } else {
+          const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
+          const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : 60);
+          const task: Task = {
+            id: uid("task"), title: action.title, dueDate: a.date, category: validCategory(a.category),
+            priority: validPriority(a.priority), notes: a.notes || "", goalId: "goal_admission", completed: false,
+            projectId: projects.some((project) => project.id === a.projectId) ? a.projectId : undefined,
+            estimatedHours: Math.max(duration, 15) / 60, recurrence, subtasks: [], createdAt: now, updatedAt: now,
+          };
+          if (!recurrence && a.startTime) task.timelineRecords = [createScheduledRecord(task, a.date, a.startTime, Math.max(duration, 15))];
+          nextTasks.push(task);
+          addedTaskIds.push(task.id);
+          if (a.startTime || recurrence?.startTime) focus ||= { date: a.date, startTime: a.startTime || recurrence?.startTime, taskId: task.id, source: "schedule" };
+        }
+        continue;
+      }
+      if ((action.type === "create_scheduled_task" || action.type === "create_task") && action.title) {
+        const a = action as Record<string, any>;
+        const duration = Math.max(Number(a.durationMinutes) || 60, 15);
+        const startTime = a.start || "09:00";
+        const date = a.date || today;
+        const task: Task = {
+          id: uid("ai"), title: action.title, dueDate: date, category: "personal", priority: "medium",
+          importance: "medium", urgency: "medium", notes: a.reason || "", goalId: "", completed: false,
+          projectId: projects.some((project) => project.id === a.projectId) ? a.projectId : undefined,
+          estimatedHours: duration / 60, scheduledDate: date, scheduledStart: startTime,
+          scheduledEnd: a.end || addMinutes(startTime, duration), subtasks: [], order: Date.now(),
+          createdAt: now, updatedAt: now,
+        };
+        nextTasks.push(task);
+        addedTaskIds.push(task.id);
+        focus ||= { date, startTime, taskId: task.id, source: "schedule" };
+        continue;
+      }
+      if (action.type === "schedule_task" && action.taskId && action.date) {
+        const a = action as Record<string, any>;
+        const index = nextTasks.findIndex((task) => task.id === action.taskId);
+        if (index !== -1) {
+          if (!previousTasks.some((task) => task.id === nextTasks[index].id)) previousTasks.push(nextTasks[index]);
+          nextTasks[index] = { ...nextTasks[index], scheduledDate: action.date, scheduledStart: a.start || nextTasks[index].scheduledStart, scheduledEnd: a.end || nextTasks[index].scheduledEnd };
+          focus ||= { date: action.date, startTime: a.start || nextTasks[index].scheduledStart, taskId: action.taskId, source: "schedule" };
+        }
+      }
+    }
+    await saveData({ ...data, tasks: nextTasks, events: nextEvents });
+    setAiMessages((current) => current.map((item) => item.id === messageId ? { ...item, actionState: "adopted", actions: [], importCommit: { focus, addedCount: selected.length, addedTaskIds, addedEventIds, previousTasks } } : item));
+  }
+
+  function rejectSelectedAiActions(messageId: string) {
+    setAiMessages((current) => current.map((item) => item.id === messageId ? { ...item, actionState: "rejected", actions: [] } : item));
+  }
+
+  function viewAiImport(messageId: string) {
+    const commit = aiMessages.find((message) => message.id === messageId)?.importCommit;
+    if (!commit?.focus) return;
+    setModeState("execute");
+    setTimelineView("daily");
+    requestTimelineFocus(commit.focus);
+    setAiOpen(false);
+  }
+
+  async function undoAiImport(messageId: string) {
+    const commit = aiMessages.find((message) => message.id === messageId)?.importCommit;
+    const currentData = dataRef.current;
+    if (!commit || !currentData) return;
+    const previousById = new Map(commit.previousTasks.map((task) => [task.id, task]));
+    await saveData({
+      ...currentData,
+      tasks: currentData.tasks.filter((task) => !commit.addedTaskIds.includes(task.id)).map((task) => previousById.get(task.id) || task),
+      events: currentData.events.filter((event) => !commit.addedEventIds.includes(event.id)),
+    });
+    setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, actionState: "undone", importCommit: undefined } : message));
+  }
+
+  async function confirmAiAction(action: AiAction, messageId?: string) {
+    if (!data) return;
+    if (action.type === "import_schedule_item" && action.title && action.date) {
+      const a = action as Record<string, any>;
+      const now = new Date().toISOString();
+      if (a.kind === "event") {
+        const event: CalendarEvent = {
+          id: uid("event"),
+          title: action.title,
+          date: a.date,
+          startDate: a.date,
+          endDate: a.endDate || a.date,
+          startTime: a.startTime || "",
+          endTime: a.endTime || "",
+          category: validCategory(a.category),
+          details: a.notes || "",
+          recurrence: normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes),
+          imported: true,
+          createdAt: now,
+        };
+        await saveData({ ...data, events: [...data.events, event] });
+      } else {
+        const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
+        const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : 60);
+        const task: Task = {
+          id: uid("task"), title: action.title, dueDate: a.date, category: validCategory(a.category),
+          priority: validPriority(a.priority), notes: a.notes || "", goalId: "goal_admission", completed: false,
+          projectId: projects.some((project) => project.id === a.projectId) ? a.projectId : undefined,
+          estimatedHours: Math.max(duration, 15) / 60, recurrence, subtasks: [], createdAt: now, updatedAt: now,
+        };
+        if (!recurrence && a.startTime) task.timelineRecords = [createScheduledRecord(task, a.date, a.startTime, Math.max(duration, 15))];
+        await saveData({ ...data, tasks: [...data.tasks, task] });
+      }
+      if (messageId) removeAiMessageAction(messageId, action);
+      return;
+    }
     // Handle create_scheduled_task (TrevorAI-style) and create_task as the same flow
     if ((action.type === "create_scheduled_task" || action.type === "create_task") && action.title) {
       const a = action as Record<string, unknown>;
@@ -2805,7 +3085,7 @@ function App() {
         void saveData({ ...data, version: data.version || 1, tasks });
       });
       // Mark action as accepted
-      setAiActions((prev) => prev.map((act) => act === action ? { ...act, type: "none" as const, reason: t(lang, "toast.adopted") } : act));
+      if (messageId) removeAiMessageAction(messageId, action);
       return;
     }
     if (action.type === "schedule_task" && action.taskId && action.date) {
@@ -2821,11 +3101,17 @@ function App() {
       });
     }
     // Dismiss the action card
-    setAiActions((prev) => prev.filter((a) => a !== action));
+    if (messageId) removeAiMessageAction(messageId, action);
   }
 
-  function dismissAiAction(action: AiAction) {
-    setAiActions((prev) => prev.filter((a) => a !== action));
+  function removeAiMessageAction(messageId: string, action: AiAction) {
+    setAiMessages((current) => current.map((message) => message.id === messageId
+      ? { ...message, actions: (message.actions || []).filter((item) => item !== action) }
+      : message));
+  }
+
+  function dismissAiAction(action: AiAction, messageId: string) {
+    removeAiMessageAction(messageId, action);
   }
 
   async function generateNextAction() {
@@ -3397,7 +3683,10 @@ function App() {
                         </div>
                         <div className="df-timeline-3day-dates">
                           {threeDates.map((colDate, ci) => {
-                            const adTasks = tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === colDate);
+                            const adTasks = [
+                              ...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === colDate),
+                              ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === colDate),
+                            ];
                             return (
                               <div key={colDate} className="df-timeline-3day-allday-cell"
                                 onClick={(event) => {
@@ -3741,6 +4030,7 @@ function App() {
                   const monthStart = startOfMonthGridIso(timelineDate);
                   const allMonthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
                   const visibleMonthDays = new Set(allMonthDays);
+                  const monthEvents = expandEventOccurrences(visibleMonthDays).tasks;
                   const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
                   // Group into 6 weeks
                   const weeks: string[][] = [];
@@ -3756,7 +4046,7 @@ function App() {
                     if (task.dueDate && visibleMonthDays.has(task.dueDate)) return task.dueDate;
                     return "";
                   }
-                  const monthTaskBuckets = tasks.reduce((map, task) => {
+                  const monthTaskBuckets = [...tasks, ...monthEvents].reduce((map, task) => {
                     const primaryDate = getPrimaryMonthDate(task);
                     if (!primaryDate) return map;
                     const bucket = map.get(primaryDate);
@@ -3902,7 +4192,7 @@ function App() {
                         {allDayQuickAdd && !drag && (
                           <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, allDayQuickAdd.date, null)} onCancel={() => setAllDayQuickAdd(null)} />
                         )}
-                        {tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineDate).map((task) => (
+                        {[...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineDate), ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineDate)].map((task) => (
                           <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onDragStart={(event) => {
                             event.dataTransfer.setData("taskId", task.id);
                             setDragCreate(null);
@@ -4137,7 +4427,7 @@ function App() {
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} reply={aiReply} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); setAiActions([]); setAiSteps([]); setAiMsg(""); }} actions={aiActions} onConfirmAction={(action) => void confirmAiAction(action)} onDismissAction={dismissAiAction} steps={aiSteps} userMsg={aiMsg} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} />}
+      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); setAiMessages([]); clearAiAttachment(); }} messages={aiMessages} onConfirmAction={(messageId, action) => void confirmAiAction(action, messageId)} onDismissAction={(messageId, action) => dismissAiAction(action, messageId)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} />}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" ? (() => void handleSignOut()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -5484,7 +5774,10 @@ function EditDrawer(props: {
       <label>{t(props.lang, "form.name")}<input value={f.title} onChange={(event) => set("title", event.target.value)} /></label>
       {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label></>}
       {props.type === "project" && <><label>{t(props.lang, "form.projectNotes")}<textarea rows={3} value={f.details} onChange={(event) => set("details", event.target.value)} /></label><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></>}
-      {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div>}
+      {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label><label>重复<select value={f.recurrence?.frequency || "none"} onChange={(event) => {
+        const frequency = event.target.value as RecurrenceFrequency;
+        set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max((timeToMinutes(f.endTime || addMinutes(f.dueTime, 60)) - timeToMinutes(f.dueTime)), 15) : undefined, endDate: f.endDate || undefined });
+      }}>{RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>}
       <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? t(props.lang, "form.collapseAdvanced") : t(props.lang, "form.expandAdvanced")}</button>
       {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <label>{t(props.lang, "form.estimatedTime")}<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>}<label>{t(props.lang, "form.notes")}<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
       <div className="df-drawer-actions">{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}{props.type === "task" && <button className="df-icon-action i-next" data-tip={t(props.lang, "form.clarifyNext")} aria-label={t(props.lang, "form.clarifyNext")} onClick={props.onNextAction} />}<button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : t(props.lang, "form.add")}</button></div>
@@ -5492,58 +5785,48 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, reply, busy, onSend, onClose, actions, onConfirmAction, onDismissAction, steps, userMsg, projectList, lang }: { input: string; setInput: (v: string) => void; reply: string; busy: boolean; onSend: () => void; onClose: () => void; actions?: AiAction[]; onConfirmAction?: (action: AiAction) => void; onDismissAction?: (action: AiAction) => void; steps?: AiStep[]; userMsg?: string; projectList?: { id: string; title: string; color?: string }[]; lang: Language }) {
+function AiPanel({ input, setInput, busy, onSend, onClose, messages, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; onConfirmAction: (messageId: string, action: AiAction) => void; onDismissAction: (messageId: string, action: AiAction) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void }) {
   const projects = projectList || [];
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, attachmentStatus]);
   return <aside className="df-ai-panel">
-    {/* Header */}
     <div className="df-ai-panel-head">
-      <strong>NavoPath AI</strong>
+      <div className="df-ai-title"><span className={`df-ai-presence ${busy ? "thinking" : ""}`} /><div><strong>NavoPath AI</strong><small>{busy ? "正在思考" : "在线助手"}</small></div></div>
       <button className="df-icon-action i-close" data-tip={t(lang, "aiPanel.close")} aria-label={t(lang, "aiPanel.close")} onClick={onClose} />
     </div>
-
-    {/* Scrollable content */}
-    <div className="df-ai-panel-body">
-      {/* User message bubble */}
-      {userMsg && (
-        <div className="df-ai-msg-bubble user">
-          <span>{userMsg}</span>
-        </div>
-      )}
-
-      {/* Step feedback */}
-      {steps && steps.length > 0 && (
-        <div className="df-ai-steps">
-          {steps.map((s, i) => (
-            <div key={i} className={`df-ai-step ${s.status}`}>
-              <span className="df-ai-step-icon">
-                {s.status === "done" ? "✓" : s.status === "error" ? "✕" : s.status === "running" ? "●" : "○"}
-              </span>
-              <span className="df-ai-step-label">{s.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Action cards */}
-      {actions && actions.length > 0 && (
-        <div className="df-ai-actions">
-          <div className="df-ai-action-header">Create scheduled tasks</div>
-          {actions.map((action, i) => {
+    <div className="df-ai-panel-body" ref={bodyRef}>
+      {messages.length === 0 && <div className="df-ai-empty"><span>N</span><strong>让计划变得清晰</strong><p>描述任务、询问安排，或上传文件提取任务与事件。</p></div>}
+      {messages.map((message) => <section key={message.id} className={`df-ai-turn ${message.role}`}>
+        {message.role === "user" ? <>
+          <div className="df-ai-msg-bubble user"><span>{message.content}</span></div>
+          {message.attachment && <AttachmentCard attachment={message.attachment} referenced />}
+        </> : <>
+          <div className="df-ai-assistant-label"><span>N</span><small>NavoPath AI</small></div>
+          {message.steps && message.steps.length > 0 && <div className="df-ai-steps">
+            {message.steps.map((step, index) => <div key={index} className={`df-ai-step ${step.status}`}><span className="df-ai-step-icon">{step.status === "done" ? "✓" : step.status === "error" ? "✕" : step.status === "running" ? "●" : "○"}</span><span>{step.label}</span></div>)}
+          </div>}
+          {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.content}</div>}
+          {message.actions && message.actions.length > 0 && <div className="df-ai-actions">
+            <div className="df-ai-action-header"><span>解析结果</span><div><button onClick={() => onSetAllActions(message.id, true)}>全选</button><button onClick={() => onSetAllActions(message.id, false)}>全不选</button><small>{message.actions.length} 项</small></div></div>
+            {message.actions.map((action, i) => {
             const a = action as Record<string, unknown>;
             const title = a.title as string || a.type as string;
             const date = a.date as string | undefined;
-            const start = a.start as string | undefined;
-            const end = a.end as string | undefined;
+            const start = (a.start || a.startTime) as string | undefined;
+            const end = (a.end || a.endTime) as string | undefined;
             const dur = a.durationMinutes as number | undefined;
             const projectName = (a.projectName as string) || undefined;
             const projectId = (a.projectId as string) || undefined;
             const reason = typeof a.reason === 'string' ? a.reason : undefined;
             const isAccepted = action.type === "none";
             const proj = projectId ? projects.find((p: any) => String(p.id) === String(projectId)) : null;
-            const finalProjectName = projectName || proj?.title || lang === "zh" ? "未归属任务" : "Unassigned Task";
+            const finalProjectName = projectName || proj?.title || (lang === "zh" ? "未归属" : "Unassigned");
             const projColor = proj?.color;
             return (
             <div key={i} className={`df-ai-task-card ${isAccepted ? "accepted" : ""}`}>
+              {action.type === "import_schedule_item" && <input className="df-ai-import-check" type="checkbox" checked={message.selectedActions?.[i] !== false} onChange={() => onToggleAction(message.id, i)} />}
               {projColor && <span className="df-ai-task-strip" style={{ background: projColor }} />}
               <div className="df-ai-task-body">
                 <div className="df-ai-task-row-top">
@@ -5551,47 +5834,58 @@ function AiPanel({ input, setInput, reply, busy, onSend, onClose, actions, onCon
                   {start && end && <time>{start} - {end}</time>}
                 </div>
                 <div className="df-ai-task-row-mid">
-                  <span className="df-ai-task-project"># {finalProjectName}</span>
+                  <span className="df-ai-task-project">{a.kind === "event" ? "事件" : "任务"} · # {finalProjectName}{a.recurrence ? ` · ↻ ${(a.recurrence as any).frequency}` : ""}</span>
                 </div>
                 <div className="df-ai-task-row-bot">
                   {dur && <span className="df-ai-task-dur">{dur} min</span>}
+                  {date && <span className="df-ai-task-dur">{date}</span>}
                   {reason && <small>{reason}</small>}
+                  {typeof a.warning === "string" && <small>{a.warning}</small>}
                 </div>
               </div>
               {!isAccepted && (
                 <div className="df-ai-task-actions">
-                  <button className="df-ai-task-accept" onClick={() => onConfirmAction?.(action)} title={t(lang, "aiPanel.adopt")}>✓</button>
-                  <button className="df-ai-task-cancel" onClick={() => onDismissAction?.(action)} title={t(lang, "aiPanel.cancel")}>✕</button>
+                  <button className="df-ai-task-accept" onClick={() => onConfirmAction(message.id, action)} title={t(lang, "aiPanel.adopt")}>✓</button>
+                  <button className="df-ai-task-cancel" onClick={() => onDismissAction(message.id, action)} title={t(lang, "aiPanel.cancel")}>✕</button>
                 </div>
               )}
               {isAccepted && <span className="df-ai-task-done">{t(lang, "aiPanel.adopted")}</span>}
             </div>
           );})}
-        </div>
-      )}
-
-      {/* AI reply text */}
-      {reply && <div className="df-ai-reply">{reply}</div>}
+          {message.actions.length > 0 && <div className="df-ai-import-bulk">
+            <button onClick={() => onRejectSelected(message.id)}>取消本轮</button>
+            <button className="primary" disabled={!message.actions.some((_, index) => message.selectedActions?.[index] !== false)} onClick={() => onAdoptSelected(message.id)}>一键添加选中项</button>
+          </div>}
+        </div>}
+        {message.actionState && message.actionState !== "pending" && <div className={`df-ai-action-outcome ${message.actionState}`}>
+          <span>{message.actionState === "adopted" ? `已添加 ${message.importCommit?.addedCount || 0} 项` : message.actionState === "undone" ? "已撤回本次添加" : "已否决本轮建议"}</span>
+          {message.actionState === "adopted" && <div>
+            {message.importCommit?.focus && <button onClick={() => onViewImport(message.id)}>查看时间轴</button>}
+            <button onClick={() => onUndoImport(message.id)}>撤回本次操作</button>
+          </div>}
+        </div>}
+        </>}
+      </section>)}
     </div>
-
-    {/* Input area */}
     <div className="df-ai-panel-foot">
-      <textarea
-        value={input}
-        onChange={(event) => setInput(event.target.value)}
-        placeholder={t(lang, "aiPanel.thinkPlaceholder")}
-        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
-      />
-      <button
-        className="df-ai-send-btn"
-        onClick={onSend}
-        disabled={busy || !input.trim()}
-        title={busy ? t(lang, "aiPanel.thinking") : t(lang, "aiPanel.send")}
-      >
-        {busy ? "●" : "↑"}
-      </button>
+      {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
+      <div className="df-ai-composer-row">
+        <label className="df-ai-attach-btn" title="上传文件">＋<input type="file" accept={ATTACHMENT_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttachment(file); event.currentTarget.value = ""; }} /></label>
+        <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
+        <button className="df-ai-send-btn" onClick={onSend} disabled={busy || (!input.trim() && !attachment)} title={busy ? t(lang, "aiPanel.thinking") : t(lang, "aiPanel.send")}>{busy ? "●" : "↑"}</button>
+      </div>
     </div>
   </aside>;
+}
+
+function AttachmentCard({ attachment, referenced = false, onRemove }: { attachment: AiAttachmentSnapshot; referenced?: boolean; onRemove?: () => void }) {
+  const ext = attachment.name.split(".").pop()?.toUpperCase() || "FILE";
+  const size = attachment.size ? `${Math.max(attachment.size / 1024, 1).toFixed(0)} KB` : "";
+  return <div className={`df-ai-attachment-card ${referenced ? "referenced" : ""} ${attachment.status}`}>
+    <span className="df-ai-file-icon">{ext.slice(0, 4)}</span>
+    <div><strong>{attachment.name}</strong><small>{referenced ? "引用附件" : attachment.statusText}{attachment.pageCount ? ` · ${attachment.pageCount} 页` : ""}{size ? ` · ${size}` : ""}</small>{referenced && attachment.summary ? <p>{attachment.summary}</p> : null}</div>
+    {onRemove && <button onClick={onRemove} aria-label="移除附件">×</button>}
+  </div>;
 }
 
 function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout, onSignOut, lang }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onShowAbout: () => void; onSignOut?: () => void; lang: Language }) {

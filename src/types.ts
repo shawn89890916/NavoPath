@@ -117,6 +117,7 @@ export interface CalendarEvent {
   endTime?: string;
   category: Category;
   details: string;
+  recurrence?: TaskRecurrence;
   imported?: boolean;
   createdAt: string;
 }
@@ -233,6 +234,24 @@ export interface AiAction {
   details?: string;
   goalId?: string;
   subtasks?: { title: string }[];
+}
+
+export interface AiImportAction {
+  type: "import_schedule_item";
+  kind: "task" | "event";
+  title: string;
+  date: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  durationMinutes?: number;
+  category?: Category;
+  priority?: Priority;
+  projectId?: string;
+  projectName?: string;
+  notes?: string;
+  recurrence?: TaskRecurrence;
+  warning?: string;
 }
 
 /** Single parsed item from AI plan output — not written until user confirms */

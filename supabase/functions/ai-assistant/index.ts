@@ -92,7 +92,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day"];
+    const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day", "import_schedule"];
     if (!validModes.includes(mode)) {
       return new Response(
         JSON.stringify({ error: `Invalid mode. Must be one of: ${validModes.join(", ")}` }),
@@ -122,7 +122,15 @@ serve(async (req: Request) => {
       : "";
 
     // Build system prompt
-    const systemPrompt = `You are the AI scheduling assistant inside NavoPath, a time-blocking execution app.
+    const systemPrompt = mode === "import_schedule" ? `You import schedules from extracted document text into NavoPath.
+Today's date is ${currentDate}. Timezone is ${timezone}.
+Classify fixed commitments, classes, meetings, exams, and appointments as events. Classify actionable work as tasks.
+Return JSON only: {"reply":"Chinese summary","steps":[{"label":"解析文件","status":"done"}],"actions":[...]}.
+Every action must have:
+{"type":"import_schedule_item","kind":"task|event","title":"short title","date":"YYYY-MM-DD","endDate":"YYYY-MM-DD optional","startTime":"HH:mm optional","endTime":"HH:mm optional","durationMinutes":60,"category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","projectId":"existing id or empty","projectName":"existing name or null","notes":"source detail","recurrence":{"mode":"scheduled","frequency":"daily|weekdays|weekends|weekly|biweekly|monthly|quarterly","startDate":"YYYY-MM-DD","startTime":"HH:mm","durationMinutes":60,"endDate":"YYYY-MM-DD optional","count":10 optional},"warning":"optional uncertainty"}.
+Use recurrence only when explicitly stated, or when a date range plus strong context such as a class timetable supports a reliable inference. Otherwise keep the item single.
+Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${projectsInfo}
+` : `You are the AI scheduling assistant inside NavoPath, a time-blocking execution app.
 
 Your job: turn the user's natural language into structured scheduled task actions — like TrevorAI but in Chinese.
 
@@ -208,7 +216,7 @@ RULES:
           { role: "user", content: userContent },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 1600,
+        max_tokens: mode === "import_schedule" ? 6000 : 1600,
         stream: false,
       }),
     });

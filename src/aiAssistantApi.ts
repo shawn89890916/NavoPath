@@ -4,7 +4,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day";
+export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "import_schedule";
 
 export type AiStep = {
   label: string;
@@ -54,6 +54,31 @@ export type AiAction =
   | {
       type: "none";
       reason?: string;
+    }
+  | {
+      type: "import_schedule_item";
+      kind?: "task" | "event";
+      title?: string;
+      date?: string;
+      endDate?: string;
+      startTime?: string;
+      endTime?: string;
+      durationMinutes?: number;
+      category?: string;
+      priority?: string;
+      projectId?: string;
+      projectName?: string;
+      notes?: string;
+      recurrence?: {
+        mode?: "flexible" | "scheduled";
+        frequency?: "none" | "daily" | "weekdays" | "weekends" | "weekly" | "biweekly" | "monthly" | "quarterly";
+        startDate?: string;
+        startTime?: string;
+        durationMinutes?: number;
+        endDate?: string;
+        count?: number;
+      };
+      warning?: string;
     };
 
 export type AiAssistantResponse = {
@@ -61,6 +86,21 @@ export type AiAssistantResponse = {
   actions: AiAction[];
   steps?: AiStep[];
 };
+
+function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse {
+  if (result.actions.length > 0 || !result.reply.trim().startsWith("{")) return result;
+  try {
+    const nested = JSON.parse(result.reply) as Partial<AiAssistantResponse>;
+    if (typeof nested.reply !== "string") return result;
+    return {
+      reply: nested.reply,
+      actions: Array.isArray(nested.actions) ? nested.actions : [],
+      steps: Array.isArray(nested.steps) ? nested.steps : result.steps,
+    };
+  } catch {
+    return result;
+  }
+}
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -134,11 +174,11 @@ export async function callAiAssistant(params: {
     }
 
     const result = data as AiAssistantResponse & { steps?: AiStep[] };
-    return {
+    return unwrapNestedResponse({
       reply: result.reply || "完成",
       actions: Array.isArray(result.actions) ? result.actions : [],
       steps: Array.isArray(result.steps) ? result.steps : [],
-    };
+    });
   } catch (err) {
     console.error("AI Assistant network error:", err);
     return {

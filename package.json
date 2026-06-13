@@ -33,8 +33,11 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "mammoth": "^1.12.0",
+    "pdfjs-dist": "^6.0.227",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "tesseract.js": "^7.0.0",
     "typescript": "^5.7.0",
     "vite": "^7.0.0"
   },
