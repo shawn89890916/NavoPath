@@ -351,12 +351,16 @@ export function installBrowserFallback() {
     hasApiKey: false,
     apiKeyPreview: "",
     displayName: "NavoPath Preview",
+    avatarDataUrl: "",
+    onboardingVersion: 1,
+    onboardingStep: "done",
     dailyFocusTime: "20:00",
     weekStartsOn: 0,
     theme: "dark",
-    accentColor: "#175cd3",
-    executeAccentColor: "#C69CF9",
-    planningAccentColor: "#CAFF72",
+    typographyStyle: "editorial",
+    accentColor: "",
+    executeAccentColor: "",
+    planningAccentColor: "",
     aiTone: "direct",
     hideCompleted: false,
     reminderLeadDays: 7,
@@ -378,6 +382,8 @@ export function installBrowserFallback() {
 
   const readSettings = () => {
     const stored: any = JSON.parse(localStorage.getItem(PREVIEW_SETTINGS_KEY) || "{}");
+    if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
+    if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
     const merged: any = { ...defaultSettings, ...stored };
     if (merged._apiKey && !merged.hasApiKey) {
       merged.hasApiKey = true;

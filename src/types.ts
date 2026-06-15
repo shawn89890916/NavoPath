@@ -192,9 +192,13 @@ export interface Settings {
   hasApiKey: boolean;
   apiKeyPreview: string;
   displayName: string;
+  avatarDataUrl?: string;
+  onboardingVersion?: number;
+  onboardingStep?: "add" | "drag" | "planning" | "done";
   dailyFocusTime: string;
   weekStartsOn: 0 | 1;
   theme: "light" | "dark";
+  typographyStyle: "editorial" | "balanced" | "sans";
   accentColor: string;
   executeAccentColor: string;
   planningAccentColor: string;
@@ -287,6 +291,7 @@ export interface PlannerApi {
   signIn?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null }>;
   resendConfirmation?: (email: string) => Promise<{ message?: string }>;
   signOut?: () => Promise<void>;
+  deleteAccount?: () => Promise<void>;
   getData: () => Promise<PlannerData>;
   saveData: (data: PlannerData) => Promise<PlannerData>;
   applyActions: (actions: AiAction[]) => Promise<{ data: PlannerData; applied: Array<{ type: string; id: string; title: string }> }>;

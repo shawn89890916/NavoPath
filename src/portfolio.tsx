@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./portfolio.css";
+import "./navopath-buttons.css";
 
 type Lang = "en" | "zh";
 

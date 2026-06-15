@@ -30,6 +30,7 @@ import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, releaseNote, 
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
+import "./navopath-buttons.css";
 
 installBrowserFallback();
 
@@ -40,13 +41,14 @@ const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
 const ATTACHMENT_ACCEPT = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
-const PROJECT_COLOR_PRESETS = ["#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
+const DEFAULT_PROJECT_COLOR = "#8B6F47";
+const PROJECT_COLOR_PRESETS = [DEFAULT_PROJECT_COLOR, "#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
 const COMMON_COLOR_PRESETS = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#1F2937", "#F9FAFB", "#6B7280"];
 const RECURRENCE_OCCURRENCE_MARKER = "__occ__";
-const EXECUTE_THEME_PRESETS_LIGHT = ["#C69CF9", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
-const EXECUTE_THEME_PRESETS_DARK  = ["#C69CF9", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
-const PLANNING_THEME_PRESETS_LIGHT = ["#CAFF72", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
-const PLANNING_THEME_PRESETS_DARK  = ["#CAFF72", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
+const EXECUTE_THEME_PRESETS_LIGHT = ["#27231E", "#C69CF9", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
+const EXECUTE_THEME_PRESETS_DARK  = ["#EEE9DF", "#C69CF9", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
+const PLANNING_THEME_PRESETS_LIGHT = ["#27231E", "#CAFF72", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
+const PLANNING_THEME_PRESETS_DARK  = ["#EEE9DF", "#CAFF72", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
 const RELEASE_NOTES = [
   { date: "2026-06-10", summary: "优化了规划栏的交互和结果展示" },
   { date: "2026-06-09", summary: "优化了时间轴的快速添加栏" },
@@ -146,8 +148,9 @@ function isLightColor(value: string) {
 }
 
 function themeVars(settings: Settings, mode: Mode) {
-  const execute = normalizeHexColor(settings.executeAccentColor || "#C69CF9", "#C69CF9");
-  const planning = normalizeHexColor(settings.planningAccentColor || "#CAFF72", "#CAFF72");
+  const themeDefaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
+  const execute = normalizeHexColor(settings.executeAccentColor || themeDefaultAccent, themeDefaultAccent);
+  const planning = normalizeHexColor(settings.planningAccentColor || themeDefaultAccent, themeDefaultAccent);
   const executeLight = isLightColor(execute);
   const planningLight = isLightColor(planning);
   const activeAccent = mode === "execute" ? execute : planning;
@@ -173,8 +176,8 @@ function themeVars(settings: Settings, mode: Mode) {
       "--text-faint": "#737A88",
       "--border-soft": "rgba(255,255,255,0.10)",
       "--border-subtle": "rgba(255,255,255,0.06)",
-      "--shadow-soft": "0 8px 24px rgba(0,0,0,0.50)",
-      "--shadow-hl": `0 0 18px rgba(${r},${g},${b},0.10)`,
+      "--shadow-soft": "0 12px 28px rgba(0,0,0,0.24)",
+      "--shadow-hl": "none",
       "--header-bg": "rgba(15,17,23,0.92)",
       "--header-border": "rgba(255,255,255,0.06)",
       "--header-fg": "#F0F2F5",
@@ -201,8 +204,8 @@ function themeVars(settings: Settings, mode: Mode) {
     "--text-faint": "#9CA3AF",
     "--border-soft": "#E2E5EC",
     "--border-subtle": "#EAEDF2",
-    "--shadow-soft": "0 8px 28px rgba(17,24,39,0.05)",
-    "--shadow-hl": `0 0 20px rgba(${r},${g},${b},0.10)`,
+    "--shadow-soft": "0 12px 28px rgba(17,24,39,0.08)",
+    "--shadow-hl": "none",
     "--header-bg": "rgba(243,244,247,0.88)",
     "--header-border": "rgba(226,229,236,0.72)",
     "--header-fg": "#181C25",
@@ -864,6 +867,53 @@ function AuthGate(props: {
   );
 }
 
+type OnboardingStep = NonNullable<Settings["onboardingStep"]>;
+
+function OnboardingGuide(props: {
+  lang: Language;
+  step: OnboardingStep;
+  mode: Mode;
+  onOpenPlanning: () => void;
+  onFinish: () => void;
+  onSkip: () => void;
+}) {
+  const zh = props.lang === "zh";
+  const content = props.step === "add"
+    ? {
+        index: "01",
+        title: zh ? "先添加一个今日任务" : "Add a task for today",
+        body: zh ? "在左下角输入任务名称并按 Add，它会进入今日候选。" : "Name a task in the lower-left field and press Add. It will enter Today's Candidates.",
+      }
+    : props.step === "drag"
+      ? {
+          index: "02",
+          title: zh ? "把任务拖到时间轴" : "Drag it onto the timeline",
+          body: zh ? "从今日候选拖动刚添加的任务，在右侧时间轴选择开始时间。" : "Drag the task from Today's Candidates and choose its start time on the timeline.",
+        }
+      : {
+          index: "03",
+          title: zh ? "在 Planning 规划长期任务" : "Plan long-term work in Planning",
+          body: zh ? "Planning 用于按项目拆解长期任务，再挑选需要推进的内容加入今日执行。" : "Use Planning to break long-term work into projects, then choose what moves into today's execution.",
+        };
+
+  return (
+    <aside className={`df-onboarding-guide step-${props.step}`} aria-live="polite">
+      <span className="df-onboarding-index">{content.index} / 03</span>
+      <strong>{content.title}</strong>
+      <p>{content.body}</p>
+      <div>
+        {props.step === "planning" && props.mode !== "planning" && (
+          <button type="button" onClick={props.onOpenPlanning}>{zh ? "打开 Planning" : "Open Planning"}</button>
+        )}
+        {props.step === "planning" && props.mode === "planning" && (
+          <button type="button" onClick={props.onFinish}>{zh ? "完成引导" : "Finish guide"}</button>
+        )}
+        <button type="button" className="quiet" onClick={props.onSkip}>{zh ? "跳过" : "Skip"}</button>
+      </div>
+    </aside>
+  );
+}
+
 function App() {
   const [data, setData] = useState<PlannerData | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -936,6 +986,7 @@ function App() {
   const lastTimelineAutoScrollKeyRef = useRef("");
   const dataRef = useRef<PlannerData | null>(null);
   const settingsRef = useRef<Settings | null>(null);
+  const loadedWorkspaceKeyRef = useRef("");
   const pendingSaveRef = useRef<PlannerData | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const queuedSaveIdRef = useRef(0);
@@ -995,9 +1046,52 @@ function App() {
     }
   }, [mode]);
 
+  function resetWorkspaceUi() {
+    pendingSaveRef.current = null;
+    queuedSaveIdRef.current += 1;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+    setModeState("execute");
+    setSelectedDate(todayIso());
+    setTimelineView("daily");
+    setDrag(null);
+    setResizePreview(null);
+    setHoverSlot("");
+    setHoveredBlock("");
+    setDrawerOpen(false);
+    setEditingId("");
+    setEditingRecordId(undefined);
+    setEditingOccurrence(null);
+    setForm(defaultForm());
+    setAdvancedOpen(false);
+    setAiOpen(false);
+    setAiMessages([]);
+    setAiAttachment(null);
+    setAiAttachmentStatus("");
+    setSchedulePreviews([]);
+    setAutoScheduleState("idle");
+    setPlanningPickMode(false);
+    setPlanningPicks({});
+    setQuickTitle("");
+    setQuickProjectId("");
+    setQuickProjectOpen(false);
+    setSourceOpen(false);
+    setUtilityPanel(null);
+    setCandidatePanelCollapsed(false);
+    setFullscreen(false);
+    setSimpleView(false);
+    setShowCompletedCandidates(false);
+    setGroupByProject(false);
+    setToast("");
+    setToastAction(null);
+  }
+
   async function loadInitial() {
     const api = await waitForPlannerApi();
     const auth = (await api.getAuthState?.()) || { mode: "local" as const, user: null, configured: false };
+    const workspaceKey = auth.mode === "cloud" ? `cloud:${auth.user?.id || "signed-out"}` : "local";
+    if (loadedWorkspaceKeyRef.current && loadedWorkspaceKeyRef.current !== workspaceKey) resetWorkspaceUi();
+    loadedWorkspaceKeyRef.current = workspaceKey;
     setAuthState(auth);
     if (auth.mode === "cloud" && !auth.user) {
       setData(null);
@@ -1076,6 +1170,7 @@ function App() {
       } else {
         await api.signIn?.(email, password);
       }
+      resetWorkspaceUi();
       await loadInitial();
       if (displayName) {
         const current = settingsRef.current;
@@ -1121,9 +1216,29 @@ function App() {
     await flushPendingSave();
     const api = await waitForPlannerApi();
     await api.signOut?.();
+    resetWorkspaceUi();
     setData(null);
     setSettings(null);
     await loadInitial();
+  }
+
+  async function handleDeleteAccount() {
+    const confirmed = window.confirm(lang === "zh"
+      ? "确定永久删除账户和全部 NavoPath 数据吗？此操作无法撤销。"
+      : "Permanently delete your account and all NavoPath data? This cannot be undone.");
+    if (!confirmed) return;
+    try {
+      await flushPendingSave();
+      const api = await waitForPlannerApi();
+      await api.deleteAccount?.();
+      resetWorkspaceUi();
+      setUtilityPanel(null);
+      setData(null);
+      setSettings(null);
+      await loadInitial();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
   }
 
   function requestTimelineFocus(target: TimelineFocusTarget) {
@@ -1817,22 +1932,51 @@ function App() {
     if (!data) return;
     const ids = Object.keys(planningPicks);
     if (ids.length === 0) return;
+    const taskIds = new Set(data.tasks.map((task) => task.id));
+    const now = new Date().toISOString();
+    const promotedSubtasks = ids.flatMap((id) => {
+      if (taskIds.has(id)) return [];
+      const parentTask = data.tasks.find((task) => (task.subtasks || []).some((subtask) => subtask.id === id));
+      const subtask = parentTask?.subtasks?.find((candidate) => candidate.id === id);
+      if (!parentTask || !subtask) return [];
+      const picked = planningPicks[id];
+      return [{
+        ...parentTask,
+        id: uid("task"),
+        title: subtask.title,
+        priority: picked === "must" ? "high" : picked === "could" ? "low" : parentTask.priority,
+        completed: false,
+        parentTaskId: parentTask.id,
+        plannedForDate: scope === "today" ? today : undefined,
+        executionLane: scope === "today" ? "candidate" as const : undefined,
+        scheduledDate: undefined,
+        scheduledStart: undefined,
+        scheduledEnd: undefined,
+        executionStatus: undefined,
+        timelineRecords: [],
+        recurrence: undefined,
+        subtasks: [],
+        order: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+      } satisfies Task];
+    });
     void saveData({
       ...data,
-      tasks: data.tasks.map((task) => {
+      tasks: [...data.tasks.map((task) => {
         if (!ids.includes(task.id)) return task;
         const picked = planningPicks[task.id];
         return {
           ...task,
           priority: picked === "must" ? "high" : picked === "could" ? "low" : task.priority,
           plannedForDate: scope === "today" ? today : undefined,
-          executionLane: scope === "today" ? "candidate" : undefined,
+          executionLane: scope === "today" ? "candidate" as const : undefined,
           scheduledDate: undefined,
           scheduledStart: undefined,
           scheduledEnd: undefined,
           updatedAt: new Date().toISOString()
         };
-      })
+      }), ...promotedSubtasks]
     });
     setPlanningPicks({});
     if (scope === "today") void saveSettings({ activeMode: "execute" });
@@ -1849,6 +1993,9 @@ function App() {
     });
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: today, order: Date.now() }] });
     setQuickTitle("");
+    if (settings?.onboardingVersion === 0 && settings.onboardingStep === "add") {
+      void saveSettings({ onboardingStep: "drag" });
+    }
     showToast(t(lang, "toast.addedToCandidates"));
   }
 
@@ -1887,12 +2034,16 @@ function App() {
     if (!data) return;
     const title = window.prompt(t(lang, "toast.newTaskName"));
     if (!title?.trim()) return;
-    const task = makeTask({
+    const task = {
+      ...makeTask({
       ...defaultForm("task"),
       title: title.trim(),
       projectId,
       dueDate: today
-    });
+      }),
+      plannedForDate: undefined,
+      executionLane: undefined,
+    };
     void saveData({ ...data, tasks: [...data.tasks, task] });
     showToast(t(lang, "toast.addedToProject"));
   }
@@ -2365,6 +2516,9 @@ function App() {
       durationMinutes: taskDuration(task),
       allDay: false,
     });
+    if (settings?.onboardingVersion === 0 && settings.onboardingStep === "drag") {
+      void saveSettings({ onboardingStep: "planning" });
+    }
     setHoverSlot("");
     setDrag(null);
     dragTargetDateRef.current = "";
@@ -2740,7 +2894,11 @@ function App() {
         void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details, recurrence: form.recurrence } : event) });
       }
     } else if (addType === "task") {
-      void saveData({ ...data, tasks: [...data.tasks, makeTask(form)] });
+      const task = makeTask(form);
+      const createdTask = mode === "planning"
+        ? { ...task, plannedForDate: undefined, executionLane: undefined }
+        : task;
+      void saveData({ ...data, tasks: [...data.tasks, createdTask] });
     } else if (addType === "project") {
       void saveData({ ...data, projects: [...data.projects, makeProject(form)] });
     } else {
@@ -3458,8 +3616,11 @@ function App() {
 
   if (!data || !settings) return <div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>;
 
+  const onboardingActive = settings.onboardingVersion === 0 && settings.onboardingStep !== "done";
+  const onboardingStep = (settings.onboardingStep || "add") as OnboardingStep;
+
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme}${fullscreen ? " is-timeline-fullscreen" : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong><span>{mode === "execute" ? "Daily execution" : "Project planning"}</span></div></div>
@@ -3476,6 +3637,16 @@ function App() {
       </header>
       <div className="df-header-fade" />
       <div id="df-portal-target" />
+      {onboardingActive && (
+        <OnboardingGuide
+          lang={lang}
+          step={onboardingStep}
+          mode={mode}
+          onOpenPlanning={() => void saveSettings({ activeMode: "planning" })}
+          onFinish={() => void saveSettings({ onboardingVersion: 1, onboardingStep: "done" })}
+          onSkip={() => void saveSettings({ onboardingVersion: 1, onboardingStep: "done" })}
+        />
+      )}
 
       {mode === "execute" ? (
         <main className={`df-execute${candidatePanelCollapsed ? " candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
@@ -4431,7 +4602,7 @@ function App() {
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); setAiMessages([]); clearAiAttachment(); }} messages={aiMessages} onConfirmAction={(messageId, action) => void confirmAiAction(action, messageId)} onDismissAction={(messageId, action) => dismissAiAction(action, messageId)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} />}
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" ? (() => void handleSignOut()) : undefined} lang={lang} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
@@ -5340,8 +5511,22 @@ function QuickProjectPicker(props: {
   const selected = props.projects.find((project) => String(project.id) === String(props.value));
   const selectedColor = selected?.color || PROJECT_COLOR_PRESETS[0];
   const [newColorOpen, setNewColorOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!props.open) return;
+    const closeOnOutsidePress = (event: MouseEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        props.onOpenChange(false);
+        setNewColorOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", closeOnOutsidePress);
+    return () => document.removeEventListener("mousedown", closeOnOutsidePress);
+  }, [props.open, props.onOpenChange]);
+
   return (
-    <div className="df-quick-project-picker" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+    <div ref={pickerRef} className="df-quick-project-picker" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
       <button type="button" className="df-quick-project-trigger" onClick={() => props.onOpenChange(!props.open)}>
         <span className="df-project-color-dot" style={{ "--project-color": selectedColor } as CSSProperties} />
         <span>{selected ? `# ${selected.title}` : "#"}</span>
@@ -5891,8 +6076,31 @@ function AttachmentCard({ attachment, referenced = false, onRemove }: { attachme
   </div>;
 }
 
-function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout, onSignOut, lang }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onShowAbout: () => void; onSignOut?: () => void; lang: Language }) {
+function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout, onSignOut, onDeleteAccount, lang }: { kind: "settings" | "about"; settings: Settings; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; lang: Language }) {
   const userName = settings.displayName?.trim() || authEmail || "NavoPath User";
+  const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
+  const uploadAvatar = (file?: File) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const size = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        const scale = Math.max(size / image.width, size / image.height);
+        const width = image.width * scale;
+        const height = image.height * scale;
+        context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+        onSave({ avatarDataUrl: canvas.toDataURL("image/jpeg", .82) });
+      };
+      image.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  };
   return (
     <>
       <div className="df-utility-backdrop" onMouseDown={onClose} />
@@ -5904,7 +6112,10 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
         {kind === "settings" ? (
           <div className="df-utility-body">
             <section className="df-settings-profile">
-              <div className="df-settings-avatar">N</div>
+              <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>
+                {settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}
+                <input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+              </label>
               <div>
                 <input
                   className="df-settings-name-input"
@@ -5929,12 +6140,27 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
                 <option value="en">English</option>
               </select>
             </label>
-            <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || "#C69CF9"} onChange={(color) => onSave({ executeAccentColor: color })} />
-            <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || "#CAFF72"} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <label className="df-utility-select">
+              {lang === "zh" ? "字体风格" : "Typography"}
+              <select value={settings.typographyStyle || "editorial"} onChange={(event) => onSave({ typographyStyle: event.target.value as Settings["typographyStyle"] })}>
+                <option value="editorial">{lang === "zh" ? "编辑衬线" : "Editorial Serif"}</option>
+                <option value="balanced">{lang === "zh" ? "平衡混排" : "Balanced"}</option>
+                <option value="sans">{lang === "zh" ? "现代无衬线" : "Modern Sans"}</option>
+              </select>
+            </label>
             <label className="df-utility-select">{t(lang, "settings.defaultView")}<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="weekly">{viewLabel(lang, "weekly")}</option><option value="month">{viewLabel(lang, "month")}</option></select></label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />{t(lang, "settings.hideCompleted")}</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />{t(lang, "settings.allowAiContext")}</label>
-            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
+            <details className="df-settings-advanced">
+              <summary>{lang === "zh" ? "高级设置" : "Advanced settings"}</summary>
+              <div className="df-settings-advanced-body">
+                <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
+                <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
+                <button className="df-settings-reset-accent" onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复主题默认强调色" : "Restore theme default accents"}</button>
+                <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
+                {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}
+              </div>
+            </details>
             {authEmail && <p>{t(lang, "settings.account")}：{authEmail}</p>}
             <div className="df-settings-footer">
               <button className="df-settings-about" onClick={onShowAbout}>

@@ -23,12 +23,16 @@ const defaultSettings: Settings = {
   hasApiKey: false,
   apiKeyPreview: "",
   displayName: "NavoPath",
+  avatarDataUrl: "",
+  onboardingVersion: 1,
+  onboardingStep: "done",
   dailyFocusTime: "20:00",
   weekStartsOn: 0,
   theme: "dark",
-  accentColor: "#C69CF9",
-  executeAccentColor: "#C69CF9",
-  planningAccentColor: "#CAFF72",
+  typographyStyle: "editorial",
+  accentColor: "",
+  executeAccentColor: "",
+  planningAccentColor: "",
   aiTone: "direct",
   hideCompleted: false,
   reminderLeadDays: 7,
@@ -53,7 +57,28 @@ function publicUser(user: User | null) {
 }
 
 function mergeSettings(settings: unknown): Settings {
-  return { ...defaultSettings, ...((settings || {}) as Partial<Settings>) };
+  const stored = { ...((settings || {}) as Partial<Settings>) };
+  if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
+  if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
+  return { ...defaultSettings, ...stored };
+}
+
+function emptyCloudData(): PlannerData {
+  return {
+    version: 1,
+    importedSeedVersion: "cloud-empty-v1",
+    generatedAt: now(),
+    goals: [],
+    projects: [],
+    tasks: [],
+    longTasks: [],
+    events: [],
+    notes: [],
+    drafts: [],
+    chat: [],
+    aiMemories: [],
+    taskLayouts: {},
+  };
 }
 
 function authErrorMessage(message: string) {
@@ -133,8 +158,12 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         return profileCache;
       }
 
-      const initialData = fallbackData();
-      const initialSettings = defaultSettings;
+      const initialData = emptyCloudData();
+      const initialSettings = {
+        ...defaultSettings,
+        onboardingVersion: 0,
+        onboardingStep: "add" as const,
+      };
       const { error: insertError } = await supabase
         .from(PROFILE_TABLE)
         .insert({
@@ -231,6 +260,14 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     signOut: async () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw new Error(error.message);
+    },
+
+    deleteAccount: async () => {
+      const { error } = await supabase.rpc("delete_own_account");
+      if (error) throw new Error(error.message);
+      profileCache = null;
+      cachedUser = null;
+      await supabase.auth.signOut({ scope: "local" });
     },
 
     getData: async () => {

@@ -1,0 +1,579 @@
+/*
+ * NavoPath global interaction layer.
+ * Direction: minimal text controls with restrained editorial annotation.
+ */
+
+.df-app,
+.landing,
+.portfolio {
+  --navo-action-accent: var(--accent-active, #c69cf9);
+  --navo-action-ink: var(--text-main, #f4f3f6);
+  --navo-action-muted: var(--text-muted, #9899a4);
+  --navo-action-rule: var(--paper-rule, rgba(255, 255, 255, .12));
+  --navo-action-rule-strong: var(--paper-rule-strong, rgba(255, 255, 255, .22));
+  --navo-action-note: var(--paper-note, color-mix(in srgb, var(--navo-action-accent) 9%, transparent));
+  --navo-action-danger: var(--df-danger, #d97777);
+  --navo-action-motion: 170ms cubic-bezier(.2, .75, .25, 1);
+}
+
+.landing {
+  --navo-action-accent: var(--l-purple);
+  --navo-action-ink: var(--l-text);
+  --navo-action-muted: var(--l-muted);
+  --navo-action-rule: var(--l-line);
+  --navo-action-rule-strong: rgba(255, 255, 255, .22);
+}
+
+.portfolio {
+  --navo-action-accent: var(--purple);
+  --navo-action-ink: #f4f3f6;
+  --navo-action-muted: var(--muted);
+  --navo-action-rule: var(--line);
+  --navo-action-rule-strong: rgba(255, 255, 255, .22);
+}
+
+.df-app button,
+.landing button,
+.landing .landing-button,
+.portfolio button,
+.portfolio a.portfolio-primary-link,
+.portfolio .portfolio-contact a,
+.portfolio .portfolio-projects a {
+  appearance: none;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+  transition:
+    color var(--navo-action-motion),
+    background-color var(--navo-action-motion),
+    border-color var(--navo-action-motion),
+    opacity var(--navo-action-motion),
+    transform 90ms ease-out !important;
+}
+
+.df-app button:hover,
+.landing button:hover,
+.landing .landing-button:hover,
+.portfolio button:hover,
+.portfolio a.portfolio-primary-link:hover,
+.portfolio .portfolio-contact a:hover,
+.portfolio .portfolio-projects a:hover {
+  filter: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+}
+
+.df-app button:active:not(:disabled),
+.landing button:active:not(:disabled),
+.landing .landing-button:active,
+.portfolio button:active:not(:disabled),
+.portfolio a.portfolio-primary-link:active,
+.portfolio .portfolio-contact a:active,
+.portfolio .portfolio-projects a:active {
+  transform: translateY(1px) !important;
+  box-shadow: none !important;
+}
+
+.df-app button:focus-visible,
+.landing button:focus-visible,
+.landing .landing-button:focus-visible,
+.portfolio button:focus-visible,
+.portfolio a:focus-visible {
+  outline: 1px solid var(--navo-action-accent) !important;
+  outline-offset: 3px;
+  box-shadow: none !important;
+}
+
+.df-app button:disabled,
+.landing button:disabled,
+.portfolio button:disabled {
+  opacity: .42 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Application: primary annotations */
+.df-app :is(
+  .primary,
+  .df-auth-submit,
+  .df-quick-add-submit,
+  .df-quick-add-confirm,
+  .df-inline-action.primary,
+  .df-ai-send-btn,
+  .df-ai-task-accept,
+  .df-add-fab,
+  .df-source-toolbar .primary,
+  .df-pick-actions .primary
+) {
+  color: var(--navo-action-accent) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--navo-action-accent) !important;
+  border-radius: 2px !important;
+  background: var(--navo-action-note) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.df-app :is(
+  .primary,
+  .df-auth-submit,
+  .df-quick-add-submit,
+  .df-quick-add-confirm,
+  .df-inline-action.primary,
+  .df-ai-send-btn,
+  .df-ai-task-accept,
+  .df-add-fab,
+  .df-source-toolbar .primary,
+  .df-pick-actions .primary
+):hover:not(:disabled) {
+  color: var(--navo-action-ink) !important;
+  border-bottom-color: var(--navo-action-accent) !important;
+  background: color-mix(in srgb, var(--navo-action-accent) 14%, transparent) !important;
+  box-shadow: none !important;
+}
+
+/* Application: secondary text, tabs, and toggles */
+.df-app :is(
+  .df-tabs button,
+  .df-view-switch-vertical button,
+  .df-segment button,
+  .df-filter-row button,
+  .df-link,
+  .df-empty button,
+  .df-settings-about,
+  .df-toast-undo-btn,
+  .df-inline-action:not(.primary),
+  .df-auth-tabs button,
+  .df-auth-notice-actions button,
+  .df-ai-action-header button,
+  .df-ai-import-bulk button:not(.primary),
+  .df-source-toolbar .light,
+  .df-card-popover button,
+  .df-project-popover button,
+  .df-drawer-project-list button,
+  .df-repeat-modal-actions button:not(.primary),
+  .df-source-filter button,
+  .df-detail-pill-trevor.action:not(.danger)
+) {
+  color: var(--navo-action-muted) !important;
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.df-app :is(
+  .df-tabs button,
+  .df-view-switch-vertical button,
+  .df-segment button,
+  .df-filter-row button,
+  .df-link,
+  .df-empty button,
+  .df-settings-about,
+  .df-toast-undo-btn,
+  .df-inline-action:not(.primary),
+  .df-auth-tabs button,
+  .df-auth-notice-actions button,
+  .df-ai-action-header button,
+  .df-ai-import-bulk button:not(.primary),
+  .df-source-toolbar .light,
+  .df-card-popover button,
+  .df-project-popover button,
+  .df-drawer-project-list button,
+  .df-repeat-modal-actions button:not(.primary),
+  .df-source-filter button,
+  .df-detail-pill-trevor.action:not(.danger)
+):hover:not(:disabled) {
+  color: var(--navo-action-ink) !important;
+  border-bottom-color: var(--navo-action-rule-strong) !important;
+  background: transparent !important;
+}
+
+.df-app :is(.df-tabs button, .df-view-switch-vertical button, .df-segment button, .df-filter-row button).active {
+  color: var(--navo-action-accent) !important;
+  border-bottom-color: var(--navo-action-accent) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.df-app :is(.df-tabs button, .df-view-switch-vertical button, .df-segment button, .df-filter-row button).active:hover {
+  color: var(--navo-action-accent) !important;
+  border-bottom-color: var(--navo-action-accent) !important;
+}
+.df-app .df-tabs button.active:hover,
+.df-app .df-view-switch-vertical button.active:hover,
+.df-app .df-segment button.active:hover,
+.df-app .df-filter-row button.active:hover,
+.df-app .df-auth-tabs button.active:hover {
+  color: var(--navo-action-accent) !important;
+  border-bottom-color: var(--navo-action-accent) !important;
+  background: transparent !important;
+}
+
+/* Application: icon tools */
+.df-app :is(
+  .df-icon-action,
+  .df-icon-button,
+  .df-date-arrow,
+  .df-back-today,
+  .df-exit-fullscreen-btn,
+  .df-preview-action,
+  .df-ai-plan-toggle,
+  .df-ai-plan-confirm,
+  .df-ai-plan-cancel,
+  .df-detail-add-btn,
+  .df-ai-fab,
+  .df-user-avatar
+) {
+  color: var(--navo-action-muted) !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.df-app :is(
+  .df-icon-action,
+  .df-icon-button,
+  .df-date-arrow,
+  .df-back-today,
+  .df-exit-fullscreen-btn,
+  .df-preview-action,
+  .df-ai-plan-toggle,
+  .df-ai-plan-confirm,
+  .df-ai-plan-cancel,
+  .df-detail-add-btn,
+  .df-ai-fab,
+  .df-user-avatar
+):hover:not(:disabled) {
+  color: var(--navo-action-accent) !important;
+  border-color: var(--navo-action-rule) !important;
+  background: var(--navo-action-note) !important;
+  box-shadow: none !important;
+}
+
+/* Application: AI planning is an annotation action, not a glowing CTA. */
+.df-app .df-ai-plan {
+  color: var(--navo-action-accent) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--navo-action-accent) !important;
+  border-radius: 2px !important;
+  background: var(--navo-action-note) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+.df-app .df-ai-plan::before { box-shadow: none !important; filter: none !important; }
+.df-app .df-ai-plan:hover:not(:disabled) {
+  color: var(--navo-action-ink) !important;
+  background: color-mix(in srgb, var(--navo-action-accent) 14%, transparent) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+.df-app .df-ai-plan,
+.df-app .df-ai-plan:hover:not(:disabled) {
+  color: var(--navo-action-ink) !important;
+  border: 1px solid var(--navo-action-rule) !important;
+  border-radius: var(--paper-radius, 4px) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Execute floating add follows the same quiet tool treatment as Ask Navo. */
+.df-app .df-add-fab,
+.df-app .df-add-fab:hover:not(:disabled) {
+  color: var(--navo-action-accent) !important;
+  border: 1px solid var(--navo-action-rule) !important;
+  border-radius: var(--paper-radius, 4px) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+.df-app.theme-dark .df-add-fab,
+.df-app:not(.theme-dark) .df-add-fab,
+.df-app.theme-dark .df-add-fab:hover:not(:disabled),
+.df-app:not(.theme-dark) .df-add-fab:hover:not(:disabled) {
+  color: var(--navo-action-muted) !important;
+  border: 1px solid var(--navo-action-rule) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+.df-app.theme-dark .df-ai-fab,
+.df-app:not(.theme-dark) .df-ai-fab,
+.df-app.theme-dark .df-ai-fab:hover:not(:disabled),
+.df-app:not(.theme-dark) .df-ai-fab:hover:not(:disabled) {
+  color: var(--navo-action-muted) !important;
+  border: 1px solid var(--navo-action-rule) !important;
+  border-radius: 2px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+.df-app .df-add-fab.i-plus::before {
+  font-size: 24px !important;
+  font-weight: 800 !important;
+}
+.df-app .df-add-fab:active:not(:disabled),
+.df-app .df-ai-fab:active:not(:disabled),
+.df-app .df-date-arrow:active:not(:disabled) {
+  transform: translateY(1px) !important;
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--navo-action-ink) 18%, transparent) !important;
+}
+
+/* Application: restrained danger ink */
+.df-app :is(.danger, .danger-lite, .df-settings-logout, .df-ai-task-cancel, .df-preview-action.cancel) {
+  color: var(--navo-action-danger) !important;
+  border: 0 !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--navo-action-danger) 65%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.df-app :is(.danger, .danger-lite, .df-settings-logout, .df-ai-task-cancel, .df-preview-action.cancel):hover:not(:disabled) {
+  color: var(--navo-action-danger) !important;
+  background: color-mix(in srgb, var(--navo-action-danger) 8%, transparent) !important;
+}
+
+/* Product page: text controls and annotation CTAs */
+.landing .landing-button {
+  min-height: 42px;
+  padding: 0 16px;
+  color: var(--navo-action-muted);
+  border: 0;
+  border-bottom: 1px solid var(--navo-action-rule);
+  border-radius: 0;
+  background: transparent;
+}
+.landing .landing-button.primary {
+  color: var(--navo-action-accent);
+  border-bottom-color: var(--navo-action-accent);
+  background: var(--navo-action-note);
+}
+.landing .landing-button:hover {
+  color: var(--navo-action-ink);
+  border-bottom-color: var(--navo-action-accent);
+  background: var(--navo-action-note);
+  box-shadow: none !important;
+}
+.landing .landing-lang,
+.landing .landing-auth-close {
+  color: var(--navo-action-muted);
+  border-color: transparent;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+}
+.landing .landing-lang:hover,
+.landing .landing-auth-close:hover {
+  color: var(--navo-action-accent);
+  border-color: var(--navo-action-rule);
+  background: var(--navo-action-note);
+}
+.landing .landing-auth-tabs {
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--navo-action-rule);
+  border-radius: 0;
+}
+.landing .landing-auth-tabs button,
+.landing .landing-auth-notice button {
+  color: var(--navo-action-muted);
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+.landing .landing-auth-tabs button.active {
+  color: var(--navo-action-accent);
+  border-bottom-color: var(--navo-action-accent);
+  background: transparent;
+}
+
+/* Portfolio: links behave like editorial controls. */
+.portfolio .portfolio-nav button {
+  color: var(--navo-action-muted);
+  border-color: transparent;
+  border-radius: 2px;
+  background: transparent;
+}
+.portfolio .portfolio-nav button:hover {
+  color: var(--navo-action-accent);
+  border-color: var(--navo-action-rule);
+  background: var(--navo-action-note);
+}
+.portfolio .portfolio-primary-link {
+  padding: 10px 2px;
+  color: var(--navo-action-accent);
+  border-bottom: 1px solid var(--navo-action-accent);
+  background: var(--navo-action-note);
+}
+.portfolio .portfolio-contact a {
+  border: 0;
+  border-bottom: 1px solid var(--navo-action-rule);
+  border-radius: 0;
+  background: transparent;
+}
+.portfolio .portfolio-contact a:hover {
+  color: var(--navo-action-accent);
+  border-bottom-color: var(--navo-action-accent);
+  background: var(--navo-action-note);
+}
+.portfolio .portfolio-projects a {
+  border-color: transparent;
+  border-radius: 2px;
+  background: transparent;
+}
+.portfolio .portfolio-projects a:hover {
+  border-color: var(--navo-action-rule);
+  background: var(--navo-action-note);
+}
+
+@media (pointer: coarse), (max-width: 620px) {
+  .df-app button,
+  .landing button,
+  .landing .landing-button,
+  .portfolio button,
+  .portfolio .portfolio-contact a,
+  .portfolio .portfolio-primary-link {
+    min-height: 44px !important;
+  }
+  .df-app :is(.df-icon-action, .df-icon-button, .df-date-arrow, .df-back-today, .df-exit-fullscreen-btn, .df-preview-action, .df-ai-plan-toggle, .df-ai-plan-confirm, .df-ai-plan-cancel, .df-ai-fab, .df-user-avatar),
+  .landing :is(.landing-lang, .landing-auth-close),
+  .portfolio .portfolio-nav button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df-app button,
+  .landing button,
+  .landing .landing-button,
+  .portfolio button,
+  .portfolio a {
+    transition-duration: .001ms !important;
+  }
+}
+
+/* Final application pencil-button rule: controls merge into their paper surface. */
+.df-app button:not(.df-project-color-picker button),
+.df-app button:not(.df-project-color-picker button):hover:not(:disabled),
+.df-app button:not(.df-project-color-picker button):focus-visible,
+.df-app button:not(.df-project-color-picker button):disabled {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+.df-app button:not(.df-project-color-picker button):active:not(:disabled) {
+  background: transparent !important;
+  transform: translateY(1px) !important;
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--text-main) 18%, transparent),
+    inset 1px 0 0 color-mix(in srgb, var(--text-main) 8%, transparent) !important;
+}
+
+/* Project swatches intentionally retain their color fill. */
+.df-app .df-project-color-picker button,
+.df-app .df-project-color-picker button:hover,
+.df-app .df-project-color-picker button:focus-visible,
+.df-app .df-project-color-picker button:active {
+  background-color: var(--project-color) !important;
+  background-image:
+    linear-gradient(97deg, rgba(255,255,255,.12), transparent 42%),
+    repeating-linear-gradient(12deg, rgba(0,0,0,.06) 0 1px, transparent 1px 4px) !important;
+}
+
+/* Specificity closeout for legacy application button overrides. */
+#root .df-app button,
+#root .df-app button:hover:not(:disabled),
+#root .df-app button:focus-visible,
+#root .df-app button:disabled {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+#root .df-app button:active:not(:disabled) {
+  background: transparent !important;
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--text-main) 18%, transparent),
+    inset 1px 0 0 color-mix(in srgb, var(--text-main) 8%, transparent) !important;
+}
+
+#root .df-app .df-project-color-picker button,
+#root .df-app .df-project-color-picker button:hover,
+#root .df-app .df-project-color-picker button:focus-visible,
+#root .df-app .df-project-color-picker button:active {
+  background-color: var(--project-color) !important;
+  background-image:
+    linear-gradient(97deg, rgba(255,255,255,.12), transparent 42%),
+    repeating-linear-gradient(12deg, rgba(0,0,0,.06) 0 1px, transparent 1px 4px) !important;
+}
+
+/* Icon controls use graphite underlines instead of curved bottom shadows. */
+#root .df-app :is(
+  .df-panel-title .df-icon-action,
+  .df-icon-button,
+  .df-tabs button,
+  .df-view-switch-vertical button
+) {
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+#root .df-app :is(
+  .df-panel-title .df-icon-action.active,
+  .df-icon-button.is-active,
+  .df-icon-button.icon-collapse,
+  .df-tabs button.active,
+  .df-view-switch-vertical button.active,
+  .df-panel-title .df-icon-action[aria-pressed="true"],
+  .df-icon-button[aria-pressed="true"]
+) {
+  border-bottom-width: 2px !important;
+  border-bottom-color: var(--pencil-rule-strong) !important;
+}
+#root .df-app .df-task-card .df-icon-button,
+#root .df-app .df-task-card .df-icon-button:hover,
+#root .df-app .df-task-card .df-icon-button:focus-visible {
+  border: 0 !important;
+  border-bottom-color: transparent !important;
+}
+#root .df-app .df-panel-title .df-icon-action:not(.active),
+#root .df-app .df-panel-title .df-icon-action:not(.active):hover,
+#root .df-app .df-view-switch-vertical button:not(.active),
+#root .df-app .df-view-switch-vertical button:not(.active):hover {
+  border-bottom-color: transparent !important;
+}
+#root .df-app .df-date-arrow,
+#root .df-app .df-date-arrow:hover,
+#root .df-app .df-date-arrow:focus-visible {
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  line-height: 1 !important;
+}
+#root .df-app :is(
+  .df-panel-title .df-icon-action,
+  .df-icon-button,
+  .df-tabs button,
+  .df-view-switch-vertical button
+):active:not(:disabled) {
+  box-shadow: inset 0 1px 2px var(--pencil-press) !important;
+}

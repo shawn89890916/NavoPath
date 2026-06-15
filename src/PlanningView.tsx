@@ -209,8 +209,8 @@ function PlanningSubtaskNode(props: {
               event.stopPropagation();
               props.onPromote(props.subtask.id);
             }}
-            aria-label={t(props.lang, "planning.moveToPlanning")}
-            title={t(props.lang, "planning.moveToPlanning")}
+            aria-label={t(props.lang, "planning.addToCandidate")}
+            title={t(props.lang, "planning.addToCandidate")}
           >
             <ArrowRightIcon />
           </button>
@@ -631,7 +631,23 @@ export default function PlanningView(props: {
   }, [leftRatio]);
 
   const pickedTasks = Object.keys(props.picks)
-    .map((id) => safeTasks.find((task) => task?.id === id))
+    .map((id) => {
+      const task = safeTasks.find((candidate) => candidate?.id === id);
+      if (task) return task;
+
+      const parentTask = safeTasks.find((candidate) => (candidate.subtasks || []).some((subtask) => subtask.id === id));
+      const subtask = parentTask?.subtasks?.find((candidate) => candidate.id === id);
+      if (!parentTask || !subtask) return null;
+
+      return {
+        ...parentTask,
+        id: subtask.id,
+        title: subtask.title,
+        completed: Boolean(subtask.completed || subtask.done),
+        parentTaskId: parentTask.id,
+        subtasks: [],
+      } satisfies Task;
+    })
     .filter(Boolean) as Task[];
 
   const today = todayIso();
@@ -952,7 +968,6 @@ export default function PlanningView(props: {
 
           <div className="df-pick-actions">
             <button className="primary" disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("today")}>{t(props.lang, "planning.addToToday")}</button>
-            <button disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("week")}>{t(props.lang, "planning.addToWeek")}</button>
             <button className="light" disabled={pickedTasks.length === 0} onClick={props.onClearPicks}>{t(props.lang, "planning.clearCandidates")}</button>
           </div>
         </section>
