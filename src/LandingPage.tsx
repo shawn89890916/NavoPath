@@ -177,6 +177,12 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   };
   const passwordMismatch = authIntent === "signup" && password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
 
+  useEffect(() => {
+    if (!error && !notice) return;
+    setShowAuth(true);
+    if (notice) setAuthIntent("signup");
+  }, [error, notice]);
+
   const openAuth = (intent: AuthIntent) => {
     setAuthIntent(intent);
     setShowAuth(true);
@@ -202,11 +208,20 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
             <h1>{c.title}<br /><em>{c.titleAccent}</em></h1>
             <p>{c.intro}</p>
             <div className="landing-actions">
-              <button className="landing-button primary" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
-              <button className="landing-button quiet" onClick={() => openAuth("signin")}>{c.signIn}</button>
+              <button className="landing-button primary hero-cta" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
+              <button className="landing-button quiet hero-cta" onClick={() => openAuth("signin")}>{c.signIn}</button>
             </div>
-            <div className="landing-proof">{c.proof.map((item) => <span key={item}><i />{item}</span>)}</div>
+            <div className="landing-hero-path" aria-label={lang === "zh" ? "规划、选择、执行" : "Plan, choose, execute"}>
+              <span><i className="plan" />{lang === "zh" ? "规划" : "Plan"}</span>
+              <b aria-hidden="true">→</b>
+              <span><i className="choice" />{lang === "zh" ? "选择" : "Choice"}</span>
+              <b aria-hidden="true">→</b>
+              <span><i className="execution" />{lang === "zh" ? "执行" : "Execution"}</span>
+            </div>
           </div>
+        </section>
+
+        <section className="landing-demo-section" aria-label={lang === "zh" ? "NavoPath 产品操作演示" : "NavoPath product demonstration"}>
           <div className="landing-product-frame"><ProductFlowDemo lang={lang} /></div>
         </section>
 

@@ -86,10 +86,23 @@ function authErrorMessage(message: string) {
   if (waitMatch) return `请求过于频繁，请在 ${waitMatch[1]} 秒后重试。`;
   if (/invalid login credentials/i.test(message)) return "邮箱或密码不正确。";
   if (/email not confirmed/i.test(message)) return "邮箱还没有完成确认，请先打开确认邮件中的链接。";
+  if (/email link.*invalid|link.*expired|otp.*expired|token.*expired/i.test(message)) return "确认链接无效或已过期，请重新发送确认邮件。";
   if (/user already registered|already been registered|already exists/i.test(message)) return "这个邮箱已经注册过，请直接登录。";
   if (/password/i.test(message) && /weak|short|least/i.test(message)) return "密码强度不够，请至少使用 6 位字符。";
   if (/rate limit|security purposes/i.test(message)) return "请求过于频繁，请稍后再试。";
   return message || "账号请求失败，请稍后再试。";
+}
+
+function emailConfirmationRedirectUrl() {
+  return new URL("/", window.location.origin).toString();
+}
+
+function clearAuthCallbackUrl() {
+  const url = new URL(window.location.href);
+  const authKeys = ["auth_callback", "code", "token_hash", "type", "error", "error_code", "error_description"];
+  authKeys.forEach((key) => url.searchParams.delete(key));
+  if (url.hash && /access_token|refresh_token|error_description|type=signup/i.test(url.hash)) url.hash = "";
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
 }
 
 export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: string): PlannerApi {
@@ -225,7 +238,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: emailConfirmationRedirectUrl()
         }
       });
       if (error) throw new Error(authErrorMessage(error.message));
@@ -250,11 +263,55 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         type: "signup",
         email,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: emailConfirmationRedirectUrl()
         }
       });
       if (error) throw new Error(authErrorMessage(error.message));
       return { message: "确认邮件已重新发送。" };
+    },
+
+    completeEmailConfirmation: async () => {
+      try {
+        const url = new URL(window.location.href);
+        const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+        const errorDescription = url.searchParams.get("error_description")
+          || hashParams.get("error_description")
+          || url.searchParams.get("error_code")
+          || hashParams.get("error_code");
+        if (errorDescription) throw new Error(authErrorMessage(errorDescription));
+
+        const code = url.searchParams.get("code");
+        const tokenHash = url.searchParams.get("token_hash");
+        const type = url.searchParams.get("type");
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw new Error(authErrorMessage(error.message));
+        } else if (tokenHash && type) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: type as "signup" | "email"
+          });
+          if (error) throw new Error(authErrorMessage(error.message));
+        }
+
+        let sessionUser: User | null = null;
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) throw new Error(authErrorMessage(error.message));
+          sessionUser = data.session?.user ?? null;
+          if (sessionUser) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+        }
+
+        cachedUser = sessionUser;
+        return {
+          confirmed: Boolean(sessionUser),
+          user: publicUser(sessionUser),
+          message: sessionUser ? "邮箱确认成功，正在打开工作区。" : "邮箱可能已确认，请使用邮箱和密码登录。"
+        };
+      } finally {
+        clearAuthCallbackUrl();
+      }
     },
 
     signOut: async () => {

@@ -1148,7 +1148,29 @@ function App() {
   }
 
   useEffect(() => {
-    void loadInitial().catch((error) => {
+    const url = new URL(window.location.href);
+    const hasConfirmationCallback = url.searchParams.has("auth_callback")
+      || url.searchParams.has("code")
+      || url.searchParams.has("token_hash")
+      || /access_token|error_description|type=signup/i.test(url.hash);
+    const initialize = async () => {
+      if (hasConfirmationCallback) {
+        setAuthBusy(true);
+        try {
+          const api = await waitForPlannerApi();
+          const result = await api.completeEmailConfirmation?.();
+          if (result?.confirmed) resetWorkspaceUi();
+          if (result?.message) setAuthError(result.message);
+        } catch (error) {
+          setAuthError(error instanceof Error ? error.message : String(error));
+        } finally {
+          setAuthBusy(false);
+        }
+      }
+      await loadInitial();
+    };
+    void initialize().catch((error) => {
+      setAuthBusy(false);
       setAuthError(error instanceof Error ? error.message : String(error));
     });
   }, []);
@@ -1202,14 +1224,24 @@ function App() {
   }
 
   async function continueAfterConfirm(email: string) {
+    setAuthBusy(true);
     setAuthError("");
-    setAuthNotice(null);
-    await loadInitial();
-    const api = await waitForPlannerApi();
-    const latest = await api.getAuthState?.();
-    if (!latest?.user) {
+    try {
+      const api = await waitForPlannerApi();
+      const confirmation = await api.completeEmailConfirmation?.();
+      if (confirmation?.confirmed) {
+        setAuthNotice(null);
+        resetWorkspaceUi();
+        await loadInitial();
+        return;
+      }
       setAuthNotice({ type: "confirm-email", email });
-      setAuthError("邮箱确认完成后，请直接登录。");
+      setAuthError(confirmation?.message || "尚未检测到邮箱确认。请打开最新确认邮件中的链接，或确认后直接使用邮箱和密码登录。");
+    } catch (error) {
+      setAuthNotice({ type: "confirm-email", email });
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
     }
   }
 

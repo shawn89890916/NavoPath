@@ -290,6 +290,11 @@ export interface PlannerApi {
   }>;
   signIn?: (email: string, password: string) => Promise<{ user: { id: string; email?: string } | null }>;
   resendConfirmation?: (email: string) => Promise<{ message?: string }>;
+  completeEmailConfirmation?: () => Promise<{
+    confirmed: boolean;
+    user: { id: string; email?: string } | null;
+    message?: string;
+  }>;
   signOut?: () => Promise<void>;
   deleteAccount?: () => Promise<void>;
   getData: () => Promise<PlannerData>;
