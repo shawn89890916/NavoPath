@@ -258,7 +258,11 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
 
     signOut: async () => {
-      const { error } = await supabase.auth.signOut();
+      cachedUser = null;
+      userPromise = null;
+      profileCache = null;
+      profilePromise = null;
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw new Error(error.message);
     },
 

@@ -347,6 +347,14 @@
 .df-empty strong { position: relative; margin-top: 14px; font-family: var(--paper-display); font-size: 15px; font-weight: 600; }
 .df-empty span { position: relative; max-width: 230px; color: var(--text-faint); font-size: 11px; line-height: 1.6; }
 .df-empty button { position: relative; min-height: 32px; margin-top: 7px; border: 0 !important; border-bottom: 1px solid var(--accent-active) !important; border-radius: 0 !important; color: var(--accent-active) !important; background: transparent !important; box-shadow: none !important; }
+.df-app .df-candidate-list:has(> .df-empty),
+.df-app .df-candidate-list > .df-empty {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.df-app .df-candidate-list > .df-empty .blob-accent {
+  display: none !important;
+}
 
 /* Paper interaction language */
 @keyframes paper-sheet-in {
@@ -1383,9 +1391,34 @@
   border-radius: 0 !important;
 }
 .df-app .df-ai-plan-toggle {
+  width: 26px !important;
+  margin-left: 4px !important;
   border: 0 !important;
   border-bottom: 1px solid transparent !important;
   border-radius: 0 !important;
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.df-app .df-ai-plan-toggle:hover,
+.df-app .df-ai-plan-toggle.active {
+  color: var(--text-main) !important;
+  border-bottom-color: var(--pencil-rule) !important;
+  background: transparent !important;
+}
+.df-app .df-ai-plan-chevron {
+  width: 7px;
+  height: 7px;
+  display: block;
+  margin: -3px auto 0;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 160ms ease, margin 160ms ease;
+}
+.df-app .df-ai-plan-toggle.active .df-ai-plan-chevron {
+  margin: 3px auto 0;
+  transform: rotate(225deg);
 }
 
 /* Keep the daily timeline at a stable reading width until the layout stacks. */

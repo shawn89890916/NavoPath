@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProductIcon } from "./main";
 
 type AuthIntent = "signin" | "signup";
@@ -38,19 +38,19 @@ const copy = {
   zh: {
     nav: ["工作流", "功能", "原则"],
     login: "登录",
-    eyebrow: "为创造者设计的规划工具",
+    eyebrow: "为长期目标与今日行动而设计",
     title: "把宏大的目标变成",
-    titleAccent: "今天的下一步。",
-    intro: "NavoPath 将长期项目思考与真实日程连接起来，让计划经得起每一天的变化。",
+    titleAccent: "今天清晰的下一步。",
+    intro: "NavoPath 把长期项目规划与真实日程连接起来。先想清楚要推进什么，再把它放进今天真正可用的时间。",
     start: "开始规划",
     signIn: "打开工作区",
     proof: ["树状项目规划", "时间轴执行", "AI 辅助排程"],
-    workflowTitle: "从目标到行动，一条连续的路径。",
-    workflowIntro: "规划与执行始终相连。先选择真正重要的工作，再为它安排真实的时间。",
+    workflowTitle: "从长期目标，到今天真正完成的工作。",
+    workflowIntro: "规划与执行保持连接。选择值得推进的任务，再为它安排一段真实可用的时间。",
     steps: [
       ["01", "搭建项目结构", "把复杂目标拆解为项目、任务和清晰的下一步行动。"],
-      ["02", "选择今日推进项", "只把今天值得推进的任务带入候选列表。"],
-      ["03", "让时间变得真实", "把任务放入时间轴，解决冲突，并随变化重新安排。"],
+      ["02", "选择今日推进项", "只把今天值得推进的任务带入今日候选。"],
+      ["03", "让时间变得真实", "把任务拖入时间轴，解决冲突，并随变化重新安排。"],
     ],
     featureTitle: "足够安静，便于思考；足够精确，支持执行。",
     features: [
@@ -77,8 +77,71 @@ function Glyph({ name }: { name: "tree" | "timeline" | "spark" | "sync" }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
 }
 
+function ProductFlowDemo({ lang }: { lang: Lang }) {
+  const [step, setStep] = useState(0);
+  const [manuallyPaused, setManuallyPaused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const labels = lang === "zh"
+    ? [
+        ["01", "规划", "把长期目标拆成明确的下一步"],
+        ["02", "选择", "把今天值得推进的任务加入候选"],
+        ["03", "执行", "拖入时间轴，为任务留出真实时间"],
+      ]
+    : [
+        ["01", "Plan", "Break long-term work into a clear next action"],
+        ["02", "Choose", "Bring the right task into today's candidates"],
+        ["03", "Execute", "Drag it onto the timeline and make time real"],
+      ];
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (manuallyPaused || reducedMotion) return;
+    const timer = window.setInterval(() => setStep((current) => (current + 1) % labels.length), 5200);
+    return () => window.clearInterval(timer);
+  }, [manuallyPaused, reducedMotion, labels.length]);
+
+  return (
+    <div className={`landing-flow-demo step-${step}`}>
+      <div className="landing-frame-bar"><span /><span /><span /><b>NavoPath / Planning → Execute</b></div>
+      <div className="landing-flow-stage">
+        <figure className="landing-flow-pane planning">
+          <figcaption>Planning</figcaption>
+          <img src="/navo-planning-paper.png" alt={lang === "zh" ? "NavoPath 规划工作区" : "NavoPath Planning workspace"} />
+        </figure>
+        <div className="landing-flow-path" aria-hidden="true"><i /><i /><i /></div>
+        <figure className="landing-flow-pane execute">
+          <figcaption>Execute</figcaption>
+          <img src="/navo-execute-paper.png" alt={lang === "zh" ? "NavoPath 执行工作区" : "NavoPath Execute workspace"} />
+        </figure>
+        <div className="landing-flow-task" aria-hidden="true">
+          <span />
+          <strong>{lang === "zh" ? "重构 NavoPath 视觉系统" : "Refine the NavoPath visual system"}</strong>
+          <small>{step === 0 ? "Planning" : step === 1 ? (lang === "zh" ? "今日候选" : "Today's candidates") : "13:00 – 14:00"}</small>
+        </div>
+      </div>
+      <div className="landing-flow-story" aria-label={lang === "zh" ? "产品操作流程" : "Product workflow"}>
+        {labels.map(([number, title, body], index) => (
+          <button type="button" key={number} className={index === step ? "active" : ""} onClick={() => { setStep(index); setManuallyPaused(true); }}>
+            <span>{number}</span><strong>{title}</strong><small>{body}</small>
+          </button>
+        ))}
+      </div>
+      <button className="landing-flow-play" type="button" onClick={() => setManuallyPaused((value) => !value)}>
+        {manuallyPaused ? (lang === "zh" ? "自动播放" : "Auto play") : (lang === "zh" ? "暂停演示" : "Pause demo")}
+      </button>
+    </div>
+  );
+}
+
 export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm, busy, error, notice }: {
-  onLogin: (email: string, password: string, displayName: string, intent: AuthIntent) => void;
+  onLogin: (email: string, password: string, displayName: string, intent: AuthIntent, theme: "light" | "dark") => void;
   onResend: (email: string) => void;
   onContinueAfterConfirm: (email: string) => void;
   busy: boolean;
@@ -93,7 +156,25 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   const [displayName, setDisplayName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [preferredTheme, setPreferredTheme] = useState<"light" | "dark">("light");
   const c = copy[lang];
+  const authText = lang === "zh" ? {
+    account: "NavoPath 账户", welcome: "欢迎回来。", begin: "开始你的路径。",
+    signIn: "登录", signUp: "注册", name: "显示名称", email: "邮箱",
+    password: "密码（至少 6 位）", confirm: "确认密码", show: "显示密码",
+    inbox: "请查收邮件", inboxBody: "请确认发送至该邮箱的邮件，然后返回登录。",
+    resend: "重新发送邮件", continue: "继续登录", mismatch: "两次输入的密码不一致。",
+    working: "处理中…", open: "打开工作区", create: "创建账户",
+    theme: "进入工作区时使用", light: "浅色纸张", dark: "深色纸张",
+  } : {
+    account: "NavoPath account", welcome: "Welcome back.", begin: "Start your path.",
+    signIn: "Sign in", signUp: "Sign up", name: "Display name", email: "Email",
+    password: "Password (6+ characters)", confirm: "Confirm password", show: "Show password",
+    inbox: "Check your inbox", inboxBody: "Confirm the email sent to this address, then return to sign in.",
+    resend: "Resend email", continue: "Continue to sign in", mismatch: "Passwords do not match.",
+    working: "Working…", open: "Open workspace", create: "Create account",
+    theme: "Open workspace in", light: "Light paper", dark: "Dark paper",
+  };
   const passwordMismatch = authIntent === "signup" && password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
 
   const openAuth = (intent: AuthIntent) => {
@@ -109,15 +190,13 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
           {c.nav.map((item, index) => <a key={item} href={`#${["workflow", "features", "principles"][index]}`}>{item}</a>)}
         </div>
         <div className="landing-nav-actions">
-          <button className="landing-lang" onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button>
+          <button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button>
           <button className="landing-button quiet small" onClick={() => openAuth("signin")}>{c.login}</button>
         </div>
       </nav>
 
       <main>
         <section className="landing-hero" id="top">
-          <div className="landing-orbit landing-orbit-one" />
-          <div className="landing-orbit landing-orbit-two" />
           <div className="landing-hero-copy">
             <span className="landing-kicker"><i />{c.eyebrow}</span>
             <h1>{c.title}<br /><em>{c.titleAccent}</em></h1>
@@ -128,32 +207,29 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
             </div>
             <div className="landing-proof">{c.proof.map((item) => <span key={item}><i />{item}</span>)}</div>
           </div>
-          <div className="landing-product-frame">
-            <div className="landing-frame-bar"><span /><span /><span /><b>NavoPath / Execute</b></div>
-            <img src="/navo-dark.png" alt="NavoPath Execute workspace" />
-          </div>
+          <div className="landing-product-frame"><ProductFlowDemo lang={lang} /></div>
         </section>
 
         <section className="landing-section" id="workflow">
-          <header className="landing-section-head"><span>01 / Workflow</span><h2>{c.workflowTitle}</h2><p>{c.workflowIntro}</p></header>
+          <header className="landing-section-head"><span>{lang === "zh" ? "01 / 工作流" : "01 / Workflow"}</span><h2>{c.workflowTitle}</h2><p>{c.workflowIntro}</p></header>
           <div className="landing-workflow">
             {c.steps.map(([number, title, body]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></article>)}
           </div>
           <div className="landing-planning-frame">
-            <div><span>Planning</span><strong>Think in outcomes.<br />Move in next actions.</strong></div>
-            <img src="/navo-settings.png" alt="NavoPath settings and theme controls" />
+            <div><span>Planning</span><strong>{lang === "zh" ? <>以成果思考。<br />以下一步行动。</> : <>Think in outcomes.<br />Move in next actions.</>}</strong></div>
+            <img src="/navo-planning-paper.png" alt={lang === "zh" ? "NavoPath 规划工作区" : "NavoPath Planning workspace"} />
           </div>
         </section>
 
         <section className="landing-section" id="features">
-          <header className="landing-section-head"><span>02 / System</span><h2>{c.featureTitle}</h2></header>
+          <header className="landing-section-head"><span>{lang === "zh" ? "02 / 系统" : "02 / System"}</span><h2>{c.featureTitle}</h2></header>
           <div className="landing-feature-grid">
             {c.features.map(([title, body], index) => <article key={title}><div className="landing-glyph"><Glyph name={(["tree", "timeline", "sync", "spark"] as const)[index]} /></div><span>0{index + 1}</span><h3>{title}</h3><p>{body}</p></article>)}
           </div>
         </section>
 
         <section className="landing-section landing-principles" id="principles">
-          <header className="landing-section-head"><span>03 / Principles</span><h2>{c.principlesTitle}</h2></header>
+          <header className="landing-section-head"><span>{lang === "zh" ? "03 / 原则" : "03 / Principles"}</span><h2>{c.principlesTitle}</h2></header>
           <ol>{c.principles.map((item, index) => <li key={item}><span>0{index + 1}</span><strong>{item}</strong></li>)}</ol>
         </section>
 
@@ -169,20 +245,25 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 
       {showAuth && <div className="landing-auth-overlay" onMouseDown={() => setShowAuth(false)}>
         <section className="landing-auth-card" onMouseDown={(event) => event.stopPropagation()}>
-          <button className="landing-auth-close" onClick={() => setShowAuth(false)}>×</button>
-          <ProductIcon /><span className="landing-auth-label">NavoPath account</span>
-          <h2>{authIntent === "signin" ? (lang === "en" ? "Welcome back." : "欢迎回来。") : (lang === "en" ? "Start your path." : "开始你的路径。")}</h2>
-          <div className="landing-auth-tabs"><button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>Sign in</button><button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>Sign up</button></div>
-          <form onSubmit={(event) => { event.preventDefault(); if (!passwordMismatch) onLogin(email.trim(), password, displayName.trim(), authIntent); }}>
-            {authIntent === "signup" && <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name" maxLength={64} />}
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />
-            <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (6+ characters)" minLength={6} required />
-            {authIntent === "signup" && <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm password" minLength={6} required />}
-            <label className="landing-auth-check"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />Show password</label>
-            {notice && <div className="landing-auth-notice"><strong>Check your inbox</strong><p>Confirm the email sent to {notice.email}, then sign in.</p><button type="button" onClick={() => onResend(notice.email)}>Resend email</button><button type="button" onClick={() => onContinueAfterConfirm(notice.email)}>Continue to sign in</button></div>}
-            {passwordMismatch && <p className="landing-auth-error">Passwords do not match.</p>}
+          <button className="landing-auth-close" aria-label={lang === "zh" ? "关闭" : "Close"} onClick={() => setShowAuth(false)}>×</button>
+          <ProductIcon /><span className="landing-auth-label">{authText.account}</span>
+          <h2>{authIntent === "signin" ? authText.welcome : authText.begin}</h2>
+          <div className="landing-auth-tabs"><button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>{authText.signIn}</button><button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{authText.signUp}</button></div>
+          <form onSubmit={(event) => { event.preventDefault(); if (!passwordMismatch) onLogin(email.trim(), password, displayName.trim(), authIntent, preferredTheme); }}>
+            {authIntent === "signup" && <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={authText.name} maxLength={64} />}
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={authText.email} required />
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={authText.password} minLength={6} required />
+            {authIntent === "signup" && <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={authText.confirm} minLength={6} required />}
+            <fieldset className="landing-auth-theme">
+              <legend>{authText.theme}</legend>
+              <button type="button" className={preferredTheme === "light" ? "active" : ""} onClick={() => setPreferredTheme("light")}><i className="light" /><span>{authText.light}</span></button>
+              <button type="button" className={preferredTheme === "dark" ? "active" : ""} onClick={() => setPreferredTheme("dark")}><i className="dark" /><span>{authText.dark}</span></button>
+            </fieldset>
+            <label className="landing-auth-check"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />{authText.show}</label>
+            {notice && <div className="landing-auth-notice"><strong>{authText.inbox}</strong><p>{authText.inboxBody}<br />{notice.email}</p><button type="button" onClick={() => onResend(notice.email)}>{authText.resend}</button><button type="button" onClick={() => onContinueAfterConfirm(notice.email)}>{authText.continue}</button></div>}
+            {passwordMismatch && <p className="landing-auth-error">{authText.mismatch}</p>}
             {error && <p className="landing-auth-error">{error}</p>}
-            <button className="landing-button primary full" disabled={busy || passwordMismatch}>{busy ? "Working…" : authIntent === "signin" ? "Open workspace" : "Create account"}</button>
+            <button className="landing-button primary full" disabled={busy || passwordMismatch}>{busy ? authText.working : authIntent === "signin" ? authText.open : authText.create}</button>
           </form>
         </section>
       </div>}

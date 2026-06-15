@@ -1153,7 +1153,7 @@ function App() {
     });
   }, []);
 
-  async function handleAuthSubmit(email: string, password: string, displayName: string, intent: "signin" | "signup") {
+  async function handleAuthSubmit(email: string, password: string, displayName: string, intent: "signin" | "signup", preferredTheme: Settings["theme"]) {
     setAuthBusy(true);
     setAuthError("");
     setAuthNotice(null);
@@ -1172,11 +1172,12 @@ function App() {
       }
       resetWorkspaceUi();
       await loadInitial();
-      if (displayName) {
-        const current = settingsRef.current;
-        if (current && current.displayName !== displayName) {
-          void saveSettings({ displayName });
-        }
+      const current = settingsRef.current;
+      if (current) {
+        const patch: Partial<Settings> = {};
+        if (displayName && current.displayName !== displayName) patch.displayName = displayName;
+        if (current.theme !== preferredTheme) patch.theme = preferredTheme;
+        if (Object.keys(patch).length > 0) await saveSettings(patch);
       }
       if (feedbackMessage) setAuthError(feedbackMessage);
     } catch (error) {
@@ -1213,13 +1214,27 @@ function App() {
   }
 
   async function handleSignOut() {
-    await flushPendingSave();
-    const api = await waitForPlannerApi();
-    await api.signOut?.();
-    resetWorkspaceUi();
-    setData(null);
-    setSettings(null);
-    await loadInitial();
+    try {
+      try {
+        await flushPendingSave();
+      } catch {
+        // A stale or expired session must not prevent the user from signing out.
+        pendingSaveRef.current = null;
+      }
+      const api = await waitForPlannerApi();
+      await api.signOut?.();
+      resetWorkspaceUi();
+      loadedWorkspaceKeyRef.current = "cloud:signed-out";
+      dataRef.current = null;
+      settingsRef.current = null;
+      setUtilityPanel(null);
+      setData(null);
+      setSettings(null);
+      setAuthState({ mode: "cloud", user: null, configured: true });
+      await loadInitial();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
   }
 
   async function handleDeleteAccount() {
@@ -3765,7 +3780,7 @@ function App() {
                 <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label={t(lang, "timeline.aiPlanningSettings")} onClick={(event) => {
                   event.stopPropagation();
                   setAiPlanMenuOpen((open) => !open);
-                }}>⌄</button>
+                }}><span className="df-ai-plan-chevron" aria-hidden="true" /></button>
                 {schedulePreviews.length > 0 && autoScheduleState === "preview" && <>
                   <button className="df-ai-plan-confirm" onClick={() => acceptAllPreviews()} title={t(lang, "timeline.adoptAll")}>✓</button>
                   <button className="df-ai-plan-cancel" onClick={() => cancelAutoSchedule()} title={t(lang, "timeline.cancelPreview")}>✕</button>
