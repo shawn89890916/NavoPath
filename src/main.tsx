@@ -26,7 +26,7 @@ import {
   TIMELINE_END as GEOMETRY_TIMELINE_END,
   HOUR_HEIGHT,
 } from "./timelineGeometry";
-import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, releaseNote, formatDateTitle, monthTitle, nowLabel, weekdayName } from "./i18n";
+import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, releaseNote, formatDateTitle, monthTitle, weekdayName } from "./i18n";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -117,7 +117,19 @@ type EditingOccurrence = {
   scheduledStart: string;
 } | null;
 
-type DragState = { taskId: string; kind: "candidate" | "block"; duration: number; offsetMinutes?: number; pointer?: { x: number; y: number }; outsideTimeline?: boolean } | null;
+type DragState = {
+  taskId: string;
+  kind: "candidate" | "block";
+  duration: number;
+  offsetMinutes?: number;
+  pointer?: { x: number; y: number };
+  outsideTimeline?: boolean;
+} | null;
+
+function isEventDisplayTask(taskOrId: Task | string) {
+  const id = typeof taskOrId === "string" ? taskOrId : taskOrId.id;
+  return id.startsWith("event_occ_");
+}
 
 function normalizeHexColor(value: string, fallback: string) {
   const input = value.trim();
@@ -807,6 +819,54 @@ function makeEvent(form: FormState): CalendarEvent {
   };
 }
 
+function buildEventFromTask(task: Task, activeRecord?: TimelineRecord): CalendarEvent {
+  const scheduledDate = activeRecord?.scheduledDate || task.scheduledDate || task.plannedForDate || task.dueDate || todayIso();
+  const scheduledStart = activeRecord?.scheduledStart || task.scheduledStart || task.recurrence?.startTime || "";
+  const scheduledEnd = activeRecord?.scheduledEnd || task.scheduledEnd || (scheduledStart ? addMinutes(scheduledStart, taskDuration(task)) : "");
+  return {
+    id: uid("event"),
+    title: task.title,
+    date: scheduledDate,
+    startDate: scheduledDate,
+    endDate: scheduledDate,
+    startTime: scheduledStart || undefined,
+    endTime: scheduledEnd || undefined,
+    category: task.category,
+    details: task.notes || "",
+    recurrence: task.recurrence,
+    createdAt: new Date().toISOString()
+  };
+}
+
+function buildTaskFromEvent(event: CalendarEvent): Task {
+  const now = new Date().toISOString();
+  const date = event.startDate || event.date || todayIso();
+  const start = event.startTime || undefined;
+  const end = start ? (event.endTime || addMinutes(start, event.recurrence?.durationMinutes || 60)) : undefined;
+  const durationMinutes = start && end ? Math.max(timeToMinutes(end) - timeToMinutes(start), SLOT_MINUTES) : 30;
+  return {
+    id: uid("task"),
+    title: event.title,
+    dueDate: date,
+    category: event.category,
+    priority: "medium",
+    notes: event.details || "",
+    goalId: "goal_admission",
+    completed: false,
+    estimatedHours: durationMinutes / 60,
+    plannedForDate: start ? undefined : date,
+    executionLane: start ? undefined : "candidate",
+    scheduledDate: date,
+    scheduledStart: start,
+    scheduledEnd: end,
+    recurrence: event.recurrence,
+    order: Date.now(),
+    subtasks: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
 export function ProductIcon({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`dayflow-icon ${compact ? "compact" : ""}`} aria-hidden="true">
@@ -1032,12 +1092,7 @@ function App() {
     }
   }, [timelineView]);
 
-  // In multi-day views, simple view follows the collapsed state of the
-  // candidate panel. It is always off in daily view.
-  useEffect(() => {
-    const supportsRangeControls = timelineView === "3day" || timelineView === "weekly" || timelineView === "month";
-    setSimpleView(supportsRangeControls && candidatePanelCollapsed);
-  }, [timelineView, candidatePanelCollapsed]);
+  // simpleView is only controlled by the user toggle button; do not auto-set.
 
   useEffect(() => {
     if (mode !== "execute") {
@@ -1661,6 +1716,11 @@ function App() {
     return occurrenceToTaskMap.get(id) || recordToTaskMap.get(id);
   }
 
+  function resolveOwningEvent(taskOrId: Task | string) {
+    const id = typeof taskOrId === "string" ? taskOrId : taskOrId.id;
+    return occurrenceToEventMap.get(id) || events.find((event) => id.startsWith(`event_occ_${event.id}_`));
+  }
+
   const placementPreviewTask = useMemo(
     () => placementPreview ? tasks.find((task) => task.id === placementPreview.taskId) : undefined,
     [placementPreview, tasks],
@@ -1708,6 +1768,12 @@ function App() {
   const completedCandidates = useMemo(
     () => tasks.filter((task) => task.completed && getExecutionLane(task) !== "queued" && task.plannedForDate === today && !(task.timelineRecords || []).some((r) => r.executionStatus === "scheduled") && !task.scheduledDate && !hasRecurrenceOccurrenceOnDate(task, today)).sort((a, b) => (a.order || 0) - (b.order || 0)),
     [tasks, today]
+  );
+  const todayEventCandidates = useMemo(
+    () => expandEventOccurrences(new Set([today])).tasks
+      .filter((task) => !task.scheduledStart && task.scheduledDate === today)
+      .sort((a, b) => (a.title || "").localeCompare(b.title || "")),
+    [events, today],
   );
   // Conflict layout: maps taskId → { index, count } for overlapping tasks
   const conflictLayout = useMemo(() => {
@@ -1758,7 +1824,7 @@ function App() {
     console.table(info);
   }, [conflictLayout, tasks, timelineView, timelineDate]);
 
-  const visibleCandidates = showCompletedCandidates ? [...todayCandidates, ...completedCandidates] : todayCandidates;
+  const visibleCandidates = showCompletedCandidates ? [...todayEventCandidates, ...todayCandidates, ...completedCandidates] : [...todayEventCandidates, ...todayCandidates];
   const executeStats = useMemo(() => {
     const planned = tasks.filter((task) => !task.completed && task.plannedForDate === today);
     const scheduled = planned.filter((task) =>
@@ -2218,6 +2284,34 @@ function App() {
     setDrag(null);
   }
 
+  function makeEventCandidate(occurrenceId: string, targetDate: string = today) {
+    if (!data) return;
+    const event = resolveOwningEvent(occurrenceId);
+    if (!event) return;
+    void saveData({
+      ...data,
+      events: data.events.map((item) => item.id === event.id ? {
+        ...item,
+        date: targetDate,
+        startDate: targetDate,
+        endDate: targetDate,
+        startTime: undefined,
+        endTime: undefined,
+        recurrence: item.recurrence ? {
+          ...item.recurrence,
+          mode: "flexible",
+          startDate: targetDate,
+          startTime: undefined,
+          durationMinutes: undefined,
+        } : item.recurrence,
+      } : item),
+    });
+    showToast(t(lang, "toast.movedBackToCandidates"));
+    setDrag(null);
+    setHoverSlot("");
+    dragTargetDateRef.current = "";
+  }
+
   function saveFloatingTimeAdd(title: string, projectId: string | null) {
     if (!data || !floatingTimeAdd) return;
     const { date, startTime, endTime } = floatingTimeAdd;
@@ -2555,6 +2649,13 @@ function App() {
 
   function scheduleTask(taskId: string, startTime: string) {
     const targetDate = dragTargetDateRef.current || timelineDate;
+    if (isEventDisplayTask(taskId)) {
+      moveEventOccurrence(taskId, startTime, targetDate);
+      setHoverSlot("");
+      setDrag(null);
+      dragTargetDateRef.current = "";
+      return;
+    }
     const task = data?.tasks.find((item) => item.id === taskId);
     if (!task) return;
     applyCandidateTimeSettings(taskId, {
@@ -2652,26 +2753,101 @@ function App() {
     });
   }
 
+  function moveEventOccurrence(occurrenceId: string, newStart: string, newDate?: string) {
+    if (!data) return;
+    const event = resolveOwningEvent(occurrenceId);
+    if (!event) return;
+    const sourceStart = event.startTime || "09:00";
+    const sourceEnd = event.endTime || addMinutes(sourceStart, event.recurrence?.durationMinutes || 60);
+    const duration = Math.max(timeToMinutes(sourceEnd) - timeToMinutes(sourceStart), SLOT_MINUTES);
+    const date = newDate || event.startDate || event.date;
+    const nextEnd = addMinutes(newStart, duration);
+    void saveData({
+      ...data,
+      events: data.events.map((item) => item.id === event.id ? {
+        ...item,
+        date,
+        startDate: date,
+        endDate: date,
+        startTime: newStart,
+        endTime: nextEnd,
+        recurrence: item.recurrence ? {
+          ...item.recurrence,
+          mode: "scheduled",
+          startDate: date,
+          startTime: newStart,
+          durationMinutes: duration,
+        } : item.recurrence,
+      } : item),
+    });
+  }
+
+  function makeEventAllDay(occurrenceId: string, targetDate: string) {
+    if (!data) return;
+    const event = resolveOwningEvent(occurrenceId);
+    if (!event) return;
+    void saveData({
+      ...data,
+      events: data.events.map((item) => item.id === event.id ? {
+        ...item,
+        date: targetDate,
+        startDate: targetDate,
+        endDate: targetDate,
+        startTime: undefined,
+        endTime: undefined,
+        recurrence: item.recurrence ? {
+          ...item.recurrence,
+          mode: "flexible",
+          startDate: targetDate,
+          startTime: undefined,
+          durationMinutes: undefined,
+        } : item.recurrence,
+      } : item),
+    });
+  }
+
+  function resizeEventOccurrence(occurrenceId: string, nextStart: string, nextEnd: string) {
+    if (!data) return;
+    const event = resolveOwningEvent(occurrenceId);
+    if (!event) return;
+    const duration = Math.max(timeToMinutes(nextEnd) - timeToMinutes(nextStart), SLOT_MINUTES);
+    void saveData({
+      ...data,
+      events: data.events.map((item) => item.id === event.id ? {
+        ...item,
+        startTime: nextStart,
+        endTime: nextEnd,
+        recurrence: item.recurrence ? {
+          ...item.recurrence,
+          mode: "scheduled",
+          startTime: nextStart,
+          durationMinutes: duration,
+        } : item.recurrence,
+      } : item),
+    });
+    showToast(t(lang, "toast.durationAdjusted"));
+  }
+
   function beginBlockDrag(event: React.MouseEvent, task: Task) {
     if ((event.target as HTMLElement).closest("button,input,textarea,select")) return;
-    if (hasRecurringRule(resolveOwningTask(task) || task)) return;
-    event.preventDefault();
+    const isEvent = isEventDisplayTask(task);
+    if (!isEvent && hasRecurringRule(resolveOwningTask(task) || task)) return;
     const target = event.currentTarget as HTMLElement;
-    target.classList.add("is-dragging");
     const startX = event.clientX;
     const startY = event.clientY;
     const duration = taskDuration(task);
     const rect = event.currentTarget.getBoundingClientRect();
     const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
     const offsetMinutes = Math.min(Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0), Math.max(duration - SLOT_MINUTES, 0));
-    const realTaskId = resolveOwningTask(task.id)?.id || task.id;
     let active = false;
     suppressBlockClickRef.current = false;
     const move = (moveEvent: MouseEvent) => {
       const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
       if (!active && distance < 5) return;
       if (!active) {
+        moveEvent.preventDefault();
         active = true;
+        target.classList.add("is-dragging");
         suppressBlockClickRef.current = true;
         setDragCreate(null);
         setDrag({ taskId: task.id, kind: "block", duration, offsetMinutes, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline: pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY) });
@@ -2718,7 +2894,11 @@ function App() {
                 targetDate = threeDates[di];
               }
             }
-            makeAllDay(task.id, targetDate);
+            if (isEvent) {
+              makeEventAllDay(task.id, targetDate);
+            } else {
+              makeAllDay(task.id, targetDate);
+            }
             window.removeEventListener("mousemove", move);
             window.removeEventListener("mouseup", up);
             setDrag(null);
@@ -2730,8 +2910,14 @@ function App() {
           }
         }
         const leftPanel = document.querySelector(".df-candidate-panel")?.getBoundingClientRect();
-        if ((leftPanel && upEvent.clientX >= leftPanel.left && upEvent.clientX <= leftPanel.right && upEvent.clientY >= leftPanel.top && upEvent.clientY <= leftPanel.bottom) || pointerOutsideTimeline(upEvent.clientX, upEvent.clientY)) {
+        const droppedOnCandidatePanel = Boolean(leftPanel && upEvent.clientX >= leftPanel.left && upEvent.clientX <= leftPanel.right && upEvent.clientY >= leftPanel.top && upEvent.clientY <= leftPanel.bottom);
+        const droppedOutsideTimeline = pointerOutsideTimeline(upEvent.clientX, upEvent.clientY);
+        if (isEvent && droppedOnCandidatePanel) {
+          makeEventCandidate(task.id, today);
+        } else if (!isEvent && (droppedOnCandidatePanel || droppedOutsideTimeline)) {
           deleteTimelineRecord(task.id);
+        } else if (isEvent && droppedOutsideTimeline) {
+          // Outside the timeline but not over the candidate shelf: cancel the move.
         } else {
           const { gridEl, scrollEl, visDays } = getDropGridAndDays();
           if (gridEl && scrollEl) {
@@ -2744,9 +2930,13 @@ function App() {
               debugLabel: `block-up-${timelineView}`,
             });
             dragTargetDateRef.current = target.date;
-            moveTimelineRecord(task.id, minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes)), target.date);
+            const nextStart = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
+            if (isEvent) moveEventOccurrence(task.id, nextStart, target.date);
+            else moveTimelineRecord(task.id, nextStart, target.date);
           } else {
-            moveTimelineRecord(task.id, slotFromPointer(upEvent.clientY, offsetMinutes));
+            const nextStart = slotFromPointer(upEvent.clientY, offsetMinutes);
+            if (isEvent) moveEventOccurrence(task.id, nextStart);
+            else moveTimelineRecord(task.id, nextStart);
           }
         }
       }
@@ -2792,6 +2982,25 @@ function App() {
       const end = timeToMinutes(task.scheduledEnd);
       const now = new Date().toISOString();
       let nextData = data;
+      if (isEventDisplayTask(task)) {
+        if (edge === "start") {
+          const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
+          const nextEnd = task.scheduledEnd || minutesToTime(end);
+          resizeEventOccurrence(task.id, nextStart, nextEnd);
+        } else {
+          const nextStart = task.scheduledStart || minutesToTime(start);
+          const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
+          resizeEventOccurrence(task.id, nextStart, nextEnd);
+        }
+        setResizePreview(null);
+        document.body.classList.remove("df-resizing");
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        window.setTimeout(() => {
+          suppressBlockClickRef.current = false;
+        }, 0);
+        return;
+      }
       if (edge === "start") {
         const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
         const nextEnd = task.scheduledEnd || minutesToTime(end);
@@ -2881,10 +3090,10 @@ function App() {
       title: realTask.title,
       projectId: realTask.projectId || "",
       projectColor: "#C69CF9",
-      dueDate: realTask.dueDate || today,
-      dueTime: "",
-      endDate: realTask.dueDate || today,
-      endTime: "",
+      dueDate: task.scheduledDate || realTask.dueDate || today,
+      dueTime: task.scheduledStart || "",
+      endDate: task.scheduledDate || realTask.dueDate || today,
+      endTime: task.scheduledEnd || "",
       category: realTask.category,
       priority: realTask.priority,
       importance: realTask.importance || realTask.priority,
@@ -2942,9 +3151,17 @@ function App() {
       }
     } else if (addType === "task") {
       const task = makeTask(form);
+      const durationMinutes = form.dueTime
+        ? Math.max(
+            form.endTime ? timeToMinutes(form.endTime) - timeToMinutes(form.dueTime) : Math.round((form.estimatedHours || 0.5) * 60),
+            SLOT_MINUTES,
+          )
+        : 0;
       const createdTask = mode === "planning"
         ? { ...task, plannedForDate: undefined, executionLane: undefined }
-        : task;
+        : form.dueTime
+          ? { ...task, plannedForDate: form.dueDate, executionLane: undefined, timelineRecords: [createScheduledRecord(task, form.dueDate || today, form.dueTime, durationMinutes)] }
+          : task;
       void saveData({ ...data, tasks: [...data.tasks, createdTask] });
     } else if (addType === "project") {
       void saveData({ ...data, projects: [...data.projects, makeProject(form)] });
@@ -3033,6 +3250,90 @@ function App() {
       }]
     });
     showToast(t(lang, "toast.taskDuplicated"));
+  }
+
+  function convertTaskToEvent(taskId: string) {
+    if (!data) return;
+    const task = data.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    if (!window.confirm(t(lang, "confirm.convertTaskToEvent"))) return;
+    const now = new Date().toISOString();
+    const activeRecord = editingRecordId
+      ? (task.timelineRecords || []).find((record) => record.id === editingRecordId)
+      : undefined;
+    const sourceTask: Task = editingId === task.id
+      ? {
+          ...task,
+          title: form.title.trim() || task.title,
+          dueDate: form.dueDate || task.dueDate,
+          category: form.category,
+          priority: form.priority,
+          notes: form.details,
+          recurrence: form.recurrence || task.recurrence,
+          estimatedHours: Math.max(form.estimatedHours || task.estimatedHours || 0.25, 0.25),
+          updatedAt: now,
+        }
+      : task;
+    const event = buildEventFromTask(sourceTask, activeRecord);
+    void saveData({
+      ...data,
+      tasks: data.tasks.filter((item) => item.id !== task.id),
+      events: [...data.events, event],
+    });
+    setEditingId(event.id);
+    setEditingRecordId(undefined);
+    setEditingOccurrence(null);
+    setAddType("event");
+    setForm({ ...defaultForm("event"), title: event.title, dueDate: event.startDate || event.date, endDate: event.endDate || event.date, dueTime: event.startTime || "", endTime: event.endTime || "", category: event.category, details: event.details, recurrence: event.recurrence });
+    showToast(t(lang, "toast.convertedToEvent"));
+  }
+
+  function convertEventToTask(eventId: string) {
+    if (!data) return;
+    const event = data.events.find((item) => item.id === eventId);
+    if (!event) return;
+    if (!window.confirm(t(lang, "confirm.convertEventToTask"))) return;
+    const sourceEvent: CalendarEvent = editingId === event.id
+      ? {
+          ...event,
+          title: form.title.trim() || event.title,
+          date: form.dueDate || event.date,
+          startDate: form.dueDate || event.startDate || event.date,
+          endDate: form.endDate || form.dueDate || event.endDate || event.date,
+          startTime: form.dueTime || undefined,
+          endTime: form.endTime || undefined,
+          category: form.category,
+          details: form.details,
+          recurrence: form.recurrence,
+        }
+      : event;
+    const task = buildTaskFromEvent(sourceEvent);
+    void saveData({
+      ...data,
+      events: data.events.filter((item) => item.id !== event.id),
+      tasks: [...data.tasks, task],
+    });
+    setEditingId(task.id);
+    setEditingRecordId(undefined);
+    setEditingOccurrence(null);
+    setAddType("task");
+    setForm({
+      title: task.title,
+      projectId: "",
+      projectColor: "#C69CF9",
+      dueDate: task.dueDate,
+      dueTime: task.scheduledStart || "",
+      endDate: task.dueDate,
+      endTime: task.scheduledEnd || "",
+      category: task.category,
+      priority: task.priority,
+      importance: task.importance || task.priority,
+      urgency: task.urgency || "low",
+      estimatedHours: task.estimatedHours || 0.5,
+      details: task.notes || "",
+      recurrence: task.recurrence,
+    });
+    showToast(t(lang, "toast.convertedToTask"));
   }
 
   function askAi(taskId: string) {
@@ -3700,7 +4001,14 @@ function App() {
           <section className={`df-candidate-panel${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
-            if (taskId) unscheduleTask(taskId);
+            if (taskId) {
+              const isDroppedEvent = events.some((e) => taskId.startsWith(`event_occ_${e.id}_`)) || recordToTaskMap.get(taskId) && isEventDisplayTask(recordToTaskMap.get(taskId)!);
+              if (isDroppedEvent) {
+                makeEventCandidate(taskId, today);
+              } else {
+                unscheduleTask(taskId);
+              }
+            }
           }}>
             {candidatePanelCollapsed ? (
               <div className="df-candidate-collapsed-strip">
@@ -3731,17 +4039,17 @@ function App() {
               ) : groupByProject ? (
                 Array.from(
                   visibleCandidates.reduce((map, task) => {
-                    const gid = task.projectId || "__unassigned__";
+                    const gid = isEventDisplayTask(task) ? "__events__" : task.projectId || "__unassigned__";
                     if (!map.has(gid)) map.set(gid, []);
                     map.get(gid)!.push(task);
                     return map;
                   }, new Map<string, Task[]>())
                 )
-                  .sort(([a], [b]) => a === "__unassigned__" ? 1 : b === "__unassigned__" ? -1 : 0)
+                  .sort(([a], [b]) => a === "__events__" ? -1 : b === "__events__" ? 1 : a === "__unassigned__" ? 1 : b === "__unassigned__" ? -1 : 0)
                   .map(([gid, tasks]) => {
-                    const project = gid === "__unassigned__" ? null : projects.find(p => String(p.id) === String(gid));
-                    const projectColor = project?.color || "var(--accent-active)";
-                    const projectTitle = project?.title || t(lang, "candidate.unassigned");
+                    const project = gid === "__unassigned__" || gid === "__events__" ? null : projects.find(p => String(p.id) === String(gid));
+                    const projectColor = gid === "__events__" ? "var(--accent-active)" : project?.color || "var(--accent-active)";
+                    const projectTitle = gid === "__events__" ? "EVENTS" : project?.title || t(lang, "candidate.unassigned");
                     return (
                       <div key={gid} className="df-project-group">
                         <div className="df-project-group-header">
@@ -4177,7 +4485,7 @@ function App() {
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
-                                    <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
+                                    <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
                                     />
                                   );
@@ -4334,25 +4642,26 @@ function App() {
                                       <strong className="df-month-cell-strong">{dateObj.getDate()}</strong>
                                       <div className="df-month-cell-tasks">
                                         {[...dayTasks].sort((a, b) => {
-                                          const aD = a.completed ? 1 : 0, bD = b.completed ? 1 : 0;
+                                          const aD = !isEventDisplayTask(a) && a.completed ? 1 : 0, bD = !isEventDisplayTask(b) && b.completed ? 1 : 0;
                                           if (aD !== bD) return aD - bD;
                                           const aT = a.scheduledStart || "", bT = b.scheduledStart || "";
                                           if (aT && bT) return aT.localeCompare(bT);
                                           if (aT) return -1; if (bT) return 1; return 0;
                                         }).map((task) => (
-                                          <button key={task.id} className={`df-month-task${task.completed ? " completed" : ""}`}
-                                            draggable={!hasRecurringRule(task)}
+                                          <button key={task.id} className={`df-month-task${!isEventDisplayTask(task) && task.completed ? " completed" : ""}${isEventDisplayTask(task) ? " is-event" : ""}`}
+                                            data-kind={isEventDisplayTask(task) ? "event" : "task"}
+                                            draggable={!isEventDisplayTask(task) && !hasRecurringRule(task)}
                                             style={{ "--cat": projects.find((p) => String(p.id) === String(task.projectId || ""))?.color || categories[task.category].color } as CSSProperties}
                                             onClick={(e) => { e.stopPropagation(); openTaskEdit(task); }}
                                             onDragStart={(e) => {
-                                              if (hasRecurringRule(task)) return;
+                                              if (isEventDisplayTask(task) || hasRecurringRule(task)) return;
                                               e.dataTransfer.setData("taskId", task.id);
                                               e.dataTransfer.effectAllowed = "move";
                                               setDragCreate(null);
                                               setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
                                             }}
                                             onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }}
-                                          ><span />{task.scheduledStart ? <time>{task.scheduledStart}</time> : null}{task.title}</button>
+                                          ><span />{task.scheduledStart ? <time>{task.scheduledStart}</time> : null}{isEventDisplayTask(task) ? <small>{t(lang, "form.event")}</small> : null}{task.title}</button>
                                         ))}
                                         {monthQuickAdd && !drag && monthQuickAdd.date === day && (
                                           <AllDayQuickAddPopover absolute add={monthQuickAdd} projects={projects}
@@ -4550,7 +4859,7 @@ function App() {
                         })}
                         {isViewingToday && <NowLine lang={lang} />}
                         {scheduledTasks.length === 0 && schedulePreviews.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />{t(lang, "timeline.dragHere")}</div>}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock={drag.kind === "block"} conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
                         {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -4647,7 +4956,7 @@ function App() {
       {!settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); setAiMessages([]); clearAiAttachment(); }} messages={aiMessages} onConfirmAction={(messageId, action) => void confirmAiAction(action, messageId)} onDismissAction={(messageId, action) => dismissAiAction(action, messageId)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} />}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
@@ -4978,7 +5287,10 @@ function TaskCard({
     count: task.recurrence?.count,
   }));
   const overdue = task.dueDate < focusDate ? dateDiff(task.dueDate, focusDate) : 0;
-  const cardAccentColor = projects.find((p) => String(p.id) === String(task.projectId || ""))?.color || "var(--accent-active)";
+  const isEvent = isEventDisplayTask(task);
+  const cardAccentColor = isEvent
+    ? categories[task.category]?.color || "var(--accent-active)"
+    : projects.find((p) => String(p.id) === String(task.projectId || ""))?.color || "var(--accent-active)";
   const recurringLocked = hasRecurringRule(task);
   const isPlacementArmed = placementPreview?.taskId === task.id;
 
@@ -5005,17 +5317,18 @@ function TaskCard({
   return (
     <>
       <article
-        className={`df-task-card ${overdue > 0 ? "overdue" : ""} ${task.completed ? "completed" : ""} ${openPanel ? "expanded" : ""} ${isMoreOpen ? "more-open" : ""} ${isPlacementArmed ? "placement-armed" : ""} ${recurringLocked ? "recurring-locked" : ""}`}
+        className={`df-task-card ${overdue > 0 && !isEvent ? "overdue" : ""} ${task.completed && !isEvent ? "completed" : ""} ${openPanel ? "expanded" : ""} ${isMoreOpen ? "more-open" : ""} ${isPlacementArmed ? "placement-armed" : ""} ${recurringLocked && !isEvent ? "recurring-locked" : ""} ${isEvent ? "is-event" : ""}`}
         style={{ "--cat": cardAccentColor } as React.CSSProperties}
         data-placement-card={task.id}
-        draggable={!recurringLocked}
-        onDragStart={recurringLocked ? undefined : onDragStart}
+        data-kind={isEvent ? "event" : "task"}
+        draggable={isEvent || !recurringLocked}
+        onDragStart={!isEvent && recurringLocked ? undefined : onDragStart}
         onDragEnd={onDragEnd}
         onClick={onClick}
-        title={recurringLocked ? t(lang, "taskCard.recurringHint") : t(lang, "taskCard.dragHint")}
+        title={!isEvent && recurringLocked ? t(lang, "taskCard.recurringHint") : t(lang, "taskCard.dragHint")}
       >
         <div className="candidate-task-accent" style={{ background: cardAccentColor }} />
-        <button
+        {!isEvent && <button
           className={`df-block-check ${task.completed ? "completed" : ""}`}
           title={task.completed ? t(lang, "taskCard.markIncomplete") : t(lang, "taskCard.markComplete")}
           onClick={(event) => {
@@ -5024,13 +5337,14 @@ function TaskCard({
           }}
         >
           {task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}
-        </button>
+        </button>}
         {!isMoreOpen && <div className="df-candidate-row">
           <div className="df-candidate-main">
+            {isEvent ? <span className="df-candidate-kind">EVENT</span> : null}
             <strong className="df-candidate-title" title={task.title}>{task.title}</strong>
             {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
           </div>
-          <button
+          {!isEvent && <button
             className="df-duration-pill"
             title={t(lang, "taskCard.adjustDuration")}
             onClick={(event) => {
@@ -5039,8 +5353,8 @@ function TaskCard({
             }}
           >
             {formatDuration(task.estimatedHours || 0.5)}
-          </button>
-          <button
+          </button>}
+          {!isEvent && <button
             className="df-icon-button icon-schedule"
             title={t(lang, "taskCard.openScheduling")}
             onClick={(event) => {
@@ -5053,8 +5367,8 @@ function TaskCard({
               <rect x="3.5" y="5" width="13" height="11.5" rx="2" />
               <path d="M6.5 3.5v3M13.5 3.5v3M3.5 8.5h13" />
             </svg>
-          </button>
-          <button
+          </button>}
+          {!isEvent && <button
             className={`df-icon-button ${isMoreOpen ? "icon-collapse" : "icon-expand"}`}
             title={isMoreOpen ? t(lang, "taskCard.collapseMore") : t(lang, "taskCard.expandMore")}
             onClick={(event) => {
@@ -5066,7 +5380,7 @@ function TaskCard({
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               {isMoreOpen ? <path d="M5 12l5-5 5 5" /> : <path d="M5 8l5 5 5-5" />}
             </svg>
-          </button>
+          </button>}
         </div>}
 
         {isPlacementArmed && placementPreview && (
@@ -5422,6 +5736,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT);
   const next = extractNextAction(task.notes);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
+  const isEvent = isEventDisplayTask(task);
   const [badgeWidth, setBadgeWidth] = useState(0);
   useLayoutEffect(() => {
     if (hovered && projectBtnRef.current) {
@@ -5447,19 +5762,20 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
   return (
-    <div className={`df-time-block priority-${task.priority} ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 38 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 38 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
-    }} onMouseDown={isReturnedUnfinished || recurringLocked ? undefined : onDragStart} onClick={onEdit} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
+    }} onMouseDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={onEdit} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {!isReturnedUnfinished && !recurringLocked && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} />}
-      {!isWeekView && !isReturnedUnfinished && <div className="df-category-strip" />}
-      <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
+      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} />}
+      {!isReturnedUnfinished && <div className="df-category-strip" />}
+      {!isEvent && <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
         event.stopPropagation();
         onToggleDone();
       }} aria-label={task.completed ? t(lang, "timeBlock.markIncomplete") : t(lang, "timeBlock.markComplete")}>
         {task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}
-      </button>
+      </button>}
       <div className="df-block-title-row">
+        {isEvent ? <span className="df-event-kind-label">{t(lang, "form.event")}</span> : null}
         <strong title={task.title} style={isWeekView && !isRecurring ? { color: stripeColor } : undefined}>{task.title}</strong>
       </div>
       {isPreview && (
@@ -5468,14 +5784,14 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
           <button className="df-preview-action cancel" onClick={(e) => { e.stopPropagation(); onCancelPreview?.(); }} aria-label={t(lang, "timeBlock.cancel")} title={t(lang, "timeBlock.cancel")}>✕</button>
         </span>
       )}
-      {hovered && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+      {!isEvent && hovered && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => {
           event.stopPropagation();
           setProjectOpen((open) => !open);
         }}># {projectName}</button>
       </span>}
       {next && <span className="df-next">{t(lang, "timeBlock.nextStep")}：{next}</span>}
-      {!isReturnedUnfinished && !recurringLocked && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} />}
+      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{
@@ -5512,7 +5828,8 @@ function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extr
   const height = Math.max(timeBlockHeight(startTime, endTime), SLOT_HEIGHT);
   const color = categories[task.category]?.color || "#888";
   const isPlacementPreview = Boolean(extraStyle && (extraStyle as Record<string, unknown>)["--df-preview" as string]);
-  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${isPlacementPreview ? "placement-preview" : ""}`} style={{ top, height, "--cat": color, ...extraStyle } as CSSProperties}><strong>{task.title}</strong>{!draggingBlock && <span>{startTime} · {Math.round(duration)}min</span>}</div>;
+  const isEvent = isEventDisplayTask(task);
+  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${isPlacementPreview ? "placement-preview" : ""} ${isEvent ? "is-event" : ""}`} data-kind={isEvent ? "event" : "task"} style={{ top, height, "--cat": color, ...extraStyle } as CSSProperties}><strong>{task.title}</strong>{!draggingBlock && <span>{startTime} · {Math.round(duration)}min</span>}</div>;
 }
 
 function ProjectColorPicker({ value, onChange, compact = false, presets = PROJECT_COLOR_PRESETS }: { value: string; onChange: (color: string) => void; compact?: boolean; presets?: string[] }) {
@@ -5602,6 +5919,7 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
+  const isEvent = isEventDisplayTask(task);
   const isShortName = task.title.length <= 6;
   const isReturnedUnfinished = task.executionStatus === "returned_unfinished";
   const recurringLocked = hasRecurringRule(task);
@@ -5614,14 +5932,14 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
     }
   }, [hovered]);
   return (
-    <article className={`df-all-day-block ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}`} draggable={!isReturnedUnfinished && !recurringLocked} style={{ "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onDragStart={isReturnedUnfinished || recurringLocked ? undefined : onDragStart} onDragEnd={onDragEnd} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+    <article className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}`} data-kind={isEvent ? "event" : "task"} draggable={!isEvent && !isReturnedUnfinished && !recurringLocked} style={{ "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onDragStart={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onDragStart} onDragEnd={onDragEnd} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
       {!isReturnedUnfinished && <div className="df-category-strip" />}
-      <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onClick={(event) => {
+      {!isEvent && <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onClick={(event) => {
         event.stopPropagation();
         onToggleDone();
-      }}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}</button>
-      <strong title={task.title}>{task.title}</strong>
-      {hovered && <span className="df-block-project-wrap" onClick={(event) => event.stopPropagation()}>
+      }}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}</button>}
+      <strong title={task.title}>{isEvent ? <span className="df-event-kind-label">{t(lang, "form.event")}</span> : null}{task.title}</strong>
+      {!isEvent && hovered && <span className="df-block-project-wrap" onClick={(event) => event.stopPropagation()}>
         <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => { event.stopPropagation(); setProjectOpen((open) => !open); }}># {projectName}</button>
         {projectOpen && projectBtnRef.current && createPortal(
           <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
@@ -5653,7 +5971,7 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
   );
 }
 
-function NowLine({ extraStyle, lang }: { extraStyle?: CSSProperties; lang: Language }) {
+function NowLine({ extraStyle }: { extraStyle?: CSSProperties; lang?: Language }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);
@@ -5662,11 +5980,11 @@ function NowLine({ extraStyle, lang }: { extraStyle?: CSSProperties; lang: Langu
   const minutes = now.getHours() * 60 + now.getMinutes();
   if (minutes < TIMELINE_START * 60 || minutes > TIMELINE_END * 60) return null;
   const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`);
-  return <div className="df-now-line" style={{ top, ...extraStyle }}><span>{nowLabel(lang)}</span></div>;
+  return <div className="df-now-line" style={{ top, ...extraStyle }} />;
 }
 
 function EditDrawer(props: {
-  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
+  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
   editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; lang: Language;
 }) {
   const [newProjectTitle, setNewProjectTitle] = useState("");
@@ -5777,6 +6095,101 @@ function EditDrawer(props: {
     if (task.plannedForDate === props.today) return t(props.lang, "drawer.todayUnscheduled");
     if (task.dueDate) return `${task.dueDate} · ${formatDuration(f.estimatedHours || 0.5)}`;
     return t(props.lang, "drawer.unscheduled");
+  }
+  const eventDurationMinutes = f.dueTime
+    ? Math.max(timeToMinutes(f.endTime || addMinutes(f.dueTime, f.recurrence?.durationMinutes || 60)) - timeToMinutes(f.dueTime), SLOT_MINUTES)
+    : 0;
+  const eventRecurrence = f.recurrence || {
+    mode: f.dueTime ? "scheduled" as const : "flexible" as const,
+    frequency: "weekly" as RecurrenceFrequency,
+    startDate: f.dueDate || props.today,
+    startTime: f.dueTime || undefined,
+    durationMinutes: f.dueTime ? eventDurationMinutes || 60 : undefined,
+    endDate: f.endDate || undefined,
+  };
+  if (props.editing && props.type === "event" && props.event) {
+    const eventSchedule = f.dueTime
+      ? `${f.dueDate} ${f.dueTime} - ${f.endTime || addMinutes(f.dueTime, eventDurationMinutes || 60)}`
+      : `${f.dueDate}${f.endDate && f.endDate !== f.dueDate ? ` - ${f.endDate}` : ""} · ${t(props.lang, "drawer.allDayEvent")}`;
+    const recurrenceText = recurrenceLabel(f.recurrence);
+    return (
+      <aside className="df-drawer df-task-detail df-event-detail" onMouseDown={(event) => event.stopPropagation()}>
+        <section className="df-detail-hero-trevor">
+          <textarea className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.eventTitlePlaceholder")} spellCheck={false} />
+        </section>
+
+        <section className="df-detail-tag-row">
+          <span className="df-detail-pill-trevor event-kind">{t(props.lang, "form.event")}</span>
+          <span className="df-detail-pill-trevor">{eventSchedule}</span>
+          {f.dueTime ? <span className="df-detail-pill-trevor">{formatMinutes(eventDurationMinutes || 60)}</span> : null}
+          {recurrenceText ? <span className="df-detail-pill-trevor">↻ {recurrenceText}</span> : null}
+        </section>
+
+        <section className="df-detail-status-row">
+          <button className="df-detail-pill-trevor action" onClick={props.onConvertToTask}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg>
+            <span>{t(props.lang, "drawer.convertToTask")}</span>
+          </button>
+          <button className="df-detail-pill-trevor action danger" onClick={props.onDelete}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h8M4 3V2h4v1M3 3v6.5a1 1 0 001 1h4a1 1 0 001-1V3"/></svg>
+            <span>{t(props.lang, "drawer.remove")}</span>
+          </button>
+        </section>
+
+        <section className="df-event-detail-grid">
+          <label>{t(props.lang, "drawer.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
+          <label>{t(props.lang, "drawer.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label>
+          <label>{t(props.lang, "drawer.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label>
+          <label>{t(props.lang, "drawer.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label>
+        </section>
+
+        <section className="df-detail-schedule-row">
+          <button className={`df-detail-pill-trevor action ${recurrenceOpen ? "active" : ""}`} onClick={() => setRecurrenceOpen((open) => !open)}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8"/></svg>
+            <span>{t(props.lang, "drawer.setRepeat")}</span>
+          </button>
+          <button className="df-detail-pill-trevor action" onClick={props.onSave}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 7l2.5 2.5L10 3"/></svg>
+            <span>{t(props.lang, "drawer.save")}</span>
+          </button>
+        </section>
+
+        {recurrenceOpen && (
+          <section className="df-detail-project-pick">
+            <div className="df-repeat-form">
+              <label><span>{t(props.lang, "drawer.frequency")}</span><select value={f.recurrence?.frequency || "none"} onChange={(event) => {
+                const frequency = event.target.value as RecurrenceFrequency;
+                set("recurrence", frequency === "none" ? undefined : { ...eventRecurrence, frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? eventDurationMinutes || 60 : undefined, endDate: f.endDate || undefined });
+              }}>{RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <label><span>{t(props.lang, "drawer.startDate")}</span><input type="date" value={eventRecurrence.startDate || f.dueDate || props.today} onChange={(event) => set("recurrence", { ...eventRecurrence, startDate: event.target.value })} /></label>
+              <label><span>{t(props.lang, "drawer.startTime")}</span><input type="time" value={eventRecurrence.startTime || f.dueTime || ""} onChange={(event) => set("recurrence", { ...eventRecurrence, mode: event.target.value ? "scheduled" : "flexible", startTime: event.target.value || undefined })} /></label>
+            </div>
+          </section>
+        )}
+
+        <section className="df-detail-notes-new">
+          <div className="df-detail-section-head">
+            <h3>{t(props.lang, "drawer.notes")}</h3>
+            <button className="df-detail-add-btn" onClick={() => setNotesEditing((open) => !open)}>
+              <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 2l2 2-6 6H2V8l6-6z"/></svg>
+              <span>{notesEditing ? t(props.lang, "drawer.cancel") : t(props.lang, "drawer.edit")}</span>
+            </button>
+          </div>
+          {notesEditing ? (
+            <div className="df-notes-editor">
+              <textarea rows={4} value={f.details} onChange={(event) => { set("details", event.target.value); setNoteDraft(event.target.value); }} placeholder={t(props.lang, "drawer.addNotePlaceholder")} />
+              <div className="df-notes-editor-actions">
+                <button className="df-detail-pill-trevor action" onClick={() => { setNoteDraft(f.details); setNotesEditing(false); }}>{t(props.lang, "drawer.save")}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="df-notes-preview" onClick={() => setNotesEditing(true)}>
+              {f.details ? <p>{f.details}</p> : <p className="placeholder">{t(props.lang, "drawer.noNotes")}</p>}
+            </div>
+          )}
+        </section>
+      </aside>
+    );
   }
   if (props.editing && props.type === "task" && props.task) {
     const activeRecord = props.editingRecordId
@@ -5904,6 +6317,10 @@ function EditDrawer(props: {
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="2" width="7" height="9" rx="1"/><path d="M2 5v7a1 1 0 001 1h6"/></svg>
             <span>{t(props.lang, "drawer.duplicate")}</span>
           </button>
+          <button className="df-detail-pill-trevor action" onClick={props.onConvertToEvent}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 6H3M6 3L3 6l3 3"/></svg>
+            <span>{t(props.lang, "drawer.convertToEvent")}</span>
+          </button>
         </section>
 
         {projectPickerOpen && createPortal(
@@ -6007,7 +6424,7 @@ function EditDrawer(props: {
       <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : t(props.lang, "form.event")}</button>)}</div>
       {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />{t(props.lang, "form.completed")}</label>}
       <label>{t(props.lang, "form.name")}<input value={f.title} onChange={(event) => set("title", event.target.value)} /></label>
-      {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label></>}
+      {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label><div className="df-grid2"><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div></>}
       {props.type === "project" && <><label>{t(props.lang, "form.projectNotes")}<textarea rows={3} value={f.details} onChange={(event) => set("details", event.target.value)} /></label><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></>}
       {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label><label>重复<select value={f.recurrence?.frequency || "none"} onChange={(event) => {
         const frequency = event.target.value as RecurrenceFrequency;
