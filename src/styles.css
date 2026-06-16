@@ -8120,18 +8120,7 @@ input[type="range"] {
 .df-card-strip { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 4px; height: 36px; border-radius: 999px; }
 
 /* 锟斤拷锟斤拷 Candidate accent bar (project color) & hover checkbox 锟斤拷锟斤拷 */
-.candidate-task-accent {
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 36px;
-  border-radius: 999px;
-  transition: opacity .18s ease;
-  z-index: 1;
-  pointer-events: none;
-}
+/* category accent removed — border uses project colour via --cat */
 
 .df-candidate-check {
   width: 20px;
@@ -10352,9 +10341,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   padding-left: 12px !important;
 }
 
-.df-execute.simple-view .df-task-card .candidate-task-accent {
-  width: 3px !important;
-}
 
 .df-execute.simple-view .df-time-block,
 .df-execute.simple-view .df-event-blocks-layer .df-time-block {
@@ -10534,9 +10520,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
   position: relative;
   display: grid;
   gap: 5px;
-  padding: 10px 12px 10px 44px;
+  padding: 10px 12px 10px 38px;
   margin-bottom: 6px;
-  border: 1px solid color-mix(in srgb, var(--accent-active) 22%, #E5E7EB);
+  border: 1px solid color-mix(in srgb, var(--cat, var(--accent-active)) 36%, var(--border-subtle));
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
@@ -10551,11 +10537,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-task-card:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent-active) 42%, #E5E7EB);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-active) 12%, transparent);
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 52%, var(--border-subtle));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--cat, var(--accent-active)) 12%, transparent);
 }
 
-.df-task-card:active { cursor: grabbing; border-color: color-mix(in srgb, var(--accent-active) 58%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-active) 16%, transparent); }
+.df-task-card:active { cursor: grabbing; border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 58%, var(--border-subtle)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cat, var(--accent-active)) 16%, transparent); }
 
 .df-task-card.overdue { border-color: rgba(239,68,68,.25); }
 
@@ -10568,11 +10554,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-radius: 8px;
 }
 
-.df-task-card:hover .candidate-task-accent { opacity: 0; }
-
-.df-task-card:hover .df-block-check { opacity: 1; pointer-events: auto; }
-
-.df-task-card.completed .candidate-task-accent { opacity: 0; }
 
 .df-task-card.completed .df-block-check {
   opacity: 1;
@@ -11097,13 +11078,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   cursor: pointer;
   opacity: 1;
   pointer-events: auto;
-  transition: opacity 120ms ease, background 120ms ease, border-color 120ms ease;
-}
-
-.df-time-block:hover .df-block-check,
-.df-all-day-block:hover .df-block-check {
-  opacity: 1;
-  pointer-events: auto;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .df-time-block.completed .df-block-check,
@@ -12094,8 +12069,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   flex-direction: column;
   justify-content: center;
   background: var(--bg-surface);
-  border: 1px solid color-mix(in srgb, var(--accent-active) 22%, #E5E7EB);
-  border-left: 0;
+  border: 1px solid color-mix(in srgb, var(--cat, var(--accent-active)) 36%, var(--border-subtle));
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   z-index: 4;
   transition: box-shadow .14s ease, border-color .14s ease;
@@ -12104,9 +12078,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-time-block:hover {
   transform: none;
-  border-color: color-mix(in srgb, var(--accent-active) 42%, var(--border-subtle));
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 52%, var(--border-subtle));
   box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  background: color-mix(in srgb, var(--accent-active) 2%, var(--bg-surface));
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 2%, var(--bg-surface));
   z-index: inherit;
 }
 
@@ -12114,7 +12088,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-time-block.completed {
   background: color-mix(in srgb, var(--text-main) 3%, var(--bg-surface));
-  border-color: color-mix(in srgb, var(--accent-active) 14%, var(--border-subtle));
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 10%, var(--border-subtle));
   box-shadow: none;
 }
 
@@ -12173,28 +12147,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   overflow-wrap: normal;
 }
 
-/* 锟斤拷锟斤拷 Category strip 锟斤拷锟斤拷 */
-.df-category-strip {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 36px;
-  max-height: 100%;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--cat, var(--accent-active)) 65%, white);
-  transition: opacity 120ms ease;
-}
-
-.df-time-block:hover .df-category-strip {
-  opacity: 1;
-}
-
-.df-all-day-block:hover .df-category-strip {
-  background: color-mix(in srgb, var(--cat, var(--accent-active)) 78%, transparent);
-}
-
 /* Short time blocks: hide non-essential elements */
 .df-time-block.short-block .df-block-project,
 .df-time-block.short-block .df-next,
@@ -12205,30 +12157,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 .df-time-block.short-block .df-block-title-row strong {
   font-size: 12px;
-}
-
-.df-time-block.completed .df-category-strip,
-.df-all-day-block.completed .df-category-strip {
-  opacity: 0.4;
-}
-
-.df-time-block.recurring,
-.df-event-blocks-layer .df-time-block.recurring {
-  background: color-mix(in srgb, var(--cat, var(--accent-active)) 72%, #FFFFFF);
-  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 42%, rgba(15,23,42,0.10));
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--cat, var(--accent-active)) 18%, transparent);
-}
-
-.df-time-block.recurring:hover,
-.df-event-blocks-layer .df-time-block.recurring:hover {
-  background: color-mix(in srgb, var(--cat, var(--accent-active)) 78%, #FFFFFF);
-  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 52%, rgba(15,23,42,0.14));
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--cat, var(--accent-active)) 22%, transparent);
-}
-
-.df-time-block.recurring .df-category-strip,
-.df-event-blocks-layer .df-time-block.recurring .df-category-strip {
-  opacity: 0.4;
 }
 
 .df-time-block.recurring .df-block-title-row strong,
@@ -12642,14 +12570,14 @@ body:has(:active)::-webkit-scrollbar-thumb {
   pointer-events: auto;
   min-width: 0;
   background: transparent;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--cat, var(--accent-active)) 36%, var(--border-subtle));
   box-shadow: none;
   border-radius: 6px;
   padding: 4px 6px 4px 24px;
 }
 
 .df-event-blocks-layer .df-time-block:hover {
-  border-color: color-mix(in srgb, var(--accent-active) 44%, var(--border-subtle));
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 52%, var(--border-subtle));
   box-shadow: 0 6px 16px rgba(0,0,0,0.12);
   z-index: inherit;
 }
@@ -12659,7 +12587,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   top: 50%;
   transform: translateY(-50%);
   width: 4px;
-  height: 24px;
+  height: 28px;
   max-height: 100%;
   border-radius: 999px;
   transition: opacity 120ms ease;
@@ -12676,7 +12604,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-event-blocks-layer .df-time-block.completed .df-category-strip {
-  opacity: 0;
+  opacity: 0.4;
 }
 
 .df-event-blocks-layer .df-time-block.completed .df-block-title-row strong {
@@ -12716,8 +12644,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
   left: 8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   padding: 0 !important;
   opacity: 1;
   pointer-events: auto;
@@ -12739,23 +12667,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: none;
 }
 
-.df-time-block.is-event .df-category-strip,
-.df-event-blocks-layer .df-time-block.is-event .df-category-strip {
-  left: 6px;
-  opacity: 1;
-}
-
-.df-time-block.is-event:hover .df-category-strip,
-.df-event-blocks-layer .df-time-block.is-event:hover .df-category-strip {
-  opacity: 1;
-}
-
-.df-time-block.is-event .df-block-check,
-.df-all-day-block.is-event .df-block-check,
-.df-month-task.is-event .df-block-check {
-  display: none !important;
-}
-
 .df-event-kind-label {
   display: inline-flex;
   align-items: center;
@@ -12764,6 +12675,26 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0;
+}
+
+/* Event indicator — gray box replacing checkbox on event blocks */
+.df-event-indicator {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--text-faint);
+  opacity: 0.5;
+  cursor: help;
+  z-index: 3;
+}
+.df-event-blocks-layer .df-time-block .df-event-indicator {
+  width: 14px;
+  height: 14px;
+  left: 6px;
 }
 
 .df-all-day-block.is-event {
@@ -12831,23 +12762,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   padding: 6px 10px 6px 28px;
   min-width: 80px;
 }
-.df-event-blocks-layer .df-time-block .df-block-check {
-  left: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  padding: 0 !important;
-  opacity: 1;
-  pointer-events: auto;
-  transition: background 120ms ease, border-color 120ms ease;
-  border-radius: 4px;
-}
-.df-event-blocks-layer .df-time-block .df-category-strip {
-  left: 6px;
-  width: 3px;
-  height: 28px;
-}
 .df-event-blocks-layer .df-resize-dot { width: 7px; height: 7px; }
 /* When block height is very short (≤32px), hide secondary elements */
 .df-event-blocks-layer .df-time-block[style*="height: 3"],
@@ -12862,33 +12776,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-color: color-mix(in srgb, var(--accent-active) 44%, var(--border-subtle));
   box-shadow: 0 6px 16px rgba(0,0,0,0.12);
   z-index: inherit;
-}
-
-.df-event-blocks-layer .df-time-block .df-category-strip {
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 36px;
-  max-height: 100%;
-  border-radius: 999px;
-  transition: opacity 120ms ease;
-}
-
-.df-event-blocks-layer .df-time-block:hover .df-category-strip {
-  opacity: 1;
-}
-
-.df-event-blocks-layer .df-time-block .df-block-check {
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  padding: 0 !important;
-  opacity: 1;
-  pointer-events: auto;
-  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .df-event-blocks-layer .df-time-block strong {
@@ -13264,7 +13151,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   width: 4px;
   height: 20px;
   max-height: 100%;
-  height: 20px;
   border-radius: 999px;
 }
 
@@ -18066,10 +17952,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.df-app .df-task-card.is-event .candidate-task-accent {
-  opacity: 1;
-}
-
 .df-candidate-kind {
   display: inline-flex;
   width: max-content;
@@ -18084,55 +17966,4 @@ body:has(:active)::-webkit-scrollbar-thumb {
   text-transform: uppercase;
 }
 
-/* ================================================================
-   FINAL OVERRIDE — 勾选框 & 项目色描边在所有视图始终可见
-   Place at EOF so it beats every earlier rule.
-   ================================================================ */
 
-/* checkpoint — ALWAYS visible (light + dark, all views, all states) */
-.df-time-block .df-block-check,
-.df-all-day-block .df-block-check,
-.df-event-blocks-layer .df-time-block .df-block-check,
-.df-week-view .df-time-block .df-block-check,
-.df-week-view .df-event-blocks-layer .df-time-block .df-block-check,
-.df-task-card .df-block-check {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  visibility: visible !important;
-}
-
-/* project colour strip — ALWAYS visible */
-.df-time-block .df-category-strip,
-.df-all-day-block .df-category-strip,
-.df-event-blocks-layer .df-time-block .df-category-strip,
-.df-week-view .df-time-block .df-category-strip,
-.df-week-view .df-event-blocks-layer .df-time-block .df-category-strip {
-  opacity: 1 !important;
-  display: block !important;
-  visibility: visible !important;
-}
-
-/* hover must not hide either */
-.df-time-block:hover .df-category-strip,
-.df-all-day-block:hover .df-category-strip,
-.df-event-blocks-layer .df-time-block:hover .df-category-strip,
-.df-week-view .df-time-block:hover .df-category-strip,
-.df-week-view .df-event-blocks-layer .df-time-block:hover .df-category-strip {
-  opacity: 1 !important;
-}
-
-/* completed / recurring 态色条半透明保留 */
-.df-time-block.completed .df-category-strip,
-.df-all-day-block.completed .df-category-strip,
-.df-time-block.recurring .df-category-strip,
-.df-event-blocks-layer .df-time-block.recurring .df-category-strip {
-  opacity: 0.4 !important;
-  display: block !important;
-}
-
-/* dark-mode completed category strip */
-.df-app.theme-dark .df-time-block.completed .df-category-strip,
-.df-app.theme-dark .df-all-day-block.completed .df-category-strip {
-  opacity: 0.4 !important;
-  display: block !important;
-}

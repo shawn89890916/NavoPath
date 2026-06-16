@@ -331,6 +331,24 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       await supabase.auth.signOut({ scope: "local" });
     },
 
+    sendPasswordResetEmail: async (email: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${window.location.pathname}?auth_callback=1`,
+      });
+      if (error) throw new Error(authErrorMessage(error.message));
+      return { message: "密码重置邮件已发送，请检查收件箱。" };
+    },
+
+    resetPassword: async (newPassword: string) => {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        return { success: false, message: "重置链接已过期或无效，请重新发起密码重置。" };
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw new Error(authErrorMessage(error.message));
+      return { success: true, message: "密码已成功更改。" };
+    },
+
     getData: async () => {
       const user = await requireUser();
       return (await ensureProfile(user)).data;

@@ -297,6 +297,8 @@ export interface PlannerApi {
   }>;
   signOut?: () => Promise<void>;
   deleteAccount?: () => Promise<void>;
+  sendPasswordResetEmail?: (email: string) => Promise<{ message?: string }>;
+  resetPassword?: (newPassword: string) => Promise<{ success: boolean; message?: string }>;
   getData: () => Promise<PlannerData>;
   saveData: (data: PlannerData) => Promise<PlannerData>;
   applyActions: (actions: AiAction[]) => Promise<{ data: PlannerData; applied: Array<{ type: string; id: string; title: string }> }>;

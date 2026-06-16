@@ -140,10 +140,11 @@ function ProductFlowDemo({ lang }: { lang: Lang }) {
   );
 }
 
-export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm, busy, error, notice }: {
+export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm, onForgotPassword, busy, error, notice }: {
   onLogin: (email: string, password: string, displayName: string, intent: AuthIntent, theme: "light" | "dark") => void;
   onResend: (email: string) => void;
   onContinueAfterConfirm: (email: string) => void;
+  onForgotPassword: (email: string) => Promise<void>;
   busy: boolean;
   error: string;
   notice: { type: "confirm-email"; email: string } | null;
@@ -151,6 +152,8 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   const [lang, setLang] = useState<Lang>("en");
   const [showAuth, setShowAuth] = useState(false);
   const [authIntent, setAuthIntent] = useState<AuthIntent>("signin");
+  const [authView, setAuthView] = useState<"login" | "forgot" | "forgotSent">("login");
+  const [forgotBusy, setForgotBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -166,6 +169,9 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
     resend: "重新发送邮件", continue: "继续登录", mismatch: "两次输入的密码不一致。",
     working: "处理中…", open: "打开工作区", create: "创建账户",
     theme: "进入工作区时使用", light: "浅色纸张", dark: "深色纸张",
+    forgot: "忘记密码？", forgotTitle: "找回密码", forgotBody: "输入注册邮箱，我们将发送密码重置链接。",
+    sendReset: "发送重置链接", sentTitle: "邮件已发送", sentBody: "密码重置邮件已发送。请检查收件箱，点击链接设置新密码。",
+    backToLogin: "返回登录", resendReset: "重新发送",
   } : {
     account: "NavoPath account", welcome: "Welcome back.", begin: "Start your path.",
     signIn: "Sign in", signUp: "Sign up", name: "Display name", email: "Email",
@@ -174,6 +180,9 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
     resend: "Resend email", continue: "Continue to sign in", mismatch: "Passwords do not match.",
     working: "Working…", open: "Open workspace", create: "Create account",
     theme: "Open workspace in", light: "Light paper", dark: "Dark paper",
+    forgot: "Forgot password?", forgotTitle: "Reset Password", forgotBody: "Enter your registered email and we'll send a password reset link.",
+    sendReset: "Send Reset Link", sentTitle: "Email Sent", sentBody: "Password reset email sent. Check your inbox and click the link to set a new password.",
+    backToLogin: "Back to login", resendReset: "Resend",
   };
   const passwordMismatch = authIntent === "signup" && password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
 
@@ -258,28 +267,55 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 
       <footer className="landing-footer"><span>{c.footer}</span><span>© 2026 Xiaoyang Chen</span></footer>
 
-      {showAuth && <div className="landing-auth-overlay" onMouseDown={() => setShowAuth(false)}>
+      {showAuth && <div className="landing-auth-overlay" onMouseDown={() => { setShowAuth(false); setAuthView("login"); }}>
         <section className="landing-auth-card" onMouseDown={(event) => event.stopPropagation()}>
-          <button className="landing-auth-close" aria-label={lang === "zh" ? "关闭" : "Close"} onClick={() => setShowAuth(false)}>×</button>
-          <ProductIcon /><span className="landing-auth-label">{authText.account}</span>
-          <h2>{authIntent === "signin" ? authText.welcome : authText.begin}</h2>
-          <div className="landing-auth-tabs"><button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>{authText.signIn}</button><button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{authText.signUp}</button></div>
-          <form onSubmit={(event) => { event.preventDefault(); if (!passwordMismatch) onLogin(email.trim(), password, displayName.trim(), authIntent, preferredTheme); }}>
-            {authIntent === "signup" && <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={authText.name} maxLength={64} />}
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={authText.email} required />
-            <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={authText.password} minLength={6} required />
-            {authIntent === "signup" && <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={authText.confirm} minLength={6} required />}
-            <fieldset className="landing-auth-theme">
-              <legend>{authText.theme}</legend>
-              <button type="button" className={preferredTheme === "light" ? "active" : ""} onClick={() => setPreferredTheme("light")}><i className="light" /><span>{authText.light}</span></button>
-              <button type="button" className={preferredTheme === "dark" ? "active" : ""} onClick={() => setPreferredTheme("dark")}><i className="dark" /><span>{authText.dark}</span></button>
-            </fieldset>
-            <label className="landing-auth-check"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />{authText.show}</label>
-            {notice && <div className="landing-auth-notice"><strong>{authText.inbox}</strong><p>{authText.inboxBody}<br />{notice.email}</p><button type="button" onClick={() => onResend(notice.email)}>{authText.resend}</button><button type="button" onClick={() => onContinueAfterConfirm(notice.email)}>{authText.continue}</button></div>}
-            {passwordMismatch && <p className="landing-auth-error">{authText.mismatch}</p>}
-            {error && <p className="landing-auth-error">{error}</p>}
-            <button className="landing-button primary full" disabled={busy || passwordMismatch}>{busy ? authText.working : authIntent === "signin" ? authText.open : authText.create}</button>
-          </form>
+          <button className="landing-auth-close" aria-label={lang === "zh" ? "关闭" : "Close"} onClick={() => { setShowAuth(false); setAuthView("login"); }}>×</button>
+          <ProductIcon />
+          {authView !== "login" ? (
+            <>
+              <span className="landing-auth-label">{authText.account}</span>
+              <h2>{authView === "forgot" ? authText.forgotTitle : authText.sentTitle}</h2>
+              {authView === "forgot" ? (
+                <form onSubmit={async (event) => { event.preventDefault(); setForgotBusy(true); try { await onForgotPassword(email.trim()); setAuthView("forgotSent"); } finally { setForgotBusy(false); } }}>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "12px" }}>{authText.forgotBody}</p>
+                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={authText.email} required autoFocus />
+                  {error && <p className="landing-auth-error">{error}</p>}
+                  <button className="landing-button primary full" disabled={forgotBusy || !email.trim()}>{forgotBusy ? authText.working : authText.sendReset}</button>
+                  <button type="button" className="landing-button quiet full" style={{ marginTop: "8px" }} onClick={() => { setAuthView("login"); }}>{authText.backToLogin}</button>
+                </form>
+              ) : (
+                <div>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "12px" }}>{authText.sentBody}</p>
+                  <p style={{ fontSize: "13px", fontWeight: 600, marginBottom: "16px", color: "var(--text-main)" }}>{email}</p>
+                  <button className="landing-button primary full" onClick={async () => { setForgotBusy(true); try { await onForgotPassword(email.trim()); } finally { setForgotBusy(false); } }}>{authText.resendReset}</button>
+                  <button className="landing-button quiet full" style={{ marginTop: "8px" }} onClick={() => { setAuthView("login"); }}>{authText.backToLogin}</button>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="landing-auth-label">{authText.account}</span>
+              <h2>{authIntent === "signin" ? authText.welcome : authText.begin}</h2>
+              <div className="landing-auth-tabs"><button className={authIntent === "signin" ? "active" : ""} onClick={() => setAuthIntent("signin")}>{authText.signIn}</button><button className={authIntent === "signup" ? "active" : ""} onClick={() => setAuthIntent("signup")}>{authText.signUp}</button></div>
+              <form onSubmit={(event) => { event.preventDefault(); if (!passwordMismatch) onLogin(email.trim(), password, displayName.trim(), authIntent, preferredTheme); }}>
+                {authIntent === "signup" && <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={authText.name} maxLength={64} />}
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={authText.email} required />
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={authText.password} minLength={6} required />
+                {authIntent === "signup" && <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={authText.confirm} minLength={6} required />}
+                <fieldset className="landing-auth-theme">
+                  <legend>{authText.theme}</legend>
+                  <button type="button" className={preferredTheme === "light" ? "active" : ""} onClick={() => setPreferredTheme("light")}><i className="light" /><span>{authText.light}</span></button>
+                  <button type="button" className={preferredTheme === "dark" ? "active" : ""} onClick={() => setPreferredTheme("dark")}><i className="dark" /><span>{authText.dark}</span></button>
+                </fieldset>
+                <label className="landing-auth-check"><input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />{authText.show}</label>
+                {authIntent === "signin" && <button type="button" className="landing-forgot-link" onClick={() => { setAuthView("forgot"); }}>{authText.forgot}</button>}
+                {notice && <div className="landing-auth-notice"><strong>{authText.inbox}</strong><p>{authText.inboxBody}<br />{notice.email}</p><button type="button" onClick={() => onResend(notice.email)}>{authText.resend}</button><button type="button" onClick={() => onContinueAfterConfirm(notice.email)}>{authText.continue}</button></div>}
+                {passwordMismatch && <p className="landing-auth-error">{authText.mismatch}</p>}
+                {error && <p className="landing-auth-error">{error}</p>}
+                <button className="landing-button primary full" disabled={busy || passwordMismatch}>{busy ? authText.working : authIntent === "signin" ? authText.open : authText.create}</button>
+              </form>
+            </>
+          )}
         </section>
       </div>}
     </div>

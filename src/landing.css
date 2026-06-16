@@ -199,6 +199,22 @@
 .landing-auth-notice p, .landing-auth-error { margin: 0; font-size: 12px; }
 .landing-auth-error { margin-bottom: 10px; color: #9d3e46; }
 
+.landing-forgot-link {
+  display: block;
+  margin: -8px 0 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--l-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: right;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+.landing-forgot-link:hover { color: var(--accent-active); }
+
 @media (max-width: 900px) {
   .landing-nav { grid-template-columns: 1fr auto; padding: 0 18px; }
   .landing-nav-links { display: none; }

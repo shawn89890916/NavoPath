@@ -927,6 +927,41 @@ function AuthGate(props: {
   );
 }
 
+function ResetPasswordForm({ lang, busy, error, onReset }: { lang: Language; busy: boolean; error: string; onReset: (newPassword: string) => Promise<void> }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const isValid = password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
+  const mismatch = password.length > 0 && confirm.length > 0 && password !== confirm;
+  let pwHint = "";
+  if (password.length > 0) {
+    if (password.length < 8) pwHint = `✕ ${t(lang, "auth.passwordStrength")}`;
+    else if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) pwHint = `✕ ${t(lang, "auth.passwordStrength")}`;
+    else pwHint = "✓ OK";
+  }
+
+  return (
+    <div className="landing" lang={lang}>
+      <div className="landing-auth-overlay" style={{ position: "fixed", display: "flex" }}>
+        <section className="landing-auth-card" style={{ maxWidth: 400 }}>
+          <ProductIcon /><span className="landing-auth-label">NavoPath</span>
+          <h2>{t(lang, "auth.setNewPassword")}</h2>
+          <p style={{ fontSize: 13, color: "var(--l-muted)", marginBottom: 12 }}>{t(lang, "auth.setNewPasswordDesc")}</p>
+          <form onSubmit={async (event) => { event.preventDefault(); if (isValid && !mismatch) await onReset(password); }}>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t(lang, "auth.newPassword")} minLength={8} required autoFocus />
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={t(lang, "auth.confirmPassword")} minLength={8} required />
+            {password.length > 0 && <p style={{ fontSize: 11, margin: "-4px 0 4px", color: isValid ? "#22c55e" : "var(--l-muted)" }}>{pwHint}</p>}
+            {mismatch && <p className="landing-auth-error">{t(lang, "auth.passwordMismatch")}</p>}
+            {error && <p className="landing-auth-error">{error}</p>}
+            <button className="landing-button primary full" disabled={busy || !isValid || mismatch}>
+              {busy ? t(lang, "auth.processing") : t(lang, "auth.setNewPassword")}
+            </button>
+          </form>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 type OnboardingStep = NonNullable<Settings["onboardingStep"]>;
 
 function OnboardingGuide(props: {
@@ -982,6 +1017,7 @@ function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [mode, setModeState] = useState<Mode>("execute");
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
@@ -1208,6 +1244,10 @@ function App() {
       || url.searchParams.has("code")
       || url.searchParams.has("token_hash")
       || /access_token|error_description|type=signup/i.test(url.hash);
+    const isRecovery = /type=recovery/i.test(url.hash);
+    if (isRecovery) {
+      setIsRecoveryMode(true);
+    }
     const initialize = async () => {
       if (hasConfirmationCallback) {
         setAuthBusy(true);
@@ -1294,6 +1334,41 @@ function App() {
       setAuthError(confirmation?.message || "尚未检测到邮箱确认。请打开最新确认邮件中的链接，或确认后直接使用邮箱和密码登录。");
     } catch (error) {
       setAuthNotice({ type: "confirm-email", email });
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleForgotPassword(email: string) {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const api = await waitForPlannerApi();
+      const response = await api.sendPasswordResetEmail?.(email);
+      if (response?.message) setAuthError(response.message);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleResetPassword(newPassword: string) {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const api = await waitForPlannerApi();
+      const response = await api.resetPassword?.(newPassword);
+      if (response?.success) {
+        setAuthError(response?.message || "");
+        setIsRecoveryMode(false);
+        await handleSignOut();
+      } else {
+        setAuthError(response?.message || "令牌已过期或无效，请重新发起密码重置。");
+        setIsRecoveryMode(false);
+      }
+    } catch (error) {
       setAuthError(error instanceof Error ? error.message : String(error));
     } finally {
       setAuthBusy(false);
@@ -3958,8 +4033,12 @@ function App() {
 
   if (authState?.mode === "cloud" && !authState.user) {
     return <Suspense fallback={<div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>}>
-      <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} />
+      <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} onForgotPassword={handleForgotPassword} />
     </Suspense>;
+  }
+
+  if (authState?.mode === "cloud" && authState.user && isRecoveryMode) {
+    return <ResetPasswordForm lang={lang} busy={authBusy} error={authError} onReset={handleResetPassword} />;
   }
 
   if (!data || !settings) return <div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>;
@@ -5327,7 +5406,6 @@ function TaskCard({
         onClick={onClick}
         title={!isEvent && recurringLocked ? t(lang, "taskCard.recurringHint") : t(lang, "taskCard.dragHint")}
       >
-        <div className="candidate-task-accent" style={{ background: cardAccentColor }} />
         {!isEvent && <button
           className={`df-block-check ${task.completed ? "completed" : ""}`}
           title={task.completed ? t(lang, "taskCard.markIncomplete") : t(lang, "taskCard.markComplete")}
@@ -5767,13 +5845,16 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
     }} onMouseDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={onEdit} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
       {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} />}
-      {!isReturnedUnfinished && <div className="df-category-strip" />}
-      {!isEvent && <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
-        event.stopPropagation();
-        onToggleDone();
-      }} aria-label={task.completed ? t(lang, "timeBlock.markIncomplete") : t(lang, "timeBlock.markComplete")}>
-        {task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}
-      </button>}
+      {isEvent ? (
+        <span className="df-event-indicator" title={t(lang, "timeBlock.eventTooltip")} aria-label={t(lang, "timeBlock.eventTooltip")} />
+      ) : (
+        <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => {
+          event.stopPropagation();
+          onToggleDone();
+        }} aria-label={task.completed ? t(lang, "timeBlock.markIncomplete") : t(lang, "timeBlock.markComplete")}>
+          {task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}
+        </button>
+      )}
       <div className="df-block-title-row">
         {isEvent ? <span className="df-event-kind-label">{t(lang, "form.event")}</span> : null}
         <strong title={task.title} style={isWeekView && !isRecurring ? { color: stripeColor } : undefined}>{task.title}</strong>
