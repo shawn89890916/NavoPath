@@ -76,6 +76,8 @@ function emptyCloudData(): PlannerData {
     notes: [],
     drafts: [],
     chat: [],
+    aiConversations: [],
+    activeAiConversationId: undefined,
     aiMemories: [],
     taskLayouts: {},
   };
@@ -398,7 +400,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
           applied.push({ type: "add_note", id: note.id, title: note.content.slice(0, 30) });
         }
         if (action.type === "add_memory" && action.content) {
-          const memory = { id: uid("memory"), content: action.content, createdAt: now(), updatedAt: now(), tags: action.tags || [] };
+          const memory = { id: uid("memory"), content: action.content, createdAt: now(), updatedAt: now(), tags: action.tags || [], source: "auto" as const };
           data.aiMemories = data.aiMemories || [];
           data.aiMemories.push(memory);
           applied.push({ type: "add_memory", id: memory.id, title: memory.content.slice(0, 30) });

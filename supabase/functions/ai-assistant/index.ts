@@ -94,7 +94,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day", "import_schedule"];
+    const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day", "import_schedule", "summarize_memory"];
     if (!validModes.includes(mode)) {
       return new Response(
         JSON.stringify({ error: `Invalid mode. Must be one of: ${validModes.join(", ")}` }),
@@ -145,7 +145,11 @@ serve(async (req: Request) => {
       : [];
 
     // Build system prompt
-    const systemPrompt = mode === "import_schedule" ? `You import schedules from extracted document text into NavoPath.
+    const systemPrompt = mode === "summarize_memory" ? `You compress selected NavoPath conversation turns into one durable AI memory.
+Today's date is ${currentDate}. Timezone is ${timezone}.
+Return JSON only: {"reply":"one concise Chinese memory, max 120 Chinese characters","actions":[],"memories":[]}.
+Capture stable user preferences, constraints, facts, plans, or decisions. Do not summarize temporary chatter. If there is no durable memory, reply with the most useful factual context from the selected turns.
+` : mode === "import_schedule" ? `You import schedules from extracted document text into NavoPath.
 Today's date is ${currentDate}. Timezone is ${timezone}.
 Classify fixed commitments, classes, meetings, exams, and appointments as events. Classify actionable work as tasks.
 Return JSON only: {"reply":"Chinese summary","steps":[{"label":"解析文件","status":"done"}],"actions":[...]}.
@@ -186,6 +190,9 @@ You must return valid JSON only, following this EXACT shape:
   ]
 }
 If there is nothing to schedule, use type "none".
+For fixed commitments, classes, meetings, exams, appointments, deadlines with exact external time, or anything the user would not freely move, return an action with:
+{"type":"import_schedule_item","kind":"event","title":"short title","date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","durationMinutes":60,"projectId":"matching project id or empty","projectName":"matching project name or null","notes":"brief source note"}.
+For flexible work the user wants to do, keep using "create_scheduled_task".
 
 TIME PARSING RULES:
 * "今天晚上" → check current hour. If before 18:00, schedule at 20:00. If between 18:00-21:00, schedule at next available. If after 21:00, schedule tomorrow 20:00.
@@ -259,7 +266,7 @@ CONVERSATION AND MEMORY RULES:
         model: "deepseek-v4-flash",
         messages,
         response_format: { type: "json_object" },
-        max_tokens: mode === "import_schedule" ? 6000 : 1600,
+        max_tokens: mode === "import_schedule" ? 6000 : mode === "summarize_memory" ? 600 : 1600,
         stream: false,
       }),
     });

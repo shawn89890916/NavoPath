@@ -135,6 +135,10 @@ export interface AiMemory {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  source?: "auto" | "manual" | "conversation";
+  sourceMessages?: ChatMessage[];
+  pinned?: boolean;
+  archived?: boolean;
 }
 
 export interface PlannerDraft {
@@ -156,9 +160,19 @@ export interface PlannerDraft {
 }
 
 export interface ChatMessage {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  saved?: boolean;
+}
+
+export interface AiConversation {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlannerData {
@@ -174,6 +188,8 @@ export interface PlannerData {
   notes: Note[];
   drafts: PlannerDraft[];
   chat: ChatMessage[];
+  aiConversations?: AiConversation[];
+  activeAiConversationId?: string;
   aiMemories: AiMemory[];
   taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
 }

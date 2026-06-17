@@ -48,6 +48,31 @@ function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
 }
 
 export function normalizeData(data: PlannerData): PlannerData {
+  const chat = (data.chat || []).map((message) => ({
+    ...message,
+    id: message.id || uid("chat"),
+    saved: Boolean(message.saved),
+  }));
+  const aiConversations = (data.aiConversations && data.aiConversations.length > 0)
+    ? data.aiConversations.map((conversation) => ({
+      ...conversation,
+      id: conversation.id || uid("conversation"),
+      title: conversation.title || "AI 对话",
+      messages: (conversation.messages || []).map((message) => ({
+        ...message,
+        id: message.id || uid("chat"),
+        saved: Boolean(message.saved),
+      })),
+      createdAt: conversation.createdAt || now(),
+      updatedAt: conversation.updatedAt || conversation.createdAt || now(),
+    }))
+    : (chat.length > 0 ? [{
+      id: uid("conversation"),
+      title: "历史对话",
+      messages: chat,
+      createdAt: chat[0]?.createdAt || now(),
+      updatedAt: chat[chat.length - 1]?.createdAt || now(),
+    }] : []);
   return {
     ...data,
     projects: (data.projects || []).map((project) => ({
@@ -57,8 +82,22 @@ export function normalizeData(data: PlannerData): PlannerData {
       urgency: project.urgency || "low",
     })),
     longTasks: data.longTasks || [],
-    chat: data.chat || [],
-    aiMemories: data.aiMemories || [],
+    chat,
+    aiConversations,
+    activeAiConversationId: data.activeAiConversationId || aiConversations[0]?.id,
+    aiMemories: (data.aiMemories || []).map((memory) => ({
+      ...memory,
+      id: memory.id || uid("memory"),
+      tags: memory.tags || [],
+      source: memory.source || "auto",
+      sourceMessages: (memory.sourceMessages || []).map((message) => ({
+        ...message,
+        id: message.id || uid("chat"),
+        saved: true,
+      })),
+      pinned: Boolean(memory.pinned),
+      archived: Boolean(memory.archived),
+    })),
     drafts: (data.drafts || []).filter((draft) => draft.title).slice(-10),
     events: (data.events || []).map((event) => ({
       ...event,
@@ -457,7 +496,7 @@ export function installBrowserFallback() {
           applied.push({ type: "add_note", id: note.id, title: note.content.slice(0, 30) });
         }
         if (action.type === "add_memory" && action.content) {
-          const memory = { id: uid("memory"), content: action.content, createdAt: now(), updatedAt: now(), tags: action.tags || [] };
+          const memory = { id: uid("memory"), content: action.content, createdAt: now(), updatedAt: now(), tags: action.tags || [], source: "auto" as const };
           data.aiMemories = data.aiMemories || [];
           data.aiMemories.push(memory);
           applied.push({ type: "add_memory", id: memory.id, title: memory.content.slice(0, 30) });

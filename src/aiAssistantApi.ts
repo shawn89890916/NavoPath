@@ -4,7 +4,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "import_schedule";
+export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "import_schedule" | "summarize_memory";
 
 export type AiStep = {
   label: string;
@@ -99,13 +99,13 @@ export type AiAssistantResponse = {
 };
 
 function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse {
-  if (result.actions.length > 0 || !result.reply.trim().startsWith("{")) return result;
+  if (!result.reply.trim().startsWith("{")) return result;
   try {
     const nested = JSON.parse(result.reply) as Partial<AiAssistantResponse>;
     if (typeof nested.reply !== "string") return result;
     return {
       reply: nested.reply,
-      actions: Array.isArray(nested.actions) ? nested.actions : [],
+      actions: Array.isArray(nested.actions) ? nested.actions : result.actions,
       steps: Array.isArray(nested.steps) ? nested.steps : result.steps,
       memories: Array.isArray(nested.memories) ? nested.memories : result.memories,
     };
