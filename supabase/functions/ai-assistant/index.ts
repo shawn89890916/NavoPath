@@ -8,72 +8,79 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
+  "Content-Type": "application/json; charset=utf-8",
 };
 
-/** Calculate tomorrow's date from a given YYYY-MM-DD date */
 function getTomorrow(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 
-/** Calculate day-after-tomorrow's date from a given YYYY-MM-DD date */
 function getDayAfterTomorrow(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + 2);
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * Robustly extract a JSON object from text that may contain markdown fences.
- * Handles:
- *   - Plain JSON: {"reply":"..."}
- *   - Fenced JSON: ```json\n{"reply":"..."}\n```
- *   - Fenced without lang: ```\n{"reply":"..."}\n```
- *   - Text before/after JSON
- */
 function extractJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-
-  // Remove markdown fences
-  const withoutFence = trimmed
+  const withoutFence = text
+    .trim()
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/```$/i, "")
     .trim();
 
-  // Try direct parse first
   try {
     return JSON.parse(withoutFence);
   } catch {
-    // ignore
+    // Fall through to balanced-brace extraction.
   }
 
-  // Try to find the first JSON object in the text
-  const match = withoutFence.match(/\{[\s\S]*\}/);
-  if (match) {
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      // ignore
+  const first = withoutFence.indexOf("{");
+  if (first === -1) throw new Error("No JSON object found");
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = first; i < withoutFence.length; i += 1) {
+    const char = withoutFence[i];
+    if (escaped) {
+      escaped = false;
+      continue;
     }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === "{") depth += 1;
+    if (char === "}") depth -= 1;
+    if (depth === 0) return JSON.parse(withoutFence.slice(first, i + 1));
   }
 
-  throw new Error("No valid JSON object found in response");
+  throw new Error("No complete JSON object found");
+}
+
+function normalizeAssistantPayload(value: unknown) {
+  const parsed = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  return {
+    reply: typeof parsed.reply === "string" ? parsed.reply : "已完成。",
+    steps: Array.isArray(parsed.steps) ? parsed.steps : [],
+    actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+    memories: Array.isArray(parsed.memories) ? parsed.memories : [],
+  };
 }
 
 serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders });
   }
 
   try {
@@ -86,54 +93,33 @@ serve(async (req: Request) => {
       memories?: Array<{ content?: string; tags?: string[] }>;
     };
 
-    // Validate required fields
     if (!mode || !message) {
-      return new Response(
-        JSON.stringify({ error: "Missing mode or message" }),
-        { status: 400, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Missing mode or message" }), { status: 400, headers: corsHeaders });
     }
 
     const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day", "import_schedule", "summarize_memory"];
     if (!validModes.includes(mode)) {
       return new Response(
         JSON.stringify({ error: `Invalid mode. Must be one of: ${validModes.join(", ")}` }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
-    // Read API key from environment
     const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "Missing DEEPSEEK_API_KEY" }),
-        { status: 500, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Missing DEEPSEEK_API_KEY" }), { status: 500, headers: corsHeaders });
     }
 
-    // Build date context
     const currentDate = (context?.currentDate as string) || new Date().toISOString().slice(0, 10);
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
-
-    // Build project context for the AI to use
-    const projectsInfo = context?.projects
-      ? `Available projects: ${JSON.stringify(context.projects)}`
-      : "";
+    const projectsInfo = context?.projects ? `Available projects: ${JSON.stringify(context.projects)}` : "";
     const scheduledTodayInfo = context?.scheduledToday
       ? `Already scheduled on current view date (${String(context?.currentViewDate || currentDate)}): ${JSON.stringify(context.scheduledToday)}`
       : "";
-    const activeTasksInfo = context?.activeTasks
-      ? `Active task snapshot: ${JSON.stringify(context.activeTasks).slice(0, 8000)}`
-      : "";
-    const eventsInfo = context?.upcomingEvents
-      ? `Upcoming events snapshot: ${JSON.stringify(context.upcomingEvents).slice(0, 5000)}`
-      : "";
-    const notesInfo = context?.recentNotes
-      ? `Recent notes: ${JSON.stringify(context.recentNotes).slice(0, 3000)}`
-      : "";
-    const focusTaskInfo = context?.focusTask
-      ? `Focused task: ${JSON.stringify(context.focusTask).slice(0, 2000)}`
-      : "";
+    const activeTasksInfo = context?.activeTasks ? `Active task snapshot: ${JSON.stringify(context.activeTasks).slice(0, 8000)}` : "";
+    const eventsInfo = context?.upcomingEvents ? `Upcoming events snapshot: ${JSON.stringify(context.upcomingEvents).slice(0, 5000)}` : "";
+    const notesInfo = context?.recentNotes ? `Recent notes: ${JSON.stringify(context.recentNotes).slice(0, 3000)}` : "";
+    const focusTaskInfo = context?.focusTask ? `Focused task: ${JSON.stringify(context.focusTask).slice(0, 2000)}` : "";
     const memoryInfo = Array.isArray(memories) && memories.length > 0
       ? `Long-term user memory and preferences: ${JSON.stringify(memories.slice(-20)).slice(0, 5000)}`
       : "Long-term user memory: none supplied.";
@@ -144,22 +130,22 @@ serve(async (req: Request) => {
         .map((item) => ({ role: item.role as "user" | "assistant", content: item.content!.slice(0, 2000) }))
       : [];
 
-    // Build system prompt
-    const systemPrompt = mode === "summarize_memory" ? `You compress selected NavoPath conversation turns into one durable AI memory.
+    const summarizeMemoryPrompt = `You compress selected NavoPath conversation turns into one durable AI memory.
 Today's date is ${currentDate}. Timezone is ${timezone}.
 Return JSON only: {"reply":"one concise Chinese memory, max 120 Chinese characters","actions":[],"memories":[]}.
-Capture stable user preferences, constraints, facts, plans, or decisions. Do not summarize temporary chatter. If there is no durable memory, reply with the most useful factual context from the selected turns.
-` : mode === "import_schedule" ? `You import schedules from extracted document text into NavoPath.
+Capture stable user preferences, constraints, facts, plans, or decisions. Do not summarize temporary chatter. If there is no durable memory, reply with the most useful factual context from the selected turns.`;
+
+    const importSchedulePrompt = `You import schedules from extracted document text into NavoPath.
 Today's date is ${currentDate}. Timezone is ${timezone}.
 Classify fixed commitments, classes, meetings, exams, and appointments as events. Classify actionable work as tasks.
-Return JSON only: {"reply":"Chinese summary","steps":[{"label":"解析文件","status":"done"}],"actions":[...]}.
+Return JSON only: {"reply":"中文摘要","steps":[{"label":"解析文件","status":"done"}],"actions":[...]}.
 Every action must have:
 {"type":"import_schedule_item","kind":"task|event","title":"short title","date":"YYYY-MM-DD","endDate":"YYYY-MM-DD optional","startTime":"HH:mm optional","endTime":"HH:mm optional","durationMinutes":60,"category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","projectId":"existing id or empty","projectName":"existing name or null","notes":"source detail","recurrence":{"mode":"scheduled","frequency":"daily|weekdays|weekends|weekly|biweekly|monthly|quarterly","startDate":"YYYY-MM-DD","startTime":"HH:mm","durationMinutes":60,"endDate":"YYYY-MM-DD optional","count":10 optional},"warning":"optional uncertainty"}.
 Use recurrence only when explicitly stated, or when a date range plus strong context such as a class timetable supports a reliable inference. Otherwise keep the item single.
-Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${projectsInfo}
-` : `You are the AI scheduling assistant inside NavoPath, a time-blocking execution app.
+Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${projectsInfo}`;
 
-Your job: turn the user's natural language into structured scheduled task actions — like TrevorAI but in Chinese.
+    const chatPrompt = `You are the AI scheduling assistant inside NavoPath, a time-blocking execution app.
+Your job: turn the user's natural language into structured scheduled task actions like TrevorAI, using concise Chinese text.
 
 IMPORTANT CONTEXT:
 * Today's date is ${currentDate}. Calculate all relative dates from this.
@@ -168,12 +154,13 @@ IMPORTANT CONTEXT:
 ${projectsInfo ? `\n${projectsInfo}\n` : ""}
 ${scheduledTodayInfo ? `\n${scheduledTodayInfo}\n` : ""}
 
-You must return valid JSON only, following this EXACT shape:
+Return valid JSON only. Do not use markdown, code fences, comments, or prose outside JSON.
+Use this exact top-level shape:
 {
-  "reply": "a natural Chinese summary of what you arranged, like: 已经帮你把"设计火箭模型"安排在今晚20:45，时长60分钟。",
+  "reply": "已经帮你把「设计火箭模型」安排在今晚20:45，时长60分钟。",
   "steps": [
-    { "label": "Read task lists info", "status": "done" },
-    { "label": "Create scheduled tasks", "status": "done" }
+    { "label": "解析用户请求", "status": "done" },
+    { "label": "生成计划", "status": "done" }
   ],
   "actions": [
     {
@@ -182,43 +169,46 @@ You must return valid JSON only, following this EXACT shape:
       "projectId": "matching project id from context, or empty",
       "projectName": "matching project name, e.g. 准备ESAT&TARA, or null",
       "date": "YYYY-MM-DD",
-      "start": "HH:mm (24h)",
-      "end": "HH:mm (24h, start+duration)",
+      "start": "HH:mm",
+      "end": "HH:mm",
       "durationMinutes": 60,
-      "reason": "brief note about this task, e.g. user said 今天晚上设计火箭模型"
+      "reason": "brief note, e.g. 用户说今天晚上设计火箭模型"
     }
-  ]
+  ],
+  "memories": []
 }
-If there is nothing to schedule, use type "none".
-For fixed commitments, classes, meetings, exams, appointments, deadlines with exact external time, or anything the user would not freely move, return an action with:
+
+ACTION RULES:
+* If there is nothing to schedule, return {"reply":"需要更多信息才能安排。","steps":[...],"actions":[],"memories":[]}.
+* For flexible work the user wants to do, use "create_scheduled_task".
+* For fixed commitments, classes, meetings, exams, appointments, deadlines with exact external time, or anything the user would not freely move, use:
 {"type":"import_schedule_item","kind":"event","title":"short title","date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","durationMinutes":60,"projectId":"matching project id or empty","projectName":"matching project name or null","notes":"brief source note"}.
-For flexible work the user wants to do, keep using "create_scheduled_task".
+* Never put raw JSON inside reply. The reply must be a normal sentence for the user.
+* Never claim the app has already saved data. Say what you prepared or arranged for confirmation.
 
 TIME PARSING RULES:
-* "今天晚上" → check current hour. If before 18:00, schedule at 20:00. If between 18:00-21:00, schedule at next available. If after 21:00, schedule tomorrow 20:00.
-* "下午三点" → 15:00
-* "晚上八点" → 20:00
-* "上午九点" → 09:00
-* "明天" → ${getTomorrow(currentDate)}
-* "后天" → ${getDayAfterTomorrow(currentDate)}
-* "半小时" → 30 minutes
-* "一小时半" → 90 minutes
-* No end time specified → default 60 minutes
-* Never guess project IDs — use the ones provided in context.
+* "今天晚上" -> if before 18:00, schedule at 20:00; if 18:00-21:00, schedule at the next available time; if after 21:00, schedule tomorrow at 20:00.
+* "下午三点" -> 15:00.
+* "晚上八点" -> 20:00.
+* "上午九点" -> 09:00.
+* "明天" -> ${getTomorrow(currentDate)}.
+* "后天" -> ${getDayAfterTomorrow(currentDate)}.
+* "半小时" -> 30 minutes.
+* "一个半小时" -> 90 minutes.
+* If no end time is specified, default to 60 minutes.
+* Never guess project IDs; use only IDs provided in context.
 
 PROJECT MATCHING:
-* If user mentions a project name directly (e.g. "准备ESAT&TARA", "数学"), try to match it to one from the available projects list.
-* If user uses #projectname syntax, match that.
-* If no match found or no project mentioned, leave projectName as null and projectId empty.
-* NEVER invent new projects.
+* If the user mentions a project name directly, e.g. "准备ESAT&TARA" or "数学", match it to available projects.
+* If the user uses #projectname syntax, match that.
+* If no match is found, leave projectName as null and projectId empty.
+* Never invent new projects.`;
 
-RULES:
-* Output JSON ONLY. No markdown, no code fences, no explanation outside JSON.
-* Keep titles short and concrete.
-* Use Chinese for all text.
-* If unsure, ask a clarification in reply and return actions: [].
-* Never claim data was already modified.
-* Include the "steps" array with at least 2 steps showing progress.`;
+    const systemPrompt = mode === "summarize_memory"
+      ? summarizeMemoryPrompt
+      : mode === "import_schedule"
+        ? importSchedulePrompt
+        : chatPrompt;
 
     const contextPrompt = `
 
@@ -231,31 +221,27 @@ ${memoryInfo}
 
 CONVERSATION AND MEMORY RULES:
 * Use recent conversation to resolve pronouns like "it", "that one", "continue", "刚才那个", "它", and "继续".
-* Treat long-term memory as user preference context, but the latest user message wins.
-* Return JSON only. You may include a "memories" array in the response: [{"content":"stable preference in Chinese","tags":["preference"]}].
+* Treat long-term memory as preference context. The latest user message always wins.
+* You may include a top-level "memories" array: [{"content":"stable preference in Chinese","tags":["preference"]}].
 * Only return memories for explicit "remember this" requests, stable preferences, recurring constraints, or durable planning habits.
-* Do not put memory writes in "actions"; use the top-level "memories" field.
-`;
+* Do not put memory writes in "actions"; use the top-level "memories" field.`;
     const finalSystemPrompt = `${systemPrompt}${contextPrompt}`;
 
-    // Build natural language user message with context
     let userContent = message;
-    if (context?.taskId && context?.taskTitle) {
-      userContent = `[focus task: "${context.taskTitle}"]\n${message}`;
-    }
+    if (context?.taskId && context?.taskTitle) userContent = `[focus task: "${context.taskTitle}"]\n${message}`;
     if (context?.scheduledToday) {
-      const scheduled = context.scheduledToday as Array<{title: string; start: string; end: string}>;
+      const scheduled = context.scheduledToday as Array<{ title: string; start: string; end: string }>;
       if (scheduled.length > 0) {
-        userContent += `\n\nExisting schedule on current view date ${String(context?.currentViewDate || currentDate)} (avoid conflicts when planning that date):\n${scheduled.map((t: any) => `${t.start}-${t.end}: ${t.title}`).join('\n')}`;
+        userContent += `\n\nExisting schedule on current view date ${String(context?.currentViewDate || currentDate)} (avoid conflicts when planning that date):\n${scheduled.map((item) => `${item.start}-${item.end}: ${item.title}`).join("\n")}`;
       }
     }
 
-    // Call DeepSeek API
     const messages = [
       { role: "system", content: finalSystemPrompt },
       ...historyMessages,
       { role: "user", content: userContent },
     ];
+
     const dsResponse = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -274,59 +260,25 @@ CONVERSATION AND MEMORY RULES:
     if (!dsResponse.ok) {
       const errorText = await dsResponse.text();
       console.error("DeepSeek API error:", dsResponse.status, errorText);
-      return new Response(
-        JSON.stringify({
-          reply: "AI 请求失败，请稍后重试。",
-          actions: [],
-        }),
-        { status: 502, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ reply: "AI 请求失败，请稍后重试。", actions: [], steps: [] }), { status: 502, headers: corsHeaders });
     }
 
     const dsData = await dsResponse.json();
     const content = dsData.choices?.[0]?.message?.content;
-
     if (!content) {
-      return new Response(
-        JSON.stringify({
-          reply: "AI 未返回有效内容。",
-          actions: [],
-        }),
-        { headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ reply: "AI 未返回有效内容。", actions: [], steps: [] }), { headers: corsHeaders });
     }
 
-    // Try to parse the content as JSON (with markdown fence handling)
     try {
-      const parsed = extractJsonObject(content);
-      return new Response(JSON.stringify(parsed), { headers: corsHeaders });
+      return new Response(JSON.stringify(normalizeAssistantPayload(extractJsonObject(content))), { headers: corsHeaders });
     } catch {
-      // If JSON parse fails and content looks like text, return as plain reply
-      if (typeof content === "string" && content.trim().length > 0) {
-        return new Response(
-          JSON.stringify({
-            reply: content,
-            actions: [],
-          }),
-          { headers: corsHeaders }
-        );
+      if (typeof content === "string" && content.trim()) {
+        return new Response(JSON.stringify({ reply: content.trim(), actions: [], steps: [], memories: [] }), { headers: corsHeaders });
       }
-      return new Response(
-        JSON.stringify({
-          reply: "AI 返回格式异常，请重试。",
-          actions: [],
-        }),
-        { headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ reply: "AI 返回格式异常，请重试。", actions: [], steps: [] }), { headers: corsHeaders });
     }
   } catch (err) {
     console.error("Edge function error:", err);
-    return new Response(
-      JSON.stringify({
-        reply: "AI 服务异常，请稍后重试。",
-        actions: [],
-      }),
-      { status: 500, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ reply: "AI 服务异常，请稍后重试。", actions: [], steps: [] }), { status: 500, headers: corsHeaders });
   }
 });

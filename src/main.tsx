@@ -50,6 +50,9 @@ const EXECUTE_THEME_PRESETS_LIGHT = ["#27231E", "#C69CF9", "#7C3AED", "#BE185D",
 const EXECUTE_THEME_PRESETS_DARK  = ["#EEE9DF", "#C69CF9", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
 const PLANNING_THEME_PRESETS_LIGHT = ["#27231E", "#CAFF72", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
 const PLANNING_THEME_PRESETS_DARK  = ["#EEE9DF", "#CAFF72", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
+const SAVE_DEBOUNCE_MS = 250;
+const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
+const SYNC_FAILURE_NOTICE_AFTER = 3;
 const RELEASE_NOTES = [
   { date: "2026-06-10", summary: "优化了规划栏的交互和结果展示" },
   { date: "2026-06-09", summary: "优化了时间轴的快速添加栏" },
@@ -79,6 +82,9 @@ type Mode = "execute" | "planning";
 type AddType = "task" | "project" | "event";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
 type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
+type SettingsPatch = Partial<Settings> & { apiKey?: string; clearApiKey?: boolean };
+type QueuedDataSave = { payload: PlannerData; version: number };
+type QueuedSettingsSave = { payload: SettingsPatch; version: number };
 
 /**
  * SchedulePreview — single source of truth for a preview block.
@@ -755,6 +761,15 @@ function writeBootstrapCache(data: PlannerData, settings: Settings, userId?: str
   }
 }
 
+function timeValue(iso?: string) {
+  const value = iso ? Date.parse(iso) : 0;
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isCacheNewer(cached?: PlannerData | null, remote?: PlannerData | null) {
+  return timeValue(cached?.savedAt) > timeValue(remote?.savedAt);
+}
+
 function defaultForm(type: AddType = "task"): FormState {
   const today = todayIso();
   return {
@@ -918,11 +933,28 @@ function buildAiContext(data: PlannerData, params: {
   };
 }
 
-function toAiHistory(messages: AiSessionMessage[], fallback: PlannerData["chat"] = []): AiChatMessage[] {
+function cleanAiHistoryContent(content: string) {
+  const text = content.trim();
+  if (!text.startsWith("{")) return text;
+  try {
+    const parsed = JSON.parse(text) as { reply?: unknown };
+    return typeof parsed.reply === "string" && parsed.reply.trim() ? parsed.reply.trim() : text;
+  } catch {
+    return text;
+  }
+}
+
+function toAiHistory(messages: AiSessionMessage[], fallback: PlannerData["chat"] = [], conversation: PlannerData["chat"] = []): AiChatMessage[] {
   const local = messages
     .filter((message) => message.status !== "thinking" && message.content.trim())
-    .map((message) => ({ role: message.role, content: message.content.trim() }));
-  const source = local.length > 0 ? local : (fallback || []).map((message) => ({ role: message.role, content: message.content }));
+    .map((message) => ({ role: message.role, content: cleanAiHistoryContent(message.content) }));
+  const conversationHistory = (conversation || [])
+    .filter((message) => message.content.trim())
+    .map((message) => ({ role: message.role, content: cleanAiHistoryContent(message.content) }));
+  const fallbackHistory = (fallback || [])
+    .filter((message) => message.content.trim())
+    .map((message) => ({ role: message.role, content: cleanAiHistoryContent(message.content) }));
+  const source = local.length > 0 ? local : conversationHistory.length > 0 ? conversationHistory : fallbackHistory;
   return source.slice(-12);
 }
 
@@ -1284,9 +1316,20 @@ function App() {
   const dataRef = useRef<PlannerData | null>(null);
   const settingsRef = useRef<Settings | null>(null);
   const loadedWorkspaceKeyRef = useRef("");
-  const pendingSaveRef = useRef<PlannerData | null>(null);
-  const saveTimerRef = useRef<number | null>(null);
-  const queuedSaveIdRef = useRef(0);
+  const pendingDataSaveRef = useRef<QueuedDataSave | null>(null);
+  const dataSaveTimerRef = useRef<number | null>(null);
+  const dataSaveRetryTimerRef = useRef<number | null>(null);
+  const dataSaveInFlightRef = useRef(false);
+  const dataSaveVersionRef = useRef(0);
+  const dataSaveRetryCountRef = useRef(0);
+  const dataSaveNoticeShownRef = useRef(false);
+  const pendingSettingsSaveRef = useRef<QueuedSettingsSave | null>(null);
+  const settingsSaveTimerRef = useRef<number | null>(null);
+  const settingsSaveRetryTimerRef = useRef<number | null>(null);
+  const settingsSaveInFlightRef = useRef(false);
+  const settingsSaveVersionRef = useRef(0);
+  const settingsSaveRetryCountRef = useRef(0);
+  const settingsSaveNoticeShownRef = useRef(false);
   const colsContainerRef = useRef<HTMLDivElement | null>(null);
   const timeGridRef = useRef<HTMLDivElement | null>(null);
   const [multiColWidth, setMultiColWidth] = useState(0);
@@ -1352,10 +1395,22 @@ function App() {
   }, [mode]);
 
   function resetWorkspaceUi() {
-    pendingSaveRef.current = null;
-    queuedSaveIdRef.current += 1;
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = null;
+    pendingDataSaveRef.current = null;
+    pendingSettingsSaveRef.current = null;
+    dataSaveVersionRef.current += 1;
+    settingsSaveVersionRef.current += 1;
+    dataSaveRetryCountRef.current = 0;
+    settingsSaveRetryCountRef.current = 0;
+    dataSaveNoticeShownRef.current = false;
+    settingsSaveNoticeShownRef.current = false;
+    if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
+    if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
+    if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
+    if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
+    dataSaveTimerRef.current = null;
+    dataSaveRetryTimerRef.current = null;
+    settingsSaveTimerRef.current = null;
+    settingsSaveRetryTimerRef.current = null;
     setModeState("execute");
     setSelectedDate(todayIso());
     setTimelineView("daily");
@@ -1425,8 +1480,13 @@ function App() {
         data: await api.getData(),
         settings: await api.getSettings()
       };
-    const nextData = bootstrap.data || cached?.data;
-    const nextSettings = bootstrap.settings || cached?.settings;
+    let nextData = bootstrap.data || cached?.data;
+    let nextSettings = bootstrap.settings || cached?.settings;
+    const shouldPushCachedData = Boolean(cached?.data && bootstrap.data && isCacheNewer(cached.data, bootstrap.data));
+    if (shouldPushCachedData) {
+      nextData = cached?.data;
+      nextSettings = cached?.settings || nextSettings;
+    }
     if (!nextData || !nextSettings) return;
     // Migrate legacy task scheduling fields into timelineRecords
     if (nextData.tasks) {
@@ -1454,6 +1514,7 @@ function App() {
     setModeState((nextSettings.activeMode as Mode) || "execute");
     setAdvancedOpen(Boolean(nextSettings.addAdvancedOpen));
     if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
+    if (shouldPushCachedData && nextData) void saveData(nextData);
   }
 
   useEffect(() => {
@@ -1615,10 +1676,12 @@ function App() {
   async function handleSignOut() {
     try {
       try {
-        await flushPendingSave();
+        await flushPendingSave({ urgent: true });
+        await flushPendingSettings({ urgent: true });
       } catch {
         // A stale or expired session must not prevent the user from signing out.
-        pendingSaveRef.current = null;
+        pendingDataSaveRef.current = null;
+        pendingSettingsSaveRef.current = null;
       }
       const api = await waitForPlannerApi();
       await api.signOut?.();
@@ -1642,7 +1705,8 @@ function App() {
       : "Permanently delete your account and all NavoPath data? This cannot be undone.");
     if (!confirmed) return;
     try {
-      await flushPendingSave();
+      await flushPendingSave({ urgent: true });
+      await flushPendingSettings({ urgent: true });
       const api = await waitForPlannerApi();
       await api.deleteAccount?.();
       resetWorkspaceUi();
@@ -1664,15 +1728,30 @@ function App() {
   }
 
   useEffect(() => {
+    const flushForLifecycle = () => {
+      void flushPendingSave({ urgent: true });
+      void flushPendingSettings({ urgent: true });
+    };
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") void flushPendingSave();
+      if (document.visibilityState === "hidden") flushForLifecycle();
+    };
+    const handleOnline = () => {
+      void flushPendingSave();
+      void flushPendingSettings();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleVisibilityChange);
+    window.addEventListener("pagehide", flushForLifecycle);
+    window.addEventListener("beforeunload", flushForLifecycle);
+    window.addEventListener("online", handleOnline);
     return () => {
-      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
+      if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
+      if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
+      if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushForLifecycle);
+      window.removeEventListener("beforeunload", flushForLifecycle);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
@@ -1780,38 +1859,160 @@ function App() {
     if (floatingTimeAdd) setFloatingTimeAdd(null);
   }, [timelineView, drag, drawerOpen]);
 
-  async function flushPendingSave() {
-    if (!pendingSaveRef.current) return;
-    const payload = pendingSaveRef.current;
-    const saveId = queuedSaveIdRef.current;
-    pendingSaveRef.current = null;
-    saveTimerRef.current = null;
-    const saved = await window.plannerApi.saveData(payload);
-    if (queuedSaveIdRef.current !== saveId) return;
-    dataRef.current = saved;
-    setData(saved);
-    if (settingsRef.current) writeBootstrapCache(saved, settingsRef.current, authState?.user?.id);
+  function syncFailureMessage() {
+    return lang === "zh" ? "同步稍后自动重试" : "Sync will retry automatically";
+  }
+
+  function maybeShowSyncFailureNotice(kind: "data" | "settings") {
+    const retryCount = kind === "data" ? dataSaveRetryCountRef.current : settingsSaveRetryCountRef.current;
+    const shown = kind === "data" ? dataSaveNoticeShownRef.current : settingsSaveNoticeShownRef.current;
+    if (retryCount < SYNC_FAILURE_NOTICE_AFTER || shown) return;
+    if (kind === "data") dataSaveNoticeShownRef.current = true;
+    else settingsSaveNoticeShownRef.current = true;
+    showToast(syncFailureMessage());
+  }
+
+  function scheduleDataFlush(delay = SAVE_DEBOUNCE_MS) {
+    if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
+    if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
+    dataSaveTimerRef.current = window.setTimeout(() => {
+      void flushPendingSave();
+    }, delay);
+  }
+
+  function scheduleSettingsFlush(delay = SAVE_DEBOUNCE_MS) {
+    if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
+    if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
+    settingsSaveTimerRef.current = window.setTimeout(() => {
+      void flushPendingSettings();
+    }, delay);
+  }
+
+  function scheduleDataRetry() {
+    const delay = SYNC_RETRY_DELAYS[Math.min(dataSaveRetryCountRef.current - 1, SYNC_RETRY_DELAYS.length - 1)];
+    if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
+    dataSaveRetryTimerRef.current = window.setTimeout(() => {
+      void flushPendingSave();
+    }, delay);
+  }
+
+  function scheduleSettingsRetry() {
+    const delay = SYNC_RETRY_DELAYS[Math.min(settingsSaveRetryCountRef.current - 1, SYNC_RETRY_DELAYS.length - 1)];
+    if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
+    settingsSaveRetryTimerRef.current = window.setTimeout(() => {
+      void flushPendingSettings();
+    }, delay);
+  }
+
+  async function flushPendingSave(options: { urgent?: boolean } = {}) {
+    if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
+    if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
+    dataSaveTimerRef.current = null;
+    dataSaveRetryTimerRef.current = null;
+    if (dataSaveInFlightRef.current) return;
+    dataSaveInFlightRef.current = true;
+    try {
+      while (pendingDataSaveRef.current) {
+        const job = pendingDataSaveRef.current;
+        pendingDataSaveRef.current = null;
+        try {
+          const saved = await window.plannerApi.saveData(job.payload);
+          dataSaveRetryCountRef.current = 0;
+          dataSaveNoticeShownRef.current = false;
+          if (job.version === dataSaveVersionRef.current && !pendingDataSaveRef.current) {
+            dataRef.current = saved;
+            setData(saved);
+            if (settingsRef.current) writeBootstrapCache(saved, settingsRef.current, authState?.user?.id);
+          }
+        } catch {
+          const latestPending = pendingDataSaveRef.current as QueuedDataSave | null;
+          if (!latestPending || latestPending.version < job.version) {
+            pendingDataSaveRef.current = job;
+          }
+          dataSaveRetryCountRef.current += 1;
+          maybeShowSyncFailureNotice("data");
+          scheduleDataRetry();
+          break;
+        }
+      }
+    } finally {
+      dataSaveInFlightRef.current = false;
+      if (pendingDataSaveRef.current && !dataSaveRetryTimerRef.current && !options.urgent) scheduleDataFlush(0);
+    }
+  }
+
+  async function flushPendingSettings(options: { urgent?: boolean } = {}) {
+    if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
+    if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
+    settingsSaveTimerRef.current = null;
+    settingsSaveRetryTimerRef.current = null;
+    if (settingsSaveInFlightRef.current) return;
+    settingsSaveInFlightRef.current = true;
+    try {
+      while (pendingSettingsSaveRef.current) {
+        const job = pendingSettingsSaveRef.current;
+        pendingSettingsSaveRef.current = null;
+        try {
+          const saved = await window.plannerApi.saveSettings(job.payload);
+          settingsSaveRetryCountRef.current = 0;
+          settingsSaveNoticeShownRef.current = false;
+          if (job.version === settingsSaveVersionRef.current && !pendingSettingsSaveRef.current) {
+            settingsRef.current = saved;
+            setSettings(saved);
+            if (saved.language) setLang(saved.language);
+            if (dataRef.current) writeBootstrapCache(dataRef.current, saved, authState?.user?.id);
+            if (saved.activeMode) setModeState(saved.activeMode as Mode);
+          }
+        } catch {
+          const latestPending = pendingSettingsSaveRef.current as QueuedSettingsSave | null;
+          if (!latestPending || latestPending.version < job.version) {
+            pendingSettingsSaveRef.current = job;
+          }
+          settingsSaveRetryCountRef.current += 1;
+          maybeShowSyncFailureNotice("settings");
+          scheduleSettingsRetry();
+          break;
+        }
+      }
+    } finally {
+      settingsSaveInFlightRef.current = false;
+      if (pendingSettingsSaveRef.current && !settingsSaveRetryTimerRef.current && !options.urgent) scheduleSettingsFlush(0);
+    }
   }
 
   async function saveData(next: PlannerData) {
-    queuedSaveIdRef.current += 1;
-    pendingSaveRef.current = next;
-    dataRef.current = next;
-    setData(next);
-    if (settingsRef.current) writeBootstrapCache(next, settingsRef.current, authState?.user?.id);
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      void flushPendingSave();
-    }, 1000);
+    const savedAt = new Date().toISOString();
+    const optimistic = { ...next, savedAt };
+    const version = dataSaveVersionRef.current + 1;
+    dataSaveVersionRef.current = version;
+    pendingDataSaveRef.current = { payload: optimistic, version };
+    dataRef.current = optimistic;
+    setData(optimistic);
+    if (settingsRef.current) writeBootstrapCache(optimistic, settingsRef.current, authState?.user?.id);
+    scheduleDataFlush();
   }
 
-  async function saveSettings(patch: Partial<Settings>) {
-    const saved = await window.plannerApi.saveSettings(patch);
-    settingsRef.current = saved;
-    setSettings(saved);
-    if (saved.language) setLang(saved.language);
-    if (dataRef.current) writeBootstrapCache(dataRef.current, saved, authState?.user?.id);
+  async function saveSettings(patch: SettingsPatch) {
+    const current = settingsRef.current || settings;
+    if (!current) return;
+    const optimisticPatch = { ...patch };
+    delete optimisticPatch.apiKey;
+    delete optimisticPatch.clearApiKey;
+    const optimistic = { ...current, ...optimisticPatch };
+    const payload: SettingsPatch = {
+      ...optimistic,
+      ...(patch.apiKey ? { apiKey: patch.apiKey } : {}),
+      ...(patch.clearApiKey ? { clearApiKey: patch.clearApiKey } : {}),
+    };
+    const version = settingsSaveVersionRef.current + 1;
+    settingsSaveVersionRef.current = version;
+    pendingSettingsSaveRef.current = { payload, version };
+    settingsRef.current = optimistic;
+    setSettings(optimistic);
+    if (optimistic.language) setLang(optimistic.language);
+    if (dataRef.current) writeBootstrapCache(dataRef.current, optimistic, authState?.user?.id);
     if (patch.activeMode) setModeState(patch.activeMode as Mode);
+    scheduleSettingsFlush();
   }
 
   const today = todayIso();
@@ -3679,10 +3880,13 @@ function App() {
     setAiMemoryNotice("");
     clearAiAttachment();
 
+    const dataForHistory = dataRef.current || data;
+    const activeConversationForHistory = (dataForHistory.aiConversations || [])
+      .find((conversation) => conversation.id === (activeAiConversationId || dataForHistory.activeAiConversationId));
     const context = settings?.aiMemoryEnabled === false
       ? { currentViewDate: selectedDate || today, page: mode }
       : buildAiContext(data, { date: selectedDate || today, mode, focusTask: task });
-    const history = settings?.aiMemoryEnabled === false ? [] : toAiHistory(aiMessages, data.chat);
+    const history = toAiHistory(aiMessages, data.chat, activeConversationForHistory?.messages || []);
     const memories = settings?.aiMemoryEnabled === false
       ? []
       : pickMemoriesForContext(data.aiMemories || []);
