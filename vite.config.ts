@@ -18,9 +18,25 @@ export default defineConfig({
           if (id.includes("node_modules/@supabase/")) {
             return "supabase-vendor";
           }
+          if (id.includes("node_modules/pdfjs-dist/")) {
+            return "pdfjs-vendor";
+          }
+          if (
+            id.includes("node_modules/mammoth/") ||
+            id.includes("node_modules/jszip/") ||
+            id.includes("node_modules/pako/") ||
+            id.includes("node_modules/lie/") ||
+            id.includes("node_modules/immediate/") ||
+            id.includes("node_modules/underscore/") ||
+            id.includes("node_modules/@xmldom/") ||
+            id.includes("node_modules/saxes/")
+          ) {
+            return "docx-vendor";
+          }
         },
       },
     },
+    chunkSizeWarningLimit: 550,
     target: "es2020",
   },
 });

@@ -93,6 +93,18 @@ The build output is written to:
 dist
 ```
 
+Check the production asset size budget:
+
+```powershell
+npm run size
+```
+
+To check the existing `dist` output without rebuilding:
+
+```powershell
+npm run size:check
+```
+
 ## Desktop Packaging
 
 Build the desktop app and package the Windows portable executable:

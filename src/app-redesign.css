@@ -79,7 +79,6 @@
 .df-brand { gap: 10px !important; }
 .df-brand > div { display: grid; gap: 0; }
 .df-brand strong { font-family: var(--paper-display); font-size: 16px !important; font-weight: 600 !important; letter-spacing: -.035em; }
-.df-brand span { display: block; color: var(--text-faint); font-family: var(--paper-mono); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
 .df-app .dayflow-icon { box-shadow: none !important; filter: none !important; }
 .df-tabs {
   gap: 18px !important; padding: 0 !important; border: 0 !important;
@@ -164,8 +163,8 @@
   background: var(--surface-raised) !important; box-shadow: var(--paper-float-shadow) !important; backdrop-filter: none !important;
 }
 .df-candidate-placement-bar, .df-drop-preview.placement-preview {
-  border: 1px dashed var(--paper-accent-rule) !important; border-radius: var(--paper-radius) !important;
-  background: var(--paper-note) !important; box-shadow: none !important;
+  border: 1px dashed var(--paper-rule-strong) !important; border-radius: var(--paper-radius) !important;
+  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important; box-shadow: none !important;
 }
 
 /* Timeline as the main paper canvas */
@@ -477,7 +476,6 @@
 }
 @media (max-width: 620px) {
   .df-header-inner { padding: 0 10px !important; }
-  .df-brand span { display: none; }
   .df-tabs { gap: 12px !important; }
   .df-execute, .df-planning-body { padding: 6px !important; }
   .df-candidate-panel, .df-mindmap { padding: 14px !important; }
@@ -585,10 +583,16 @@
   background: transparent !important;
   box-shadow: none !important;
 }
-.df-app .df-quick-add { border: 0 !important; }
+.df-app .df-quick-add-submit {
+  min-width: 78px !important;
+  margin-right: 10px !important;
+  padding-inline: 10px !important;
+}
+.df-app .df-quick-add { border: 0 !important; border-top: 1px solid var(--paper-rule) !important; }
 .df-app .df-quick-add:focus-within {
   border: 0 !important;
-  background: var(--paper-note) !important;
+  border-top: 1px solid var(--paper-accent-rule) !important;
+  background: transparent !important;
 }
 .df-app .df-all-day-block {
   border: 1px solid rgba(0, 0, 0, .18) !important;
@@ -1305,6 +1309,18 @@
   transform: translateY(-50%) !important;
   transition: box-shadow 90ms ease-out, transform 90ms ease-out !important;
 }
+.df-app .df-block-check.completed svg { display: none !important; }
+.df-app .df-block-check.completed::after {
+  content: "✓";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font-family: "Comic Sans MS", "Segoe Print", var(--paper-sans);
+  font-size: 17px;
+  font-weight: 800;
+  text-shadow: -.5px .2px currentColor, .4px -.3px color-mix(in srgb, currentColor 45%, transparent);
+  transform: translate(-48%, -57%) rotate(-8deg);
+}
 .df-app :is(.df-task-card, .df-time-block, .df-all-day-block):hover .df-category-strip,
 .df-app :is(.df-task-card, .df-time-block, .df-all-day-block).completed .df-category-strip {
   opacity: 1 !important;
@@ -1481,6 +1497,14 @@
 .df-app .df-timeline-content,
 .df-app .df-timeline-daily {
   min-height: 0 !important;
+}
+.df-app .df-timeline-daily { --df-daily-time-gutter: 68px; }
+.df-app .df-timeline-daily .df-date-title { padding-left: var(--df-daily-time-gutter) !important; }
+.df-app .df-timeline-daily .df-timeline-allday {
+  width: calc(100% - var(--df-daily-time-gutter) - 20px) !important;
+  max-width: none !important;
+  margin-left: var(--df-daily-time-gutter) !important;
+  margin-right: 20px !important;
 }
 .df-app .df-timeline-body,
 .df-app .df-timeline-content,

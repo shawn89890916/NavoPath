@@ -1,13 +1,9 @@
-import mammoth from "mammoth";
-import { createWorker, type Worker } from "tesseract.js";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import type { Worker } from "tesseract.js";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_PDF_PAGES = 30;
 const MAX_TEXT_LENGTH = 60_000;
 const ACCEPTED_EXTENSIONS = new Set(["pdf", "docx", "txt", "md", "png", "jpg", "jpeg", "webp"]);
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
 
 export type ParsedAttachment = {
   name: string;
@@ -70,6 +66,7 @@ async function createOcrSession() {
   return {
     async recognize(source: Blob | HTMLCanvasElement) {
       if (!worker) {
+        const { createWorker } = await import("tesseract.js");
         worker = await createWorker("eng+chi_sim");
         await worker.setParameters({ preserve_interword_spaces: "1", user_defined_dpi: "300" });
       }
@@ -82,7 +79,14 @@ async function createOcrSession() {
   };
 }
 
+async function loadPdfJs() {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
+  return pdfjs;
+}
+
 async function parsePdf(file: File, ocr: Awaited<ReturnType<typeof createOcrSession>>) {
+  const pdfjs = await loadPdfJs();
   const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   if (doc.numPages > MAX_PDF_PAGES) throw new Error(`PDF 超过 ${MAX_PDF_PAGES} 页限制`);
   const chunks: string[] = [];
@@ -129,6 +133,7 @@ export async function parseAttachment(file: File): Promise<ParsedAttachment> {
     if (ext === "txt" || ext === "md") {
       rawText = await file.text();
     } else if (ext === "docx") {
+      const mammoth = await import("mammoth");
       rawText = (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value;
     } else if (ext === "pdf") {
       const parsed = await parsePdf(file, ocr!);

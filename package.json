@@ -11,8 +11,38 @@
     "build:portfolio": "tsc && vite build --config vite.portfolio.config.ts",
     "preview:portfolio": "vite preview --config vite.portfolio.config.ts --host 127.0.0.1",
     "dist": "npm run build && electron-builder --win portable",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "size": "npm run build && size-limit",
+    "size:check": "size-limit"
   },
+  "size-limit": [
+    {
+      "name": "Core app scripts",
+      "path": [
+        "dist/assets/index-*.js",
+        "dist/assets/react-vendor-*.js",
+        "dist/assets/supabase-vendor-*.js",
+        "dist/assets/PlanningView-*.js",
+        "dist/assets/LandingPage-*.js",
+        "dist/assets/supabasePlannerApi-*.js",
+        "dist/assets/aiAssistantApi-*.js"
+      ],
+      "limit": "230 KB"
+    },
+    {
+      "name": "Document parsing scripts",
+      "path": [
+        "dist/assets/fileParser-*.js",
+        "dist/assets/pdf.worker.min-*.mjs"
+      ],
+      "limit": "700 KB"
+    },
+    {
+      "name": "Styles",
+      "path": "dist/assets/index-*.css",
+      "limit": "80 KB"
+    }
+  ],
   "build": {
     "appId": "com.local.admission.goal.calendar",
     "productName": "NavoPath",
@@ -45,11 +75,13 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@size-limit/file": "^12.1.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "concurrently": "^9.1.2",
     "electron": "^37.0.0",
     "electron-builder": "^25.1.8",
+    "size-limit": "^12.1.0",
     "wait-on": "^8.0.1"
   }
 }

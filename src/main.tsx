@@ -4065,7 +4065,7 @@ function App() {
     <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
-          <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong><span>{mode === "execute" ? "Daily execution" : "Project planning"}</span></div></div>
+          <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
           <div className="df-header-right">
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
