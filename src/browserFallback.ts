@@ -57,6 +57,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       urgency: project.urgency || "low",
     })),
     longTasks: data.longTasks || [],
+    chat: data.chat || [],
     aiMemories: data.aiMemories || [],
     drafts: (data.drafts || []).filter((draft) => draft.title).slice(-10),
     events: (data.events || []).map((event) => ({

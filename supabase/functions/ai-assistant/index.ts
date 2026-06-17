@@ -78,10 +78,12 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { mode, message, context } = body as {
+    const { mode, message, context, history, memories } = body as {
       mode?: string;
       message?: string;
       context?: Record<string, unknown>;
+      history?: Array<{ role?: string; content?: string }>;
+      memories?: Array<{ content?: string; tags?: string[] }>;
     };
 
     // Validate required fields
@@ -118,8 +120,29 @@ serve(async (req: Request) => {
       ? `Available projects: ${JSON.stringify(context.projects)}`
       : "";
     const scheduledTodayInfo = context?.scheduledToday
-      ? `Already scheduled today: ${JSON.stringify(context.scheduledToday)}`
+      ? `Already scheduled on current view date (${String(context?.currentViewDate || currentDate)}): ${JSON.stringify(context.scheduledToday)}`
       : "";
+    const activeTasksInfo = context?.activeTasks
+      ? `Active task snapshot: ${JSON.stringify(context.activeTasks).slice(0, 8000)}`
+      : "";
+    const eventsInfo = context?.upcomingEvents
+      ? `Upcoming events snapshot: ${JSON.stringify(context.upcomingEvents).slice(0, 5000)}`
+      : "";
+    const notesInfo = context?.recentNotes
+      ? `Recent notes: ${JSON.stringify(context.recentNotes).slice(0, 3000)}`
+      : "";
+    const focusTaskInfo = context?.focusTask
+      ? `Focused task: ${JSON.stringify(context.focusTask).slice(0, 2000)}`
+      : "";
+    const memoryInfo = Array.isArray(memories) && memories.length > 0
+      ? `Long-term user memory and preferences: ${JSON.stringify(memories.slice(-20)).slice(0, 5000)}`
+      : "Long-term user memory: none supplied.";
+    const historyMessages = Array.isArray(history)
+      ? history
+        .filter((item) => (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim())
+        .slice(-12)
+        .map((item) => ({ role: item.role as "user" | "assistant", content: item.content!.slice(0, 2000) }))
+      : [];
 
     // Build system prompt
     const systemPrompt = mode === "import_schedule" ? `You import schedules from extracted document text into NavoPath.
@@ -190,6 +213,24 @@ RULES:
 * Never claim data was already modified.
 * Include the "steps" array with at least 2 steps showing progress.`;
 
+    const contextPrompt = `
+
+ADDITIONAL NAVOPATH CONTEXT:
+${activeTasksInfo ? `${activeTasksInfo}\n` : ""}
+${eventsInfo ? `${eventsInfo}\n` : ""}
+${notesInfo ? `${notesInfo}\n` : ""}
+${focusTaskInfo ? `${focusTaskInfo}\n` : ""}
+${memoryInfo}
+
+CONVERSATION AND MEMORY RULES:
+* Use recent conversation to resolve pronouns like "it", "that one", "continue", "刚才那个", "它", and "继续".
+* Treat long-term memory as user preference context, but the latest user message wins.
+* Return JSON only. You may include a "memories" array in the response: [{"content":"stable preference in Chinese","tags":["preference"]}].
+* Only return memories for explicit "remember this" requests, stable preferences, recurring constraints, or durable planning habits.
+* Do not put memory writes in "actions"; use the top-level "memories" field.
+`;
+    const finalSystemPrompt = `${systemPrompt}${contextPrompt}`;
+
     // Build natural language user message with context
     let userContent = message;
     if (context?.taskId && context?.taskTitle) {
@@ -198,11 +239,16 @@ RULES:
     if (context?.scheduledToday) {
       const scheduled = context.scheduledToday as Array<{title: string; start: string; end: string}>;
       if (scheduled.length > 0) {
-        userContent += `\n\nToday's existing schedule (avoid conflicts):\n${scheduled.map((t: any) => `${t.start}-${t.end}: ${t.title}`).join('\n')}`;
+        userContent += `\n\nExisting schedule on current view date ${String(context?.currentViewDate || currentDate)} (avoid conflicts when planning that date):\n${scheduled.map((t: any) => `${t.start}-${t.end}: ${t.title}`).join('\n')}`;
       }
     }
 
     // Call DeepSeek API
+    const messages = [
+      { role: "system", content: finalSystemPrompt },
+      ...historyMessages,
+      { role: "user", content: userContent },
+    ];
     const dsResponse = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -211,10 +257,7 @@ RULES:
       },
       body: JSON.stringify({
         model: "deepseek-v4-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
+        messages,
         response_format: { type: "json_object" },
         max_tokens: mode === "import_schedule" ? 6000 : 1600,
         stream: false,

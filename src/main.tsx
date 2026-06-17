@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, ExecutionLane, Language, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Task, TaskRecurrence, TimelineRecord } from "./types";
-import type { AiAction, AiStep } from "./aiAssistantApi";
+import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
@@ -276,6 +276,16 @@ type AiSessionMessage = {
     addedEventIds: string[];
     previousTasks: Task[];
   };
+};
+type AiContextSummary = {
+  currentViewDate: string;
+  page: "execute" | "planning";
+  projects: Array<{ id: string; title: string; category: Category; color?: string; importance?: Priority; urgency?: Priority; notes?: string }>;
+  activeTasks: Array<{ id: string; title: string; projectId?: string; dueDate: string; priority: Priority; scheduled?: string[]; subtasks?: string[]; notes?: string }>;
+  upcomingEvents: Array<{ id: string; title: string; date: string; startTime?: string; endTime?: string; details?: string }>;
+  scheduledToday: Array<{ id: string; title: string; start: string; end: string; projectId?: string }>;
+  recentNotes: Array<{ content: string; tags: string[]; createdAt: string }>;
+  focusTask?: { id: string; title: string; notes?: string; projectId?: string; subtasks?: string[] };
 };
 type FormState = {
   title: string;
@@ -820,6 +830,130 @@ function makeEvent(form: FormState): CalendarEvent {
   };
 }
 
+function compactText(value: string | undefined, limit = 180) {
+  const text = (value || "").replace(/\s+/g, " ").trim();
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+function taskScheduleLabels(task: Task) {
+  const records = (task.timelineRecords || [])
+    .filter((record) => record.executionStatus === "scheduled")
+    .map((record) => `${record.scheduledDate} ${record.scheduledStart}-${record.scheduledEnd}`);
+  if (task.scheduledDate && task.scheduledStart) {
+    records.push(`${task.scheduledDate} ${task.scheduledStart}-${task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task))}`);
+  }
+  return records.slice(-4);
+}
+
+function buildAiContext(data: PlannerData, params: {
+  date: string;
+  mode: Mode;
+  focusTask?: Task | null;
+}): AiContextSummary {
+  const rangeEnd = addDays(params.date, 14);
+  const scheduledToday = data.tasks
+    .flatMap((task) => {
+      const records = (task.timelineRecords || [])
+        .filter((record) => record.executionStatus === "scheduled" && record.scheduledDate === params.date)
+        .map((record) => ({ id: record.id, title: task.title, start: record.scheduledStart, end: record.scheduledEnd, projectId: task.projectId }));
+      if (task.scheduledDate === params.date && task.scheduledStart) {
+        records.push({ id: task.id, title: task.title, start: task.scheduledStart, end: task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)), projectId: task.projectId });
+      }
+      return records;
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  return {
+    currentViewDate: params.date,
+    page: params.mode,
+    projects: data.projects.slice(0, 24).map((project) => ({
+      id: project.id,
+      title: project.title,
+      category: project.category,
+      color: project.color,
+      importance: project.importance,
+      urgency: project.urgency,
+      notes: compactText(project.notes, 120),
+    })),
+    activeTasks: data.tasks
+      .filter((task) => !task.completed)
+      .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || "") || (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+      .slice(0, 30)
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        projectId: task.projectId,
+        dueDate: task.dueDate,
+        priority: task.priority,
+        scheduled: taskScheduleLabels(task),
+        subtasks: (task.subtasks || []).filter((subtask) => !subtask.completed && !subtask.done).slice(0, 6).map((subtask) => subtask.title),
+        notes: compactText(task.notes, 160),
+      })),
+    upcomingEvents: data.events
+      .filter((event) => (event.startDate || event.date) >= params.date && (event.startDate || event.date) <= rangeEnd)
+      .sort((a, b) => (a.startDate || a.date).localeCompare(b.startDate || b.date) || (a.startTime || "").localeCompare(b.startTime || ""))
+      .slice(0, 24)
+      .map((event) => ({
+        id: event.id,
+        title: event.title,
+        date: event.startDate || event.date,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        details: compactText(event.details, 140),
+      })),
+    scheduledToday,
+    recentNotes: (data.notes || []).slice(-8).map((note) => ({
+      content: compactText(note.content, 160),
+      tags: note.tags || [],
+      createdAt: note.createdAt,
+    })),
+    focusTask: params.focusTask ? {
+      id: params.focusTask.id,
+      title: params.focusTask.title,
+      notes: compactText(params.focusTask.notes, 220),
+      projectId: params.focusTask.projectId,
+      subtasks: (params.focusTask.subtasks || []).map((subtask) => `${subtask.completed || subtask.done ? "done" : "todo"}: ${subtask.title}`).slice(0, 12),
+    } : undefined,
+  };
+}
+
+function toAiHistory(messages: AiSessionMessage[], fallback: PlannerData["chat"] = []): AiChatMessage[] {
+  const local = messages
+    .filter((message) => message.status !== "thinking" && message.content.trim())
+    .map((message) => ({ role: message.role, content: message.content.trim() }));
+  const source = local.length > 0 ? local : (fallback || []).map((message) => ({ role: message.role, content: message.content }));
+  return source.slice(-12);
+}
+
+function chatToSessionMessages(chat: PlannerData["chat"] = []): AiSessionMessage[] {
+  return chat.slice(-12).map((message) => ({
+    id: uid(`ai_${message.role}`),
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+    status: "done",
+  }));
+}
+
+function extractLocalMemories(message: string): AiMemoryPatch[] {
+  const text = compactText(message, 240);
+  if (!text) return [];
+  const shouldRemember = /(记住|以后|偏好|习惯|我一般|我通常|不要再|别再|优先|尽量)/.test(text);
+  return shouldRemember ? [{ content: text, tags: ["user-preference"] }] : [];
+}
+
+function mergeAiMemories(data: PlannerData, patches: AiMemoryPatch[]) {
+  const existing = data.aiMemories || [];
+  const seen = new Set(existing.map((memory) => memory.content.trim().toLowerCase()));
+  const now = new Date().toISOString();
+  const additions = patches
+    .map((patch) => ({ content: compactText(patch.content, 280), tags: patch.tags || ["ai-memory"] }))
+    .filter((patch) => patch.content && !seen.has(patch.content.toLowerCase()))
+    .slice(0, 4)
+    .map((patch) => ({ id: uid("memory"), content: patch.content, tags: patch.tags, createdAt: now, updatedAt: now }));
+  return [...existing, ...additions].slice(-40);
+}
+
 function buildEventFromTask(task: Task, activeRecord?: TimelineRecord): CalendarEvent {
   const scheduledDate = activeRecord?.scheduledDate || task.scheduledDate || task.plannedForDate || task.dueDate || todayIso();
   const scheduledStart = activeRecord?.scheduledStart || task.scheduledStart || task.recurrence?.startTime || "";
@@ -1120,6 +1254,12 @@ function App() {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    if (!data || aiMessages.length > 0) return;
+    const restored = chatToSessionMessages(data.chat || []);
+    if (restored.length > 0) setAiMessages(restored);
+  }, [data?.generatedAt]);
 
   // Daily view resets range-only panel controls.
   useEffect(() => {
@@ -3434,6 +3574,7 @@ function App() {
 
   async function sendAi() {
     if (!aiInput.trim() && !aiAttachment) return;
+    if (!data) return;
     const task = tasks.find((item) => item.id === referencedTaskId);
     const msg = aiInput.trim() || "解析附件中的任务和事件";
     const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
@@ -3456,18 +3597,11 @@ function App() {
     setAiBusy(true);
     clearAiAttachment();
 
-    // Build rich context for the AI
-    const scheduledToday = tasks.filter((t) => t.scheduledDate === today && t.scheduledStart);
-    const context: Record<string, unknown> = {
-      currentViewDate: today,
-      page: "execute",
-      projects: projects.map((p) => ({ id: p.id, title: p.title, color: p.color })),
-      scheduledToday: scheduledToday.map((t) => ({ title: t.title, start: t.scheduledStart, end: t.scheduledEnd, projectId: t.projectId })),
-    };
-    if (task) {
-      context.taskId = task.id;
-      context.taskTitle = task.title;
-    }
+    const context = buildAiContext(data, { date: selectedDate || today, mode, focusTask: task });
+    const history = toAiHistory(aiMessages, data.chat);
+    const memories = settings?.aiMemoryEnabled === false
+      ? []
+      : (data.aiMemories || []).slice(-20).map((memory) => ({ content: memory.content, tags: memory.tags }));
 
     try {
       const { callAiAssistant } = await import("./aiAssistantApi");
@@ -3475,6 +3609,8 @@ function App() {
         mode: attachmentSnapshot ? "import_schedule" : "chat",
         message: aiAttachment ? `${msg}\n\n附件：${aiAttachment.name}\n\n${aiAttachment.text}` : msg,
         context,
+        history,
+        memories,
       });
       const validActions = (result.actions || []).filter(isValidAiAction);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
@@ -3486,6 +3622,18 @@ function App() {
         selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
         actionState: validActions.length ? "pending" : undefined,
       } : message));
+      const currentData = dataRef.current;
+      if (currentData) {
+        const nextChat = [
+          ...(currentData.chat || []),
+          { role: "user" as const, content: msg, createdAt: userMessage.createdAt },
+          { role: "assistant" as const, content: result.reply, createdAt: new Date().toISOString() },
+        ].slice(-40);
+        const nextMemories = settingsRef.current?.aiMemoryEnabled === false
+          ? currentData.aiMemories || []
+          : mergeAiMemories(currentData, [...extractLocalMemories(msg), ...(result.memories || [])]);
+        await saveData({ ...currentData, chat: nextChat, aiMemories: nextMemories });
+      }
     } catch (error) {
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
@@ -5052,7 +5200,7 @@ function App() {
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); setAiMessages([]); clearAiAttachment(); }} messages={aiMessages} onConfirmAction={(messageId, action) => void confirmAiAction(action, messageId)} onDismissAction={(messageId, action) => dismissAiAction(action, messageId)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} />}
+      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} onConfirmAction={(messageId, action) => void confirmAiAction(action, messageId)} onDismissAction={(messageId, action) => dismissAiAction(action, messageId)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} />}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -6540,19 +6688,22 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, busy, onSend, onClose, messages, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; onConfirmAction: (messageId: string, action: AiAction) => void; onDismissAction: (messageId: string, action: AiAction) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void }) {
+function AiPanel({ input, setInput, busy, onSend, onClose, messages, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; onConfirmAction: (messageId: string, action: AiAction) => void; onDismissAction: (messageId: string, action: AiAction) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
   const projects = projectList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, attachmentStatus]);
+  const contextLabel = lang === "zh"
+    ? `${contextDate} · ${historyCount} 条历史 · ${memoryCount} 条记忆`
+    : `${contextDate} · ${historyCount} history · ${memoryCount} memories`;
   return <aside className="df-ai-panel">
     <div className="df-ai-panel-head">
-      <div className="df-ai-title"><span className={`df-ai-presence ${busy ? "thinking" : ""}`} /><div><strong>NavoPath AI</strong><small>{busy ? "正在思考" : "在线助手"}</small></div></div>
+      <div className="df-ai-title"><span className={`df-ai-presence ${busy ? "thinking" : ""}`} /><div><strong>NavoPath AI</strong><small>{busy ? "正在思考" : contextLabel}</small></div></div>
       <button className="df-icon-action i-close" data-tip={t(lang, "aiPanel.close")} aria-label={t(lang, "aiPanel.close")} onClick={onClose} />
     </div>
     <div className="df-ai-panel-body" ref={bodyRef}>
-      {messages.length === 0 && <div className="df-ai-empty"><span>N</span><strong>让计划变得清晰</strong><p>描述任务、询问安排，或上传文件提取任务与事件。</p></div>}
+      {messages.length === 0 && <div className="df-ai-empty"><span>N</span><strong>让计划变得清晰</strong><p>我会参考当前日程、项目、最近对话和已保存偏好来回答。描述任务、询问安排，或上传文件提取任务与事件。</p></div>}
       {messages.map((message) => <section key={message.id} className={`df-ai-turn ${message.role}`}>
         {message.role === "user" ? <>
           <div className="df-ai-msg-bubble user"><span>{message.content}</span></div>

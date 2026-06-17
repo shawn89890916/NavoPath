@@ -11,6 +11,16 @@ export type AiStep = {
   status: "pending" | "running" | "done" | "error";
 };
 
+export type AiChatMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+export type AiMemoryPatch = {
+  content: string;
+  tags?: string[];
+};
+
 export type AiAction =
   | {
       type: "create_subtasks";
@@ -85,6 +95,7 @@ export type AiAssistantResponse = {
   reply: string;
   actions: AiAction[];
   steps?: AiStep[];
+  memories?: AiMemoryPatch[];
 };
 
 function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse {
@@ -96,6 +107,7 @@ function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse 
       reply: nested.reply,
       actions: Array.isArray(nested.actions) ? nested.actions : [],
       steps: Array.isArray(nested.steps) ? nested.steps : result.steps,
+      memories: Array.isArray(nested.memories) ? nested.memories : result.memories,
     };
   } catch {
     return result;
@@ -125,6 +137,8 @@ export async function callAiAssistant(params: {
   mode: AiMode;
   message: string;
   context?: unknown;
+  history?: AiChatMessage[];
+  memories?: AiMemoryPatch[];
 }): Promise<AiAssistantResponse> {
   const client = getClient();
   if (!client) {
@@ -178,6 +192,7 @@ export async function callAiAssistant(params: {
       reply: result.reply || "完成",
       actions: Array.isArray(result.actions) ? result.actions : [],
       steps: Array.isArray(result.steps) ? result.steps : [],
+      memories: Array.isArray(result.memories) ? result.memories : [],
     });
   } catch (err) {
     console.error("AI Assistant network error:", err);
