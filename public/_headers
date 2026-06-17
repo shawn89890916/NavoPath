@@ -1,2 +1,20 @@
+/assets/react-vendor-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/supabase-vendor-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/fileParser-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.mjs
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.js
+  Cache-Control: public, max-age=604800
+
 /*
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { CalendarEvent, Category, ExecutionLane, Language, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Task, TaskRecurrence, TimelineRecord } from "./types";
-import { callAiAssistant, type AiAction, type AiStep } from "./aiAssistantApi";
+import type { AiAction, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
@@ -3476,6 +3476,7 @@ function App() {
     }
 
     try {
+      const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: attachmentSnapshot ? "import_schedule" : "chat",
         message: aiAttachment ? `${msg}\n\n附件：${aiAttachment.name}\n\n${aiAttachment.text}` : msg,
@@ -3720,6 +3721,7 @@ function App() {
   async function generateNextAction() {
     const task = editingId ? tasks.find((item) => item.id === editingId) : null;
     try {
+      const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: "parse_task",
         message: t(lang, "toast.clarifyPrompt"),
