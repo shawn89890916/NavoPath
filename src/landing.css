@@ -187,14 +187,26 @@
 .landing-auth-tabs button, .landing-auth-notice button { padding: 9px 0 7px; color: var(--l-muted); }
 .landing-auth-tabs button.active { color: var(--l-ink); border-bottom: 2px solid var(--l-ink); }
 .landing-auth-card input:not([type=checkbox]) { width: 100%; height: 46px; margin-bottom: 10px; padding: 0 2px; border: 0; border-bottom: 1px solid var(--l-rule-strong); border-radius: 0; outline: 0; color: var(--l-ink); background: transparent; }
-.landing-auth-card input:focus { border-bottom-color: var(--l-ink); }
+.landing-auth-card input:not([type=checkbox]):focus { border-bottom-color: var(--l-ink); }
 .landing-auth-theme { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 16px; padding: 12px 0 0; border: 0; border-top: 1px solid var(--l-rule); }
 .landing-auth-theme legend { padding: 0; color: var(--l-faint); font: 10px var(--l-mono); letter-spacing: .08em; text-transform: uppercase; }
 .landing-auth-theme button { min-height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 3px; border: 0; border-bottom: 1px solid var(--l-rule); color: var(--l-muted); text-align: left; background: transparent; cursor: pointer; }
 .landing-auth-theme button.active { color: var(--l-ink); border-bottom: 2px solid var(--l-ink); }
 .landing-auth-theme i { width: 18px; height: 18px; border: 1px solid var(--l-rule-strong); background: #f7f2e9; }
 .landing-auth-theme i.dark { background: #24211d; }
-.landing-auth-check { display: flex; gap: 8px; margin: 4px 0 18px; color: var(--l-muted); font-size: 12px; }
+.landing-auth-check { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 18px; color: var(--l-muted); font-size: 12px; cursor: pointer; }
+.landing-auth-check input[type=checkbox] {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--l-rule-strong);
+  border-radius: 0;
+  background: var(--l-paper-soft);
+  accent-color: var(--l-ink);
+  cursor: pointer;
+}
 .landing-auth-notice { display: grid; gap: 6px; padding: 12px 0; margin-bottom: 12px; border-top: 1px solid var(--l-rule); border-bottom: 1px solid var(--l-rule); color: var(--l-muted); font-size: 12px; }
 .landing-auth-notice p, .landing-auth-error { margin: 0; font-size: 12px; }
 .landing-auth-error { margin-bottom: 10px; color: #9d3e46; }

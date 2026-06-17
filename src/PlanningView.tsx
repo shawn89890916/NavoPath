@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import type { PlannerData, Project, Subtask, Task } from "./types";
 import { t, priLabels, type Language } from "./i18n";
+import { useInAppDialog } from "./InAppDialog";
 
 type PlanPickPriority = "must" | "should" | "could";
 
@@ -210,7 +211,6 @@ function PlanningSubtaskNode(props: {
               props.onPromote(props.subtask.id);
             }}
             aria-label={t(props.lang, "planning.addToCandidate")}
-            title={t(props.lang, "planning.addToCandidate")}
           >
             <ArrowRightIcon />
           </button>
@@ -221,7 +221,6 @@ function PlanningSubtaskNode(props: {
               setMenuOpen((open) => !open);
             }}
             aria-label={t(props.lang, "planning.more")}
-            title={t(props.lang, "planning.more")}
           >
             <MoreIcon />
           </button>
@@ -302,7 +301,6 @@ function PlanningTaskNode(props: {
                 props.onAddToPick();
               }}
               aria-label={t(props.lang, "planning.addToCandidate")}
-              title={t(props.lang, "planning.addToCandidate")}
             >
               <ArrowRightIcon />
             </button>
@@ -313,7 +311,6 @@ function PlanningTaskNode(props: {
                 setMenuOpen((open) => !open);
               }}
               aria-label={t(props.lang, "planning.more")}
-              title={t(props.lang, "planning.more")}
             >
               <MoreIcon />
             </button>
@@ -377,7 +374,7 @@ function PlanningProjectNode(props: {
         </span>
         <span className="df-project-badge">{props.taskCount}</span>
         <div className="df-project-node-actions">
-          <button className="df-tree-icon-button df-project-add-btn" onClick={props.onAddTask} aria-label={t(props.lang, "planning.addTask")} title={t(props.lang, "planning.addTask")}>
+          <button className="df-tree-icon-button df-project-add-btn" onClick={props.onAddTask} aria-label={t(props.lang, "planning.addTask")}>
             <PlusIcon />
           </button>
           <button className="df-tree-icon-button df-collapse-btn" onClick={props.onToggleCollapse} aria-label={props.collapsed ? t(props.lang, "planning.expandProject") : t(props.lang, "planning.collapseProject")}>
@@ -604,6 +601,7 @@ export default function PlanningView(props: {
   const treeRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const dialog = useInAppDialog(props.lang);
 
   const startSplitterDrag = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
@@ -665,14 +663,14 @@ export default function PlanningView(props: {
     [safeProjects, props.lang],
   );
 
-  const renameTask = useCallback((task: Task) => {
-    const title = window.prompt(t(props.lang, "planning.editName"), task.title);
+  const renameTask = useCallback(async (task: Task) => {
+    const title = await dialog.prompt(t(props.lang, "planning.editName"), task.title);
     if (!title?.trim()) return;
     props.onTaskUpdate(task.id, { title: title.trim() });
-  }, [props]);
+  }, [dialog, props]);
 
-  const addSubtask = useCallback((task: Task) => {
-    const title = window.prompt(t(props.lang, "planning.addSubtask"));
+  const addSubtask = useCallback(async (task: Task) => {
+    const title = await dialog.prompt(t(props.lang, "planning.addSubtask"));
     if (!title?.trim()) return;
     props.onTaskUpdate(task.id, {
       subtasks: [
@@ -680,26 +678,27 @@ export default function PlanningView(props: {
         { id: uid("subtask"), title: title.trim(), completed: false, done: false, order: Date.now(), createdAt: new Date().toISOString() },
       ],
     });
-  }, [props]);
+  }, [dialog, props]);
 
-  const setTaskDate = useCallback((task: Task) => {
-    const date = window.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
+  const setTaskDate = useCallback(async (task: Task) => {
+    const date = await dialog.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
     if (!date?.trim()) return;
     props.onTaskUpdate(task.id, { dueDate: date.trim() });
-  }, [props]);
+  }, [dialog, props]);
 
-  const moveTaskProject = useCallback((task: Task) => {
+  const moveTaskProject = useCallback(async (task: Task) => {
     const options = safeProjects.map((project, index) => `${index + 1}. ${project.title}`).join("\n");
-    const choice = window.prompt(
+    const choice = await dialog.prompt(
       props.lang === "zh"
-        ? `移动到项目：\n0. 未归属\n${options}`
-        : `Move to project:\n0. Unassigned\n${options}`,
+        ? "移动到项目"
+        : "Move to project",
       "0",
+      { message: `0. ${t(props.lang, "planning.unassigned")}${options ? `\n${options}` : ""}` },
     );
     if (choice === null) return;
     const index = Number(choice) - 1;
     props.onTaskUpdate(task.id, { projectId: index >= 0 ? safeProjects[index]?.id : undefined });
-  }, [props, safeProjects]);
+  }, [dialog, props, safeProjects]);
 
   const toggleSubtask = useCallback((taskId: string, subtaskId: string) => {
     const task = safeTasks.find((item) => item.id === taskId);
@@ -713,11 +712,11 @@ export default function PlanningView(props: {
     });
   }, [props, safeTasks]);
 
-  const renameSubtask = useCallback((subtaskId: string) => {
+  const renameSubtask = useCallback(async (subtaskId: string) => {
     for (const task of safeTasks) {
       const subtask = (task.subtasks || []).find((s) => s.id === subtaskId);
       if (subtask) {
-        const title = window.prompt(t(props.lang, "planning.editName"), subtask.title);
+        const title = await dialog.prompt(t(props.lang, "planning.editName"), subtask.title);
         if (!title?.trim()) return;
         props.onTaskUpdate(task.id, {
           subtasks: (task.subtasks || []).map((s) =>
@@ -727,10 +726,11 @@ export default function PlanningView(props: {
         return;
       }
     }
-  }, [safeTasks, props]);
+  }, [dialog, safeTasks, props]);
 
-  const deleteSubtask = useCallback((subtaskId: string) => {
-    if (!window.confirm(props.lang === "zh" ? "确定删除此子任务？" : "Delete this subtask?")) return;
+  const deleteSubtask = useCallback(async (subtaskId: string) => {
+    const confirmed = await dialog.confirm(props.lang === "zh" ? "确定删除此子任务？" : "Delete this subtask?");
+    if (!confirmed) return;
     for (const task of safeTasks) {
       if ((task.subtasks || []).some((s) => s.id === subtaskId)) {
         props.onTaskUpdate(task.id, {
@@ -739,17 +739,17 @@ export default function PlanningView(props: {
         return;
       }
     }
-  }, [safeTasks, props]);
+  }, [dialog, safeTasks, props]);
 
   const promoteSubtask = useCallback((subtaskId: string) => {
     props.onAddPick(subtaskId);
   }, [props]);
 
-  const setSubtaskDate = useCallback((subtaskId: string) => {
+  const setSubtaskDate = useCallback(async (subtaskId: string) => {
     for (const task of safeTasks) {
       const subtask = (task.subtasks || []).find((s) => s.id === subtaskId);
       if (subtask) {
-        const date = window.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
+        const date = await dialog.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
         if (!date?.trim()) return;
         props.onTaskUpdate(task.id, {
           subtasks: (task.subtasks || []).map((s) =>
@@ -759,17 +759,18 @@ export default function PlanningView(props: {
         return;
       }
     }
-  }, [safeTasks, props]);
+  }, [dialog, safeTasks, props]);
 
-  const moveSubtaskProject = useCallback((subtaskId: string) => {
+  const moveSubtaskProject = useCallback(async (subtaskId: string) => {
     for (const task of safeTasks) {
       if ((task.subtasks || []).some((s) => s.id === subtaskId)) {
         const options = safeProjects.map((p, i) => `${i + 1}. ${p.title}`).join("\n");
-        const choice = window.prompt(
+        const choice = await dialog.prompt(
           props.lang === "zh"
-            ? `移动父任务到项目：\n0. 未归属\n${options}`
-            : `Move parent task to project:\n0. Unassigned\n${options}`,
+            ? "移动父任务到项目"
+            : "Move parent task to project",
           "0",
+          { message: `0. ${t(props.lang, "planning.unassigned")}${options ? `\n${options}` : ""}` },
         );
         if (choice === null) return;
         const index = Number(choice) - 1;
@@ -777,7 +778,7 @@ export default function PlanningView(props: {
         return;
       }
     }
-  }, [safeTasks, safeProjects, props]);
+  }, [dialog, safeTasks, safeProjects, props]);
 
   const visibleProjects = useMemo(
     () => safeProjects.map((project) => ({
@@ -791,6 +792,7 @@ export default function PlanningView(props: {
 
   return (
     <main className={`df-planning ${props.pickMode ? "pick-mode" : ""}`}>
+      {dialog.host}
       <div className="df-planning-body" ref={containerRef}>
         <section className="df-mindmap no-root" style={{ flex: `${leftRatio}%`, minWidth: 0 }}>
           <div className="df-tree-wrap">

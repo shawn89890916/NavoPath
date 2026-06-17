@@ -1607,6 +1607,165 @@
   box-shadow: none !important;
 }
 
+/* Add drawer and settings controls should read as ink on paper, not white form islands. */
+.df-app .df-icon-action.i-clarify::before {
+  content: "\2316";
+  font-size: 18px;
+  line-height: 1;
+}
+
+.df-app .df-drawer,
+.df-app .df-utility-panel {
+  --field-paper: color-mix(in srgb, var(--surface-main) 88%, var(--bg-app) 12%);
+  --field-paper-hover: color-mix(in srgb, var(--surface-main) 80%, var(--accent-active) 5%);
+}
+
+.df-app .df-drawer label,
+.df-app .df-utility-body label {
+  margin-top: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+.df-app .df-utility-body {
+  gap: 18px !important;
+}
+
+.df-app .df-utility-select,
+.df-app .df-utility-check,
+.df-app .df-theme-setting,
+.df-app .df-settings-profile {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+
+.df-app .df-drawer input:not([type="checkbox"]):not([type="color"]):not([type="file"]),
+.df-app .df-drawer select,
+.df-app .df-drawer textarea,
+.df-app .df-drawer-project-picker > button,
+.df-app .df-project-create-line input,
+.df-app .df-utility-panel input:not([type="checkbox"]):not([type="color"]):not([type="file"]),
+.df-app .df-utility-panel select,
+.df-app .df-utility-panel textarea,
+.df-app .df-utility-select select {
+  border-color: color-mix(in srgb, var(--text-main) 13%, transparent) !important;
+  background: var(--field-paper) !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-drawer input:not([type="checkbox"]):not([type="color"]):not([type="file"]):hover,
+.df-app .df-drawer select:hover,
+.df-app .df-drawer textarea:hover,
+.df-app .df-drawer-project-picker > button:hover,
+.df-app .df-project-create-line input:hover,
+.df-app .df-utility-panel input:not([type="checkbox"]):not([type="color"]):not([type="file"]):hover,
+.df-app .df-utility-panel select:hover,
+.df-app .df-utility-panel textarea:hover,
+.df-app .df-utility-select select:hover {
+  border-color: var(--paper-rule-strong) !important;
+  background: var(--field-paper-hover) !important;
+}
+
+.df-app .df-drawer input:not([type="checkbox"]):not([type="color"]):not([type="file"]):focus,
+.df-app .df-drawer select:focus,
+.df-app .df-drawer textarea:focus,
+.df-app .df-utility-panel input:not([type="checkbox"]):not([type="color"]):not([type="file"]):focus,
+.df-app .df-utility-panel select:focus,
+.df-app .df-utility-panel textarea:focus,
+.df-app .df-utility-select select:focus {
+  border-color: var(--paper-accent-rule) !important;
+  background: color-mix(in srgb, var(--field-paper) 88%, var(--accent-active) 7%) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-active) 18%, transparent) !important;
+}
+
+.df-app .df-drawer input[type="checkbox"],
+.df-app .df-utility-panel input[type="checkbox"] {
+  appearance: none;
+  width: 18px !important;
+  height: 18px !important;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-drawer input[type="checkbox"]::before,
+.df-app .df-utility-panel input[type="checkbox"]::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  transform: scale(0);
+  background: var(--accent-active);
+  transition: transform var(--paper-motion);
+}
+
+.df-app .df-drawer input[type="checkbox"]:checked::before,
+.df-app .df-utility-panel input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.df-app .df-form-color-row {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.df-app .df-drawer .df-form-color-row .df-project-color-picker {
+  padding: 9px !important;
+  border-color: color-mix(in srgb, var(--text-main) 12%, transparent) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-drawer-actions.stacked {
+  align-items: flex-end !important;
+}
+
+.df-app .df-drawer-primary-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 150px;
+}
+
+.df-app .df-drawer-primary-flow .df-icon-action {
+  align-self: flex-end;
+}
+
+.df-app .df-drawer-primary-flow .primary {
+  width: 100%;
+}
+
+.df-app .df-settings-advanced {
+  margin-top: 4px;
+}
+
+.df-app .df-settings-advanced-body {
+  gap: 18px !important;
+}
+
+.df-app .df-settings-account {
+  padding: 10px 0;
+  border-top: 1px solid var(--paper-rule);
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.df-app .df-settings-advanced-body .df-settings-about,
+.df-app .df-settings-advanced-body .df-settings-logout {
+  justify-self: start;
+  padding: 8px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
 /* First-use guide: a quiet editorial annotation tied to real workspace actions. */
 .df-app .df-onboarding-guide {
   position: fixed;
@@ -1704,4 +1863,127 @@
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Browser comment fixes: planning rows, dark logo, and app-native dialogs. */
+.df-app.theme-dark .dayflow-icon img {
+  filter: invert(1) brightness(1.08) contrast(.96) !important;
+}
+
+.df-app.mode-planning .df-plan-project-node,
+.df-app.mode-planning.theme-dark .df-plan-project-node,
+.df-app.mode-planning:not(.theme-dark) .df-plan-project-node {
+  border-color: var(--paper-rule) !important;
+  background: var(--surface-card) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.df-app.mode-planning .df-plan-project-node:hover,
+.df-app.mode-planning.theme-dark .df-plan-project-node:hover,
+.df-app.mode-planning:not(.theme-dark) .df-plan-project-node:hover {
+  border-color: var(--paper-rule-strong) !important;
+  background: var(--paper-note) !important;
+  box-shadow: none !important;
+}
+
+.df-app.mode-planning .df-task-node-inner,
+.df-app.mode-planning.theme-dark .df-task-node-inner,
+.df-app.mode-planning:not(.theme-dark) .df-task-node-inner {
+  padding-left: 36px !important;
+}
+
+.df-app.mode-planning .df-task-node-inner::before,
+.df-app.mode-planning.theme-dark .df-task-node-inner::before,
+.df-app.mode-planning:not(.theme-dark) .df-task-node-inner::before {
+  left: 16px !important;
+  width: 2px !important;
+  height: 28px !important;
+  border-radius: 1px !important;
+  opacity: .76 !important;
+}
+
+.df-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: color-mix(in srgb, var(--bg-app, #f7f2e9) 42%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.df-dialog {
+  width: min(420px, 100%);
+  border: 1px solid var(--paper-rule-strong, rgba(33, 29, 24, .4));
+  border-radius: 3px;
+  background: var(--surface-main, #f7f2e9);
+  color: var(--text-main, #211d18);
+  box-shadow: none;
+}
+
+.df-dialog form {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+}
+
+.df-dialog h2 {
+  margin: 0;
+  color: var(--text-main, #211d18);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.df-dialog p {
+  margin: -4px 0 0;
+  color: var(--text-muted, #686057);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.df-dialog input {
+  width: 100%;
+  height: 42px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px solid var(--paper-rule-strong, rgba(33, 29, 24, .4));
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-main, #211d18);
+}
+
+.df-dialog input:focus-visible {
+  outline: 1px solid var(--accent-active, currentColor);
+  outline-offset: 3px;
+}
+
+.df-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.df-dialog-actions button {
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-main, #211d18);
+  cursor: pointer;
+}
+
+.df-dialog-actions button:hover {
+  border-bottom-color: var(--paper-rule-strong, currentColor);
+}
+
+.df-dialog-primary {
+  font-weight: 720;
 }

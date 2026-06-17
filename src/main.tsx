@@ -27,6 +27,7 @@ import {
   HOUR_HEIGHT,
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, releaseNote, formatDateTitle, monthTitle, weekdayName } from "./i18n";
+import { useInAppDialog } from "./InAppDialog";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -1075,6 +1076,7 @@ function App() {
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
+  const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
   const suppressBlockClickRef = useRef(false);
@@ -1419,7 +1421,7 @@ function App() {
   }
 
   async function handleDeleteAccount() {
-    const confirmed = window.confirm(lang === "zh"
+    const confirmed = await dialog.confirm(lang === "zh"
       ? "确定永久删除账户和全部 NavoPath 数据吗？此操作无法撤销。"
       : "Permanently delete your account and all NavoPath data? This cannot be undone.");
     if (!confirmed) return;
@@ -2238,21 +2240,13 @@ function App() {
   }
 
   function createTaskInProject(projectId: string) {
-    if (!data) return;
-    const title = window.prompt(t(lang, "toast.newTaskName"));
-    if (!title?.trim()) return;
-    const task = {
-      ...makeTask({
-      ...defaultForm("task"),
-      title: title.trim(),
-      projectId,
-      dueDate: today
-      }),
-      plannedForDate: undefined,
-      executionLane: undefined,
-    };
-    void saveData({ ...data, tasks: [...data.tasks, task] });
-    showToast(t(lang, "toast.addedToProject"));
+    setAddType("task");
+    setEditingId("");
+    setEditingRecordId(undefined);
+    setEditingOccurrence(null);
+    setForm({ ...defaultForm("task"), projectId, dueDate: today });
+    setAdvancedOpen(false);
+    setDrawerOpen(true);
   }
 
   function saveQuickSchedule() {
@@ -3346,11 +3340,11 @@ function App() {
     showToast(t(lang, "toast.taskDuplicated"));
   }
 
-  function convertTaskToEvent(taskId: string) {
+  async function convertTaskToEvent(taskId: string) {
     if (!data) return;
     const task = data.tasks.find((item) => item.id === taskId);
     if (!task) return;
-    if (!window.confirm(t(lang, "confirm.convertTaskToEvent"))) return;
+    if (!await dialog.confirm(t(lang, "confirm.convertTaskToEvent"))) return;
     const now = new Date().toISOString();
     const activeRecord = editingRecordId
       ? (task.timelineRecords || []).find((record) => record.id === editingRecordId)
@@ -3382,11 +3376,11 @@ function App() {
     showToast(t(lang, "toast.convertedToEvent"));
   }
 
-  function convertEventToTask(eventId: string) {
+  async function convertEventToTask(eventId: string) {
     if (!data) return;
     const event = data.events.find((item) => item.id === eventId);
     if (!event) return;
-    if (!window.confirm(t(lang, "confirm.convertEventToTask"))) return;
+    if (!await dialog.confirm(t(lang, "confirm.convertEventToTask"))) return;
     const sourceEvent: CalendarEvent = editingId === event.id
       ? {
           ...event,
@@ -3741,7 +3735,7 @@ function App() {
       ? tasks.filter((t) => !t.completed && getExecutionLane(t) !== "queued" && !(t.timelineRecords || []).some((r) => r.executionStatus === "scheduled") && !t.scheduledDate && !hasRecurrenceOccurrenceOnDate(t, today))
       : todayCandidates;
     if (sourceTasks.length === 0) {
-      alert(aiPlanPrefs.source === "all" ? t(lang, "toast.noTaskToSchedule") : t(lang, "toast.noCandidateYet"));
+      void dialog.alert(aiPlanPrefs.source === "all" ? t(lang, "toast.noTaskToSchedule") : t(lang, "toast.noCandidateYet"));
       return;
     }
     setSchedulePreviews([]);
@@ -4085,6 +4079,7 @@ function App() {
       </header>
       <div className="df-header-fade" />
       <div id="df-portal-target" />
+      {dialog.host}
       {onboardingActive && (
         <OnboardingGuide
           lang={lang}
@@ -6089,6 +6084,7 @@ function EditDrawer(props: {
   type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; onCreateProject: (title: string) => string;
   editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; lang: Language;
 }) {
+  const dialog = useInAppDialog(props.lang);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [durationPickerOpen, setDurationPickerOpen] = useState(false);
@@ -6103,6 +6099,11 @@ function EditDrawer(props: {
   const f = props.form;
   const set = (key: keyof FormState, value: FormState[keyof FormState]) => props.setForm((current) => ({ ...current, [key]: value }));
   const selectedProjectTitle = props.projects.find((project) => String(project.id) === String(f.projectId))?.title || "未归属";
+  const addTypeHints: Record<AddType, string> = {
+    task: props.lang === "zh" ? "Task：需要完成的行动，可以安排到时间轴并标记完成。" : "Task: an action to complete, schedulable on the timeline and markable as done.",
+    project: props.lang === "zh" ? "Project：一组任务的长期目标，用颜色和重要度组织计划。" : "Project: a longer-term goal that groups tasks with color and priority context.",
+    event: props.lang === "zh" ? "Event：固定发生的日程，不作为可完成任务处理。" : "Event: a fixed calendar item, not treated as a completable task.",
+  };
   useEffect(() => {
     setNoteDraft(props.task?.notes || "");
     setNotesOpen(true);
@@ -6162,9 +6163,9 @@ function EditDrawer(props: {
     if (props.task.scheduledStart) patch.scheduledEnd = addMinutes(props.task.scheduledStart, safeMinutes);
     props.onTaskUpdate(props.task.id, patch);
   }
-  function addSubtask() {
+  async function addSubtask() {
     if (!props.task) return;
-    const title = window.prompt("子任务名称");
+    const title = await dialog.prompt(props.lang === "zh" ? "子任务名称" : "Subtask name");
     if (!title?.trim()) return;
     props.onTaskUpdate(props.task.id, {
       subtasks: [...(props.task.subtasks || []), { id: uid("subtask"), title: title.trim(), completed: false, done: false, order: Date.now(), createdAt: new Date().toISOString() }]
@@ -6523,18 +6524,18 @@ function EditDrawer(props: {
   return (
     <aside className="df-drawer">
       <div className="df-drawer-head"><h2>{props.editing ? t(props.lang, "form.edit") : t(props.lang, "form.add")}</h2><button className="df-icon-action i-close" data-tip={t(props.lang, "form.close")} aria-label={t(props.lang, "form.close")} onClick={props.onClose} /></div>
-      <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : t(props.lang, "form.event")}</button>)}</div>
+      <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} title={addTypeHints[type]} aria-label={addTypeHints[type]} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : t(props.lang, "form.event")}</button>)}</div>
       {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />{t(props.lang, "form.completed")}</label>}
       <label>{t(props.lang, "form.name")}<input value={f.title} onChange={(event) => set("title", event.target.value)} /></label>
-      {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label><div className="df-grid2"><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div></>}
-      {props.type === "project" && <><label>{t(props.lang, "form.projectNotes")}<textarea rows={3} value={f.details} onChange={(event) => set("details", event.target.value)} /></label><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></>}
+      {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label></>}
+      {props.type === "project" && <div className="df-form-color-row"><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></div>}
       {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label><label>重复<select value={f.recurrence?.frequency || "none"} onChange={(event) => {
         const frequency = event.target.value as RecurrenceFrequency;
         set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max((timeToMinutes(f.endTime || addMinutes(f.dueTime, 60)) - timeToMinutes(f.dueTime)), 15) : undefined, endDate: f.endDate || undefined });
       }}>{RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>}
       <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? t(props.lang, "form.collapseAdvanced") : t(props.lang, "form.expandAdvanced")}</button>
-      {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <label>{t(props.lang, "form.estimatedTime")}<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>}<label>{t(props.lang, "form.notes")}<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
-      <div className="df-drawer-actions">{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}{props.type === "task" && <button className="df-icon-action i-next" data-tip={t(props.lang, "form.clarifyNext")} aria-label={t(props.lang, "form.clarifyNext")} onClick={props.onNextAction} />}<button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : t(props.lang, "form.add")}</button></div>
+      {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><div className="df-grid2"><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div><label>{t(props.lang, "form.estimatedTime")}<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label></>}<label>{t(props.lang, "form.notes")}<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
+      <div className={`df-drawer-actions ${props.type === "task" ? "stacked" : ""}`}>{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}<div className="df-drawer-primary-flow">{props.type === "task" && <button className="df-icon-action i-clarify" data-tip={t(props.lang, "form.clarifyNext")} aria-label={t(props.lang, "form.clarifyNext")} onClick={props.onNextAction} />}<button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : t(props.lang, "form.add")}</button></div></div>
     </aside>
   );
 }
@@ -6724,17 +6725,15 @@ function UtilityPanel({ kind, settings, authEmail, onClose, onSave, onShowAbout,
                 <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
                 <button className="df-settings-reset-accent" onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复主题默认强调色" : "Restore theme default accents"}</button>
                 <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
+                {authEmail && <p className="df-settings-account">{t(lang, "settings.account")}：{authEmail}</p>}
+                <button className="df-settings-about" onClick={onShowAbout}>
+                  <span className="df-settings-about-icon">i</span>
+                  <span>{t(lang, "settings.about")}</span>
+                </button>
+                {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
                 {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}
               </div>
             </details>
-            {authEmail && <p>{t(lang, "settings.account")}：{authEmail}</p>}
-            <div className="df-settings-footer">
-              <button className="df-settings-about" onClick={onShowAbout}>
-                <span className="df-settings-about-icon">i</span>
-                <span>{t(lang, "settings.about")}</span>
-              </button>
-              {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
-            </div>
           </div>
         ) : (
           <div className="df-utility-body">
