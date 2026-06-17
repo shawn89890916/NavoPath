@@ -91,32 +91,54 @@ export type AiAction =
       warning?: string;
     };
 
+export type AiPlanBlock = {
+  taskId?: string;
+  title: string;
+  start: string;
+  end: string;
+  durationMinutes?: number;
+  reason?: string;
+};
+
 export type AiAssistantResponse = {
   reply: string;
   actions: AiAction[];
   steps?: AiStep[];
   memories?: AiMemoryPatch[];
+  intent?: string;
+  plan?: AiPlanBlock[];
+  format?: "text" | "markdown";
 };
 
+/**
+ * Strip any number of nested JSON layers from the `reply` field. Mirrors the
+ * server-side `unwrapReplyLayers` in supabase/functions/ai-assistant/index.ts
+ * so the UI is protected even if the edge function is on an older revision.
+ */
 function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse {
   let reply = result.reply;
-  while (reply.trim().startsWith("{")) {
+  for (let i = 0; i < 8; i += 1) {
+    const trimmed = reply.trim();
+    if (!trimmed.startsWith("{")) break;
     try {
-      const nested = JSON.parse(reply) as Partial<AiAssistantResponse>;
-      if (typeof nested.reply === "string") {
+      const nested = JSON.parse(trimmed) as Partial<AiAssistantResponse>;
+      if (typeof nested.reply === "string" && nested.reply !== trimmed) {
         reply = nested.reply;
-      } else {
-        break;
+        continue;
       }
     } catch {
-      break;
+      // not parseable -> done
     }
+    break;
   }
   return {
     reply,
     actions: result.actions,
     steps: result.steps,
     memories: result.memories,
+    intent: result.intent,
+    plan: result.plan,
+    format: result.format,
   };
 }
 
@@ -145,6 +167,7 @@ export async function callAiAssistant(params: {
   context?: unknown;
   history?: AiChatMessage[];
   memories?: AiMemoryPatch[];
+  signal?: AbortSignal;
 }): Promise<AiAssistantResponse> {
   const client = getClient();
   if (!client) {
@@ -165,8 +188,11 @@ export async function callAiAssistant(params: {
   };
 
   try {
+    if (params.signal?.aborted) {
+      return { reply: "请求已取消。", actions: [], steps: [{ label: "请求已取消", status: "error" }] };
+    }
     const { data, error } = await client.functions.invoke("ai-assistant", {
-      body: { ...params, context: enrichedContext },
+      body: { ...params, context: enrichedContext, signal: undefined },
     });
 
     if (error) {
@@ -199,6 +225,9 @@ export async function callAiAssistant(params: {
       actions: Array.isArray(result.actions) ? result.actions : [],
       steps: Array.isArray(result.steps) ? result.steps : [],
       memories: Array.isArray(result.memories) ? result.memories : [],
+      intent: typeof result.intent === "string" ? result.intent : undefined,
+      plan: Array.isArray(result.plan) ? result.plan : undefined,
+      format: result.format === "markdown" ? "markdown" : "text",
     });
   } catch (err) {
     console.error("AI Assistant network error:", err);

@@ -276,6 +276,9 @@ type AiSessionMessage = {
   actions?: AiAction[];
   selectedActions?: Record<number, boolean>;
   actionState?: "pending" | "adopted" | "rejected" | "undone";
+  intent?: string;
+  plan?: Array<{ taskId?: string; title: string; start: string; end: string; durationMinutes?: number; reason?: string }>;
+  format?: "text" | "markdown";
   importCommit?: {
     focus?: TimelineFocusTarget;
     addedCount: number;
@@ -3909,6 +3912,9 @@ function App() {
         actions: validActions,
         selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
         actionState: validActions.length ? "pending" : undefined,
+        intent: result.intent,
+        plan: result.plan,
+        format: result.format || "text",
       } : message));
       const currentData = dataRef.current;
       if (currentData) {
@@ -7134,6 +7140,14 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
             {message.steps.map((step, index) => <div key={index} className={`df-ai-step ${step.status}`}><span className="df-ai-step-icon">{step.status === "done" ? "✓" : step.status === "error" ? "✕" : step.status === "running" ? "●" : "○"}</span><span>{step.label}</span></div>)}
           </div>}
           {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.content}</div>}
+          {message.plan && message.plan.length > 0 && <div className="df-ai-plan">
+            <div className="df-ai-plan-header"><span>📅 今日时间块</span><small>{message.plan.length} 项</small></div>
+            {message.plan.map((block, pi) => <div key={pi} className="df-ai-plan-row">
+              <span className="df-ai-plan-time mono">{block.start} - {block.end}</span>
+              <span className="df-ai-plan-title">{block.title}</span>
+              {block.durationMinutes ? <span className="df-ai-plan-dur">{block.durationMinutes}m</span> : null}
+            </div>)}
+          </div>}
           {message.actions && message.actions.length > 0 && <div className="df-ai-actions">
             <div className="df-ai-action-header"><span>{text.parsed}</span><div><button onClick={() => onSetAllActions(message.id, true)}>{text.selectAll}</button><button onClick={() => onSetAllActions(message.id, false)}>{text.selectNone}</button><small>{message.actions.length} {text.itemUnit}</small></div></div>
             {message.actions.map((action, i) => {

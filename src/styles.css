@@ -16542,6 +16542,40 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-ai-task-card:last-child { border-bottom: none; }
 .df-ai-task-card.accepted { opacity: 0.6; }
 
+/* Plan card — time-block list shown alongside chat reply */
+.df-ai-plan {
+  margin: 0 12px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.df-ai-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  background: var(--accent-active-soft, rgba(198, 156, 249, 0.12));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.df-ai-plan-header small { color: var(--text-muted); font-weight: 500; }
+.df-ai-plan-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.df-ai-plan-row:last-child { border-bottom: none; }
+.df-ai-plan-time { color: var(--mode-primary); font-weight: 600; }
+.df-ai-plan-title { color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-ai-plan-dur { color: var(--text-muted); font-size: 11px; }
+
 .df-ai-task-strip {
   width: 3px;
   border-radius: 999px;
