@@ -1746,7 +1746,8 @@
 }
 
 .df-app .df-drawer-actions.stacked {
-  align-items: flex-end !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
 }
 
 .df-app .df-drawer-primary-flow {
@@ -1754,7 +1755,7 @@
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
-  margin-left: auto;
+  margin-left: 0;
   min-width: 150px;
 }
 
@@ -1764,6 +1765,52 @@
 
 .df-app .df-drawer-primary-flow .primary {
   width: 100%;
+}
+
+.df-app .df-segment .active {
+  border-bottom: 3px solid var(--accent-active) !important;
+  color: var(--text-main) !important;
+  font-weight: 700 !important;
+}
+
+.df-app .df-clarify-action {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 8px 0 4px;
+  padding: 0 12px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-accent-rule) !important;
+  border-radius: 0 !important;
+  color: var(--text-main) !important;
+  background: var(--paper-note) !important;
+  box-shadow: none !important;
+  font-weight: 650;
+  text-align: left;
+}
+
+.df-app .df-clarify-action:hover {
+  color: var(--accent-active) !important;
+  border-bottom-color: var(--accent-active) !important;
+  background: color-mix(in srgb, var(--paper-note) 86%, var(--accent-active) 6%) !important;
+}
+
+.df-app .df-clarify-action:active {
+  transform: translateY(1px) !important;
+}
+
+.df-app .df-clarify-action:focus-visible {
+  outline: 1px solid var(--accent-active) !important;
+  outline-offset: 2px;
+}
+
+.df-app .df-clarify-action span::before {
+  content: "\2316";
+  font-size: 17px;
+  line-height: 1;
 }
 
 .df-app .df-settings-advanced {
@@ -2010,4 +2057,109 @@
 
 .df-dialog-primary {
   font-weight: 720;
+}
+
+/* Keep calendar canvases on one continuous sheet of paper in every view. */
+.df-app .df-timeline-scroll > .df-timeline-canvas,
+.df-app .df-timeline-3day-cols {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, #c9a46f 10%, transparent) 0,
+      color-mix(in srgb, #c9a46f 10%, transparent) 80px,
+      transparent 80px,
+      transparent 160px
+    ) !important;
+}
+
+.df-app.theme-dark .df-timeline-scroll > .df-timeline-canvas,
+.df-app.theme-dark .df-timeline-3day-cols {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, #b8895f 8%, transparent) 0,
+      color-mix(in srgb, #b8895f 8%, transparent) 80px,
+      transparent 80px,
+      transparent 160px
+    ) !important;
+}
+
+/* The multi-day ruler is part of the same paper, not a separate white rail. */
+.df-app .df-timeline-3day-ruler,
+.df-app.theme-dark .df-timeline-3day-ruler,
+.df-app:not(.theme-dark) .df-timeline-3day-ruler,
+.df-app .df-timeline-3day-ruler .df-timeline-canvas {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Hidden scrollbars need no reserved width; all-day and timed columns then align. */
+.df-app .df-timeline-3day {
+  --df-scrollbar-gutter: 0px;
+}
+
+.df-app .df-timeline-3day-scroll {
+  scrollbar-gutter: auto !important;
+}
+
+.df-app .df-timeline-3day-top .df-timeline-3day-dates,
+.df-app .df-timeline-3day-allday > .df-timeline-3day-dates {
+  padding-right: 0 !important;
+}
+
+/* Month view alternates by week instead of inheriting hourly timeline bands. */
+.df-app .df-month-scroll,
+.df-app.theme-dark .df-month-scroll {
+  background: transparent !important;
+}
+
+.df-app .df-month-week-row:nth-child(odd) {
+  background: color-mix(in srgb, #c9a46f 10%, transparent) !important;
+}
+
+.df-app.theme-dark .df-month-week-row:nth-child(odd) {
+  background: color-mix(in srgb, #b8895f 8%, transparent) !important;
+}
+
+.df-app .df-month-week-row:nth-child(even) {
+  background: transparent !important;
+}
+
+.df-app .df-timeline-3day-allday,
+.df-app .df-timeline-3day-allday-cell,
+.df-app .df-timeline-allday,
+.df-app .df-timeline-allday-content {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-month-cell,
+.df-app .df-month-cell.muted,
+.df-app.theme-dark .df-month-cell,
+.df-app.theme-dark .df-month-cell.muted {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-timeline-allday-content.drop-active,
+.df-app .df-timeline-3day-allday-cell.drop-active,
+.df-app .df-timeline-allday-content:has(.df-all-day-block:hover),
+.df-app .df-timeline-3day-allday-cell:has(.df-all-day-block:hover) {
+  background: var(--paper-note) !important;
+}
+
+/* Header selector is a secondary text control, not a framed button. */
+.df-app .df-month-year-btn,
+.df-app .df-month-year-btn:hover,
+.df-app .df-month-year-btn:focus-visible {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Separate candidate content from quick add with one quiet paper rule. */
+.df-app .df-quick-add,
+.df-app .df-quick-add:focus-within {
+  border: 0 !important;
+  border-top: 1px solid var(--paper-rule) !important;
 }

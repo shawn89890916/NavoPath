@@ -1310,6 +1310,7 @@ function App() {
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -2614,15 +2615,30 @@ function App() {
 
   function quickAddTask() {
     if (!data || !quickTitle.trim()) return;
-    const estimatedMinutes = learnedTaskDurationMinutes(quickTitle, data.tasks, quickProjectId);
+    let title = quickTitle;
+    let targetDate = today;
+    const yearMatch = quickTitle.match(/^\/(\d{4})\s+/);
+    if (yearMatch) {
+      const year = parseInt(yearMatch[1], 10);
+      if (year >= 2000 && year <= 2100) {
+        title = quickTitle.replace(yearMatch[0], "").trim();
+        const currentDateObj = new Date(`${selectedDate}T00:00:00`);
+        const month = currentDateObj.getMonth();
+        const day = Math.min(currentDateObj.getDate(), daysInMonth(year, month));
+        targetDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        setSelectedDate(targetDate);
+      }
+    }
+    if (!title.trim()) return;
+    const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, quickProjectId);
     const task = makeTask({
       ...defaultForm("task"),
-      title: quickTitle,
+      title,
       projectId: quickProjectId,
-      dueDate: today,
+      dueDate: targetDate,
       estimatedHours: estimatedMinutes / 60,
     });
-    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: today, order: Date.now() }] });
+    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, order: Date.now() }] });
     setQuickTitle("");
     if (settings?.onboardingVersion === 0 && settings.onboardingStep === "add") {
       void saveSettings({ onboardingStep: "drag" });
@@ -4557,6 +4573,42 @@ function App() {
     });
   }
 
+  function prevYear() {
+    setSelectedDate((date) => {
+      const d = new Date(`${date}T00:00:00`);
+      const year = d.getFullYear() - 1;
+      const month = d.getMonth();
+      const day = Math.min(d.getDate(), daysInMonth(year, month));
+      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    });
+    setYearPickerOpen(false);
+  }
+
+  function nextYear() {
+    setSelectedDate((date) => {
+      const d = new Date(`${date}T00:00:00`);
+      const year = d.getFullYear() + 1;
+      const month = d.getMonth();
+      const day = Math.min(d.getDate(), daysInMonth(year, month));
+      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    });
+    setYearPickerOpen(false);
+  }
+
+  function selectYear(year: number) {
+    setSelectedDate((date) => {
+      const d = new Date(`${date}T00:00:00`);
+      const month = d.getMonth();
+      const day = Math.min(d.getDate(), daysInMonth(year, month));
+      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    });
+    setYearPickerOpen(false);
+  }
+
+  function daysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
+  }
+
   if (authState?.mode === "cloud" && !authState.user) {
     return <Suspense fallback={<div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>}>
       <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} onForgotPassword={handleForgotPassword} />
@@ -4577,6 +4629,34 @@ function App() {
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
+          <div className="df-month-year-selector" onClick={(e) => e.stopPropagation()}>
+            <button className="df-month-year-btn" onClick={() => setYearPickerOpen((open) => !open)}>
+              {(() => { const d = new Date(`${timelineDate}T00:00:00`); return `${d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" })} ${d.getFullYear()}`; })()}
+              <span className="df-month-year-chevron" />
+            </button>
+            {yearPickerOpen && <div className="df-month-year-dropdown">
+              <div className="df-month-year-header">
+                <button className="df-month-year-nav" onClick={() => prevYear()} title={lang === "zh" ? "上一年" : "Previous year"}>‹</button>
+                <span className="df-month-year-current">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.getFullYear(); })()}</span>
+                <button className="df-month-year-nav" onClick={() => nextYear()} title={lang === "zh" ? "下一年" : "Next year"}>›</button>
+              </div>
+              <div className="df-month-grid">
+                {(() => { const months = lang === "zh" ? ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"] : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return months; })().map((month, mi) => {
+                  const d = new Date(`${timelineDate}T00:00:00`);
+                  const isCurrent = mi === d.getMonth();
+                  return (
+                    <button key={mi} className={`df-month-option${isCurrent ? " selected" : ""}`} onClick={() => {
+                      const year = d.getFullYear();
+                      const day = Math.min(d.getDate(), daysInMonth(year, mi));
+                      setSelectedDate(`${year}-${String(mi + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+                    }}>
+                      {month}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>}
+          </div>
           <div className="df-header-right">
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
@@ -4778,6 +4858,7 @@ function App() {
                             return (
                               <div key={colDate} className={`df-timeline-3day-date${isToday ? " today" : ""}`}>
                                 <span className="df-timeline-3day-date-num">{dateObj.getDate()}</span>
+                                <span className="df-timeline-3day-date-sep"></span>
                                 <span className="df-timeline-3day-date-wd">{weekdayShort[dateObj.getDay()]}</span>
                               </div>
                             );
@@ -5196,7 +5277,9 @@ function App() {
                   return (
                     <div className="df-month-view">
                       <div className="df-month-header">
-                        <div className="df-month-title">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return monthTitle(lang, d.getFullYear(), d.getMonth() + 1); })()}</div>
+                        <div className="df-month-title">
+                          <span className="df-month-name">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" }); })()}</span>
+                        </div>
                       </div>
                       <div className="df-month-body">
                         <div className="df-month-weekdays">{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <span key={day}>{day}</span>)}</div>
@@ -5295,8 +5378,10 @@ function App() {
                   );
                 })() : (
                   <div className="df-timeline-daily">
-                    <div className={`df-date-title${timelineDate === today ? " today" : ""}`}>
-                      {(() => { const d = new Date(`${timelineDate}T00:00:00`); return formatDateTitle(lang, d.getFullYear(), d.getMonth() + 1, d.getDate()); })()}
+                    <div className={`df-date-title df-date-title-compact${timelineDate === today ? " today" : ""}`}>
+                      <span className="df-date-num">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.getDate(); })()}</span>
+                      <span className="df-date-sep"></span>
+                      <span className="df-date-wd">{(() => { const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const d = new Date(`${timelineDate}T00:00:00`); return weekdayShort[d.getDay()]; })()}</span>
                     </div>
                     <div
                       className={`df-timeline-allday${allDayDragOver && drag ? " drag-over" : ""}`}
@@ -7038,16 +7123,17 @@ function EditDrawer(props: {
       <div className="df-drawer-head"><h2>{props.editing ? t(props.lang, "form.edit") : t(props.lang, "form.add")}</h2><button className="df-icon-action i-close" data-tip={t(props.lang, "form.close")} aria-label={t(props.lang, "form.close")} onClick={props.onClose} /></div>
       <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} title={addTypeHints[type]} aria-label={addTypeHints[type]} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : t(props.lang, "form.event")}</button>)}</div>
       {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />{t(props.lang, "form.completed")}</label>}
-      <label>{t(props.lang, "form.name")}<input value={f.title} onChange={(event) => set("title", event.target.value)} /></label>
+      <label>{t(props.lang, "form.name")}<input autoFocus={!props.editing} value={f.title} onChange={(event) => set("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onSave(); } }} /></label>
       {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label></>}
       {props.type === "project" && <div className="df-form-color-row"><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></div>}
       {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label><label>重复<select value={f.recurrence?.frequency || "none"} onChange={(event) => {
         const frequency = event.target.value as RecurrenceFrequency;
         set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max((timeToMinutes(f.endTime || addMinutes(f.dueTime, 60)) - timeToMinutes(f.dueTime)), 15) : undefined, endDate: f.endDate || undefined });
       }}>{RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>}
+      {props.type === "task" && <button className="df-clarify-action" onClick={props.onNextAction}><span aria-hidden="true" />{t(props.lang, "form.clarifyNext")}</button>}
       <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? t(props.lang, "form.collapseAdvanced") : t(props.lang, "form.expandAdvanced")}</button>
       {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><div className="df-grid2"><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div><label>{t(props.lang, "form.estimatedTime")}<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label></>}<label>{t(props.lang, "form.notes")}<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
-      <div className={`df-drawer-actions ${props.type === "task" ? "stacked" : ""}`}>{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}<div className="df-drawer-primary-flow">{props.type === "task" && <button className="df-icon-action i-clarify" data-tip={t(props.lang, "form.clarifyNext")} aria-label={t(props.lang, "form.clarifyNext")} onClick={props.onNextAction} />}<button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : t(props.lang, "form.add")}</button></div></div>
+      <div className={`df-drawer-actions ${props.type === "task" ? "stacked" : ""}`}>{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}<div className="df-drawer-primary-flow"><button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : t(props.lang, "form.add")}</button></div></div>
     </aside>
   );
 }

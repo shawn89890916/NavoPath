@@ -11747,6 +11747,254 @@ body:has(:active)::-webkit-scrollbar-thumb {
   color: color-mix(in srgb, var(--accent-active) 80%, var(--text-main));
 }
 
+.df-month-year-selector {
+  display: inline-flex;
+  align-items: center;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
+.df-month-year-selector-top {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.df-month-year-selector-inline {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+}
+
+.df-month-year-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  padding: 6px 10px;
+  font-family: inherit;
+}
+
+.df-month-year-btn:hover {
+  opacity: 0.7;
+}
+
+.df-month-year-chevron {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  transition: transform 0.15s ease;
+  opacity: 0.5;
+}
+
+.df-month-year-btn:hover .df-month-year-chevron {
+  transform: rotate(180deg);
+}
+
+.df-month-year-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-popover, #ffffff);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  min-width: 280px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.df-month-year-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--accent-active-soft, rgba(198, 156, 249, 0.08));
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.df-month-year-nav {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.df-month-year-nav:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.df-month-year-current {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.df-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px;
+}
+
+.df-month-option {
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.df-month-option:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.df-month-option.selected {
+  background: var(--accent-active-soft, rgba(198, 156, 249, 0.15));
+  color: var(--mode-primary);
+  font-weight: 600;
+}
+
+/* 日期标题紧凑样式 - 日期和星期并排显示 */
+.df-date-title-compact {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  padding: 8px;
+  gap: 6px;
+}
+
+.df-date-num {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-main);
+}
+
+.df-date-sep {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.df-date-wd {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.df-date-title-compact.today .df-date-num {
+  color: var(--mode-primary);
+}
+
+.df-date-title-compact.today .df-date-wd {
+  color: var(--mode-primary);
+}
+
+.df-date-title-compact.today .df-date-sep {
+  background: var(--mode-primary);
+}
+
+/* 月份名称样式 */
+.df-month-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* 三日/周视图日期样式 - 日期和星期并排显示 */
+.df-timeline-3day-date {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.df-timeline-3day-date-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.df-timeline-3day-date-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.df-timeline-3day-date-wd {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.df-timeline-3day-date.today .df-timeline-3day-date-num {
+  color: var(--mode-primary);
+}
+
+.df-timeline-3day-date.today .df-timeline-3day-date-wd {
+  color: var(--mode-primary);
+}
+
+.df-timeline-3day-date.today .df-timeline-3day-date-sep {
+  background: var(--mode-primary);
+}
+
+.df-app.theme-dark .df-month-year-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.df-app.theme-dark .df-month-year-dropdown {
+  background: var(--bg-popover, rgba(30, 30, 35, 0.98));
+  border-color: var(--border-subtle);
+}
+
+.df-app.theme-dark .df-month-year-header {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.df-app.theme-dark .df-month-year-nav:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.df-app.theme-dark .df-month-option:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .df-back-today {
   position: absolute;
   top: 8px;

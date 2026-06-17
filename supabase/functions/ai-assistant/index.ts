@@ -6,6 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { chatPrompt, importSchedulePrompt, routerPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
+import { buildConversationContinuation } from "./conversation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,8 +16,6 @@ const corsHeaders = {
 };
 
 const STAGE_TIMEOUT_MS = 12_000;
-const CACHE_TTL_MS = 60_000;
-const CACHE_MAX_ENTRIES = 64;
 
 function getTomorrow(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -73,6 +72,11 @@ function extractJsonObject(text: string): unknown {
   throw new Error("No complete JSON object found");
 }
 
+function looksLikeCodeOrJson(value: string): boolean {
+  const text = value.trim();
+  return text.startsWith("{") || text.startsWith("[") || text.startsWith("```") || /\"(?:reply|actions|steps)\"\s*:/.test(text);
+}
+
 /**
  * Strip any number of nested JSON layers from the `reply` field. This is the
  * canonical fix for the bug where AI replies show raw JSON in the UI: models
@@ -85,9 +89,9 @@ function unwrapReplyLayers(reply: string): string {
   // Hard cap to avoid pathological loops.
   for (let i = 0; i < 8; i += 1) {
     const trimmed = current.trim();
-    if (!trimmed.startsWith("{")) return current;
+    if (!looksLikeCodeOrJson(trimmed)) return current;
     try {
-      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      const parsed = extractJsonObject(trimmed) as Record<string, unknown>;
       if (typeof parsed.reply === "string" && parsed.reply !== trimmed) {
         current = parsed.reply;
         continue;
@@ -95,14 +99,16 @@ function unwrapReplyLayers(reply: string): string {
     } catch {
       // not parseable -> done
     }
-    return current;
+    return "已生成结果，请查看下方可执行操作。";
   }
-  return current;
+  return looksLikeCodeOrJson(current) ? "已生成结果，请查看下方可执行操作。" : current;
 }
 
 function normalizeAssistantPayload(value: unknown) {
   const parsed = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
-  const rawReply = typeof parsed.reply === "string" ? parsed.reply : "已完成。";
+  if (typeof parsed.reply !== "string") throw new Error("Assistant payload is missing reply");
+  if (!Array.isArray(parsed.actions)) throw new Error("Assistant payload is missing actions");
+  const rawReply = parsed.reply;
   return {
     reply: unwrapReplyLayers(rawReply),
     steps: Array.isArray(parsed.steps) ? parsed.steps : [],
@@ -112,40 +118,6 @@ function normalizeAssistantPayload(value: unknown) {
     plan: Array.isArray(parsed.plan) ? parsed.plan : undefined,
     format: parsed.format === "markdown" ? "markdown" : "text",
   };
-}
-
-// ---------------------------------------------------------------------------
-// Lightweight in-memory LRU cache for identical (mode, message, context-hash)
-// request triples. Avoids hitting DeepSeek when a user retries quickly.
-// ---------------------------------------------------------------------------
-type CacheEntry = { key: string; value: unknown; expiresAt: number };
-const _cache: Map<string, CacheEntry> = new Map();
-
-function cacheGet(key: string): unknown | null {
-  const entry = _cache.get(key);
-  if (!entry) return null;
-  if (entry.expiresAt < Date.now()) {
-    _cache.delete(key);
-    return null;
-  }
-  // LRU touch
-  _cache.delete(key);
-  _cache.set(key, entry);
-  return entry.value;
-}
-
-function cacheSet(key: string, value: unknown) {
-  if (_cache.size >= CACHE_MAX_ENTRIES) {
-    const firstKey = _cache.keys().next().value;
-    if (firstKey) _cache.delete(firstKey);
-  }
-  _cache.set(key, { key, value, expiresAt: Date.now() + CACHE_TTL_MS });
-}
-
-function buildCacheKey(mode: string, message: string, context: Record<string, unknown> | undefined) {
-  // Stable JSON of the inputs (deterministic key order).
-  const ctx = context ? JSON.stringify(context, Object.keys(context).sort()) : "{}";
-  return `${mode}::${message}::${ctx}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +218,19 @@ async function plannerStage(
   ];
   const maxTokens = mode === "import_schedule" ? 6000 : mode === "summarize_memory" ? 600 : 1600;
   const content = await callDeepSeek(apiKey, messages, maxTokens);
-  return extractJsonObject(content);
+  try {
+    return normalizeAssistantPayload(extractJsonObject(content));
+  } catch (firstError) {
+    console.warn("Planner payload validation failed; requesting one repair:", firstError);
+    const repaired = await callDeepSeek(apiKey, [
+      {
+        role: "system",
+        content: "Repair the candidate into one valid JSON object. Required fields: reply (plain user-facing sentence), steps (array), actions (array), memories (array). Never place JSON, markdown, or code inside reply. Return JSON only.",
+      },
+      { role: "user", content: content.slice(0, 12_000) },
+    ], maxTokens);
+    return normalizeAssistantPayload(extractJsonObject(repaired));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -286,16 +270,6 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Missing DEEPSEEK_API_KEY" }), { status: 500, headers: corsHeaders });
     }
 
-    // Cache lookup: only for chat-like, low-stakes modes.
-    const cacheable = mode === "chat" || mode === "plan_day";
-    const cacheKey = cacheable ? buildCacheKey(mode, message, context) : null;
-    if (cacheKey) {
-      const cached = cacheGet(cacheKey);
-      if (cached) {
-        return new Response(JSON.stringify(cached), { headers: corsHeaders });
-      }
-    }
-
     const currentDate = (context?.currentDate as string) || new Date().toISOString().slice(0, 10);
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
     const projectsInfo = context?.projects ? `Available projects: ${JSON.stringify(context.projects)}` : "";
@@ -332,6 +306,8 @@ serve(async (req: Request) => {
     };
 
     let userContent = message;
+    const continuation = buildConversationContinuation(historyMessages, message);
+    if (continuation) userContent = continuation;
     if (context?.taskId && context?.taskTitle) userContent = `[focus task: "${context.taskTitle}"]\n${message}`;
     if (context?.scheduledToday) {
       const scheduled = context.scheduledToday as Array<{ title: string; start: string; end: string }>;
@@ -365,7 +341,6 @@ serve(async (req: Request) => {
       normalized.intent = route.intent;
     }
 
-    if (cacheKey) cacheSet(cacheKey, normalized);
     return new Response(JSON.stringify(normalized), { headers: corsHeaders });
   } catch (err) {
     console.error("Edge function error:", err);

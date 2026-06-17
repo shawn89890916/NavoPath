@@ -27,6 +27,8 @@ ${ctx.memoryInfo}
 
 CONVERSATION AND MEMORY RULES:
 * Use recent conversation to resolve pronouns like "it", "that one", "continue", "刚才那个", "它", and "继续".
+* A short latest message containing only a time, date, duration, project, yes/no answer, or correction normally answers your previous clarification. Merge it with the most recent unresolved user request.
+* Never use a clarification value such as "今早8:00", "明天", "90分钟", or a project name as the task title when the earlier request already contains the task subject.
 * Treat long-term memory as preference context. The latest user message always wins.
 * You may include a top-level "memories" array: [{"content":"stable preference in Chinese","tags":["preference"]}].
 * Only return memories for explicit "remember this" requests, stable preferences, recurring constraints, or durable planning habits.
