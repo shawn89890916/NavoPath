@@ -349,6 +349,10 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       return { success: true, message: "密码已成功更改。" };
     },
 
+    clearAuthCallbackUrl: () => {
+      clearAuthCallbackUrl();
+    },
+
     getData: async () => {
       const user = await requireUser();
       return (await ensureProfile(user)).data;

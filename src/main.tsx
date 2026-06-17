@@ -1247,6 +1247,23 @@ function App() {
     const isRecovery = /type=recovery/i.test(url.hash);
     if (isRecovery) {
       setIsRecoveryMode(true);
+      // Recovery flow: Supabase client auto-processes the recovery hash and sets the session.
+      // Do NOT call completeEmailConfirmation() -- that's for sign-up email verification.
+      // Just load initial state; authState.user will be set from the recovery session,
+      // and isRecoveryMode will trigger ResetPasswordForm.
+      (async () => {
+        await loadInitial();
+        // Clean up the URL hash (access token, recovery params) for security / clean URL
+        try {
+          const api = await waitForPlannerApi();
+          await api.clearAuthCallbackUrl?.();
+        } catch { /* non-critical */ }
+      })().catch((error) => {
+        setAuthBusy(false);
+        setIsRecoveryMode(false);
+        setAuthError(error instanceof Error ? error.message : String(error));
+      });
+      return;
     }
     const initialize = async () => {
       if (hasConfirmationCallback) {
@@ -1345,10 +1362,12 @@ function App() {
     setAuthError("");
     try {
       const api = await waitForPlannerApi();
-      const response = await api.sendPasswordResetEmail?.(email);
-      if (response?.message) setAuthError(response.message);
+      await api.sendPasswordResetEmail?.(email);
+      // Success: LandingPage transitions to forgotSent UI
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : String(error));
+      const msg = error instanceof Error ? error.message : String(error);
+      setAuthError(msg);
+      throw error; // re-throw so LandingPage can stay in forgot view
     } finally {
       setAuthBusy(false);
     }
@@ -1361,11 +1380,11 @@ function App() {
       const api = await waitForPlannerApi();
       const response = await api.resetPassword?.(newPassword);
       if (response?.success) {
-        setAuthError(response?.message || "");
         setIsRecoveryMode(false);
+        showToast(response?.message || "密码已成功更改，请用新密码登录。");
         await handleSignOut();
       } else {
-        setAuthError(response?.message || "令牌已过期或无效，请重新发起密码重置。");
+        setAuthError(response?.message || "重置链接已过期或无效，请重新发起密码重置。");
         setIsRecoveryMode(false);
       }
     } catch (error) {

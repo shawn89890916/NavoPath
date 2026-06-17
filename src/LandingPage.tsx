@@ -276,7 +276,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
               <span className="landing-auth-label">{authText.account}</span>
               <h2>{authView === "forgot" ? authText.forgotTitle : authText.sentTitle}</h2>
               {authView === "forgot" ? (
-                <form onSubmit={async (event) => { event.preventDefault(); setForgotBusy(true); try { await onForgotPassword(email.trim()); setAuthView("forgotSent"); } finally { setForgotBusy(false); } }}>
+                <form onSubmit={async (event) => { event.preventDefault(); setForgotBusy(true); try { await onForgotPassword(email.trim()); setAuthView("forgotSent"); } catch { /* error already shown via error prop */ } finally { setForgotBusy(false); } }}>
                   <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "12px" }}>{authText.forgotBody}</p>
                   <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={authText.email} required autoFocus />
                   {error && <p className="landing-auth-error">{error}</p>}
