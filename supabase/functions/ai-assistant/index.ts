@@ -68,8 +68,21 @@ function extractJsonObject(text: string): unknown {
 
 function normalizeAssistantPayload(value: unknown) {
   const parsed = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  let reply = typeof parsed.reply === "string" ? parsed.reply : "已完成。";
+  while (reply.trim().startsWith("{")) {
+    try {
+      const nested = JSON.parse(reply) as Record<string, unknown>;
+      if (typeof nested.reply === "string") {
+        reply = nested.reply;
+      } else {
+        break;
+      }
+    } catch {
+      break;
+    }
+  }
   return {
-    reply: typeof parsed.reply === "string" ? parsed.reply : "已完成。",
+    reply,
     steps: Array.isArray(parsed.steps) ? parsed.steps : [],
     actions: Array.isArray(parsed.actions) ? parsed.actions : [],
     memories: Array.isArray(parsed.memories) ? parsed.memories : [],

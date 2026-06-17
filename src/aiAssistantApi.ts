@@ -99,19 +99,25 @@ export type AiAssistantResponse = {
 };
 
 function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse {
-  if (!result.reply.trim().startsWith("{")) return result;
-  try {
-    const nested = JSON.parse(result.reply) as Partial<AiAssistantResponse>;
-    if (typeof nested.reply !== "string") return result;
-    return {
-      reply: nested.reply,
-      actions: Array.isArray(nested.actions) ? nested.actions : result.actions,
-      steps: Array.isArray(nested.steps) ? nested.steps : result.steps,
-      memories: Array.isArray(nested.memories) ? nested.memories : result.memories,
-    };
-  } catch {
-    return result;
+  let reply = result.reply;
+  while (reply.trim().startsWith("{")) {
+    try {
+      const nested = JSON.parse(reply) as Partial<AiAssistantResponse>;
+      if (typeof nested.reply === "string") {
+        reply = nested.reply;
+      } else {
+        break;
+      }
+    } catch {
+      break;
+    }
   }
+  return {
+    reply,
+    actions: result.actions,
+    steps: result.steps,
+    memories: result.memories,
+  };
 }
 
 function uid(prefix: string) {
