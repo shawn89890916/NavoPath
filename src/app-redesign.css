@@ -1,11 +1,16 @@
 /* NavoPath paper editorial application layer. Shared accents follow --accent-active. */
 .df-app {
+  --navo-brown: #584d3d;
+  --navo-sage: #7ea172;
+  --navo-coral: #d7816a;
+  --navo-aubergine: #0f0326;
+  --navo-white: #fbf9ff;
   --paper-serif: Georgia, "Noto Serif SC", "Songti SC", SimSun, serif;
   --paper-sans: "Avenir Next", "Segoe UI", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
   --paper-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --paper-display: var(--paper-serif);
   --paper-task: var(--paper-serif);
-  --paper-complete: #caff72;
+  --paper-complete: var(--navo-sage);
   --paper-radius: 4px;
   --paper-radius-soft: 8px;
   --paper-motion: 160ms cubic-bezier(.2,.75,.25,1);
@@ -29,31 +34,31 @@
 .df-app.type-sans { --paper-display: var(--paper-sans); --paper-task: var(--paper-sans); }
 
 .df-app.theme-dark {
-  --bg-app: #12110f !important;
-  --bg-app-soft: #181613 !important;
-  --surface-main: #1b1916 !important;
-  --surface-raised: #211e1a !important;
-  --surface-card: #1e1b18 !important;
-  --text-main: #eee9df !important;
-  --text-muted: #aaa397 !important;
-  --text-faint: #756f66 !important;
-  --border-soft: rgba(238,233,223,.14) !important;
-  --border-subtle: rgba(238,233,223,.075) !important;
+  --bg-app: var(--navo-aubergine) !important;
+  --bg-app-soft: #160a2d !important;
+  --surface-main: #1b1033 !important;
+  --surface-raised: #24183b !important;
+  --surface-card: #20143a !important;
+  --text-main: var(--navo-white) !important;
+  --text-muted: #b8b1c2 !important;
+  --text-faint: #81798d !important;
+  --border-soft: rgba(251,249,255,.15) !important;
+  --border-subtle: rgba(251,249,255,.08) !important;
   --paper-float-shadow: 0 20px 48px rgba(0,0,0,.32);
 }
 
 .df-app:not(.theme-dark) {
-  --bg-app: #eee9df !important;
-  --bg-app-soft: #e8e1d5 !important;
-  --surface-main: #f7f2e9 !important;
-  --surface-raised: #fffaf1 !important;
-  --surface-card: #faf5ec !important;
-  --text-main: #27231e !important;
-  --text-muted: #6f685e !important;
-  --text-faint: #9a9184 !important;
-  --border-soft: rgba(39,35,30,.16) !important;
-  --border-subtle: rgba(39,35,30,.09) !important;
-  --paper-float-shadow: 0 20px 48px rgba(71,61,47,.16);
+  --bg-app: #f6f2f5 !important;
+  --bg-app-soft: #eee9ec !important;
+  --surface-main: var(--navo-white) !important;
+  --surface-raised: #fff !important;
+  --surface-card: #fff !important;
+  --text-main: var(--navo-brown) !important;
+  --text-muted: #7b7062 !important;
+  --text-faint: #a69d92 !important;
+  --border-soft: rgba(88,77,61,.18) !important;
+  --border-subtle: rgba(88,77,61,.10) !important;
+  --paper-float-shadow: 0 20px 48px rgba(88,77,61,.16);
 }
 
 .df-app *, .df-app *::before, .df-app *::after { box-sizing: border-box; }
@@ -249,6 +254,92 @@
 .df-ai-reply { border-left: 1px solid var(--accent-active) !important; }
 .df-ai-attach-btn, .df-ai-send-btn { border-color: var(--paper-rule) !important; border-radius: var(--paper-radius) !important; background: transparent !important; color: var(--accent-active) !important; box-shadow: none !important; }
 .df-ai-send-btn:not(:disabled), .df-ai-task-accept, .df-ai-import-bulk .primary { color: var(--accent-active) !important; border-color: var(--paper-accent-rule) !important; background: var(--paper-note) !important; box-shadow: none !important; }
+.df-app .df-ai-composer-row { border:0 !important; background:transparent !important; }
+.df-app .df-ai-panel-foot textarea { background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
+.df-app .df-ai-panel-foot textarea:focus { background:transparent !important; box-shadow:inset 0 -1px 0 var(--accent-active) !important; }
+.df-app .df-ai-panel-foot { padding-bottom:7px !important; gap:3px !important; }
+
+/* Reference-led AI workspace: utility bar, prompt suggestions and anchored composer. */
+.df-app .df-ai-panel-reference {
+  right: 16px; bottom: 14px; width: min(570px, calc(100vw - 32px)); height: min(820px, calc(100vh - 28px)); max-height: none;
+  border-radius: 30px !important; overflow: hidden; background: var(--surface-main) !important;
+}
+.df-ai-panel-reference .df-ai-panel-head {
+  min-height: 72px; padding: 0 20px 0 22px; border-bottom: 1px solid var(--paper-rule) !important; background: var(--surface-raised) !important;
+}
+.df-ai-new-chat {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 42px; padding: 0; border: 0; color: var(--text-main); background: transparent; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.df-ai-new-chat > span { display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid currentColor; border-radius: 50%; font: 700 17px/1 var(--paper-sans); }
+.df-ai-panel-reference .df-ai-head-actions { display: flex; align-items: center; gap: 4px; }
+.df-ai-reference-tool {
+  display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; color: var(--text-muted); background: transparent; font: 500 23px/1 var(--paper-sans); cursor: pointer;
+}
+.df-ai-reference-tool.settings { font-size: 0; }
+.df-ai-reference-tool.settings::before { content: "\2699\FE0E"; font: 20px/1 var(--paper-sans); }
+.df-ai-reference-tool:hover, .df-ai-reference-tool.active { color: var(--accent-active); background: var(--paper-note); }
+.df-ai-panel-reference .df-ai-panel-body { padding: 24px; background: var(--surface-main); }
+.df-ai-reference-empty { display: grid; gap: 30px; width: 100%; }
+.df-ai-reference-prompt {
+  padding: 12px 10px; border: 1px dashed var(--paper-rule-strong); border-radius: 10px; color: var(--text-main); background: color-mix(in srgb, var(--navo-sage) 14%, var(--surface-card)); font-size: 17px; line-height: 1.35;
+}
+.df-ai-reference-suggestions { display: grid; gap: 10px; }
+.df-ai-reference-suggestions button {
+  min-height: 43px; width: 100%; padding: 8px 18px; border: 1px solid var(--paper-rule); border-radius: 999px; color: var(--text-main); background: color-mix(in srgb, var(--navo-sage) 10%, var(--surface-card)); font-size: 13px; cursor: pointer;
+}
+.df-ai-reference-suggestions button:hover { border-color: var(--navo-sage); background: color-mix(in srgb, var(--navo-sage) 18%, var(--surface-card)); }
+.df-ai-panel-reference .df-ai-panel-foot { position: relative; padding: 8px 12px 6px !important; border-top: 0 !important; background: var(--surface-main) !important; }
+.df-ai-continue-chat { justify-self: center; display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 0; color: var(--text-muted); background: transparent; font-size: 12px; font-weight: 650; cursor: pointer; }
+.df-ai-continue-chat:hover { color: var(--accent-active); }
+.df-ai-panel-reference .df-ai-composer-row {
+  position: relative; display: grid; grid-template-columns: minmax(0,1fr) 32px 32px; grid-template-rows: minmax(54px,auto) 30px; gap: 2px 4px; padding: 8px 9px 7px 12px !important;
+  border: 1px solid var(--paper-rule-strong) !important; border-radius: 16px !important; background: var(--surface-raised) !important; box-shadow: 0 4px 12px rgba(88,77,61,.14) !important;
+}
+.df-ai-panel-reference .df-ai-panel-foot textarea { grid-column: 1 / 4; grid-row: 1; min-height: 54px; max-height: 110px; padding: 5px 4px; font-size: 14px; }
+.df-ai-panel-reference .df-ai-panel-foot textarea:focus { box-shadow: none !important; }
+.df-ai-panel-reference .df-ai-attach-btn { grid-column: 2; grid-row: 2; width: 30px; height: 30px; min-width: 30px; min-height: 30px; align-self: center; }
+.df-ai-panel-reference .df-ai-send-btn { grid-column: 3; grid-row: 2; width: 30px; height: 30px; min-width: 30px; min-height: 30px; align-self: center; }
+.df-ai-model-picker { position: relative; grid-column: 1; grid-row: 2; justify-self: start; min-width: 0; }
+.df-ai-model-trigger {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 240px; height: 30px; padding: 0 4px; border: 0; color: var(--text-muted); background: transparent; font-size: 10px; cursor: pointer;
+}
+.df-ai-model-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-ai-model-trigger b, .df-ai-model-family button b { padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--navo-coral) 55%, var(--paper-rule)); border-radius: 999px; color: var(--navo-coral); font: 700 8px/1 var(--paper-mono); letter-spacing: .06em; }
+.df-ai-model-trigger i { font-style: normal; font-size: 13px; }
+.df-ai-model-menu {
+  position: absolute; z-index: 20; left: -13px; bottom: 37px; width: min(285px, calc(100vw - 54px)); max-height: min(600px, calc(100vh - 150px)); overflow-y: auto; padding: 10px 0;
+  border: 1px solid var(--paper-rule-strong); border-radius: 14px; color: var(--text-main); background: var(--surface-raised); box-shadow: 8px 12px 24px rgba(15,3,38,.18);
+  scrollbar-width: thin; scrollbar-color: var(--paper-rule-strong) transparent;
+}
+.df-ai-model-menu::-webkit-scrollbar { width: 5px; }
+.df-ai-model-menu::-webkit-scrollbar-thumb { border-radius: 5px; background: var(--paper-rule-strong); }
+.df-ai-model-tier { display: grid; padding: 8px 0 10px; border-left: 4px solid var(--navo-sage); }
+.df-ai-model-tier + .df-ai-model-tier { border-top: 1px solid var(--paper-rule); }
+.df-ai-model-tier.standard { border-left-color: color-mix(in srgb,var(--text-muted) 72%,transparent); }
+.df-ai-model-tier.pro { border-left-color: var(--navo-coral); }
+.df-ai-model-tier > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 6px 18px 8px 20px; }
+.df-ai-model-tier > header strong { display:flex; align-items:center; gap:7px; font-size: 13px; letter-spacing: .04em; }
+.df-ai-model-tier > header strong i { display:grid; place-items:center; width:16px; height:16px; border:1.5px solid currentColor; border-radius:50%; font:700 10px/1 var(--paper-serif); font-style:normal; opacity:.75; }
+.df-ai-model-tier > header small { color: var(--text-faint); font-size: 9px; }
+.df-ai-model-tier-list { display:grid; }
+.df-ai-model-tier-list button {
+  display: grid; grid-template-columns: minmax(0,1fr) auto 18px; align-items: center; gap: 8px; min-height: 42px; width: 100%; padding: 7px 14px 7px 18px; border: 0; color: var(--text-main); text-align: left; background: transparent; cursor: pointer;
+}
+.df-ai-model-tier-list button:hover, .df-ai-model-tier-list button.selected { background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-card)); }
+.df-ai-model-tier-list button em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-style: normal; }
+.df-ai-model-tier-list button small { min-width:42px; padding:4px 8px; border-radius:999px; color:var(--text-muted); text-align:center; background:color-mix(in srgb,var(--text-main) 7%,transparent); font:600 9px/1 var(--paper-sans); }
+.df-ai-model-tier-list button i { color: var(--accent-active); font-style: normal; }
+.df-ai-model-manage { width:100%; min-height:44px; padding:8px 20px; border:0; border-top:1px solid var(--paper-rule); color:var(--text-main); text-align:left; background:transparent; font-size:12px; cursor:pointer; }
+.df-ai-model-manage:hover { color:var(--accent-active); background:var(--paper-note); }
+.df-ai-reference-disclaimer { justify-self: center; color: var(--text-faint); font-size: 9px; line-height: 1.3; }
+@media (max-width: 620px) {
+  .df-app .df-ai-panel-reference { right: 8px; bottom: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); border-radius: 24px !important; }
+  .df-ai-panel-reference .df-ai-panel-head { min-height: 62px; padding-inline: 15px 12px; }
+  .df-ai-panel-reference .df-ai-panel-body { padding: 16px; }
+  .df-ai-reference-empty { gap: 20px; }
+  .df-ai-reference-suggestions { gap: 8px; }
+  .df-ai-reference-suggestions button { min-height: 39px; font-size: 12px; }
+}
 
 /* Settings and detail sheets */
 .df-utility-panel { width: min(430px,100vw) !important; padding: 0 !important; }

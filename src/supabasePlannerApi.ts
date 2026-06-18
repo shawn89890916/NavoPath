@@ -27,8 +27,8 @@ const defaultSettings: Settings = {
   planningView: "tree",
   aiDockOpen: false,
   appTitle: "NavoPath",
-  model: "deepseek-v4-flash",
-  baseUrl: "",
+  model: "deepseek-ai/DeepSeek-V4-Flash",
+  baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
   hasApiKey: false,
   apiKeyPreview: "",
   displayName: "NavoPath",
@@ -69,6 +69,8 @@ function mergeSettings(settings: unknown): Settings {
   const stored = { ...((settings || {}) as Partial<Settings>) };
   if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
   if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
+  if (stored.model === "deepseek-v4-flash" || stored.model === "deepseek-chat") stored.model = "deepseek-ai/DeepSeek-V4-Flash";
+  if (!stored.baseUrl || stored.baseUrl === "https://api.deepseek.com/chat/completions") stored.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
   return { ...defaultSettings, ...stored };
 }
 

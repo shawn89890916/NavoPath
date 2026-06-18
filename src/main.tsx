@@ -6,6 +6,7 @@ import { Suspense, lazy } from "react";
 import type { AiConversation, AiMemory, CalendarEvent, Category, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
+import { filterAiModels, groupAiModels } from "./utils/aiModels";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
 import {
@@ -48,14 +49,14 @@ const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 20;
 const DURATION_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
 const ATTACHMENT_ACCEPT = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
-const DEFAULT_PROJECT_COLOR = "#8B6F47";
-const PROJECT_COLOR_PRESETS = [DEFAULT_PROJECT_COLOR, "#8B5CF6", "#A78BFA", "#C69CF9", "#EC4899", "#38BDF8", "#22C55E", "#F59E0B", "#EF4444"];
+const DEFAULT_PROJECT_COLOR = "#584D3D";
+const PROJECT_COLOR_PRESETS = [DEFAULT_PROJECT_COLOR, "#7EA172", "#D7816A", "#0F0326", "#584D3D", "#8B5CF6", "#38BDF8", "#F59E0B", "#EF4444"];
 const COMMON_COLOR_PRESETS = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#1F2937", "#F9FAFB", "#6B7280"];
 const RECURRENCE_OCCURRENCE_MARKER = "__occ__";
-const EXECUTE_THEME_PRESETS_LIGHT = ["#27231E", "#C69CF9", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
-const EXECUTE_THEME_PRESETS_DARK  = ["#EEE9DF", "#C69CF9", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
-const PLANNING_THEME_PRESETS_LIGHT = ["#27231E", "#CAFF72", "#7C3AED", "#BE185D", "#D97706", "#059669", "#2563EB"];
-const PLANNING_THEME_PRESETS_DARK  = ["#EEE9DF", "#CAFF72", "#A78BFA", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
+const EXECUTE_THEME_PRESETS_LIGHT = ["#D7816A", "#584D3D", "#7EA172", "#0F0326", "#BE185D", "#D97706", "#2563EB"];
+const EXECUTE_THEME_PRESETS_DARK  = ["#D7816A", "#FBF9FF", "#7EA172", "#584D3D", "#EC4899", "#F59E0B", "#3B82F6"];
+const PLANNING_THEME_PRESETS_LIGHT = ["#7EA172", "#584D3D", "#D7816A", "#0F0326", "#BE185D", "#D97706", "#2563EB"];
+const PLANNING_THEME_PRESETS_DARK  = ["#7EA172", "#FBF9FF", "#D7816A", "#584D3D", "#EC4899", "#F59E0B", "#3B82F6"];
 const SAVE_DEBOUNCE_MS = 250;
 const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
@@ -162,9 +163,10 @@ function isLightColor(value: string) {
 }
 
 function themeVars(settings: Settings, mode: Mode) {
-  const themeDefaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
-  const execute = normalizeHexColor(settings.executeAccentColor || themeDefaultAccent, themeDefaultAccent);
-  const planning = normalizeHexColor(settings.planningAccentColor || themeDefaultAccent, themeDefaultAccent);
+  const executeDefault = "#D7816A";
+  const planningDefault = "#7EA172";
+  const execute = normalizeHexColor(settings.executeAccentColor || executeDefault, executeDefault);
+  const planning = normalizeHexColor(settings.planningAccentColor || planningDefault, planningDefault);
   const executeLight = isLightColor(execute);
   const planningLight = isLightColor(planning);
   const activeAccent = mode === "execute" ? execute : planning;
@@ -180,23 +182,23 @@ function themeVars(settings: Settings, mode: Mode) {
       "--accent-active": activeAccent,
       "--accent-rgb": `${r}, ${g}, ${b}`,
       "--accent-on": activeLight ? "#111827" : "#FFFFFF",
-      "--bg-app": "#0F1117",
-      "--bg-app-soft": "#14161C",
-      "--surface-main": "#181B22",
-      "--surface-raised": "#1E2129",
-      "--surface-card": "#1C1F28",
-      "--text-main": "#F0F2F5",
-      "--text-muted": "#A0A7B5",
-      "--text-faint": "#737A88",
+      "--bg-app": "#0F0326",
+      "--bg-app-soft": "#160A2D",
+      "--surface-main": "#1B1033",
+      "--surface-raised": "#24183B",
+      "--surface-card": "#20143A",
+      "--text-main": "#FBF9FF",
+      "--text-muted": "#B8B1C2",
+      "--text-faint": "#81798D",
       "--border-soft": "rgba(255,255,255,0.10)",
       "--border-subtle": "rgba(255,255,255,0.06)",
       "--shadow-soft": "0 12px 28px rgba(0,0,0,0.24)",
       "--shadow-hl": "none",
-      "--header-bg": "rgba(15,17,23,0.92)",
+      "--header-bg": "rgba(15,3,38,0.94)",
       "--header-border": "rgba(255,255,255,0.06)",
-      "--header-fg": "#F0F2F5",
-      "--header-fg-muted": "#A0A7B5",
-      "--input-bg": "#181B22",
+      "--header-fg": "#FBF9FF",
+      "--header-fg-muted": "#B8B1C2",
+      "--input-bg": "#1B1033",
       "--input-border": "rgba(255,255,255,0.12)",
     } as CSSProperties;
   }
@@ -208,24 +210,24 @@ function themeVars(settings: Settings, mode: Mode) {
     "--accent-active": activeAccent,
     "--accent-rgb": `${r}, ${g}, ${b}`,
     "--accent-on": activeLight ? "#111827" : "#FFFFFF",
-    "--bg-app": "#F3F4F7",
-    "--bg-app-soft": "#EEF0F4",
-    "--surface-main": "#F7F8FA",
+    "--bg-app": "#F6F2F5",
+    "--bg-app-soft": "#EEE9EC",
+    "--surface-main": "#FBF9FF",
     "--surface-raised": "#FFFFFF",
     "--surface-card": "#FFFFFF",
-    "--text-main": "#181C25",
-    "--text-muted": "#6B7280",
-    "--text-faint": "#9CA3AF",
-    "--border-soft": "#E2E5EC",
-    "--border-subtle": "#EAEDF2",
-    "--shadow-soft": "0 12px 28px rgba(17,24,39,0.08)",
+    "--text-main": "#584D3D",
+    "--text-muted": "#7B7062",
+    "--text-faint": "#A69D92",
+    "--border-soft": "#DED8D8",
+    "--border-subtle": "#EBE6E8",
+    "--shadow-soft": "0 12px 28px rgba(88,77,61,0.10)",
     "--shadow-hl": "none",
-    "--header-bg": "rgba(243,244,247,0.88)",
-    "--header-border": "rgba(226,229,236,0.72)",
-    "--header-fg": "#181C25",
-    "--header-fg-muted": "#6B7280",
+    "--header-bg": "rgba(251,249,255,0.90)",
+    "--header-border": "rgba(88,77,61,0.14)",
+    "--header-fg": "#584D3D",
+    "--header-fg-muted": "#7B7062",
     "--input-bg": "#FFFFFF",
-    "--input-border": "#E2E5EC",
+    "--input-border": "#DED8D8",
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
@@ -773,7 +775,7 @@ function defaultForm(type: AddType = "task"): FormState {
   return {
     title: "",
     projectId: "",
-    projectColor: "#C69CF9",
+    projectColor: DEFAULT_PROJECT_COLOR,
     dueDate: today,
     dueTime: "",
     endDate: today,
@@ -1842,53 +1844,26 @@ function App() {
   }, [drawerOpen, editingId, addType, data, form]);
 
   useEffect(() => {
-    let pendingKeyTimer: number | null = null;
-    let composing = false;
-    const openWithTitle = (title: string) => {
-      setAddType("task");
-      setEditingId("");
-      setEditingRecordId(undefined);
-      setEditingOccurrence(null);
-      setForm({ ...defaultForm("task"), title });
-      setDrawerOpen(true);
-    };
-    const handleCompositionStart = () => {
-      composing = true;
-      if (pendingKeyTimer !== null) window.clearTimeout(pendingKeyTimer);
-      pendingKeyTimer = null;
-    };
-    const handleCompositionEnd = (event: CompositionEvent) => {
-      composing = false;
-      const target = event.target as HTMLElement | null;
-      if (drawerOpen || aiOpen || utilityPanel || target?.closest("input, textarea, [contenteditable='true']")) return;
-      if (event.data) openWithTitle(event.data);
-    };
     const handleGlobalTyping = (event: KeyboardEvent) => {
       if (
-        drawerOpen || aiOpen || utilityPanel || composing || event.isComposing || event.key === "Process" || event.keyCode === 229 ||
-        event.ctrlKey || event.altKey || event.metaKey || event.key.length !== 1
+        drawerOpen || aiOpen || utilityPanel || event.isComposing ||
+        event.ctrlKey || event.altKey || event.metaKey || event.key !== " "
       ) return;
       const target = event.target as HTMLElement | null;
       if (
         target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], .df-ai-panel") ||
         document.querySelector("[role='dialog']")
       ) return;
-      if (pendingKeyTimer !== null) return;
-      const firstKey = event.key;
-      pendingKeyTimer = window.setTimeout(() => {
-        pendingKeyTimer = null;
-        if (!composing) openWithTitle(firstKey);
-      }, 60);
+      event.preventDefault();
+      setAddType("task");
+      setEditingId("");
+      setEditingRecordId(undefined);
+      setEditingOccurrence(null);
+      setForm(defaultForm("task"));
+      setDrawerOpen(true);
     };
     document.addEventListener("keydown", handleGlobalTyping);
-    document.addEventListener("compositionstart", handleCompositionStart);
-    document.addEventListener("compositionend", handleCompositionEnd);
-    return () => {
-      if (pendingKeyTimer !== null) window.clearTimeout(pendingKeyTimer);
-      document.removeEventListener("keydown", handleGlobalTyping);
-      document.removeEventListener("compositionstart", handleCompositionStart);
-      document.removeEventListener("compositionend", handleCompositionEnd);
-    };
+    return () => document.removeEventListener("keydown", handleGlobalTyping);
   }, [drawerOpen, aiOpen, utilityPanel]);
 
   // Forward wheel events from the full timeline panel area to the scroll container
@@ -3692,7 +3667,7 @@ function App() {
     setForm({
       title: realTask.title,
       projectId: realTask.projectId || "",
-      projectColor: "#C69CF9",
+      projectColor: DEFAULT_PROJECT_COLOR,
       dueDate: task.scheduledDate || realTask.dueDate || today,
       dueTime: task.scheduledStart || "",
       endDate: task.scheduledDate || realTask.dueDate || today,
@@ -3923,7 +3898,7 @@ function App() {
     setForm({
       title: task.title,
       projectId: "",
-      projectColor: "#C69CF9",
+      projectColor: DEFAULT_PROJECT_COLOR,
       dueDate: task.dueDate,
       dueTime: task.scheduledStart || "",
       endDate: task.dueDate,
@@ -3988,6 +3963,7 @@ function App() {
       const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: attachmentSnapshot ? "import_schedule" : "chat",
+        model: settings?.model,
         message: aiAttachment ? `${msg}\n\n附件：${aiAttachment.name}\n\n${aiAttachment.text}` : msg,
         context,
         history,
@@ -4319,6 +4295,7 @@ function App() {
       const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: "parse_task",
+        model: settings?.model,
         message: t(lang, "toast.clarifyPrompt"),
         context: { title: form.title, project: projects.find((project) => project.id === form.projectId)?.title, date: form.dueDate, estimatedHours: form.estimatedHours, notes: form.details, subtasks: task?.subtasks || [] },
       });
@@ -5733,7 +5710,7 @@ function App() {
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} />}
+      {aiOpen && <AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} />}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -7275,17 +7252,59 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
+function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate, model, onModelChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string; model: string; onModelChange: (model: string) => void }) {
   const projects = projectList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>(model ? [model] : []);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void import("./aiAssistantApi").then(({ listAiModels }) => listAiModels()).then((models) => {
+      if (!active) return;
+      const curatedModels = filterAiModels([model, ...models]);
+      setAvailableModels(curatedModels);
+      if (curatedModels.length > 0 && !curatedModels.includes(model)) onModelChange(curatedModels[0]);
+    }).finally(() => { if (active) setModelsLoading(false); });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, attachmentStatus]);
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      const menu = modelMenuRef.current?.querySelector<HTMLElement>(".df-ai-model-menu");
+      const selected = menu?.querySelector<HTMLElement>("[aria-selected='true']");
+      if (menu && selected) menu.scrollTop = Math.max(0, selected.offsetTop - menu.clientHeight / 2 + selected.clientHeight / 2);
+    });
+    const closeMenu = (event: PointerEvent) => {
+      if (!modelMenuRef.current?.contains(event.target as Node)) setModelMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setModelMenuOpen(false); };
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [modelMenuOpen]);
   const contextLabel = lang === "zh"
     ? `${contextDate} · ${historyCount} 条历史 · ${memoryCount} 条记忆`
     : `${contextDate} · ${historyCount} history · ${memoryCount} memories`;
+  const modelGroups = groupAiModels(availableModels);
+  const modelOptions = modelGroups.flatMap((group) => group.models);
+  const selectedModel = modelOptions.find((option) => option.id === model);
+  const economyModels = modelOptions.filter((option) => option.tier === "economy");
+  const standardModels = modelOptions.filter((option) => option.tier === "standard");
+  const proModels = modelOptions.filter((option) => option.tier === "pro");
   const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+  const promptSuggestions = lang === "zh"
+    ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天", "从今日候选里制定计划", "查看我下一项日程", "你能帮我做什么？"]
+    : ["Plan my three priorities for today", "Schedule 90 minutes of focused study", "Move unfinished tasks to tomorrow", "Build a plan from today's candidates", "Show my next calendar event", "What can you help me do?"];
   const text = {
     thinking: lang === "zh" ? "正在思考" : "Thinking",
     chats: lang === "zh" ? "对话" : "Chats",
@@ -7333,13 +7352,14 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
     });
     setEditMenu(null);
   };
-  return <aside className="df-ai-panel">
+  return <aside className="df-ai-panel df-ai-panel-reference">
     <div className="df-ai-panel-head">
-      <div className="df-ai-title"><span className={`df-ai-presence ${busy ? "thinking" : ""}`} /><div><strong>NavoPath AI</strong><small>{busy ? text.thinking : contextLabel}</small></div></div>
+      <button className="df-ai-new-chat" onClick={onNewConversation}><span aria-hidden="true">＋</span>{text.newChat}</button>
       <div className="df-ai-head-actions">
-        <button className={`df-ai-memory-toggle ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList}>{text.chats}</button>
-        <button className="df-ai-memory-toggle" onClick={onNewConversation}>{text.newChat}</button>
-        <button className="df-icon-action i-close" data-tip={t(lang, "aiPanel.close")} aria-label={t(lang, "aiPanel.close")} onClick={onClose} />
+        <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}>↶</button>
+        <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"} />
+        <button className="df-ai-reference-tool minimize" onClick={onClose} aria-label={lang === "zh" ? "最小化" : "Minimize"} title={lang === "zh" ? "最小化" : "Minimize"}>−</button>
+        <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}>×</button>
       </div>
     </div>
     {conversationListOpen && <div className="df-ai-conversation-list">
@@ -7352,7 +7372,12 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
       ))}
     </div>}
     <div className="df-ai-panel-body" ref={bodyRef}>
-      {messages.length === 0 && <div className="df-ai-empty"><span>N</span><strong>{text.emptyTitle}</strong><p>{text.emptyBody}</p></div>}
+      {messages.length === 0 && <div className="df-ai-reference-empty">
+        <div className="df-ai-reference-prompt">{lang === "zh" ? "需要我帮什么？直接问吧……" : "How can I help? Just ask…"}</div>
+        <div className="df-ai-reference-suggestions">
+          {promptSuggestions.map((suggestion) => <button key={suggestion} onClick={() => setInput(suggestion)}>{suggestion}</button>)}
+        </div>
+      </div>}
       {messages.map((message) => <section key={message.id} className={`df-ai-turn ${message.role}`}>
         {message.role === "user" ? <>
           <div className="df-ai-msg-bubble user"><span>{message.content}</span></div>
@@ -7439,13 +7464,31 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
       </section>)}
     </div>
     <div className="df-ai-panel-foot">
+      {messages.length === 0 && sortedConversations.length > 0 && <button className="df-ai-continue-chat" onClick={() => onSelectConversation(sortedConversations[0].id)}>↻ <span>{lang === "zh" ? "继续上次对话" : "Continue last conversation"}</span></button>}
       {memoryNotice && <button className="df-ai-memory-notice" onClick={onOpenMemorySettings}>{memoryNotice} · {text.viewMemory}</button>}
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
       <div className="df-ai-composer-row">
-        <label className="df-ai-attach-btn" title={text.upload}>＋<input type="file" accept={ATTACHMENT_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttachment(file); event.currentTarget.value = ""; }} /></label>
         <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
+        <label className="df-ai-attach-btn" title={text.upload}>＋<input type="file" accept={ATTACHMENT_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttachment(file); event.currentTarget.value = ""; }} /></label>
         <button className="df-ai-send-btn" onClick={onSend} disabled={busy || (!input.trim() && !attachment)} title={busy ? t(lang, "aiPanel.thinking") : t(lang, "aiPanel.send")}>{busy ? "●" : "↑"}</button>
+        <div className="df-ai-model-picker" ref={modelMenuRef}>
+          <button className="df-ai-model-trigger" type="button" disabled={modelsLoading || busy} aria-haspopup="listbox" aria-expanded={modelMenuOpen} onClick={() => setModelMenuOpen((open) => !open)}>
+            <span>{selectedModel?.label || model}</span>{selectedModel?.pro && <b>PRO</b>}<i aria-hidden="true">⌄</i>
+          </button>
+          {modelMenuOpen && <div className="df-ai-model-menu" role="listbox" aria-label={lang === "zh" ? "选择模型" : "Choose model"}>
+            {[{ label: "ECONOMY", models: economyModels, tone: "economy" }, { label: "STANDARD", models: standardModels, tone: "standard" }, { label: "PRO", models: proModels, tone: "pro" }].map((tier) => tier.models.length > 0 && <section key={tier.label} className={`df-ai-model-tier ${tier.tone}`}>
+              <header><strong>{tier.label} <i aria-hidden="true">i</i></strong>{tier.tone === "pro" && <small>{lang === "zh" ? "最新旗舰模型" : "Latest flagship models"}</small>}</header>
+              <div className="df-ai-model-tier-list">
+                {tier.models.map((option) => <button type="button" role="option" aria-selected={option.id === model} className={option.id === model ? "selected" : ""} key={option.id} onClick={() => { onModelChange(option.id); setModelMenuOpen(false); }}>
+                  <em>{option.label}</em><small>{tier.label === "PRO" ? "PRO" : option.family}</small>{option.id === model && <i aria-hidden="true">✓</i>}
+                </button>)}
+              </div>
+            </section>)}
+            <button type="button" className="df-ai-model-manage" onClick={() => { setModelMenuOpen(false); onOpenMemorySettings(); }}>{lang === "zh" ? "管理模型…" : "Manage models…"}</button>
+          </div>}
+        </div>
       </div>
+      <small className="df-ai-reference-disclaimer">{lang === "zh" ? "AI 生成内容可能有误，请核对重要安排。" : "AI can make mistakes. Check important schedule changes."}</small>
     </div>
   </aside>;
 }

@@ -2,7 +2,7 @@
 // Stages: Router (intent) -> Planner (structured plan) -> Actor (final actions)
 // Each stage is independently observable and can degrade gracefully.
 // Deploy: supabase functions deploy ai-assistant
-// Set secret: supabase secrets set DEEPSEEK_API_KEY=sk-xxx
+// Set secret: supabase secrets set SILICONFLOW_API_KEY=sk-xxx
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { chatPrompt, importSchedulePrompt, routerPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
@@ -135,10 +135,11 @@ function normalizeAssistantPayload(value: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// DeepSeek call with timeout, single retry on transient failure.
+// OpenAI-compatible provider call with timeout.
 // ---------------------------------------------------------------------------
 async function callDeepSeek(
   apiKey: string,
+  model: string,
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
   signal?: AbortSignal,
@@ -151,14 +152,14 @@ async function callDeepSeek(
     else signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
   try {
-    const dsResponse = await fetch("https://api.deepseek.com/chat/completions", {
+    const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-v4-flash",
+        model,
         messages,
         response_format: { type: "json_object" },
         max_tokens: maxTokens,
@@ -168,11 +169,11 @@ async function callDeepSeek(
     });
     if (!dsResponse.ok) {
       const errorText = await dsResponse.text();
-      throw new Error(`DeepSeek ${dsResponse.status}: ${errorText.slice(0, 200)}`);
+      throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
     }
     const dsData = await dsResponse.json();
     const content = dsData.choices?.[0]?.message?.content;
-    if (!content) throw new Error("DeepSeek returned no content");
+    if (!content) throw new Error("AI service returned no content");
     return content;
   } finally {
     clearTimeout(timeoutId);
@@ -185,6 +186,7 @@ async function callDeepSeek(
 // ---------------------------------------------------------------------------
 async function routeStage(
   apiKey: string,
+  model: string,
   ctx: PromptContext,
   message: string,
   history: Array<{ role: "user" | "assistant"; content: string }>,
@@ -195,7 +197,7 @@ async function routeStage(
       ...history.slice(-6),
       { role: "user", content: message.slice(0, 1000) },
     ];
-    const content = await callDeepSeek(apiKey, messages, 200);
+    const content = await callDeepSeek(apiKey, model, messages, 200);
     const parsed = extractJsonObject(content) as Record<string, unknown>;
     return {
       intent: typeof parsed.intent === "string" ? parsed.intent : undefined,
@@ -214,6 +216,7 @@ async function routeStage(
 // ---------------------------------------------------------------------------
 async function plannerStage(
   apiKey: string,
+  model: string,
   mode: string,
   ctx: PromptContext,
   userContent: string,
@@ -231,12 +234,12 @@ async function plannerStage(
     { role: "user", content: userContent },
   ];
   const maxTokens = mode === "import_schedule" ? 6000 : mode === "summarize_memory" ? 600 : 1600;
-  const content = await callDeepSeek(apiKey, messages, maxTokens);
+  const content = await callDeepSeek(apiKey, model, messages, maxTokens);
   try {
     return normalizeAssistantPayload(extractJsonObject(content));
   } catch (firstError) {
     console.warn("Planner payload validation failed; requesting one repair:", firstError);
-    const repaired = await callDeepSeek(apiKey, [
+    const repaired = await callDeepSeek(apiKey, model, [
       {
         role: "system",
         content: "Repair the candidate into one valid JSON object. Required fields: reply (plain user-facing sentence), steps (array), actions (array), memories (array). Never place JSON, markdown, or code inside reply. Return JSON only.",
@@ -259,15 +262,39 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { mode, message, context, history, memories } = body as {
+    const { mode, message, model, context, history, memories } = body as {
       mode?: string;
       message?: string;
+      model?: string;
       context?: Record<string, unknown>;
       history?: Array<{ role?: string; content?: string }>;
       memories?: Array<{ content?: string; tags?: string[] }>;
     };
 
-    if (!mode || !message) {
+    if (!mode) {
+      return new Response(JSON.stringify({ error: "Missing mode" }), { status: 400, headers: corsHeaders });
+    }
+
+    const apiKey = Deno.env.get("SILICONFLOW_API_KEY");
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "Missing SILICONFLOW_API_KEY" }), { status: 500, headers: corsHeaders });
+    }
+
+    if (mode === "list_models") {
+      const response = await fetch("https://api.siliconflow.cn/v1/models?type=text&sub_type=chat", {
+        headers: { "Authorization": `Bearer ${apiKey}` },
+      });
+      if (!response.ok) {
+        return new Response(JSON.stringify({ error: `AI model service ${response.status}` }), { status: 502, headers: corsHeaders });
+      }
+      const payload = await response.json();
+      const models = Array.isArray(payload?.data)
+        ? payload.data.map((item: { id?: unknown }) => item?.id).filter((id: unknown): id is string => typeof id === "string").sort()
+        : [];
+      return new Response(JSON.stringify({ models }), { headers: corsHeaders });
+    }
+
+    if (!message) {
       return new Response(JSON.stringify({ error: "Missing mode or message" }), { status: 400, headers: corsHeaders });
     }
 
@@ -279,10 +306,9 @@ serve(async (req: Request) => {
       );
     }
 
-    const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Missing DEEPSEEK_API_KEY" }), { status: 500, headers: corsHeaders });
-    }
+    const selectedModel = typeof model === "string" && /^[A-Za-z0-9._/-]{2,160}$/.test(model)
+      ? model
+      : Deno.env.get("SILICONFLOW_MODEL") || "deepseek-ai/DeepSeek-V4-Flash";
 
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
     const currentDate = validIsoDate(context?.currentDate) ? context.currentDate : localDateForTimeZone(timezone);
@@ -331,12 +357,12 @@ serve(async (req: Request) => {
     }
 
     // Stage 1: Router (best-effort)
-    const route = await routeStage(apiKey, promptCtx, userContent, historyMessages);
+    const route = await routeStage(apiKey, selectedModel, promptCtx, userContent, historyMessages);
 
     // Stage 2: Planner (required)
     let plannerValue: unknown;
     try {
-      plannerValue = await plannerStage(apiKey, mode, promptCtx, userContent, historyMessages);
+      plannerValue = await plannerStage(apiKey, selectedModel, mode, promptCtx, userContent, historyMessages);
     } catch (err) {
       console.error("Planner stage failed:", err);
       const fallback = {

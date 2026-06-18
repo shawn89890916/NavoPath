@@ -526,7 +526,7 @@ export const TR = {
   aiPanel: {
     zh: {
       close: "关闭",
-      thinkPlaceholder: "例如：今天晚上设计火箭模型 #准备ESAT",
+      thinkPlaceholder: "例如：把买菜安排到今晚 6 点",
       thinking: "思考中",
       send: "发送",
       createScheduled: "Create scheduled tasks",
@@ -536,7 +536,7 @@ export const TR = {
     },
     en: {
       close: "Close",
-      thinkPlaceholder: "e.g. Design rocket model tonight #ESAT Prep",
+      thinkPlaceholder: "e.g. Schedule grocery shopping for 6 PM",
       thinking: "Thinking...",
       send: "Send",
       createScheduled: "Create scheduled tasks",

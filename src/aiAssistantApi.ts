@@ -1,9 +1,10 @@
 // aiAssistantApi.ts — Frontend wrapper for NavoPath AI Assistant
-// Calls Supabase Edge Function: ai-assistant (DeepSeek proxy)
-// NEVER exposes DEEPSEEK_API_KEY to the browser.
+// Calls the Supabase Edge Function that proxies the configured AI provider.
+// NEVER exposes SILICONFLOW_API_KEY to the browser.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { localIsoDate } from "./utils/localDate";
+import { filterAiModels } from "./utils/aiModels";
 
 export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "import_schedule" | "summarize_memory";
 
@@ -160,11 +161,12 @@ function getClient(): SupabaseClient | null {
 
 /**
  * Call the AI Assistant via Supabase Edge Function.
- * NEVER exposes DEEPSEEK_API_KEY to the browser.
+ * NEVER exposes SILICONFLOW_API_KEY to the browser.
  */
 export async function callAiAssistant(params: {
   mode: AiMode;
   message: string;
+  model?: string;
   context?: unknown;
   history?: AiChatMessage[];
   memories?: AiMemoryPatch[];
@@ -199,7 +201,7 @@ export async function callAiAssistant(params: {
     if (error) {
       console.error("AI Assistant edge function error:", error);
       const msg = error.message || "";
-      if (msg.includes("Missing DEEPSEEK_API_KEY")) {
+      if (msg.includes("Missing SILICONFLOW_API_KEY")) {
         return { reply: "AI 服务未配置 API Key，请联系管理员。", actions: [], steps: [{ label: "验证 API Key", status: "error" }] };
       }
       if (msg.includes("function not found") || msg.includes("not deployed")) {
@@ -237,6 +239,37 @@ export async function callAiAssistant(params: {
       actions: [],
       steps: [{ label: "网络连接", status: "error" }],
     };
+  }
+}
+
+export const FALLBACK_AI_MODELS = [
+  "deepseek-ai/DeepSeek-V4-Flash",
+  "deepseek-ai/DeepSeek-V4-Pro",
+  "deepseek-ai/DeepSeek-V3.2",
+  "Qwen/Qwen3.6-35B-A3B",
+  "Qwen/Qwen3.5-397B-A17B",
+  "zai-org/GLM-5.2",
+  "moonshotai/Kimi-K2.7-Code",
+  "MiniMaxAI/MiniMax-M2.5",
+  "stepfun-ai/Step-3.5-Flash",
+] as const;
+
+export async function listAiModels(): Promise<string[]> {
+  const client = getClient();
+  if (!client) return [...FALLBACK_AI_MODELS];
+  try {
+    const { data, error } = await client.functions.invoke("ai-assistant", {
+      body: { mode: "list_models" },
+    });
+    if (error) throw error;
+    const models = Array.isArray(data?.models)
+      ? data.models.filter((model: unknown): model is string => typeof model === "string" && model.length > 0)
+      : [];
+    const filtered = filterAiModels(models);
+    return filtered.length > 0 ? filtered : [...FALLBACK_AI_MODELS];
+  } catch (error) {
+    console.warn("Unable to load AI models; using fallback list:", error);
+    return [...FALLBACK_AI_MODELS];
   }
 }
 

@@ -6,7 +6,7 @@
 .df-app,
 .landing,
 .portfolio {
-  --navo-action-accent: var(--accent-active, #c69cf9);
+  --navo-action-accent: var(--accent-active, #d7816a);
   --navo-action-ink: var(--text-main, #f4f3f6);
   --navo-action-muted: var(--text-muted, #9899a4);
   --navo-action-rule: var(--paper-rule, rgba(255, 255, 255, .12));

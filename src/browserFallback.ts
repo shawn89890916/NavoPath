@@ -78,7 +78,7 @@ export function normalizeData(data: PlannerData): PlannerData {
     ...data,
     projects: (data.projects || []).map((project) => ({
       ...project,
-      color: project.color || "#C69CF9",
+      color: project.color || "#584D3D",
       importance: project.importance || "high",
       urgency: project.urgency || "low",
     })),
@@ -387,8 +387,8 @@ export function installBrowserFallback() {
     planningView: "tree",
     aiDockOpen: false,
     appTitle: "NavoPath",
-    model: "deepseek-v4-flash",
-    baseUrl: "https://api.deepseek.com/chat/completions",
+    model: "deepseek-ai/DeepSeek-V4-Flash",
+    baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
     hasApiKey: false,
     apiKeyPreview: "",
     displayName: "NavoPath Preview",
@@ -426,6 +426,8 @@ export function installBrowserFallback() {
     if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
     if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
     const merged: any = { ...defaultSettings, ...stored };
+    if (merged.model === "deepseek-v4-flash" || merged.model === "deepseek-chat") merged.model = "deepseek-ai/DeepSeek-V4-Flash";
+    if (!merged.baseUrl || merged.baseUrl === "https://api.deepseek.com/chat/completions") merged.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
     if (merged._apiKey && !merged.hasApiKey) {
       merged.hasApiKey = true;
       merged.apiKeyPreview = merged.apiKeyPreview || `${merged._apiKey.slice(0, 6)}...${merged._apiKey.slice(-4)}`;
@@ -533,14 +535,14 @@ export function installBrowserFallback() {
       ];
 
       try {
-        const res = await fetch(settings.baseUrl || "https://api.deepseek.com/chat/completions", {
+          const res = await fetch(settings.baseUrl || "https://api.siliconflow.cn/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: settings.model || "deepseek-chat",
+              model: settings.model || "deepseek-ai/DeepSeek-V4-Flash",
             messages,
             temperature: 0.7,
             max_tokens: 4096,
