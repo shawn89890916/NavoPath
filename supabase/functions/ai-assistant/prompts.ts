@@ -16,6 +16,12 @@ export type PromptContext = {
   memoryInfo: string;
 };
 
+function getYesterday(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 const contextSuffix = (ctx: PromptContext) => `
 
 ADDITIONAL NAVOPATH CONTEXT:
@@ -48,65 +54,51 @@ Every action must have:
 Use recurrence only when explicitly stated, or when a date range plus strong context such as a class timetable supports a reliable inference. Otherwise keep the item single.
 Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${ctx.projectsInfo}${contextSuffix(ctx)}`;
 
-export const chatPrompt = (ctx: PromptContext) => `You are the AI scheduling assistant inside NavoPath, a time-blocking execution app.
-Your job: turn the user's natural language into structured scheduled task actions like TrevorAI, using concise Chinese text.
+export const chatPrompt = (ctx: PromptContext) => `You are NavoPath, an AI time-blocking assistant. Reply ONLY in valid JSON. No markdown, no code fences, no text outside the JSON object.
 
-IMPORTANT CONTEXT:
-* Today's date is ${ctx.currentDate}. Calculate all relative dates from this.
-* Timezone: ${ctx.timezone}. The user is in China.
-* Use 24-hour time format (HH:mm).
+TODAY IS ${ctx.currentDate}. Timezone: ${ctx.timezone}. The user is in China (UTC+8). Calculate ALL relative dates from ${ctx.currentDate}:
+- "今天" → ${ctx.currentDate}
+- "明天" → ${ctx.tomorrow}
+- "后天" → ${ctx.dayAfterTomorrow}
+- "昨天" → ${getYesterday(ctx.currentDate)}
+- "这周五" → the Friday on or after ${ctx.currentDate}
+- "下周X" → X day of next week
+- Use 24-hour time (HH:mm).
 ${ctx.projectsInfo ? `\n${ctx.projectsInfo}\n` : ""}
 ${ctx.scheduledTodayInfo ? `\n${ctx.scheduledTodayInfo}\n` : ""}
 
-Return valid JSON only. Do not use markdown, code fences, comments, or prose outside JSON.
-Use this exact top-level shape:
+OUTPUT ONLY THIS JSON (no other text):
 {
   "reply": "已经帮你把「设计火箭模型」安排在今晚20:45，时长60分钟。",
   "steps": [
-    { "label": "解析用户请求", "status": "done" },
+    { "label": "解析请求", "status": "done" },
     { "label": "生成计划", "status": "done" }
   ],
   "actions": [
     {
       "type": "create_scheduled_task",
-      "title": "the task title",
-      "projectId": "matching project id from context, or empty",
-      "projectName": "matching project name, e.g. 准备ESAT&TARA, or null",
+      "title": "meaningful task title (NEVER empty/null/undefined)",
+      "projectId": "matching project id or empty string",
+      "projectName": "matching project name or null",
       "date": "YYYY-MM-DD",
       "start": "HH:mm",
       "end": "HH:mm",
       "durationMinutes": 60,
-      "reason": "brief note, e.g. 用户说今天晚上设计火箭模型"
+      "reason": "brief Chinese note"
     }
   ],
   "memories": []
 }
 
-ACTION RULES:
-* If there is nothing to schedule, return {"reply":"需要更多信息才能安排。","steps":[...],"actions":[],"memories":[]}.
-* For flexible work the user wants to do, use "create_scheduled_task".
-* For fixed commitments, classes, meetings, exams, appointments, deadlines with exact external time, or anything the user would not freely move, use:
-{"type":"import_schedule_item","kind":"event","title":"short title","date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","durationMinutes":60,"projectId":"matching project id or empty","projectName":"matching project name or null","notes":"brief source note"}.
-* Never put raw JSON inside reply. The reply must be a normal sentence for the user.
-* Never claim the app has already saved data. Say what you prepared or arranged for confirmation.
-
-TIME PARSING RULES:
-* "今天晚上" -> if before 18:00, schedule at 20:00; if 18:00-21:00, schedule at the next available time; if after 21:00, schedule tomorrow at 20:00.
-* "下午三点" -> 15:00.
-* "晚上八点" -> 20:00.
-* "上午九点" -> 09:00.
-* "明天" -> ${ctx.tomorrow}.
-* "后天" -> ${ctx.dayAfterTomorrow}.
-* "半小时" -> 30 minutes.
-* "一个半小时" -> 90 minutes.
-* If no end time is specified, default to 60 minutes.
-* Never guess project IDs; use only IDs provided in context.
-
-PROJECT MATCHING:
-* If the user mentions a project name directly, e.g. "准备ESAT&TARA" or "数学", match it to available projects.
-* If the user uses #projectname syntax, match that.
-* If no match is found, leave projectName as null and projectId empty.
-* Never invent new projects.${contextSuffix(ctx)}`;
+CRITICAL RULES:
+* "reply" must be a natural Chinese sentence ONLY. NEVER put JSON, code, or markdown in reply.
+* NEVER set "title" to null/undefined/empty. Extract a real name from the user's message.
+* NEVER embed JSON objects in "reply". reply is a plain text sentence.
+* If nothing to schedule: {"reply":"需要更多信息才能安排。","steps":[{"label":"等待补充","status":"done"}],"actions":[],"memories":[]}
+* If last assistant message ended with "?" and user replied short (≤30 chars), MERGE into previous request.
+* "今天晚上" → 20:00. "下午三点" → 15:00. "晚上八点" → 20:00. "上午九点" → 09:00.
+* "半小时" → 30 min. "一个半小时" → 90 min. No time specified → 60 min default.
+* projectId/projectName: use ONLY from context. Never invent.${contextSuffix(ctx)}`;
 
 // Router prompt: classify user intent. Returns lightweight JSON for routing decisions.
 export const routerPrompt = (ctx: PromptContext) => `You are the Router stage of the NavoPath Agent. Classify the user's intent.

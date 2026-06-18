@@ -875,45 +875,6 @@ export const TR = {
     },
   },
 
-  // ── Release Notes (static) ──────────────
-  releaseNotes: [
-    {
-      zh: "优化了规划栏的交互和结果展示",
-      en: "Optimized planning sidebar interaction and result display",
-    },
-    {
-      zh: "优化了时间轴的快速添加栏",
-      en: "Optimized timeline quick-add bar",
-    },
-    {
-      zh: "优化了部分深色模式UI不适配的问题",
-      en: "Fixed dark mode UI compatibility issues",
-    },
-    {
-      zh: "优化了 3天 / 周 / 月视图和'全天'栏的体验，并支持任务堆叠",
-      en: "Optimized 3-day / week / month views and all-day lane with task stacking",
-    },
-    {
-      zh: "在一定程度上优化了深色模式的体验",
-      en: "Improved dark mode experience across the app",
-    },
-    {
-      zh: "优化了网站主页面，并且加入了深色模式(beta)",
-      en: "Revamped landing page with dark mode (beta)",
-    },
-    {
-      zh: "加入 3天 / 周 / 月视图。UI支持自定义颜色",
-      en: "Added 3-day / week / month views. Customizable UI colors",
-    },
-    {
-      zh: "规划树支持候选挑选模式，任务可从长期项目流入今日执行。",
-      en: "Planning tree now supports candidate picking. Tasks flow from long-term projects to daily execution.",
-    },
-    {
-      zh: "网页版上线",
-      en: "Web version launched",
-    },
-  ],
 } as const;
 
 // ── Convenience Accessor ──────────────────
@@ -969,10 +930,4 @@ export function priLabels(lang: Language): string[] {
 /** Get view mode label for the given language. */
 export function viewLabel(lang: Language, key: "daily" | "3day" | "weekly" | "month"): string {
   return TR.views[lang][key];
-}
-
-/** Get release notes for the given language and index. */
-export function releaseNote(lang: Language, index: number): string {
-  if (index < 0 || index >= TR.releaseNotes.length) return "";
-  return TR.releaseNotes[index][lang];
 }

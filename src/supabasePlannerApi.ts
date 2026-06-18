@@ -1,5 +1,5 @@
 import { createClient, type User } from "@supabase/supabase-js";
-import type { AiAction, PlannerApi, PlannerData, Settings } from "./types";
+import type { AiAction, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
 import { fallbackData, normalizeData } from "./browserFallback";
 
 const PROFILE_TABLE = "dayflow_profiles";
@@ -10,6 +10,15 @@ function uid(prefix: string) {
 
 function now() {
   return new Date().toISOString();
+}
+
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function tokenMetadata(row: any): McpTokenMetadata {
+  return { id: row.id, name: row.name, tokenPrefix: row.token_prefix, createdAt: row.created_at, lastUsedAt: row.last_used_at || undefined };
 }
 
 const defaultSettings: Settings = {
@@ -24,7 +33,7 @@ const defaultSettings: Settings = {
   apiKeyPreview: "",
   displayName: "NavoPath",
   avatarDataUrl: "",
-  onboardingVersion: 1,
+  onboardingVersion: 2,
   onboardingStep: "done",
   dailyFocusTime: "20:00",
   weekStartsOn: 0,
@@ -425,6 +434,29 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       const next = mergeSettings({ ...current, ...settings, hasApiKey: false, apiKeyPreview: "" });
       await updateProfile({ settings: next });
       return next;
+    },
+    listMcpTokens: async () => {
+      await requireUser();
+      const { data, error } = await supabase.rpc("list_mcp_tokens");
+      if (error) throw new Error(error.message);
+      return (data || []).map(tokenMetadata);
+    },
+    createMcpToken: async (name) => {
+      await requireUser();
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      const token = `nvp_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+      const { data, error } = await supabase.rpc("create_mcp_token", {
+        token_name: name.trim() || "MCP client",
+        token_digest: await sha256(token),
+        token_label_prefix: token.slice(0, 12),
+      });
+      if (error) throw new Error(error.message);
+      return { token, metadata: tokenMetadata(data?.[0]) };
+    },
+    revokeMcpToken: async (id) => {
+      await requireUser();
+      const { error } = await supabase.rpc("revoke_mcp_token", { token_id: id });
+      if (error) throw new Error(error.message);
     },
 
     selectBackgroundImage: async () => ({ path: "" }),

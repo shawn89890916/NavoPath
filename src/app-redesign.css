@@ -374,6 +374,55 @@
 .df-app .df-time-block,
 .df-app .df-all-day-block,
 .df-app .df-month-task { transition: color var(--paper-motion), background-color var(--paper-motion), border-color var(--paper-motion), opacity var(--paper-motion) !important; }
+
+.df-app.is-dragging,
+.df-app.is-dragging .df-time-block,
+.df-app.is-dragging .df-time-block * { user-select: none !important; -webkit-user-select: none !important; }
+
+.df-plan-project-node[draggable="true"],
+.df-plan-task-node[draggable="true"],
+.df-plan-subtask-node[draggable="true"] { cursor: grab; }
+.df-plan-project-node[draggable="true"]:active,
+.df-plan-task-node[draggable="true"]:active,
+.df-plan-subtask-node[draggable="true"]:active { cursor: grabbing; }
+.df-tree.is-tree-dragging .df-plan-project-node,
+.df-tree.is-tree-dragging .df-plan-task-node,
+.df-tree.is-tree-dragging .df-plan-subtask-node { transition: transform 160ms var(--paper-ease), border-color 160ms var(--paper-ease), background-color 160ms var(--paper-ease); cursor:grab; }
+.df-tree.is-tree-dragging .df-plan-project-node:active,
+.df-tree.is-tree-dragging .df-plan-task-node:active,
+.df-tree.is-tree-dragging .df-plan-subtask-node:active { cursor:grabbing; }
+.df-plan-task-node.added-to-today { border-color: color-mix(in srgb, var(--accent-active) 58%, var(--paper-rule)) !important; background: color-mix(in srgb, var(--accent-active) 7%, transparent) !important; }
+.df-plan-task-node.added-to-today::after { content: "TODAY"; font-family: var(--paper-mono); font-size: 9px; letter-spacing: .08em; color: var(--accent-active); margin-inline-start: 8px; }
+.df-mcp-settings { border-top:1px solid var(--paper-rule); padding-top:18px; display:grid; gap:10px; }
+.df-mcp-settings p { margin:0; color:var(--paper-ink-muted); font-size:12px; line-height:1.6; }
+.df-mcp-token { display:grid; gap:8px; }
+.df-mcp-token code { overflow-wrap:anywhere; padding:10px 0; border-block:1px solid var(--paper-rule); color:var(--accent-active); }
+.df-mcp-token-row { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--paper-rule); padding:8px 0; }
+.df-mcp-token-row span { display:grid; gap:2px; }.df-mcp-token-row small { opacity:.6; }
+.df-subtask-tree-item { position:relative; margin-inline-start:min(calc(var(--subtask-depth) * 14px), 154px); }
+.df-subtask-tree-item.nested::before { content:""; position:absolute; inset-inline-start:-8px; top:0; bottom:0; border-inline-start:1px solid var(--paper-rule); opacity:.72; }
+.df-subtask-tree-children { display:grid; gap:2px; }
+.df-subtask-row-new { border-radius:0 !important; border-bottom:1px solid transparent; }
+.df-subtask-row-new:hover { background:color-mix(in srgb,var(--accent-active) 5%,transparent) !important; border-bottom-color:var(--paper-rule); }
+.df-subtask-add-child { flex:0 0 34px; width:34px; height:34px; display:grid; place-items:center; border:0; border-bottom:1px solid transparent; background:transparent; color:var(--paper-ink-muted); cursor:pointer; transition:color var(--paper-motion),background-color var(--paper-motion),border-color var(--paper-motion); }
+.df-subtask-add-child:hover { color:var(--accent-active); background:color-mix(in srgb,var(--accent-active) 6%,transparent); border-bottom-color:var(--accent-active); }
+.df-subtask-add-child:active { transform:translateY(1px); }
+.df-subtask-add-child:focus-visible { outline:1px solid var(--accent-active); outline-offset:2px; }
+@media (pointer:coarse) { .df-subtask-add-child { flex-basis:44px; width:44px; height:44px; } }
+.df-app.theme-light .df-month-cell.focus-month .df-month-cell-strong { color:#000 !important; opacity:1; }
+.df-app .df-month-cell.muted .df-month-cell-strong { opacity:.34; }
+.df-app.theme-dark .df-month-cell.focus-month .df-month-cell-strong { color:var(--paper-ink) !important; opacity:1; }
+.df-tree-drop-preview { position:relative; z-index:8; padding:8px 14px; color:var(--accent-active); background:color-mix(in srgb,var(--accent-active) 8%,var(--surface-main)); border-radius:8px; font:600 11px/1.3 var(--paper-mono); letter-spacing:.03em; pointer-events:none; animation:treeDropIn 220ms cubic-bezier(.2,.7,.3,1) both; display:flex; align-items:center; gap:8px; backdrop-filter:blur(4px); box-shadow:0 2px 8px color-mix(in srgb,var(--accent-active) 10%,transparent); }
+.df-tree-drop-preview::before { content:""; width:4px; height:4px; border-radius:50%; background:var(--accent-active); flex-shrink:0; animation:treeDropPulse 1.2s ease-in-out infinite; }
+@keyframes treeDropIn { from { opacity:0; transform:translateY(-6px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes treeDropPulse { 0%,100% { opacity:.5; transform:scale(1); } 50% { opacity:1; transform:scale(1.5); } }
+.df-tree-drop-preview.before { margin-bottom:3px; border-bottom:1px dashed color-mix(in srgb,var(--accent-active) 40%,transparent); border-radius:8px 8px 0 0; }
+.df-tree-drop-preview.after { margin-top:3px; border-top:1px dashed color-mix(in srgb,var(--accent-active) 40%,transparent); border-radius:0 0 8px 8px; }
+.df-tree-drop-preview.inside { margin-inline-start:28px; border-inline-start:2px solid var(--accent-active); border-radius:4px 8px 8px 4px; }
+/* When dragging, nodes get a subtle scale effect */
+.df-tree.is-tree-dragging .df-plan-project-node:hover,
+.df-tree.is-tree-dragging .df-plan-task-node:hover,
+.df-tree.is-tree-dragging .df-plan-subtask-node:hover { transform:scale(1.02); }
 .df-app .df-card-popover,
 .df-app .df-quick-add-project-menu,
 .df-app .df-project-popover,

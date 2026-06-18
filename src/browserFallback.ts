@@ -1,4 +1,5 @@
 import type { AiAction, PlannerApi, PlannerData, Settings, TaskRecurrence } from "./types";
+import { normalizeTreeOrder } from "./utils/treeOrder";
 
 const PREVIEW_STORAGE_KEY = "planner-preview-data";
 const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
@@ -73,7 +74,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       createdAt: chat[0]?.createdAt || now(),
       updatedAt: chat[chat.length - 1]?.createdAt || now(),
     }] : []);
-  return {
+  return normalizeTreeOrder({
     ...data,
     projects: (data.projects || []).map((project) => ({
       ...project,
@@ -121,7 +122,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       })),
       notes: task.notes || "",
     })),
-  };
+  });
 }
 
 export function fallbackData(): PlannerData {
@@ -392,7 +393,7 @@ export function installBrowserFallback() {
     apiKeyPreview: "",
     displayName: "NavoPath Preview",
     avatarDataUrl: "",
-    onboardingVersion: 1,
+    onboardingVersion: 2,
     onboardingStep: "done",
     dailyFocusTime: "20:00",
     weekStartsOn: 0,

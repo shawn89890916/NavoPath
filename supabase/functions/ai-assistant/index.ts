@@ -6,6 +6,20 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { chatPrompt, importSchedulePrompt, routerPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
+
+function localDateForTimeZone(timeZone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${value.year}-${value.month}-${value.day}`;
+  } catch {
+    return localDateForTimeZone("Asia/Shanghai");
+  }
+}
+
+function validIsoDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
 import { buildConversationContinuation } from "./conversation.ts";
 
 const corsHeaders = {
@@ -270,8 +284,8 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Missing DEEPSEEK_API_KEY" }), { status: 500, headers: corsHeaders });
     }
 
-    const currentDate = (context?.currentDate as string) || new Date().toISOString().slice(0, 10);
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
+    const currentDate = validIsoDate(context?.currentDate) ? context.currentDate : localDateForTimeZone(timezone);
     const projectsInfo = context?.projects ? `Available projects: ${JSON.stringify(context.projects)}` : "";
     const scheduledTodayInfo = context?.scheduledToday
       ? `Already scheduled on current view date (${String(context?.currentViewDate || currentDate)}): ${JSON.stringify(context.scheduledToday)}`

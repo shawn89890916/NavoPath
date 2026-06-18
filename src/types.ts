@@ -18,6 +18,7 @@ export interface Project {
   color?: string;
   importance?: Priority;
   urgency?: Priority;
+  order?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +30,16 @@ export interface Subtask {
   done?: boolean;
   order?: number;
   createdAt: string;
+  subtasks?: Subtask[];
+}
+
+export interface McpTokenMetadata {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
 }
 
 /** 时间轴排程记录 — 支持同一任务多次排程，每条记录独立管理状态 */
@@ -210,7 +221,7 @@ export interface Settings {
   displayName: string;
   avatarDataUrl?: string;
   onboardingVersion?: number;
-  onboardingStep?: "add" | "drag" | "planning" | "done";
+  onboardingStep?: "add" | "drag" | "candidates" | "schedule" | "calendar" | "planning" | "ai" | "done";
   dailyFocusTime: string;
   weekStartsOn: 0 | 1;
   theme: "light" | "dark";
@@ -322,6 +333,9 @@ export interface PlannerApi {
   resetSeed: () => Promise<PlannerData>;
   getSettings: () => Promise<Settings>;
   saveSettings: (settings: Partial<Settings> & { apiKey?: string; clearApiKey?: boolean }) => Promise<Settings>;
+  listMcpTokens?: () => Promise<McpTokenMetadata[]>;
+  createMcpToken?: (name: string) => Promise<{ token: string; metadata: McpTokenMetadata }>;
+  revokeMcpToken?: (id: string) => Promise<void>;
   selectBackgroundImage: () => Promise<{ path: string }>;
   chat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
 }

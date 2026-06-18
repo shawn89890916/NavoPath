@@ -3,6 +3,7 @@
 // NEVER exposes DEEPSEEK_API_KEY to the browser.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { localIsoDate } from "./utils/localDate";
 
 export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "import_schedule" | "summarize_memory";
 
@@ -179,12 +180,12 @@ export async function callAiAssistant(params: {
   }
 
   // Always include current date context for date parsing
-  const currentDate = new Date().toISOString().slice(0, 10);
+  const currentDate = localIsoDate();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const enrichedContext = {
+    ...(params.context as Record<string, unknown> || {}),
     currentDate,
     timezone,
-    ...(params.context as Record<string, unknown> || {}),
   };
 
   try {

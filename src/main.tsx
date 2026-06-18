@@ -1,8 +1,9 @@
 ﻿import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, ExecutionLane, Language, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { autoScheduleTasks } from "./autoSchedule";
@@ -26,7 +27,10 @@ import {
   TIMELINE_END as GEOMETRY_TIMELINE_END,
   HOUR_HEIGHT,
 } from "./timelineGeometry";
-import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, releaseNote, formatDateTitle, monthTitle, weekdayName } from "./i18n";
+import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
+import { localIsoDate } from "./utils/localDate";
+import { buildWeekWindow } from "./utils/monthWindow";
+import { addSubtaskToTree, findSubtaskInTree } from "./utils/treeOrder";
 import { useInAppDialog } from "./InAppDialog";
 import "./styles.css";
 import "./app-redesign.css";
@@ -35,7 +39,9 @@ import "./navopath-buttons.css";
 
 installBrowserFallback();
 
-const todayIso = () => localIso(new Date());
+const ChangelogPage = lazy(() => import("./ChangelogPage"));
+
+const todayIso = () => localIsoDate();
 const TIMELINE_START = 0;
 const TIMELINE_END = 24;
 const SLOT_MINUTES = 15;
@@ -53,17 +59,6 @@ const PLANNING_THEME_PRESETS_DARK  = ["#EEE9DF", "#CAFF72", "#A78BFA", "#EC4899"
 const SAVE_DEBOUNCE_MS = 250;
 const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
-const RELEASE_NOTES = [
-  { date: "2026-06-10", summary: "优化了规划栏的交互和结果展示" },
-  { date: "2026-06-09", summary: "优化了时间轴的快速添加栏" },
-  { date: "2026-06-08", summary: "优化了部分深色模式UI不适配的问题" },
-  { date: "2026-06-08", summary: "优化了 3天 / 周 / 月视图和'全天'栏的体验，并支持任务堆叠" },
-  { date: "2026-06-07", summary: "在一定程度上优化了深色模式的体验" },
-  { date: "2026-06-06", summary: "优化了网站主页面，并且加入了深色模式(beta)" },
-  { date: "2026-06-05", summary: "加入 3天 / 周 / 月视图。UI支持自定义颜色" },
-  { date: "2026-06-04", summary: "规划树支持候选挑选模式，任务可从长期项目流入今日执行。" },
-  { date: "2026-06-03", summary: "网页版上线" },
-] as const;
 const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
   return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
 });
@@ -1200,40 +1195,39 @@ function OnboardingGuide(props: {
   step: OnboardingStep;
   mode: Mode;
   onOpenPlanning: () => void;
+  onOpenAi: () => void;
+  onChange: (step: OnboardingStep) => void;
   onFinish: () => void;
   onSkip: () => void;
 }) {
   const zh = props.lang === "zh";
-  const content = props.step === "add"
-    ? {
-        index: "01",
-        title: zh ? "先添加一个今日任务" : "Add a task for today",
-        body: zh ? "在左下角输入任务名称并按 Add，它会进入今日候选。" : "Name a task in the lower-left field and press Add. It will enter Today's Candidates.",
-      }
-    : props.step === "drag"
-      ? {
-          index: "02",
-          title: zh ? "把任务拖到时间轴" : "Drag it onto the timeline",
-          body: zh ? "从今日候选拖动刚添加的任务，在右侧时间轴选择开始时间。" : "Drag the task from Today's Candidates and choose its start time on the timeline.",
-        }
-      : {
-          index: "03",
-          title: zh ? "在 Planning 规划长期任务" : "Plan long-term work in Planning",
-          body: zh ? "Planning 用于按项目拆解长期任务，再挑选需要推进的内容加入今日执行。" : "Use Planning to break long-term work into projects, then choose what moves into today's execution.",
-        };
+  const normalizedStep = props.step === "drag" ? "schedule" : props.step;
+  const steps: Array<Exclude<OnboardingStep, "drag" | "done">> = ["add", "candidates", "schedule", "calendar", "planning", "ai"];
+  const copy = {
+    add: [zh ? "添加第一个任务" : "Add your first task", zh ? "直接在工作区键入，或使用候选区下方的快速添加栏。" : "Type anywhere in the workspace, or use the quick-add field below Candidates."],
+    candidates: [zh ? "管理今日候选" : "Manage Today's Candidates", zh ? "在这里完成、恢复、调整时长，或把任务移回 Planning。" : "Complete, restore, resize, or move tasks back to Planning here."],
+    schedule: [zh ? "拖到时间轴排程" : "Schedule on the timeline", zh ? "把候选任务拖到时间轴，选择开始时间；任务块可继续拖动和调整。" : "Drag a candidate to a start time, then move or resize its timeline block."],
+    calendar: [zh ? "切换日历视图" : "Switch calendar views", zh ? "使用日、三日、周和连续月视图，并可随时回到今天。" : "Use Day, 3-Day, Week, and continuous Month views, then jump back to today."],
+    planning: [zh ? "拆解长期目标" : "Break down long-term work", zh ? "整块拖动项目、任务与子任务；预览会显示即将放置的位置和层级。" : "Drag whole projects, tasks, and subtasks; the preview shows the resulting position and level."],
+    ai: [zh ? "使用 AI 助手" : "Use the AI assistant", zh ? "AI 以你的本地日期和时区理解今天、明天等相对日期。" : "AI uses your local date and timezone for today, tomorrow, and other relative dates."],
+  } as const;
+  const index = Math.max(0, steps.indexOf(normalizedStep as typeof steps[number]));
+  const content = copy[steps[index]];
 
   return (
     <aside className={`df-onboarding-guide step-${props.step}`} aria-live="polite">
-      <span className="df-onboarding-index">{content.index} / 03</span>
-      <strong>{content.title}</strong>
-      <p>{content.body}</p>
+      <span className="df-onboarding-index">{String(index + 1).padStart(2, "0")} / 06</span>
+      <strong>{content[0]}</strong>
+      <p>{content[1]}</p>
       <div>
-        {props.step === "planning" && props.mode !== "planning" && (
+        {index > 0 && <button type="button" className="quiet" onClick={() => props.onChange(steps[index - 1])}>{zh ? "上一步" : "Back"}</button>}
+        {steps[index] === "planning" && props.mode !== "planning" && (
           <button type="button" onClick={props.onOpenPlanning}>{zh ? "打开 Planning" : "Open Planning"}</button>
         )}
-        {props.step === "planning" && props.mode === "planning" && (
-          <button type="button" onClick={props.onFinish}>{zh ? "完成引导" : "Finish guide"}</button>
-        )}
+        {steps[index] === "ai" && <button type="button" onClick={props.onOpenAi}>{zh ? "打开 AI" : "Open AI"}</button>}
+        {index < steps.length - 1
+          ? <button type="button" onClick={() => props.onChange(steps[index + 1])}>{zh ? "下一步" : "Next"}</button>
+          : <button type="button" onClick={props.onFinish}>{zh ? "完成引导" : "Finish guide"}</button>}
         <button type="button" className="quiet" onClick={props.onSkip}>{zh ? "跳过" : "Skip"}</button>
       </div>
     </aside>
@@ -1278,6 +1272,25 @@ function App() {
   const [aiPlanMenuOpen, setAiPlanMenuOpen] = useState(false);
   const [aiPlanPrefs, setAiPlanPrefs] = useState<AiPlanPrefs>({ source: "today", scope: "day", strategy: "longShort" });
   const [timelineView, setTimelineView] = useState<TimelineView>("daily");
+  const monthScrollRef = useRef<HTMLDivElement>(null);
+  const monthAnchorOffsetRef = useRef<number | null>(null);
+  const [monthFocus, setMonthFocus] = useState("");
+
+  useLayoutEffect(() => {
+    const container = monthScrollRef.current;
+    const previousOffset = monthAnchorOffsetRef.current;
+    if (!container || timelineView !== "month") return;
+    if (previousOffset !== null) {
+      monthAnchorOffsetRef.current = null;
+      const anchor = container.querySelector<HTMLElement>("[data-week-anchor]");
+      if (anchor) container.scrollTop += anchor.offsetTop - previousOffset;
+      return;
+    }
+    const selectedCell = container.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`);
+    const selectedWeek = selectedCell?.closest<HTMLElement>("[data-week-anchor]");
+    if (selectedWeek) container.scrollTop = Math.max(0, selectedWeek.offsetTop - container.clientHeight * 0.32);
+    setMonthFocus(selectedDate.slice(0, 7));
+  }, [selectedDate, timelineView]);
   const [pendingTimelineFocus, setPendingTimelineFocus] = useState<TimelineFocusTarget | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview>(null);
   const [editingOccurrence, setEditingOccurrence] = useState<EditingOccurrence>(null);
@@ -1288,9 +1301,6 @@ function App() {
   const [floatingTimeAdd, setFloatingTimeAdd] = useState<FloatingTimeAdd>(null);
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
-  const [sourceOpen, setSourceOpen] = useState(false);
-  const [sourceFilterProjectId, setSourceFilterProjectId] = useState<string | null>(null);
-  const [sourceAnchorRect, setSourceAnchorRect] = useState<DOMRect | null>(null);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
   const [planningPickMode, setPlanningPickMode] = useState(false);
   const [planningPicks, setPlanningPicks] = useState<Record<string, PlanPickPriority>>({});
@@ -1443,7 +1453,6 @@ function App() {
     setQuickTitle("");
     setQuickProjectId("");
     setQuickProjectOpen(false);
-    setSourceOpen(false);
     setUtilityPanel(null);
     setCandidatePanelCollapsed(false);
     setFullscreen(false);
@@ -1831,6 +1840,56 @@ function App() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen, editingId, addType, data, form]);
+
+  useEffect(() => {
+    let pendingKeyTimer: number | null = null;
+    let composing = false;
+    const openWithTitle = (title: string) => {
+      setAddType("task");
+      setEditingId("");
+      setEditingRecordId(undefined);
+      setEditingOccurrence(null);
+      setForm({ ...defaultForm("task"), title });
+      setDrawerOpen(true);
+    };
+    const handleCompositionStart = () => {
+      composing = true;
+      if (pendingKeyTimer !== null) window.clearTimeout(pendingKeyTimer);
+      pendingKeyTimer = null;
+    };
+    const handleCompositionEnd = (event: CompositionEvent) => {
+      composing = false;
+      const target = event.target as HTMLElement | null;
+      if (drawerOpen || aiOpen || utilityPanel || target?.closest("input, textarea, [contenteditable='true']")) return;
+      if (event.data) openWithTitle(event.data);
+    };
+    const handleGlobalTyping = (event: KeyboardEvent) => {
+      if (
+        drawerOpen || aiOpen || utilityPanel || composing || event.isComposing || event.key === "Process" || event.keyCode === 229 ||
+        event.ctrlKey || event.altKey || event.metaKey || event.key.length !== 1
+      ) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], .df-ai-panel") ||
+        document.querySelector("[role='dialog']")
+      ) return;
+      if (pendingKeyTimer !== null) return;
+      const firstKey = event.key;
+      pendingKeyTimer = window.setTimeout(() => {
+        pendingKeyTimer = null;
+        if (!composing) openWithTitle(firstKey);
+      }, 60);
+    };
+    document.addEventListener("keydown", handleGlobalTyping);
+    document.addEventListener("compositionstart", handleCompositionStart);
+    document.addEventListener("compositionend", handleCompositionEnd);
+    return () => {
+      if (pendingKeyTimer !== null) window.clearTimeout(pendingKeyTimer);
+      document.removeEventListener("keydown", handleGlobalTyping);
+      document.removeEventListener("compositionstart", handleCompositionStart);
+      document.removeEventListener("compositionend", handleCompositionEnd);
+    };
+  }, [drawerOpen, aiOpen, utilityPanel]);
 
   // Forward wheel events from the full timeline panel area to the scroll container
   useEffect(() => {
@@ -2283,7 +2342,7 @@ function App() {
     [tasks, today]
   );
   const completedCandidates = useMemo(
-    () => tasks.filter((task) => task.completed && getExecutionLane(task) !== "queued" && task.plannedForDate === today && !(task.timelineRecords || []).some((r) => r.executionStatus === "scheduled") && !task.scheduledDate && !hasRecurrenceOccurrenceOnDate(task, today)).sort((a, b) => (a.order || 0) - (b.order || 0)),
+    () => tasks.filter((task) => task.completed && getExecutionLane(task) !== "queued" && Boolean(task.plannedForDate && task.plannedForDate <= today) && !(task.timelineRecords || []).some((r) => r.executionStatus === "scheduled") && !task.scheduledDate && !hasRecurrenceOccurrenceOnDate(task, today)).sort((a, b) => (a.order || 0) - (b.order || 0)),
     [tasks, today]
   );
   const todayEventCandidates = useMemo(
@@ -2475,6 +2534,21 @@ function App() {
     updateTask(taskId, patch);
   }
 
+  function moveCandidateToPlanning(taskId: string) {
+    const task = data?.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    updateTask(taskId, {
+      plannedForDate: undefined,
+      executionLane: undefined,
+      scheduledDate: undefined,
+      scheduledStart: undefined,
+      scheduledEnd: undefined,
+      executionStatus: undefined,
+      timelineRecords: [],
+    });
+    showToast(lang === "zh" ? "已移回 Planning" : "Moved back to Planning");
+  }
+
   function batchUpdateTasks(updates: { taskId: string; patch: Partial<Task> }[]) {
     if (!data || updates.length === 0) return;
     const map = new Map(updates.map((u) => [u.taskId, u.patch]));
@@ -2566,8 +2640,8 @@ function App() {
     const now = new Date().toISOString();
     const promotedSubtasks = ids.flatMap((id) => {
       if (taskIds.has(id)) return [];
-      const parentTask = data.tasks.find((task) => (task.subtasks || []).some((subtask) => subtask.id === id));
-      const subtask = parentTask?.subtasks?.find((candidate) => candidate.id === id);
+      const parentTask = data.tasks.find((task) => Boolean(findSubtaskInTree(task.subtasks || [], id)));
+      const subtask = parentTask ? findSubtaskInTree(parentTask.subtasks || [], id) : undefined;
       if (!parentTask || !subtask) return [];
       const picked = planningPicks[id];
       return [{
@@ -2640,8 +2714,8 @@ function App() {
     });
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, order: Date.now() }] });
     setQuickTitle("");
-    if (settings?.onboardingVersion === 0 && settings.onboardingStep === "add") {
-      void saveSettings({ onboardingStep: "drag" });
+    if ((settings?.onboardingVersion ?? 0) < 2 && settings?.onboardingStep === "add") {
+      void saveSettings({ onboardingStep: "candidates" });
     }
     showToast(t(lang, "toast.addedToCandidates"));
   }
@@ -3193,8 +3267,8 @@ function App() {
       durationMinutes: taskDuration(task),
       allDay: false,
     });
-    if (settings?.onboardingVersion === 0 && settings.onboardingStep === "drag") {
-      void saveSettings({ onboardingStep: "planning" });
+    if ((settings?.onboardingVersion ?? 0) < 2 && (settings?.onboardingStep === "drag" || settings?.onboardingStep === "schedule")) {
+      void saveSettings({ onboardingStep: "calendar" });
     }
     setHoverSlot("");
     setDrag(null);
@@ -4621,7 +4695,7 @@ function App() {
 
   if (!data || !settings) return <div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>;
 
-  const onboardingActive = settings.onboardingVersion === 0 && settings.onboardingStep !== "done";
+  const onboardingActive = (settings.onboardingVersion ?? 0) < 2 && settings.onboardingStep !== "done";
   const onboardingStep = (settings.onboardingStep || "add") as OnboardingStep;
 
   return (
@@ -4677,8 +4751,10 @@ function App() {
           step={onboardingStep}
           mode={mode}
           onOpenPlanning={() => void saveSettings({ activeMode: "planning" })}
-          onFinish={() => void saveSettings({ onboardingVersion: 1, onboardingStep: "done" })}
-          onSkip={() => void saveSettings({ onboardingVersion: 1, onboardingStep: "done" })}
+          onOpenAi={() => setAiOpen(true)}
+          onChange={(step) => void saveSettings({ onboardingStep: step })}
+          onFinish={() => void saveSettings({ onboardingVersion: 2, onboardingStep: "done" })}
+          onSkip={() => void saveSettings({ onboardingVersion: 2, onboardingStep: "done" })}
         />
       )}
 
@@ -4716,12 +4792,11 @@ function App() {
                 )}
                 <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
-                <button className="df-icon-action i-branch" data-tip={t(lang, "candidate.pickFromPlanning")} aria-label={t(lang, "candidate.pickFromPlanning")} onClick={openPlanningPicker} />
               </div>
             </div>
             <div className="df-candidate-list">
               {visibleCandidates.length === 0 ? (
-                <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span><button className="df-empty-pick-btn" onClick={openPlanningPicker}>{t(lang, "candidate.pickFromPlanning")}</button></div>
+                <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span></div>
               ) : groupByProject ? (
                 Array.from(
                   visibleCandidates.reduce((map, task) => {
@@ -4751,7 +4826,7 @@ function App() {
                             event.dataTransfer.setData("taskId", task.id);
                             setDragCreate(null);
                             setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                          }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} onToggleDone={() => toggleTaskDone(task.id)} lang={lang} />
+                          }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
                         ))}
                       </div>
                     );
@@ -4764,7 +4839,7 @@ function App() {
                   event.dataTransfer.setData("taskId", task.id);
                   setDragCreate(null);
                   setDrag({ taskId: task.id, kind: "candidate", duration: taskDuration(task) });
-                }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} onToggleDone={() => toggleTaskDone(task.id)} lang={lang} />
+                }} onDragEnd={() => { setDrag(null); setHoverSlot(""); dragTargetDateRef.current = ""; }} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
               ))}
             </div>
             <form className="df-quick-add" onSubmit={(event) => {
@@ -5243,14 +5318,10 @@ function App() {
                     </div>
                   );
                 })() : timelineView === "month" ? (() => {
-                  const monthStart = startOfMonthGridIso(timelineDate);
-                  const allMonthDays = Array.from({ length: 42 }, (_, index) => addDays(monthStart, index));
+                  const weeks = buildWeekWindow(timelineDate, 20, 30, settings.weekStartsOn);
+                  const allMonthDays = weeks.flat();
                   const visibleMonthDays = new Set(allMonthDays);
                   const monthEvents = expandEventOccurrences(visibleMonthDays).tasks;
-                  const activeMonth = new Date(`${timelineDate}T00:00:00`).getMonth();
-                  // Group into 6 weeks
-                  const weeks: string[][] = [];
-                  for (let w = 0; w < 6; w++) weeks.push(allMonthDays.slice(w * 7, w * 7 + 7));
                   function getPrimaryMonthDate(task: Task) {
                     const recordDate = [...(task.timelineRecords || [])]
                       .map((record) => record.scheduledDate)
@@ -5278,24 +5349,37 @@ function App() {
                     <div className="df-month-view">
                       <div className="df-month-header">
                         <div className="df-month-title">
-                          <span className="df-month-name">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" }); })()}</span>
+                          <span className="df-month-name">{(() => { const d = new Date(`${monthFocus || timelineDate.slice(0, 7)}-01T00:00:00`); return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long", year: "numeric" }); })()}</span>
                         </div>
                       </div>
                       <div className="df-month-body">
                         <div className="df-month-weekdays">{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <span key={day}>{day}</span>)}</div>
-                        <div className="df-month-scroll">
+                        <div className="df-month-scroll" ref={monthScrollRef} onScroll={(event) => {
+                          const element = event.currentTarget;
+                          const probeY = element.getBoundingClientRect().top + Math.min(180, element.clientHeight * 0.35);
+                          const focused = Array.from(element.querySelectorAll<HTMLElement>(".df-month-cell[data-date]")).find((cell) => { const rect = cell.getBoundingClientRect(); return rect.top <= probeY && rect.bottom >= probeY; });
+                          if (focused?.dataset.date) setMonthFocus(focused.dataset.date.slice(0, 7));
+                          if (element.scrollTop < 160) {
+                            const anchor = element.querySelector<HTMLElement>("[data-week-anchor]");
+                            monthAnchorOffsetRef.current = anchor?.offsetTop ?? element.scrollTop;
+                            setSelectedDate(addDays(timelineDate, -140));
+                          } else if (element.scrollTop + element.clientHeight > element.scrollHeight - 160) {
+                            const anchor = element.querySelector<HTMLElement>("[data-week-anchor]");
+                            monthAnchorOffsetRef.current = anchor?.offsetTop ?? element.scrollTop;
+                            setSelectedDate(addDays(timelineDate, 140));
+                          }
+                        }}>
                           {weeks.map((weekDays, wi) => {
                             const weekTaskCounts = weekDays.map((d) => getDayTasks(d).length);
                             const maxTasks = Math.max(...weekTaskCounts, 1);
                             const weekH = baseDayH + maxTasks * (taskH + taskGap) + weekPad;
                             return (
-                              <div key={wi} className="df-month-week-row" style={{ height: weekH }}>
+                              <div key={weekDays[0]} data-week-anchor={weekDays[0]} className="df-month-week-row" style={{ height: weekH }}>
                                 {weekDays.map((day) => {
                                   const dateObj = new Date(`${day}T00:00:00`);
-                                  const isCurrentMonth = dateObj.getMonth() === activeMonth;
                                   const dayTasks = getDayTasks(day);
                                   return (
-                                    <div key={day} className={`df-month-cell${isCurrentMonth ? "" : " muted"}${day === today ? " today" : ""}${drag ? " drag-active" : ""}`}
+                                    <div key={day} data-date={day} className={`df-month-cell${day.slice(0, 7) === (monthFocus || timelineDate.slice(0, 7)) ? " focus-month" : " muted"}${day === today ? " today" : ""}${drag ? " drag-active" : ""}`}
                                       onClick={(event) => {
                                         if (drawerOpen || drag) return;
                                         if ((event.target as HTMLElement).closest(".df-month-task,.df-month-task *")) return;
@@ -5638,7 +5722,7 @@ function App() {
         </main>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} pickMode={planningPickMode} picks={planningPicks} onExitPickMode={() => setPlanningPickMode(false)} onAddPick={addPlanningPick} onUpdatePick={updatePlanningPick} onRemovePick={removePlanningPick} onClearPicks={clearPlanningPicks} onApplyPicks={applyPlanningPicks} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onTaskDelete={(taskId) => {
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} pickMode={planningPickMode} picks={planningPicks} onExitPickMode={() => setPlanningPickMode(false)} onAddPick={addPlanningPick} onUpdatePick={updatePlanningPick} onRemovePick={removePlanningPick} onClearPicks={clearPlanningPicks} onApplyPicks={applyPlanningPicks} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onTaskDelete={(taskId) => {
             void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== taskId) });
           }} />
         </Suspense>
@@ -5661,7 +5745,6 @@ function App() {
           )}
         </div>
       )}
-      {sourceOpen && <SourceModal tasks={tasks} projects={projects} today={today} anchorRect={sourceAnchorRect} defaultFilter={sourceFilterProjectId || undefined} onClose={() => { setSourceOpen(false); setSourceFilterProjectId(null); setSourceAnchorRect(null); }} onJoin={(taskIds) => { taskIds.forEach((id) => addPlanningPick(id)); showToast(`已添加 ${taskIds.length} 个任务到候选`); setSourceOpen(false); setSourceFilterProjectId(null); setSourceAnchorRect(null); }} lang={lang} />}
     </div>
   );
 }
@@ -5940,6 +6023,7 @@ function TaskCard({
   onApplyTimeSettings,
   onSaveDueDate,
   onSaveRecurrence,
+  onMoveToPlanning,
   lang,
 }: {
   task: Task;
@@ -5960,6 +6044,7 @@ function TaskCard({
   onApplyTimeSettings: (settings: CandidateTimeSettings) => void;
   onSaveDueDate: (date: string) => void;
   onSaveRecurrence: (recurrence?: TaskRecurrence) => void;
+  onMoveToPlanning?: () => void;
   lang: Language;
 }) {
   const [openPanel, setOpenPanel] = useState<"more" | null>(null);
@@ -6112,6 +6197,23 @@ function TaskCard({
                 {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
               </div>
               <div className="df-task-card-more-actions">
+                {onMoveToPlanning && (
+                  <button
+                    className="df-icon-button"
+                    title={lang === "zh" ? "移回 Planning" : "Move back to Planning"}
+                    aria-label={lang === "zh" ? "移回 Planning" : "Move back to Planning"}
+                    onClick={() => {
+                      onMoveToPlanning();
+                      setOpenPanel(null);
+                    }}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 5h7a4 4 0 0 1 4 4v6" />
+                      <path d="m8 2-4 3 4 3" />
+                      <path d="M11 15h6" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   className={`df-icon-button ${repeatOpen ? "is-active" : ""}`}
                   title={t(lang, "taskCard.duplicate")}
@@ -6757,22 +6859,62 @@ function EditDrawer(props: {
     set("estimatedHours", safeMinutes / 60);
     if (!props.editing || props.type !== "task" || !props.task) return;
     const patch: Partial<Task> = { estimatedHours: safeMinutes / 60 };
+    if (props.editingRecordId && props.task.timelineRecords?.length) {
+      patch.timelineRecords = props.task.timelineRecords.map((record) =>
+        record.id === props.editingRecordId
+          ? { ...record, scheduledEnd: addMinutes(record.scheduledStart, safeMinutes) }
+          : record,
+      );
+    }
     if (props.task.scheduledStart) patch.scheduledEnd = addMinutes(props.task.scheduledStart, safeMinutes);
     props.onTaskUpdate(props.task.id, patch);
   }
-  async function addSubtask() {
+  async function addSubtask(parentId?: string) {
     if (!props.task) return;
     const title = await dialog.prompt(props.lang === "zh" ? "子任务名称" : "Subtask name");
     if (!title?.trim()) return;
+    const nextSubtask: Subtask = {
+      id: uid("subtask"),
+      title: title.trim(),
+      completed: false,
+      done: false,
+      order: Date.now(),
+      subtasks: [],
+      createdAt: new Date().toISOString(),
+    };
     props.onTaskUpdate(props.task.id, {
-      subtasks: [...(props.task.subtasks || []), { id: uid("subtask"), title: title.trim(), completed: false, done: false, order: Date.now(), createdAt: new Date().toISOString() }]
+      subtasks: addSubtaskToTree(props.task.subtasks || [], nextSubtask, parentId),
     });
   }
   function updateSubtask(subtaskId: string, patch: { title?: string; completed?: boolean }) {
     if (!props.task) return;
-    props.onTaskUpdate(props.task.id, {
-      subtasks: (props.task.subtasks || []).map((subtask) => subtask.id === subtaskId ? { ...subtask, ...patch, done: patch.completed ?? subtask.done } : subtask)
-    });
+    const recurse = (st: Subtask[]): Subtask[] =>
+      st.map((sub) =>
+        sub.id === subtaskId
+          ? { ...sub, ...patch, done: patch.completed ?? sub.done }
+          : { ...sub, subtasks: sub.subtasks ? recurse(sub.subtasks) : sub.subtasks }
+      );
+    props.onTaskUpdate(props.task.id, { subtasks: recurse(props.task.subtasks || []) });
+  }
+  function renderSubtaskRows(subtasks: Subtask[], depth = 0): React.ReactNode {
+    return subtasks.map((subtask) => (
+      <div className={`df-subtask-tree-item${depth > 0 ? " nested" : ""}`} key={subtask.id} style={{ "--subtask-depth": depth } as CSSProperties}>
+        <label className={`df-subtask-row-new ${subtask.completed || subtask.done ? "completed" : ""}`}>
+          <input type="checkbox" checked={Boolean(subtask.completed || subtask.done)} onChange={(event) => updateSubtask(subtask.id, { completed: event.target.checked })} />
+          <input className="df-subtask-title-input" value={subtask.title} onChange={(event) => updateSubtask(subtask.id, { title: event.target.value })} />
+          <button
+            type="button"
+            className="df-subtask-add-child"
+            title={props.lang === "zh" ? "添加下一级子任务" : "Add nested subtask"}
+            aria-label={props.lang === "zh" ? `在 ${subtask.title} 下添加子任务` : `Add a subtask under ${subtask.title}`}
+            onClick={(event) => { event.preventDefault(); void addSubtask(subtask.id); }}
+          >
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 2v8M2 6h8" /></svg>
+          </button>
+        </label>
+        {(subtask.subtasks || []).length > 0 && <div className="df-subtask-tree-children">{renderSubtaskRows(subtask.subtasks || [], depth + 1)}</div>}
+      </div>
+    ));
   }
   function scheduleText(task: Task) {
     const activeRecord = props.editingRecordId
@@ -7076,7 +7218,7 @@ function EditDrawer(props: {
         <section className="df-detail-subtasks-new">
           <div className="df-detail-section-head">
             <h3>{t(props.lang, "drawer.subtasks")}</h3>
-            <button className="df-detail-add-btn" onClick={addSubtask}>
+            <button className="df-detail-add-btn" onClick={() => void addSubtask()}>
               <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v8M2 6h8"/></svg>
               <span>{t(props.lang, "drawer.addSubtask")}</span>
             </button>
@@ -7084,12 +7226,7 @@ function EditDrawer(props: {
           <div className="df-subtask-list-new">
             {(props.task.subtasks || []).length === 0 ? (
               <div className="df-subtask-empty">{t(props.lang, "drawer.noSubtasks")}</div>
-            ) : (props.task.subtasks || []).map((subtask) => (
-              <label key={subtask.id} className={`df-subtask-row-new ${subtask.completed || subtask.done ? "completed" : ""}`}>
-                <input type="checkbox" checked={Boolean(subtask.completed || subtask.done)} onChange={(event) => updateSubtask(subtask.id, { completed: event.target.checked })} />
-                <input className="df-subtask-title-input" value={subtask.title} onChange={(event) => updateSubtask(subtask.id, { title: event.target.value })} />
-              </label>
-            ))}
+            ) : renderSubtaskRows(props.task.subtasks || [])}
           </div>
         </section>
 
@@ -7323,6 +7460,40 @@ function AttachmentCard({ attachment, referenced = false, onRemove }: { attachme
   </div>;
 }
 
+function McpTokenManager({ lang }: { lang: Language }) {
+  const [tokens, setTokens] = useState<McpTokenMetadata[]>([]);
+  const [name, setName] = useState("");
+  const [rawToken, setRawToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const api = window.plannerApi;
+  const supported = Boolean(api.listMcpTokens && api.createMcpToken && api.revokeMcpToken);
+  const refresh = useCallback(async () => {
+    if (!api.listMcpTokens) return;
+    setTokens(await api.listMcpTokens());
+  }, [api]);
+  useEffect(() => { if (supported) void refresh(); }, [refresh, supported]);
+  return (
+    <section className="df-mcp-settings">
+      <strong>{lang === "zh" ? "远程 MCP 访问" : "Remote MCP access"}</strong>
+      <p>{supported
+        ? (lang === "zh" ? "为 Codex 或 MCP Inspector 创建个人 Bearer Token。原始令牌只显示一次。" : "Create a personal Bearer token for Codex or MCP Inspector. The raw token is shown once.")
+        : (lang === "zh" ? "登录云端账户后可管理 MCP 令牌。" : "Sign in to a cloud account to manage MCP tokens.")}</p>
+      {supported && <div className="df-mcp-token-row"><input value={name} onChange={(event) => setName(event.target.value)} placeholder={lang === "zh" ? "令牌名称" : "Token name"} /><button disabled={busy} onClick={async () => {
+        if (!api.createMcpToken) return;
+        setBusy(true);
+        try {
+          const created = await api.createMcpToken(name.trim() || "Codex");
+          setRawToken(created.token);
+          setName("");
+          await refresh();
+        } finally { setBusy(false); }
+      }}>{lang === "zh" ? "生成" : "Generate"}</button></div>}
+      {rawToken && <div className="df-mcp-token"><small>{lang === "zh" ? "请立即保存，关闭设置后无法再次查看" : "Save this now; it cannot be viewed again"}</small><code>{rawToken}</code><button onClick={() => void navigator.clipboard.writeText(rawToken)}>{lang === "zh" ? "复制" : "Copy"}</button></div>}
+      {tokens.map((token) => <div className="df-mcp-token-row" key={token.id}><span><strong>{token.name}</strong><small>{token.tokenPrefix}… · {new Date(token.createdAt).toLocaleDateString()}</small></span><button onClick={async () => { if (!api.revokeMcpToken) return; await api.revokeMcpToken(token.id); await refresh(); }}>{lang === "zh" ? "撤销" : "Revoke"}</button></div>)}
+    </section>
+  );
+}
+
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; lang: Language }) {
   const userName = settings.displayName?.trim() || authEmail || "NavoPath User";
   const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
@@ -7418,6 +7589,8 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             <label className="df-utility-select">{t(lang, "settings.defaultView")}<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="weekly">{viewLabel(lang, "weekly")}</option><option value="month">{viewLabel(lang, "month")}</option></select></label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />{t(lang, "settings.hideCompleted")}</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />{t(lang, "settings.allowAiContext")}</label>
+            <button className="df-settings-about" onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}</button>
+            <McpTokenManager lang={lang} />
             <section className="df-ai-memory-settings">
               <div className="df-ai-memory-settings-head">
                 <div><strong>AI 记忆</strong><small>{visibleMemories.length} 条会参与上下文</small></div>
@@ -7462,14 +7635,10 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             <strong>{t(lang, "settings.version")}</strong>
             <p>{t(lang, "settings.aboutDesc")}</p>
             <small>{t(lang, "settings.lastUpdated")}</small>
-            <div className="df-release-list">
-              {RELEASE_NOTES.map((item) => (
-                <article key={`${item.date}-${item.summary}`} className="df-release-item">
-                  <strong>{item.date}</strong>
-                  <span>{item.summary}</span>
-                </article>
-              ))}
-            </div>
+            <a className="df-settings-row" href="/changelog">
+              <strong>{lang === "zh" ? "查看更新日志" : "View changelog"}</strong>
+              <span aria-hidden="true">↗</span>
+            </a>
           </div>
         )}
       </aside>
@@ -7489,113 +7658,14 @@ function ThemeColorSetting({ label, presets, value, onChange }: { label: string;
   );
 }
 
-function SourceModal({ tasks, projects, today, onClose, onJoin, defaultFilter, anchorRect, lang }: { tasks: Task[]; projects: Project[]; today: string; onClose: () => void; onJoin: (taskIds: string[]) => void; defaultFilter?: string; anchorRect: DOMRect | null; lang: Language }) {
-  const [filter, setFilter] = useState<string>(defaultFilter || "all");
-  const [showAdded, setShowAdded] = useState(false);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [expanded, setExpanded] = useState("");
-
-  // Sync filter when defaultFilter changes (e.g. different project clicked)
-  useEffect(() => {
-    setFilter(defaultFilter || "all");
-    setSelected({});
-  }, [defaultFilter]);
-
-  // Compute popover position directly from anchorRect on every render (no rAF needed)
-  const popoverStyle = useMemo<CSSProperties>(() => {
-    if (!anchorRect) return {};
-    const POPOVER_WIDTH = 340;
-    const POPOVER_MAX_HEIGHT = 420;
-    let top = anchorRect.bottom + 8;
-    let left = Math.max(8, anchorRect.left);
-    // Flip up if near bottom
-    if (top + POPOVER_MAX_HEIGHT > window.innerHeight - 8) {
-      top = Math.max(8, anchorRect.top - POPOVER_MAX_HEIGHT - 8);
-    }
-    // Shift left if near right edge
-    if (left + POPOVER_WIDTH > window.innerWidth - 12) {
-      left = Math.max(8, window.innerWidth - POPOVER_WIDTH - 12);
-    }
-    return { top, left, opacity: 1 };
-  }, [anchorRect]);
-
-  const openTasks = tasks.filter((task) => {
-    if (task.completed) return false;
-    const joined = task.plannedForDate === today && Boolean(getExecutionLane(task));
-    if (!showAdded && joined) return false;
-    if (filter === "all") return true;
-    if (filter === "unassigned") return !task.projectId;
-    return task.projectId === filter;
-  });
-  const filteredProjects = projects.filter((project) => filter === "all" || filter === project.id);
-  const selectedIds = Object.keys(selected).filter((id) => selected[id]);
-  const toggleSelected = (taskId: string) => setSelected((current) => ({ ...current, [taskId]: !current[taskId] }));
-  const addSelected = () => {
-    onJoin(selectedIds);
-    setSelected({});
-    onClose();
-  };
-
-  return createPortal(
-    <>
-      <div className="df-popover-backdrop" onClick={onClose} />
-      <div className="task-list-popover" style={popoverStyle} onClick={(event) => event.stopPropagation()}>
-        <div className="task-list-popover-header">
-          <h2>{t(lang, "sourceModal.selectTodayTasks")}</h2>
-          <button className="df-icon-action i-close" data-tip={t(lang, "sourceModal.close")} aria-label={t(lang, "sourceModal.close")} onClick={onClose} />
-        </div>
-        <div className="task-list-popover-toolbar">
-          <button className="light" onClick={() => setShowAdded((value) => !value)}>{showAdded ? t(lang, "sourceModal.hideAdded") : t(lang, "sourceModal.showAdded")}</button>
-          <button className="primary" disabled={selectedIds.length === 0} onClick={addSelected}>{t(lang, "sourceModal.addSelected")} {selectedIds.length || ""}</button>
-        </div>
-        <div className="task-list-popover-filters">
-          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t(lang, "sourceModal.allProjects")}</button>
-          <button className={filter === "unassigned" ? "active" : ""} onClick={() => setFilter("unassigned")}>{t(lang, "sourceModal.unassigned")}</button>
-          {projects.map((project) => <button key={project.id} className={filter === project.id ? "active" : ""} onClick={() => setFilter(project.id)}>{project.title}</button>)}
-        </div>
-        <div className="task-list-popover-body">
-          {openTasks.filter((task) => task.dueDate < today).length > 0 && <section className="df-source-section"><h3>{t(lang, "sourceModal.overdue")}</h3>
-            {openTasks.filter((task) => task.dueDate < today).slice(0, 8).map((task) => <SourceRow key={task.id} task={task} today={today} projectName={projects.find((project) => project.id === task.projectId)?.title || "未归属"} selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}
-          </section>}
-          {openTasks.filter((task) => task.dueDate >= today).length > 0 && <section className="df-source-section"><h3>{t(lang, "sourceModal.thisWeek")}</h3>
-            {openTasks.filter((task) => task.dueDate >= today).slice(0, 8).map((task) => <SourceRow key={task.id} task={task} today={today} projectName={projects.find((project) => project.id === task.projectId)?.title || "未归属"} selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}
-          </section>}
-          {filteredProjects.some((project) => openTasks.some((task) => task.projectId === project.id)) && <section className="df-source-section"><h3>{t(lang, "sourceModal.browseByProject")}</h3>
-        {filteredProjects.map((project) => {
-          const projectTasks = openTasks.filter((task) => task.projectId === project.id).slice(0, 8);
-          if (projectTasks.length === 0) return null;
-          return <section key={project.id}><strong>{project.title}</strong>{projectTasks.map((task) => <SourceRow key={task.id} task={task} today={today} projectName={project.title} selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}</section>;
-        })}
-          </section>}
-          {filter === "unassigned" && openTasks.length > 0 && <section><strong>未归属</strong>{openTasks.map((task) => <SourceRow key={task.id} task={task} today={today} projectName="未归属" selected={Boolean(selected[task.id])} expanded={expanded === task.id} onSelect={() => toggleSelected(task.id)} onExpand={() => setExpanded((id) => id === task.id ? "" : task.id)} />)}</section>}
-          {openTasks.length === 0 && <div className="df-source-empty">{t(lang, "sourceModal.noUnfinished")}</div>}
-        </div>
-      </div>
-    </>,
-    document.querySelector('.df-app') || document.body
-  );
-}
-
-function SourceRow({ task, today, projectName, selected, expanded, onSelect, onExpand }: { task: Task; today: string; projectName: string; selected: boolean; expanded: boolean; onSelect: () => void; onExpand: () => void }) {
-  const joined = task.plannedForDate === today && Boolean(getExecutionLane(task));
-  return (
-    <div className={`df-source-row ${selected ? "selected" : ""} ${joined ? "joined" : ""}`}>
-      <button className="df-source-select" onClick={(event) => {
-        event.stopPropagation();
-        onSelect();
-      }}>{selected ? "✓" : "›"}</button>
-      <div className="df-source-main" onClick={onExpand}>
-        <span>{task.title}</span>
-        <small>{joined ? "已添加" : `${projectName} · ${formatDuration(task.estimatedHours || 0.5)} · 截止 ${shortDate(task.dueDate)}`}</small>
-        {expanded && <p>{task.notes || "暂无备注"}</p>}
-      </div>
-    </div>
-  );
-}
 
 const rootElement = document.getElementById("root")!;
 const rootKey = "__plannerRoot";
 const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
 const root = rootWindow[rootKey] ?? createRoot(rootElement);
 rootWindow[rootKey] = root;
-root.render(<App />);
+root.render(
+  window.location.pathname === "/changelog"
+    ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
+    : <App />,
+);

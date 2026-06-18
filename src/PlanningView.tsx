@@ -3,8 +3,13 @@ import { createPortal } from "react-dom";
 import type { PlannerData, Project, Subtask, Task } from "./types";
 import { t, priLabels, type Language } from "./i18n";
 import { useInAppDialog } from "./InAppDialog";
+import { localIsoDate } from "./utils/localDate";
+import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 
 type PlanPickPriority = "must" | "should" | "could";
+type TreeNodeKind = "project" | "task" | "subtask";
+type TreeDragNode = { kind: TreeNodeKind; id: string };
+type TreeDropTarget = TreeDragNode & { position: "before" | "inside" | "after"; top: number; left: number; width: number };
 
 const DEFAULT_PROJECT_COLOR = "var(--accent-plan, #CAFF72)";
 const UNASSIGNED_COLOR = "#7B8191";
@@ -14,7 +19,7 @@ function uid(prefix: string) {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate();
 }
 
 function truncate(text: string, max: number) {
@@ -173,68 +178,106 @@ function PlanningSubtaskNode(props: {
   onSetDate: (subtaskId: string) => void;
   onMoveProject: (subtaskId: string) => void;
   onDelete: (subtaskId: string) => void;
+  onAddSubtask: (parentId: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
   const done = Boolean(props.subtask.completed || props.subtask.done);
+  const childSubtasks = props.subtask.subtasks || [];
+  const hasChildren = childSubtasks.length > 0;
 
   return (
     <>
       {tooltipEl}
-      <div className={`df-plan-subtask-node ${done ? "done" : ""}`} data-node-id={props.subtask.id} data-node-type="subtask">
-        <button
-          className={`df-subtask-check ${done ? "done" : ""}`}
-          onClick={() => props.onToggle(props.subtask.id)}
-          aria-label={done ? t(props.lang, "planning.markIncomplete") : t(props.lang, "planning.markComplete")}
-          style={done ? { "--project-color": props.projectColor } as React.CSSProperties : undefined}
-        >
-          {done && <CheckIcon size={10} />}
-        </button>
-        <span
-          className="df-subtask-title"
-          ref={titleRef}
-          onMouseEnter={() => {
-            if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
-              showTip(props.subtask.title, titleRef.current);
-            }
-          }}
-          onMouseLeave={hideTip}
-        >
-          {props.subtask.title}
-        </span>
-        <div className="df-task-node-actions">
+      <div draggable className={`df-plan-subtask-node ${done ? "done" : ""}${hasChildren ? " has-children" : ""}`} data-node-id={props.subtask.id} data-node-type="subtask">
+        <div className="df-subtask-inner">
           <button
-            className="df-tree-icon-button"
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onPromote(props.subtask.id);
-            }}
-            aria-label={t(props.lang, "planning.addToCandidate")}
+            className={`df-subtask-check ${done ? "done" : ""}`}
+            onClick={() => props.onToggle(props.subtask.id)}
+            aria-label={done ? t(props.lang, "planning.markIncomplete") : t(props.lang, "planning.markComplete")}
+            style={done ? { "--project-color": props.projectColor } as React.CSSProperties : undefined}
           >
-            <ArrowRightIcon />
+            {done && <CheckIcon size={10} />}
           </button>
-          <button
-            className="df-tree-icon-button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setMenuOpen((open) => !open);
+          <span
+            className="df-subtask-title"
+            ref={titleRef}
+            onMouseEnter={() => {
+              if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
+                showTip(props.subtask.title, titleRef.current);
+              }
             }}
-            aria-label={t(props.lang, "planning.more")}
+            onMouseLeave={hideTip}
           >
-            <MoreIcon />
-          </button>
+            {props.subtask.title}
+          </span>
+          {hasChildren && (
+            <button
+              className="df-task-chevron df-subtask-chevron"
+              onClick={(event) => {
+                event.stopPropagation();
+                setCollapsed((v) => !v);
+              }}
+              aria-label={collapsed ? t(props.lang, "planning.expandSubtasks") : t(props.lang, "planning.collapseSubtasks")}
+            >
+              <ChevronIcon open={!collapsed} />
+            </button>
+          )}
+          <div className="df-task-node-actions">
+            <button
+              className="df-tree-icon-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onPromote(props.subtask.id);
+              }}
+              aria-label={t(props.lang, "planning.addToCandidate")}
+            >
+              <ArrowRightIcon />
+            </button>
+            <button
+              className="df-tree-icon-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
+              aria-label={t(props.lang, "planning.more")}
+            >
+              <MoreIcon />
+            </button>
+          </div>
         </div>
         <TreeMenu
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
           actions={[
             { label: t(props.lang, "planning.editName"), onClick: () => props.onRename(props.subtask.id) },
+            { label: t(props.lang, "planning.addSubtask"), onClick: () => { setCollapsed(false); props.onAddSubtask(props.subtask.id); } },
             { label: t(props.lang, "planning.setDate"), onClick: () => props.onSetDate(props.subtask.id) },
             { label: t(props.lang, "planning.moveToProject"), onClick: () => props.onMoveProject(props.subtask.id) },
             { label: t(props.lang, "planning.delete"), danger: true, onClick: () => props.onDelete(props.subtask.id) },
           ]}
         />
+        {hasChildren && !collapsed && (
+          <div className="df-subtask-children">
+            {childSubtasks.map((child) => (
+              <PlanningSubtaskNode
+                key={child.id}
+                lang={props.lang}
+                subtask={child}
+                projectColor={props.projectColor}
+                onToggle={props.onToggle}
+                onPromote={props.onPromote}
+                onRename={props.onRename}
+                onSetDate={props.onSetDate}
+                onMoveProject={props.onMoveProject}
+                onDelete={props.onDelete}
+                onAddSubtask={props.onAddSubtask}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
@@ -260,13 +303,13 @@ function PlanningTaskNode(props: {
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
   const hasSubtasks = (props.task.subtasks || []).length > 0;
-  const doneCount = (props.task.subtasks || []).filter((subtask) => subtask.completed || subtask.done).length;
-  const totalCount = (props.task.subtasks || []).length;
+  const doneCount = countDoneSubtasks(props.task.subtasks);
+  const totalCount = countSubtasks(props.task.subtasks);
 
   return (
     <>
       {tooltipEl}
-      <div className={`df-plan-task-node ${props.picked ? "picked" : ""}`} data-node-id={props.task.id} data-node-type="task">
+      <div draggable className={`df-plan-task-node ${props.picked ? "picked" : ""}${props.task.plannedForDate === todayIso() ? " added-to-today" : ""}`} data-node-id={props.task.id} data-node-type="task">
         <div className="df-task-node-inner" onClick={props.onOpen}>
           <span
             className="df-task-title"
@@ -349,6 +392,7 @@ function PlanningProjectNode(props: {
     <>
       {tooltipEl}
       <div
+        draggable
         className={`df-plan-project-node ${props.collapsed ? "collapsed" : ""}`}
         data-node-id={props.project.id}
         data-node-type="project"
@@ -592,12 +636,15 @@ export default function PlanningView(props: {
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onTaskCreate: (projectId: string) => void;
   onTaskDelete: (taskId: string) => void;
+  onDataChange: (data: PlannerData) => void;
 }) {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
   const [collapsedSubtasks, setCollapsedSubtasks] = useState<Record<string, boolean>>({});
   const [leftRatio, setLeftRatio] = useState(66);
   const [showAddedTasks, setShowAddedTasks] = useState(false);
+  const [dragNode, setDragNode] = useState<TreeDragNode | null>(null);
+  const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -633,8 +680,8 @@ export default function PlanningView(props: {
       const task = safeTasks.find((candidate) => candidate?.id === id);
       if (task) return task;
 
-      const parentTask = safeTasks.find((candidate) => (candidate.subtasks || []).some((subtask) => subtask.id === id));
-      const subtask = parentTask?.subtasks?.find((candidate) => candidate.id === id);
+      const parentTask = safeTasks.find((candidate) => Boolean(findSubtaskInTree(candidate.subtasks || [], id)));
+      const subtask = parentTask ? findSubtaskInTree(parentTask.subtasks || [], id) : undefined;
       if (!parentTask || !subtask) return null;
 
       return {
@@ -669,14 +716,20 @@ export default function PlanningView(props: {
     props.onTaskUpdate(task.id, { title: title.trim() });
   }, [dialog, props]);
 
-  const addSubtask = useCallback(async (task: Task) => {
+  const addSubtask = useCallback(async (task: Task, parentId?: string) => {
     const title = await dialog.prompt(t(props.lang, "planning.addSubtask"));
     if (!title?.trim()) return;
+    const nextSubtask: Subtask = {
+      id: uid("subtask"),
+      title: title.trim(),
+      completed: false,
+      done: false,
+      order: Date.now(),
+      subtasks: [],
+      createdAt: new Date().toISOString(),
+    };
     props.onTaskUpdate(task.id, {
-      subtasks: [
-        ...(task.subtasks || []),
-        { id: uid("subtask"), title: title.trim(), completed: false, done: false, order: Date.now(), createdAt: new Date().toISOString() },
-      ],
+      subtasks: addSubtaskToTree(task.subtasks || [], nextSubtask, parentId),
     });
   }, [dialog, props]);
 
@@ -703,26 +756,25 @@ export default function PlanningView(props: {
   const toggleSubtask = useCallback((taskId: string, subtaskId: string) => {
     const task = safeTasks.find((item) => item.id === taskId);
     if (!task) return;
-    props.onTaskUpdate(taskId, {
-      subtasks: (task.subtasks || []).map((subtask) =>
+    const toggleRecursive = (subtasks: Subtask[]): Subtask[] =>
+      subtasks.map((subtask) =>
         subtask.id === subtaskId
           ? { ...subtask, completed: !(subtask.completed || subtask.done), done: !(subtask.completed || subtask.done) }
-          : subtask,
-      ),
-    });
+          : { ...subtask, subtasks: subtask.subtasks ? toggleRecursive(subtask.subtasks) : subtask.subtasks }
+      );
+    props.onTaskUpdate(taskId, { subtasks: toggleRecursive(task.subtasks || []) });
   }, [props, safeTasks]);
 
   const renameSubtask = useCallback(async (subtaskId: string) => {
+    const title = await dialog.prompt(t(props.lang, "planning.editName"));
+    if (!title?.trim()) return;
     for (const task of safeTasks) {
-      const subtask = (task.subtasks || []).find((s) => s.id === subtaskId);
-      if (subtask) {
-        const title = await dialog.prompt(t(props.lang, "planning.editName"), subtask.title);
-        if (!title?.trim()) return;
-        props.onTaskUpdate(task.id, {
-          subtasks: (task.subtasks || []).map((s) =>
-            s.id === subtaskId ? { ...s, title: title.trim() } : s,
-          ),
-        });
+      if (findSubtaskInTree(task.subtasks || [], subtaskId)) {
+        const recurse = (subtasks: Subtask[]): Subtask[] =>
+          subtasks.map((s) =>
+            s.id === subtaskId ? { ...s, title: title.trim() } : { ...s, subtasks: s.subtasks ? recurse(s.subtasks) : s.subtasks }
+          );
+        props.onTaskUpdate(task.id, { subtasks: recurse(task.subtasks || []) });
         return;
       }
     }
@@ -732,10 +784,8 @@ export default function PlanningView(props: {
     const confirmed = await dialog.confirm(props.lang === "zh" ? "确定删除此子任务？" : "Delete this subtask?");
     if (!confirmed) return;
     for (const task of safeTasks) {
-      if ((task.subtasks || []).some((s) => s.id === subtaskId)) {
-        props.onTaskUpdate(task.id, {
-          subtasks: (task.subtasks || []).filter((s) => s.id !== subtaskId),
-        });
+      if (findSubtaskInTree(task.subtasks || [], subtaskId)) {
+        props.onTaskUpdate(task.id, { subtasks: removeSubtaskFromTree(task.subtasks || [], subtaskId) });
         return;
       }
     }
@@ -747,15 +797,16 @@ export default function PlanningView(props: {
 
   const setSubtaskDate = useCallback(async (subtaskId: string) => {
     for (const task of safeTasks) {
-      const subtask = (task.subtasks || []).find((s) => s.id === subtaskId);
+      const subtask = findSubtaskInTree(task.subtasks || [], subtaskId);
       if (subtask) {
         const date = await dialog.prompt(props.lang === "zh" ? "设置日期 YYYY-MM-DD" : "Set date YYYY-MM-DD", task.dueDate || todayIso());
         if (!date?.trim()) return;
-        props.onTaskUpdate(task.id, {
-          subtasks: (task.subtasks || []).map((s) =>
-            s.id === subtaskId ? { ...s, title: `${s.title} 📅${date.trim()}` } : s,
-          ),
-        });
+        const updateRecursive = (subtasks: Subtask[]): Subtask[] => subtasks.map((item) =>
+          item.id === subtaskId
+            ? { ...item, title: `${item.title} ? ${date.trim()}` }
+            : { ...item, subtasks: item.subtasks ? updateRecursive(item.subtasks) : item.subtasks },
+        );
+        props.onTaskUpdate(task.id, { subtasks: updateRecursive(task.subtasks || []) });
         return;
       }
     }
@@ -763,7 +814,7 @@ export default function PlanningView(props: {
 
   const moveSubtaskProject = useCallback(async (subtaskId: string) => {
     for (const task of safeTasks) {
-      if ((task.subtasks || []).some((s) => s.id === subtaskId)) {
+      if (findSubtaskInTree(task.subtasks || [], subtaskId)) {
         const options = safeProjects.map((p, i) => `${i + 1}. ${p.title}`).join("\n");
         const choice = await dialog.prompt(
           props.lang === "zh"
@@ -779,6 +830,160 @@ export default function PlanningView(props: {
       }
     }
   }, [dialog, safeTasks, safeProjects, props]);
+
+  const persistTree = useCallback((projects: Project[], tasks: Task[]) => {
+    props.onDataChange(normalizeTreeOrder({ ...props.data, projects, tasks }));
+  }, [props]);
+
+  const subtaskOwner = useCallback((subtaskId: string) =>
+    safeTasks.find((task) => findSubtaskInTree(task.subtasks || [], subtaskId)), [safeTasks]);
+
+  const taskFromSubtask = useCallback((subtask: Subtask, projectId?: string): Task => ({
+    id: uid("task"),
+    title: subtask.title,
+    dueDate: today,
+    category: "personal",
+    priority: "medium",
+    notes: "",
+    goalId: "",
+    completed: Boolean(subtask.completed || subtask.done),
+    projectId,
+    order: Date.now(),
+    subtasks: subtask.subtasks || [],
+    timelineRecords: [],
+    createdAt: subtask.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }), [today]);
+
+  const projectFromItem = useCallback((item: Task | Subtask): Project => ({
+    id: uid("project"),
+    title: item.title,
+    category: "project",
+    notes: "notes" in item ? item.notes : "",
+    completed: Boolean(item.completed || ("done" in item && item.done)),
+    order: Date.now(),
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }), []);
+
+  const handleTreeDrop = useCallback(async (source: TreeDragNode, target: TreeDropTarget) => {
+    if (source.kind === target.kind && source.id === target.id) return;
+    let projects = [...safeProjects];
+    let tasks = [...safeTasks];
+    const targetTask = target.kind === "task" ? tasks.find((task) => task.id === target.id) : undefined;
+    const targetProjectId = target.kind === "project"
+      ? (target.id === "__unassigned__" ? undefined : target.id)
+      : targetTask?.projectId ?? (target.kind === "subtask" ? subtaskOwner(target.id)?.projectId : undefined);
+
+    if (source.kind === "project") {
+      const project = projects.find((item) => item.id === source.id);
+      if (!project) return;
+      if (target.kind === "project") {
+        persistTree(reorderProjects(projects, source.id, target.id, target.position === "after"), tasks);
+        return;
+      }
+      if (tasks.some((task) => task.projectId === project.id)) {
+        await dialog.alert(props.lang === "zh" ? "非空项目不能转换层级" : "A non-empty project cannot change level", { message: props.lang === "zh" ? "请先移动项目中的任务，以免丢失数据。" : "Move its tasks first to avoid losing data." });
+        return;
+      }
+      projects = projects.filter((item) => item.id !== project.id);
+      if (target.position === "inside") {
+        const subtask: Subtask = { id: uid("subtask"), title: project.title, completed: project.completed, order: Date.now(), createdAt: project.createdAt, subtasks: [] };
+        const owner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
+        if (!owner) return;
+        tasks = tasks.map((task) => task.id === owner.id ? { ...task, subtasks: addSubtaskToTree(task.subtasks || [], subtask, target.kind === "subtask" ? target.id : undefined) } : task);
+      } else {
+        const converted = taskFromSubtask({ id: uid("subtask"), title: project.title, completed: project.completed, createdAt: project.createdAt }, targetProjectId);
+        tasks = reorderTasks([...tasks, converted], converted.id, targetProjectId, targetTask?.id, target.position === "after");
+      }
+      persistTree(projects, tasks);
+      return;
+    }
+
+    if (source.kind === "task") {
+      const task = tasks.find((item) => item.id === source.id);
+      if (!task) return;
+      if (target.kind === "project" && target.position !== "inside") {
+        if ((task.subtasks || []).length || task.timelineRecords?.length || task.scheduledDate || task.recurrence) {
+          await dialog.alert(props.lang === "zh" ? "此任务不能转换为项目" : "This task cannot become a project", { message: props.lang === "zh" ? "请先移除子任务、排程或重复规则。" : "Remove subtasks, schedules, or recurrence first." });
+          return;
+        }
+        persistTree([...projects, projectFromItem(task)], tasks.filter((item) => item.id !== task.id));
+        return;
+      }
+      if ((target.kind === "task" || target.kind === "subtask") && target.position === "inside") {
+        if (task.timelineRecords?.length || task.scheduledDate || task.recurrence) {
+          await dialog.alert(props.lang === "zh" ? "已排程任务不能变为子任务" : "A scheduled task cannot become a subtask");
+          return;
+        }
+        const owner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
+        if (!owner || owner.id === task.id) return;
+        const subtask: Subtask = { id: uid("subtask"), title: task.title, completed: task.completed, order: Date.now(), createdAt: task.createdAt, subtasks: task.subtasks || [] };
+        tasks = tasks.filter((item) => item.id !== task.id).map((item) => item.id === owner.id ? { ...item, subtasks: addSubtaskToTree(item.subtasks || [], subtask, target.kind === "subtask" ? target.id : undefined) } : item);
+        persistTree(projects, tasks);
+        return;
+      }
+      if (target.kind === "subtask") {
+        const owner = subtaskOwner(target.id);
+        if (!owner) return;
+        persistTree(projects, reorderTasks(tasks, task.id, owner.projectId, owner.id, target.position === "after"));
+        return;
+      }
+      persistTree(projects, reorderTasks(tasks, task.id, targetProjectId, targetTask?.id, target.position === "after"));
+      return;
+    }
+
+    const owner = subtaskOwner(source.id);
+    const subtask = owner ? findSubtaskInTree(owner.subtasks || [], source.id) : undefined;
+    if (!owner || !subtask) return;
+    if (target.kind === "subtask" && target.position !== "inside" && subtaskOwner(target.id)?.id === owner.id) {
+      const sourceAtRoot = (owner.subtasks || []).some((item) => item.id === source.id);
+      const targetAtRoot = (owner.subtasks || []).some((item) => item.id === target.id);
+      if (sourceAtRoot && targetAtRoot) {
+        persistTree(projects, tasks.map((task) => task.id === owner.id ? { ...task, subtasks: reorderSubtasks(task.subtasks || [], source.id, target.id, target.position === "after") } : task));
+        return;
+      }
+    }
+    tasks = tasks.map((task) => task.id === owner.id ? { ...task, subtasks: removeSubtaskFromTree(task.subtasks || [], source.id) } : task);
+    if (target.kind === "project" && target.position !== "inside") {
+      if (subtask.subtasks?.length) {
+        await dialog.alert(props.lang === "zh" ? "含子项的子任务不能变为项目" : "A subtask with children cannot become a project");
+        return;
+      }
+      persistTree([...projects, projectFromItem(subtask)], tasks);
+      return;
+    }
+    if (target.kind === "project" || (target.kind === "task" && target.position !== "inside")) {
+      const converted = taskFromSubtask(subtask, targetProjectId);
+      persistTree(projects, reorderTasks([...tasks, converted], converted.id, targetProjectId, targetTask?.id, target.position === "after"));
+      return;
+    }
+    const nextOwner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
+    if (!nextOwner) return;
+    tasks = tasks.map((task) => task.id === nextOwner.id ? { ...task, subtasks: addSubtaskToTree(task.subtasks || [], { ...subtask, order: Date.now() }, target.kind === "subtask" && target.position === "inside" ? target.id : undefined) } : task);
+    persistTree(projects, tasks);
+  }, [dialog, persistTree, projectFromItem, props.lang, safeProjects, safeTasks, subtaskOwner, taskFromSubtask]);
+
+  const handleTreeDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragNode) return;
+    const node = (event.target as HTMLElement).closest<HTMLElement>("[data-node-type][data-node-id]");
+    const tree = treeRef.current;
+    if (!node || !tree) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const rect = node.getBoundingClientRect();
+    const ratio = (event.clientY - rect.top) / Math.max(rect.height, 1);
+    const position = ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
+    const treeRect = tree.getBoundingClientRect();
+    setDropTarget({
+      kind: node.dataset.nodeType as TreeNodeKind,
+      id: node.dataset.nodeId || "",
+      position,
+      top: rect.top - treeRect.top + tree.scrollTop + (position === "before" ? -16 : position === "after" ? rect.height - 2 : rect.height / 2 - 16),
+      left: rect.left - treeRect.left + tree.scrollLeft + (position === "inside" ? 22 : 0),
+      width: Math.max(160, rect.width - (position === "inside" ? 22 : 0)),
+    });
+  }, [dragNode]);
 
   const visibleProjects = useMemo(
     () => safeProjects.map((project) => ({
@@ -812,8 +1017,45 @@ export default function PlanningView(props: {
             </button>
           </div>
 
-          <div className="df-tree" ref={treeRef}>
+          <div
+            className={`df-tree${dragNode ? " is-tree-dragging" : ""}`}
+            ref={treeRef}
+            onDragStartCapture={(event) => {
+              const origin = event.target as HTMLElement;
+              if (origin.closest("button, input, textarea, select, [contenteditable='true']")) {
+                event.preventDefault();
+                return;
+              }
+              const node = origin.closest<HTMLElement>("[data-node-type][data-node-id]");
+              if (!node) return;
+              const source = { kind: node.dataset.nodeType as TreeNodeKind, id: node.dataset.nodeId || "" };
+              setDragNode(source);
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("application/x-navopath-tree", JSON.stringify(source));
+            }}
+            onDragOver={handleTreeDragOver}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (dragNode && dropTarget) void handleTreeDrop(dragNode, dropTarget);
+              setDragNode(null);
+              setDropTarget(null);
+            }}
+            onDragEnd={() => {
+              setDragNode(null);
+              setDropTarget(null);
+            }}
+          >
             {svgLines}
+            {dropTarget && (
+              <div
+                className={`df-tree-drop-preview ${dropTarget.position}`}
+                style={{ position: "absolute", top: dropTarget.top, left: dropTarget.left, width: dropTarget.width }}
+              >
+                {props.lang === "zh"
+                  ? dropTarget.position === "inside" ? "放入此层级" : dropTarget.position === "before" ? "放在此处之前" : "放在此处之后"
+                  : dropTarget.position === "inside" ? "Place inside" : dropTarget.position === "before" ? "Place before" : "Place after"}
+              </div>
+            )}
             {visibleProjects.map(({ project, tasks }) => (
               <div className="df-category-branch" key={project.id} data-project-id={project.id}>
                 <PlanningProjectNode
@@ -859,6 +1101,7 @@ export default function PlanningView(props: {
                                 onSetDate={setSubtaskDate}
                                 onMoveProject={moveSubtaskProject}
                                 onDelete={deleteSubtask}
+                              onAddSubtask={(parentId) => addSubtask(task, parentId)}
                               />
                             ))}
                           </div>
@@ -915,6 +1158,7 @@ export default function PlanningView(props: {
                                 onSetDate={setSubtaskDate}
                                 onMoveProject={moveSubtaskProject}
                                 onDelete={deleteSubtask}
+                              onAddSubtask={(parentId) => addSubtask(task, parentId)}
                               />
                             ))}
                           </div>
