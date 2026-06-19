@@ -1,10 +1,11 @@
 .landing {
-  --l-paper: #fbf9ff;
-  --l-paper-deep: #eee9ec;
-  --l-paper-soft: #ffffff;
-  --l-ink: #584d3d;
-  --l-muted: #7b7062;
-  --l-faint: #a69d92;
+  --l-paper: #f8f7f2;
+  --l-paper-deep: #efeee7;
+  --l-paper-soft: #fdfcf8;
+  --l-ink: #403b34;
+  --l-muted: #625b51;
+  --l-faint: #7d756a;
+  --l-accent: #d7816a;
   --l-rule: rgba(88, 77, 61, .15);
   --l-rule-strong: rgba(88, 77, 61, .45);
   --l-annotation: rgba(215, 129, 106, .22);
@@ -71,7 +72,7 @@
 .landing-kicker { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 28px; color: var(--l-muted); font: 11px var(--l-mono); letter-spacing: .09em; text-transform: uppercase; }
 .landing-kicker i { width: 30px; height: 1px; background: var(--l-ink); }
 .landing h1 { max-width: 1120px; margin: 0 auto; font-size: clamp(62px, 8vw, 116px); font-weight: 600; line-height: .92; letter-spacing: -.07em; }
-.landing h1 em { position: relative; color: #9b67df; font-style: italic; font-weight: 500; }
+.landing h1 em { position: relative; color: var(--l-accent); font-style: italic; font-weight: 500; }
 .landing-hero-copy > p { max-width: 720px; margin: 34px auto 28px; color: var(--l-muted); font-size: 17px; line-height: 1.65; }
 .landing-actions { display: flex; justify-content: center; gap: 14px; }
 .landing-button.hero-cta { min-width: 190px; min-height: 52px; padding: 0 20px; font-size: 14px; }

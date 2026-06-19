@@ -29,7 +29,9 @@ const corsHeaders = {
   "Content-Type": "application/json; charset=utf-8",
 };
 
-const STAGE_TIMEOUT_MS = 12_000;
+// Flagship reasoning models can take more than 12 seconds for structured JSON.
+// Keep a hard ceiling, but allow enough time for the planner stage to finish.
+const STAGE_TIMEOUT_MS = 30_000;
 
 function getTomorrow(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00`);

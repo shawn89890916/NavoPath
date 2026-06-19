@@ -34,25 +34,25 @@
 .df-app.type-sans { --paper-display: var(--paper-sans); --paper-task: var(--paper-sans); }
 
 .df-app.theme-dark {
-  --bg-app: var(--navo-aubergine) !important;
-  --bg-app-soft: #160a2d !important;
-  --surface-main: #1b1033 !important;
-  --surface-raised: #24183b !important;
-  --surface-card: #20143a !important;
-  --text-main: var(--navo-white) !important;
-  --text-muted: #b8b1c2 !important;
-  --text-faint: #81798d !important;
+  --bg-app: #1f1e1b !important;
+  --bg-app-soft: #25241f !important;
+  --surface-main: #292824 !important;
+  --surface-raised: #302f2a !important;
+  --surface-card: #2d2c27 !important;
+  --text-main: #f5f1e8 !important;
+  --text-muted: #bbb5aa !important;
+  --text-faint: #89847b !important;
   --border-soft: rgba(251,249,255,.15) !important;
   --border-subtle: rgba(251,249,255,.08) !important;
   --paper-float-shadow: 0 20px 48px rgba(0,0,0,.32);
 }
 
 .df-app:not(.theme-dark) {
-  --bg-app: #f6f2f5 !important;
-  --bg-app-soft: #eee9ec !important;
-  --surface-main: var(--navo-white) !important;
-  --surface-raised: #fff !important;
-  --surface-card: #fff !important;
+  --bg-app: #f5f4ee !important;
+  --bg-app-soft: #efeee7 !important;
+  --surface-main: #faf9f5 !important;
+  --surface-raised: #fdfcf8 !important;
+  --surface-card: #fdfcf8 !important;
   --text-main: var(--navo-brown) !important;
   --text-muted: #7b7062 !important;
   --text-faint: #a69d92 !important;
@@ -872,6 +872,141 @@
   border-radius: 0 !important;
   background: var(--paper-rule-strong) !important;
   box-shadow: none !important;
+}
+
+/* Browser review closeout: neutral paper, dismissible AI sheet, and structural loading. */
+.df-ai-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 34;
+  padding: 0;
+  border: 0;
+  background: rgba(31, 30, 27, .08) !important;
+  cursor: default;
+}
+.df-app .df-ai-backdrop:active { transform: none !important; }
+.df-app.theme-dark .df-ai-backdrop { background: rgba(0, 0, 0, .22) !important; }
+.df-app .df-ai-panel-reference {
+  background: var(--surface-main) !important;
+  box-shadow: 0 18px 46px rgba(48, 45, 39, .16) !important;
+}
+.df-ai-panel-reference .df-ai-panel-head {
+  min-height: 58px;
+  padding: 2px 16px 0 18px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+}
+.df-ai-panel-reference .df-ai-new-chat,
+.df-ai-panel-reference .df-ai-reference-tool {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.df-ai-panel-reference .df-ai-reference-tool:hover,
+.df-ai-panel-reference .df-ai-reference-tool.active {
+  color: var(--text-main) !important;
+  border-bottom: 1px solid var(--accent-active) !important;
+  background: transparent !important;
+}
+.df-ai-panel-reference .df-ai-panel-body,
+.df-ai-panel-reference .df-ai-panel-foot,
+.df-ai-panel-reference .df-ai-composer-row {
+  background: var(--surface-main) !important;
+}
+.df-ai-panel-reference .df-ai-composer-row {
+  border-color: var(--paper-rule-strong) !important;
+  box-shadow: 0 5px 16px rgba(48, 45, 39, .10) !important;
+}
+.df-ai-panel-reference .df-ai-send-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--accent-active) !important;
+  border-radius: 50% !important;
+  color: var(--surface-main) !important;
+  background: var(--accent-active) !important;
+  font-size: 18px;
+  line-height: 1;
+}
+.df-ai-panel-reference .df-ai-send-btn:hover:not(:disabled) {
+  color: var(--surface-main) !important;
+  background: var(--accent-active) !important;
+  opacity: .86;
+}
+.df-ai-panel-reference .df-ai-send-btn:disabled {
+  border-color: var(--paper-rule-strong) !important;
+  color: var(--text-faint) !important;
+  background: transparent !important;
+}
+.df-app .df-quick-add {
+  border-top: 1px solid var(--paper-rule) !important;
+}
+
+.df-execute-skeleton {
+  --accent-active: #584d3d;
+  --text-main: #383631;
+  --bg-app: #f5f4ee;
+  --surface-main: #faf9f5;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--bg-app) !important;
+}
+.df-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 58px;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(56, 54, 49, .12);
+}
+.df-skeleton-brand,
+.df-skeleton-tab,
+.df-skeleton-avatar,
+.df-skeleton-title,
+.df-skeleton-task i,
+.df-skeleton-task span,
+.df-skeleton-task small,
+.df-skeleton-timeline-head span,
+.df-skeleton-grid b,
+.df-skeleton-add {
+  display: block;
+  background: rgba(56, 54, 49, .10);
+  animation: dfSkeletonBreathe 1.35s ease-in-out infinite alternate;
+}
+.df-skeleton-brand { width: 82px; height: 14px; }
+.df-skeleton-tab { width: 110px; height: 10px; margin: 0 auto; }
+.df-skeleton-avatar { width: 32px; height: 32px; border-radius: 50%; }
+.df-skeleton-workbench { display: grid; grid-template-columns: minmax(310px, 38%) 1fr; gap: 1px; height: calc(100vh - 58px); padding: 10px; }
+.df-skeleton-candidates,
+.df-skeleton-timeline { position: relative; overflow: hidden; border: 1px solid rgba(56, 54, 49, .12); background: var(--surface-main); }
+.df-skeleton-candidates { display: grid; align-content: start; gap: 0; padding: 18px 22px; }
+.df-skeleton-title { width: 148px; height: 18px; margin: 5px 0 22px; }
+.df-skeleton-task { display: grid; grid-template-columns: 17px 1fr 44px; align-items: center; gap: 14px; min-height: 60px; border-bottom: 1px solid rgba(56, 54, 49, .11); }
+.df-skeleton-task i { width: 15px; height: 15px; background: transparent; border: 1px solid rgba(56, 54, 49, .18); }
+.df-skeleton-task span { width: min(190px, 78%); height: 11px; }
+.df-skeleton-task small { width: 40px; height: 10px; }
+.df-skeleton-add { position: absolute; right: 22px; bottom: 25px; left: 22px; height: 44px; border-top: 1px solid rgba(56, 54, 49, .12); background: transparent; }
+.df-skeleton-timeline-head { display: flex; justify-content: space-between; align-items: center; height: 76px; padding: 0 28px; border-bottom: 1px solid rgba(56, 54, 49, .12); }
+.df-skeleton-timeline-head span { width: 94px; height: 12px; }
+.df-skeleton-timeline-head span:nth-child(2) { width: 150px; height: 20px; }
+.df-skeleton-grid { position: relative; height: calc(100% - 76px); padding-top: 20px; }
+.df-skeleton-grid > i { display: block; height: 58px; border-bottom: 1px solid rgba(56, 54, 49, .08); }
+.df-skeleton-grid b { position: absolute; width: 29%; border: 1px solid rgba(56, 54, 49, .10); background: rgba(56, 54, 49, .07); }
+.df-skeleton-grid .block-one { top: 78px; left: 7%; height: 86px; }
+.df-skeleton-grid .block-two { top: 225px; left: 38%; height: 116px; }
+.df-skeleton-grid .block-three { top: 402px; left: 68%; height: 74px; }
+@keyframes dfSkeletonBreathe { from { opacity: .48; } to { opacity: .9; } }
+@media (max-width: 720px) {
+  .df-skeleton-workbench { grid-template-columns: 1fr; }
+  .df-skeleton-timeline { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-execute-skeleton * { animation: none !important; }
 }
 .df-app .df-quick-add input,
 .df-app.theme-dark .df-quick-add input,
@@ -2302,4 +2437,28 @@
 .df-app .df-quick-add:focus-within {
   border: 0 !important;
   border-top: 1px solid var(--paper-rule) !important;
+}
+
+/* Keep the reviewed AI sheet rules last so legacy theme selectors cannot reframe it. */
+.df-app .df-ai-panel-reference .df-ai-panel-head {
+  min-height: 58px !important;
+  padding: 2px 16px 0 18px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+}
+.df-app .df-ai-panel-reference .df-ai-new-chat,
+.df-app .df-ai-panel-reference .df-ai-reference-tool {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.df-app .df-ai-panel-reference .df-ai-panel-body,
+.df-app .df-ai-panel-reference .df-ai-panel-foot { background: var(--surface-main) !important; }
+.df-app .df-ai-panel-reference .df-ai-send-btn:not(:disabled) {
+  border: 1px solid var(--accent-active) !important;
+  border-radius: 50% !important;
+  color: var(--surface-main) !important;
+  background: var(--accent-active) !important;
 }
