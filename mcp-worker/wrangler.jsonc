@@ -1,1 +1,11 @@
-{"$schema":"../node_modules/wrangler/config-schema.json","name":"navopath-mcp","main":"src/index.ts","compatibility_date":"2026-06-18","compatibility_flags":["nodejs_compat"],"observability":{"enabled":true,"head_sampling_rate":1},"vars":{"MCP_SERVER_NAME":"NavoPath"}}
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "navopath-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "durable_objects": { "bindings": [{ "name": "MCP_OBJECT", "class_name": "NavoPathMCP" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NavoPathMCP"] }],
+  "vars": { "MCP_SERVER_NAME": "NavoPath" }
+}

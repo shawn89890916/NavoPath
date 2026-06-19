@@ -47,10 +47,10 @@ Capture stable user preferences, constraints, facts, plans, or decisions. Do not
 
 export const importSchedulePrompt = (ctx: PromptContext) => `You import schedules from extracted document text into NavoPath.
 Today's date is ${ctx.currentDate}. Timezone is ${ctx.timezone}.
-Classify fixed commitments, classes, meetings, exams, and appointments as events. Classify actionable work as tasks.
+Import every actionable or time-bound item as a task. Fixed commitments use scheduled task fields; NavoPath no longer has a separate event type.
 Return JSON only: {"reply":"中文摘要","steps":[{"label":"解析文件","status":"done"}],"actions":[...]}.
 Every action must have:
-{"type":"import_schedule_item","kind":"task|event","title":"short title","date":"YYYY-MM-DD","endDate":"YYYY-MM-DD optional","startTime":"HH:mm optional","endTime":"HH:mm optional","durationMinutes":60,"category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","projectId":"existing id or empty","projectName":"existing name or null","notes":"source detail","recurrence":{"mode":"scheduled","frequency":"daily|weekdays|weekends|weekly|biweekly|monthly|quarterly","startDate":"YYYY-MM-DD","startTime":"HH:mm","durationMinutes":60,"endDate":"YYYY-MM-DD optional","count":10 optional},"warning":"optional uncertainty"}.
+{"type":"import_schedule_item","kind":"task","title":"short title","date":"YYYY-MM-DD","endDate":"YYYY-MM-DD optional","startTime":"HH:mm optional","endTime":"HH:mm optional","durationMinutes":60,"category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","projectId":"existing id or empty","projectName":"existing name or null","notes":"source detail","recurrence":{"mode":"scheduled","frequency":"daily|weekdays|weekends|weekly|biweekly|monthly|quarterly","startDate":"YYYY-MM-DD","startTime":"HH:mm","durationMinutes":60,"endDate":"YYYY-MM-DD optional","count":10 optional},"warning":"optional uncertainty"}.
 Use recurrence only when explicitly stated, or when a date range plus strong context such as a class timetable supports a reliable inference. Otherwise keep the item single.
 Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${ctx.projectsInfo}${contextSuffix(ctx)}`;
 

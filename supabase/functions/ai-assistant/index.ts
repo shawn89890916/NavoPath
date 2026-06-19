@@ -144,6 +144,7 @@ async function callDeepSeek(
   model: string,
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
+  reasoningMode: "instant" | "high" | "xhigh" = "instant",
   signal?: AbortSignal,
 ): Promise<string> {
   const controller = new AbortController();
@@ -166,6 +167,7 @@ async function callDeepSeek(
         response_format: { type: "json_object" },
         max_tokens: maxTokens,
         stream: false,
+        ...(reasoningMode === "instant" ? {} : { reasoning_effort: reasoningMode }),
       }),
       signal: controller.signal,
     });
@@ -223,6 +225,7 @@ async function plannerStage(
   ctx: PromptContext,
   userContent: string,
   historyMessages: Array<{ role: "user" | "assistant"; content: string }>,
+  reasoningMode: "instant" | "high" | "xhigh" = "instant",
 ) {
   const systemPrompt = mode === "summarize_memory"
     ? summarizeMemoryPrompt(ctx)
@@ -236,7 +239,7 @@ async function plannerStage(
     { role: "user", content: userContent },
   ];
   const maxTokens = mode === "import_schedule" ? 6000 : mode === "summarize_memory" ? 600 : 1600;
-  const content = await callDeepSeek(apiKey, model, messages, maxTokens);
+  const content = await callDeepSeek(apiKey, model, messages, maxTokens, reasoningMode);
   try {
     return normalizeAssistantPayload(extractJsonObject(content));
   } catch (firstError) {
@@ -247,7 +250,7 @@ async function plannerStage(
         content: "Repair the candidate into one valid JSON object. Required fields: reply (plain user-facing sentence), steps (array), actions (array), memories (array). Never place JSON, markdown, or code inside reply. Return JSON only.",
       },
       { role: "user", content: content.slice(0, 12_000) },
-    ], maxTokens);
+    ], maxTokens, reasoningMode);
     return normalizeAssistantPayload(extractJsonObject(repaired));
   }
 }
@@ -264,10 +267,11 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { mode, message, model, context, history, memories } = body as {
+    const { mode, message, model, reasoningMode, context, history, memories } = body as {
       mode?: string;
       message?: string;
       model?: string;
+      reasoningMode?: "instant" | "high" | "xhigh";
       context?: Record<string, unknown>;
       history?: Array<{ role?: string; content?: string }>;
       memories?: Array<{ content?: string; tags?: string[] }>;
@@ -311,6 +315,8 @@ serve(async (req: Request) => {
     const selectedModel = typeof model === "string" && /^[A-Za-z0-9._/-]{2,160}$/.test(model)
       ? model
       : Deno.env.get("SILICONFLOW_MODEL") || "deepseek-ai/DeepSeek-V4-Flash";
+    const supportedReasoning = /DeepSeek-V4-Pro|Qwen3\.5-(?:122B|397B)|GLM-5\.2|Kimi-K2\.7|MiniMax-M3/i.test(selectedModel);
+    const selectedReasoning = supportedReasoning && (reasoningMode === "high" || reasoningMode === "xhigh") ? reasoningMode : "instant";
 
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
     const currentDate = validIsoDate(context?.currentDate) ? context.currentDate : localDateForTimeZone(timezone);
@@ -364,7 +370,7 @@ serve(async (req: Request) => {
     // Stage 2: Planner (required)
     let plannerValue: unknown;
     try {
-      plannerValue = await plannerStage(apiKey, selectedModel, mode, promptCtx, userContent, historyMessages);
+      plannerValue = await plannerStage(apiKey, selectedModel, mode, promptCtx, userContent, historyMessages, selectedReasoning);
     } catch (err) {
       console.error("Planner stage failed:", err);
       const fallback = {

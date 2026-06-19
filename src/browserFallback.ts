@@ -1,4 +1,4 @@
-import type { AiAction, PlannerApi, PlannerData, Settings, TaskRecurrence } from "./types";
+import type { AiAction, PlannerApi, PlannerData, Settings, Task, TaskRecurrence } from "./types";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 
 const PREVIEW_STORAGE_KEY = "planner-preview-data";
@@ -27,6 +27,50 @@ function addDays(iso: string, days: number) {
   return localIso(date);
 }
 
+function migrateEventsToTasks(data: PlannerData): Task[] {
+  const existing = new Set((data.tasks || []).map((task) => task.id));
+  const migrated: Task[] = [];
+  const makeTask = (event: PlannerData["events"][number], date: string, suffix: string): Task => {
+    const id = `migrated_event_${event.id}_${suffix}`;
+    const start = event.startTime || undefined;
+    const duration = start && event.endTime
+      ? Math.max((Number(event.endTime.slice(0, 2)) * 60 + Number(event.endTime.slice(3))) - (Number(start.slice(0, 2)) * 60 + Number(start.slice(3))), 15)
+      : 30;
+    const task: Task = {
+      id,
+      title: event.title,
+      dueDate: date,
+      category: event.category || "personal",
+      priority: "medium",
+      notes: event.details || "",
+      goalId: "",
+      completed: false,
+      estimatedHours: duration / 60,
+      plannedForDate: date,
+      recurrence: event.recurrence,
+      subtasks: [],
+      createdAt: event.createdAt || now(),
+      updatedAt: event.createdAt || now(),
+    };
+    if (start && !event.recurrence) task.timelineRecords = [{ id: `${id}_schedule`, taskId: id, scheduledDate: date, scheduledStart: start, scheduledEnd: event.endTime || `${String(Math.min(Number(start.slice(0, 2)) + 1, 23)).padStart(2, "0")}:${start.slice(3)}`, executionStatus: "scheduled", createdAt: event.createdAt || now() }];
+    return task;
+  };
+  for (const event of data.events || []) {
+    const startDate = event.startDate || event.date || localIso(new Date());
+    const endDate = event.endDate || startDate;
+    if (event.startTime || event.recurrence) {
+      const task = makeTask(event, startDate, "primary");
+      if (!existing.has(task.id)) migrated.push(task);
+      continue;
+    }
+    for (let date = startDate, index = 0; date <= endDate && index < 366; date = addDays(date, 1), index += 1) {
+      const task = makeTask(event, date, date);
+      if (!existing.has(task.id)) migrated.push(task);
+    }
+  }
+  return migrated;
+}
+
 function configurePreviewMode() {
   const params = new URLSearchParams(window.location.search);
   const preview = params.get("preview");
@@ -49,6 +93,7 @@ function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
 }
 
 export function normalizeData(data: PlannerData): PlannerData {
+  const migratedTasks = migrateEventsToTasks(data);
   const chat = (data.chat || []).map((message) => ({
     ...message,
     id: message.id || uid("chat"),
@@ -100,16 +145,10 @@ export function normalizeData(data: PlannerData): PlannerData {
       archived: Boolean(memory.archived),
     })),
     drafts: (data.drafts || []).filter((draft) => draft.title).slice(-10),
-    events: (data.events || []).map((event) => ({
-      ...event,
-      date: event.date || event.startDate || localIso(new Date()),
-      startDate: event.startDate || event.date || localIso(new Date()),
-      endDate: event.endDate || event.startDate || event.date || localIso(new Date()),
-      startTime: event.startTime || "",
-      endTime: event.endTime || "",
-    })),
+    version: Math.max(data.version || 1, 2),
+    events: [],
     taskLayouts: data.taskLayouts || {},
-    tasks: (data.tasks || []).map((task) => ({
+    tasks: [...(data.tasks || []), ...migratedTasks].map((task) => ({
       ...task,
       subtasks: (task.subtasks || []).map((subtask, index) => ({
         ...subtask,
@@ -388,6 +427,7 @@ export function installBrowserFallback() {
     aiDockOpen: false,
     appTitle: "NavoPath",
     model: "deepseek-ai/DeepSeek-V4-Flash",
+    reasoningMode: "instant",
     baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
     hasApiKey: false,
     apiKeyPreview: "",

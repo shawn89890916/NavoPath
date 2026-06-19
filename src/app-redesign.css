@@ -276,7 +276,7 @@
   display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; color: var(--text-muted); background: transparent; font: 500 23px/1 var(--paper-sans); cursor: pointer;
 }
 .df-ai-reference-tool.settings { font-size: 0; }
-.df-ai-reference-tool.settings::before { content: "\2699\FE0E"; font: 20px/1 var(--paper-sans); }
+.df-ai-reference-tool.settings::before { content: "AI"; font: 600 9px/1 var(--paper-mono); letter-spacing:.08em; }
 .df-ai-reference-tool:hover, .df-ai-reference-tool.active { color: var(--accent-active); background: var(--paper-note); }
 .df-ai-panel-reference .df-ai-panel-body { padding: 24px; background: var(--surface-main); }
 .df-ai-reference-empty { display: grid; gap: 30px; width: 100%; }
@@ -342,7 +342,7 @@
 }
 
 /* Settings and detail sheets */
-.df-utility-panel { width: min(430px,100vw) !important; padding: 0 !important; }
+.df-utility-panel { width: min(560px,100vw) !important; padding: 0 !important; }
 .df-utility-head { min-height: 58px; padding: 0 18px !important; border-bottom: 1px solid var(--paper-rule); }
 .df-utility-body { padding: 18px 20px 24px !important; }
 .df-settings-profile, .df-theme-setting, .df-utility-select, .df-utility-check, .df-detail-subtasks-new, .df-detail-notes-new, .df-detail-project-pick {
@@ -351,6 +351,19 @@
 }
 .df-theme-setting { padding: 14px 0 !important; }
 .df-utility-select, .df-utility-check { min-height: 50px; padding: 10px 0 !important; }
+.df-settings-group { display:grid; gap:4px; padding:18px 0 22px; border-bottom:1px solid var(--paper-rule); }
+.df-settings-group:first-child { padding-top:0; }
+.df-settings-group:last-child { border-bottom:0; }
+.df-settings-group > h3 { margin:0 0 8px; color:var(--text-main); font:600 11px/1.4 var(--paper-mono); letter-spacing:.1em; text-transform:uppercase; }
+.df-ai-reasoning-picker { grid-column:2; grid-row:2; display:flex; align-items:center; gap:5px; color:var(--text-faint); font:600 10px/1 var(--paper-sans); }
+.df-ai-reasoning-picker select { min-height:28px; padding:3px 18px 3px 5px; border:0; border-bottom:1px solid var(--paper-rule); color:var(--text-muted); background:transparent; font:600 10px/1 var(--paper-sans); }
+.df-ai-panel-reference .df-ai-attach-btn { grid-column:3; }
+.df-ai-panel-reference .df-ai-send-btn { grid-column:4; }
+.df-ai-panel-reference .df-ai-composer-row { grid-template-columns:minmax(0,1fr) auto 30px 30px; }
+.df-ai-panel-reference :is(.df-ai-reply,.df-ai-actions,.df-ai-steps,.df-ai-plan,.df-ai-task-card,.df-ai-msg-bubble.user) { border-radius:0 !important; box-shadow:none !important; }
+.df-ai-panel-reference .df-ai-task-card { border:0 !important; border-bottom:1px solid var(--paper-rule) !important; background:transparent !important; }
+.df-ai-panel-reference .df-ai-steps { border-left:1px solid var(--paper-rule-strong) !important; background:transparent !important; }
+.df-ai-panel-reference .df-ai-model-trigger { color:var(--text-faint) !important; opacity:.76; border:0 !important; border-bottom:1px solid var(--paper-rule) !important; background:transparent !important; }
 .df-utility-select select, .df-settings-name-input, .df-notes-editor textarea {
   border-color: var(--paper-rule) !important; border-radius: var(--paper-radius) !important; background: var(--surface-card) !important; box-shadow: none !important;
 }
@@ -360,6 +373,9 @@
 }
 .df-detail-title-trevor {
   min-height: 52px !important;
+  height: auto;
+  overflow: hidden !important;
+  resize: none !important;
   padding: 0 0 10px !important;
   color: var(--text-main) !important;
   font-family: var(--paper-display) !important;
@@ -1993,16 +2009,19 @@
 .df-app .df-drawer input[type="checkbox"]::before,
 .df-app .df-utility-panel input[type="checkbox"]::before {
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--accent-active);
+  border-bottom: 2px solid var(--accent-active);
   transform: scale(0);
-  background: var(--accent-active);
+  background: transparent;
   transition: transform var(--paper-motion);
 }
 
 .df-app .df-drawer input[type="checkbox"]:checked::before,
 .df-app .df-utility-panel input[type="checkbox"]:checked::before {
-  transform: scale(1);
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+  filter: url("#crayon-texture");
 }
 
 .df-app .df-form-color-row {

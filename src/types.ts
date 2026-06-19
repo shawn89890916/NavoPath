@@ -176,6 +176,14 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   saved?: boolean;
+  status?: "thinking" | "done" | "error";
+  steps?: Array<{ label: string; status: "pending" | "running" | "done" | "error" }>;
+  actions?: unknown[];
+  selectedActions?: Record<number, boolean>;
+  actionState?: "pending" | "adopted" | "rejected" | "undone";
+  intent?: string;
+  plan?: Array<{ taskId?: string; title: string; start: string; end: string; durationMinutes?: number; reason?: string }>;
+  format?: "text" | "markdown";
 }
 
 export interface AiConversation {
@@ -203,6 +211,7 @@ export interface PlannerData {
   activeAiConversationId?: string;
   aiMemories: AiMemory[];
   taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
+  sync?: { deleted: Record<string, string> };
 }
 
 export type Language = "en" | "zh";
@@ -215,6 +224,7 @@ export interface Settings {
   aiDockOpen: boolean;
   appTitle: string;
   model: string;
+  reasoningMode: "instant" | "high" | "xhigh";
   baseUrl: string;
   hasApiKey: boolean;
   apiKeyPreview: string;
@@ -329,6 +339,7 @@ export interface PlannerApi {
   clearAuthCallbackUrl?: () => void;
   getData: () => Promise<PlannerData>;
   saveData: (data: PlannerData) => Promise<PlannerData>;
+  subscribeToRemoteChanges?: (listener: (payload: { data: PlannerData; settings: Settings }) => void) => () => void;
   applyActions: (actions: AiAction[]) => Promise<{ data: PlannerData; applied: Array<{ type: string; id: string; title: string }> }>;
   resetSeed: () => Promise<PlannerData>;
   getSettings: () => Promise<Settings>;

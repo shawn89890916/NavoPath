@@ -1,0 +1,22 @@
+{
+  "name": "navopath-mcp-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "node ../node_modules/typescript/lib/tsc.js --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@babel/runtime-corejs3": "^8.0.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "agents": "0.16.2",
+    "cron-schedule": "^6.0.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260617.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.101.0"
+  }
+}

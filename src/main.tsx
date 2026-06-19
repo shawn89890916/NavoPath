@@ -6,7 +6,7 @@ import { Suspense, lazy } from "react";
 import type { AiConversation, AiMemory, CalendarEvent, Category, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
-import { filterAiModels, groupAiModels } from "./utils/aiModels";
+import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks } from "./autoSchedule";
 import { installBrowserFallback } from "./browserFallback";
 import {
@@ -174,20 +174,22 @@ function themeVars(settings: Settings, mode: Mode) {
   const { r, g, b } = hexToRgb(activeAccent);
   const isDark = settings.theme === "dark";
   if (isDark) {
+    const darkAccent = settings.executeAccentColor || settings.planningAccentColor ? activeAccent : "#EEE9DF";
+    const darkAccentRgb = hexToRgb(darkAccent);
     return {
       "--execute-primary": execute,
       "--execute-on-primary": executeLight ? "#111827" : "#FFFFFF",
       "--planning-primary": planning,
       "--planning-on-primary": planningLight ? "#111827" : "#FFFFFF",
-      "--accent-active": activeAccent,
-      "--accent-rgb": `${r}, ${g}, ${b}`,
-      "--accent-on": activeLight ? "#111827" : "#FFFFFF",
+      "--accent-active": darkAccent,
+      "--accent-rgb": `${darkAccentRgb.r}, ${darkAccentRgb.g}, ${darkAccentRgb.b}`,
+      "--accent-on": isLightColor(darkAccent) ? "#27231E" : "#EEE9DF",
       "--bg-app": "#0F0326",
       "--bg-app-soft": "#160A2D",
       "--surface-main": "#1B1033",
       "--surface-raised": "#24183B",
       "--surface-card": "#20143A",
-      "--text-main": "#FBF9FF",
+      "--text-main": "#EEE9DF",
       "--text-muted": "#B8B1C2",
       "--text-faint": "#81798D",
       "--border-soft": "rgba(255,255,255,0.10)",
@@ -215,7 +217,7 @@ function themeVars(settings: Settings, mode: Mode) {
     "--surface-main": "#FBF9FF",
     "--surface-raised": "#FFFFFF",
     "--surface-card": "#FFFFFF",
-    "--text-main": "#584D3D",
+    "--text-main": "#27231E",
     "--text-muted": "#7B7062",
     "--text-faint": "#A69D92",
     "--border-soft": "#DED8D8",
@@ -464,7 +466,7 @@ function normalizeAiRecurrence(value: unknown, date: string, startTime?: string,
 function isValidAiAction(action: AiAction) {
   if (action.type !== "import_schedule_item") return true;
   const raw = action as Record<string, unknown>;
-  return (raw.kind === "task" || raw.kind === "event") &&
+  return raw.kind === "task" &&
     typeof raw.title === "string" && raw.title.trim().length > 0 &&
     validIsoDate(raw.date) &&
     (!raw.startTime || validTime(raw.startTime)) &&
@@ -965,7 +967,14 @@ function chatToSessionMessages(chat: PlannerData["chat"] = []): AiSessionMessage
     content: message.content,
     createdAt: message.createdAt,
     saved: Boolean(message.saved),
-    status: "done",
+    status: message.status || "done",
+    steps: message.steps,
+    actions: (message.actions || []).map((action) => (action as AiAction).type === "import_schedule_item" ? { ...(action as AiAction), kind: "task" as const } : action) as AiAction[],
+    selectedActions: message.selectedActions,
+    actionState: message.actionState,
+    intent: message.intent,
+    plan: message.plan,
+    format: message.format,
   }));
 }
 
@@ -1104,7 +1113,7 @@ export function ProductIcon({ compact = false }: { compact?: boolean }) {
 }
 
 function ExecuteSkeleton() {
-  return <div className="df-app df-execute-skeleton" aria-label="正在加载 NavoPath" aria-busy="true">
+  return <div className="df-app df-execute-skeleton" aria-label="正在加载工作区" aria-busy="true">
     <header className="df-skeleton-header">
       <ProductIcon compact />
       <span className="df-skeleton-brand" />
@@ -1403,6 +1412,18 @@ function App() {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    if (!authState?.user || !window.plannerApi.subscribeToRemoteChanges) return;
+    return window.plannerApi.subscribeToRemoteChanges((remote) => {
+      if (pendingDataSaveRef.current || pendingSettingsSaveRef.current) return;
+      dataRef.current = remote.data;
+      settingsRef.current = remote.settings;
+      setData(remote.data);
+      setSettings(remote.settings);
+      setLang(remote.settings.language || lang);
+    });
+  }, [authState?.user?.id]);
 
   useEffect(() => {
     if (!data || aiMessages.length > 0) return;
@@ -1890,21 +1911,6 @@ function App() {
     document.addEventListener("keydown", handleGlobalTyping);
     return () => document.removeEventListener("keydown", handleGlobalTyping);
   }, [drawerOpen, aiOpen, utilityPanel]);
-
-  // Forward wheel events from the full timeline panel area to the scroll container
-  useEffect(() => {
-    if (mode !== "execute") return;
-    const handler = (e: WheelEvent) => {
-      const panel = document.getElementById("df-execute-timeline");
-      if (!panel || !panel.contains(e.target as Node)) return;
-      const scroller = panel.querySelector(".df-timeline-scroll, .df-timeline-3day-scroll") as HTMLElement | null;
-      if (!scroller) return;
-      e.preventDefault();
-      scroller.scrollTop += e.deltaY;
-    };
-    document.addEventListener("wheel", handler, { capture: true, passive: false });
-    return () => document.removeEventListener("wheel", handler, { capture: true });
-  }, [mode]);
 
   useEffect(() => {
     if (!quickSchedule) return;
@@ -2437,10 +2443,11 @@ function App() {
   }
 
   function updateTask(taskId: string, patch: Partial<Task>) {
-    if (!data) return;
+    const current = dataRef.current;
+    if (!current) return;
     void saveData({
-      ...data,
-      tasks: data.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
+      ...current,
+      tasks: current.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
     });
   }
 
@@ -3965,7 +3972,11 @@ function App() {
     const assistantId = uid("ai_assistant");
     const assistantMessage: AiSessionMessage = {
       id: assistantId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "thinking",
-      steps: [{ label: aiAttachment ? "正在读取引用文件..." : "正在分析你的请求...", status: "running" }],
+      steps: [
+        { label: aiAttachment ? (lang === "zh" ? "读取引用文件" : "Reading attachment") : (lang === "zh" ? "理解请求" : "Understanding request"), status: "running" },
+        { label: lang === "zh" ? "核对当前计划" : "Checking current plan", status: "pending" },
+        { label: lang === "zh" ? "整理任务安排" : "Preparing task schedule", status: "pending" },
+      ],
     };
     setAiMessages((current) => [...current, userMessage, assistantMessage]);
     setAiInput("");
@@ -3984,17 +3995,28 @@ function App() {
       ? []
       : pickMemoriesForContext(data.aiMemories || []);
 
+    let thinkingStage = 0;
+    const thinkingTimer = window.setInterval(() => {
+      thinkingStage = Math.min(thinkingStage + 1, 2);
+      setAiMessages((current) => current.map((message) => message.id === assistantId ? {
+        ...message,
+        steps: (message.steps || []).map((step, index) => ({ ...step, status: index < thinkingStage ? "done" : index === thinkingStage ? "running" : "pending" })),
+      } : message));
+    }, 1800);
     try {
       const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: attachmentSnapshot ? "import_schedule" : "chat",
         model: settings?.model,
+        reasoningMode: settings?.reasoningMode || "instant",
         message: aiAttachment ? `${msg}\n\n附件：${aiAttachment.name}\n\n${aiAttachment.text}` : msg,
         context,
         history,
         memories,
       });
-      const validActions = (result.actions || []).filter(isValidAiAction);
+      const validActions = (result.actions || [])
+        .map((action) => action.type === "import_schedule_item" ? { ...action, kind: "task" as const } : action)
+        .filter(isValidAiAction);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
         status: "done",
@@ -4009,7 +4031,21 @@ function App() {
       } : message));
       const currentData = dataRef.current;
       if (currentData) {
-        const assistantChat = { id: assistantId, role: "assistant" as const, content: result.reply, createdAt: new Date().toISOString(), saved: true };
+        const assistantChat = {
+          id: assistantId,
+          role: "assistant" as const,
+          content: result.reply,
+          createdAt: new Date().toISOString(),
+          saved: true,
+          status: "done" as const,
+          steps: result.steps && result.steps.length > 0 ? result.steps : [{ label: lang === "zh" ? "安排已生成" : "Schedule prepared", status: "done" as const }],
+          actions: validActions,
+          selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
+          actionState: validActions.length ? "pending" as const : undefined,
+          intent: result.intent,
+          plan: result.plan,
+          format: result.format || "text" as const,
+        };
         const userChat = { id: userMessage.id, role: "user" as const, content: msg, createdAt: userMessage.createdAt, saved: true };
         const conversations = currentData.aiConversations || [];
         let conversationId = activeAiConversationId || currentData.activeAiConversationId || conversations[0]?.id || "";
@@ -4052,6 +4088,7 @@ function App() {
         steps: [{ label: "请求失败", status: "error" }],
       } : message));
     } finally {
+      window.clearInterval(thinkingTimer);
       setAiBusy(false);
     }
   }
@@ -4098,7 +4135,8 @@ function App() {
   }
 
   async function adoptSelectedAiActions(messageId: string) {
-    if (!data) return;
+    const currentData = dataRef.current;
+    if (!currentData) return;
     const message = aiMessages.find((item) => item.id === messageId);
     const patches = aiActionPatches[messageId] || {};
     const selected = (message?.actions || [])
@@ -4106,8 +4144,8 @@ function App() {
       .filter((_, index) => message?.selectedActions?.[index] !== false);
     if (selected.length === 0) return;
     const now = new Date().toISOString();
-    const nextTasks = [...data.tasks];
-    const nextEvents = [...data.events];
+    const nextTasks = [...currentData.tasks];
+    const nextEvents = [...currentData.events];
     const addedTaskIds: string[] = [];
     const addedEventIds: string[] = [];
     const previousTasks: Task[] = [];
@@ -4172,8 +4210,9 @@ function App() {
         }
       }
     }
-    await saveData({ ...data, tasks: nextTasks, events: nextEvents });
+    await saveData({ ...currentData, tasks: nextTasks, events: nextEvents });
     setAiMessages((current) => current.map((item) => item.id === messageId ? { ...item, actionState: "adopted", actions: [], importCommit: { focus, addedCount: selected.length, addedTaskIds, addedEventIds, previousTasks } } : item));
+    persistAiMessage(messageId, { actionState: "adopted", actions: [] });
     setAiActionPatches((current) => {
       const next = { ...current };
       delete next[messageId];
@@ -4183,6 +4222,7 @@ function App() {
 
   function rejectSelectedAiActions(messageId: string) {
     setAiMessages((current) => current.map((item) => item.id === messageId ? { ...item, actionState: "rejected", actions: [] } : item));
+    persistAiMessage(messageId, { actionState: "rejected", actions: [] });
   }
 
   function viewAiImport(messageId: string) {
@@ -4205,10 +4245,23 @@ function App() {
       events: currentData.events.filter((event) => !commit.addedEventIds.includes(event.id)),
     });
     setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, actionState: "undone", importCommit: undefined } : message));
+    persistAiMessage(messageId, { actionState: "undone" });
+  }
+
+  function persistAiMessage(messageId: string, patch: Partial<AiSessionMessage>) {
+    const current = dataRef.current;
+    if (!current) return;
+    const update = (message: PlannerData["chat"][number]) => message.id === messageId ? { ...message, ...patch } : message;
+    void saveData({
+      ...current,
+      chat: (current.chat || []).map(update),
+      aiConversations: (current.aiConversations || []).map((conversation) => ({ ...conversation, messages: (conversation.messages || []).map(update), updatedAt: new Date().toISOString() })),
+    });
   }
 
   async function confirmAiAction(action: AiAction, messageId?: string, actionIndex?: number) {
-    if (!data) return;
+    const currentData = dataRef.current;
+    if (!currentData) return;
     if (action.type === "import_schedule_item" && action.title && action.date) {
       const a = action as Record<string, any>;
       const now = new Date().toISOString();
@@ -4227,11 +4280,11 @@ function App() {
           imported: true,
           createdAt: now,
         };
-        await saveData({ ...data, events: [...data.events, event] });
+        await saveData({ ...currentData, events: [...currentData.events, event] });
       } else {
         const projectId = projects.some((project) => project.id === a.projectId) ? a.projectId : undefined;
         const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
-        const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : learnedTaskDurationMinutes(action.title, tasks, projectId));
+        const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : learnedTaskDurationMinutes(action.title, currentData.tasks, projectId));
         const task: Task = {
           id: uid("task"), title: action.title, dueDate: a.date, category: validCategory(a.category),
           priority: validPriority(a.priority), notes: a.notes || "", goalId: "goal_admission", completed: false,
@@ -4239,7 +4292,7 @@ function App() {
           estimatedHours: Math.max(duration, 15) / 60, recurrence, subtasks: [], createdAt: now, updatedAt: now,
         };
         if (!recurrence && a.startTime) task.timelineRecords = [createScheduledRecord(task, a.date, a.startTime, Math.max(duration, 15))];
-        await saveData({ ...data, tasks: [...data.tasks, task] });
+        await saveData({ ...currentData, tasks: [...currentData.tasks, task] });
       }
       if (messageId) removeAiMessageAction(messageId, action, actionIndex);
       return;
@@ -4248,7 +4301,7 @@ function App() {
     if ((action.type === "create_scheduled_task" || action.type === "create_task") && action.title) {
       const a = action as Record<string, unknown>;
       const projectId = projects.some((project) => project.id === a.projectId) ? a.projectId as string : undefined;
-      const dur = (a.durationMinutes as number) || learnedTaskDurationMinutes(action.title, tasks, projectId);
+      const dur = (a.durationMinutes as number) || learnedTaskDurationMinutes(action.title, currentData.tasks, projectId);
       const startTime = (a.start as string) || "09:00";
       const endTime = (a.end as string) || addMinutes(startTime, dur);
       const newTask: Task = {
@@ -4272,10 +4325,10 @@ function App() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       } as Task;
-      const updatedTasks = [...tasks, newTask];
-      await saveData({ ...data, version: data.version || 1, tasks: updatedTasks });
+      const updatedTasks = [...currentData.tasks, newTask];
+      await saveData({ ...currentData, version: currentData.version || 1, tasks: updatedTasks });
       showUndoToast(`${t(lang, "toast.created").replace("%TITLE%", action.title)}`, t(lang, "toast.undo"), () => {
-        void saveData({ ...data, version: data.version || 1, tasks });
+        void saveData({ ...currentData, version: currentData.version || 1, tasks: currentData.tasks });
       });
       // Mark action as accepted
       if (messageId) removeAiMessageAction(messageId, action, actionIndex);
@@ -4283,14 +4336,14 @@ function App() {
     }
     if (action.type === "schedule_task" && action.taskId && action.date) {
       const a = action as Record<string, unknown>;
-      const updatedTasks = tasks.map((t) =>
+      const updatedTasks = currentData.tasks.map((t) =>
         t.id === action.taskId
           ? { ...t, scheduledDate: action.date, scheduledStart: (a.start as string) || t.scheduledStart, scheduledEnd: (a.end as string) || t.scheduledEnd }
           : t
       );
-      await saveData({ ...data, version: data.version || 1, tasks: updatedTasks });
+      await saveData({ ...currentData, version: currentData.version || 1, tasks: updatedTasks });
       showUndoToast(`${t(lang, "toast.scheduledToDate").replace("%DATE%", action.date)}`, t(lang, "toast.undo"), () => {
-        void saveData({ ...data, version: data.version || 1, tasks });
+        void saveData({ ...currentData, version: currentData.version || 1, tasks: currentData.tasks });
       });
     }
     // Dismiss the action card
@@ -4308,6 +4361,8 @@ function App() {
         return { ...current, [messageId]: messagePatches };
       });
     }
+    const current = aiMessages.find((message) => message.id === messageId);
+    if (current) persistAiMessage(messageId, { actions: (current.actions || []).filter((item, index) => actionIndex === undefined ? item !== action : index !== actionIndex) });
   }
 
   function dismissAiAction(action: AiAction, messageId: string, actionIndex?: number) {
@@ -4686,7 +4741,7 @@ function App() {
   }
 
   if (authState?.mode === "cloud" && !authState.user) {
-    return <Suspense fallback={<div className="df-loading"><ProductIcon />{t(lang, "toast.loading")}</div>}>
+    return <Suspense fallback={<ExecuteSkeleton />}>
       <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} onForgotPassword={handleForgotPassword} />
     </Suspense>;
   }
@@ -5735,7 +5790,7 @@ function App() {
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => setUtilityPanel("about")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -6792,6 +6847,7 @@ function EditDrawer(props: {
   const [detailPopoverPosition, setDetailPopoverPosition] = useState({ top: 0, left: 0, width: 280 });
   const projectTriggerRef = useRef<HTMLButtonElement>(null);
   const durationTriggerRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesEditing, setNotesEditing] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
@@ -6811,6 +6867,18 @@ function EditDrawer(props: {
     setNotesEditing(false);
     setCancelAllConfirm(false);
   }, [props.task?.id, props.task?.notes, props.editingOccurrence?.scheduledDate, props.editingRecordId]);
+  useLayoutEffect(() => {
+    const textarea = titleRef.current;
+    if (!textarea) return;
+    const resize = () => {
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [f.title, props.task?.id]);
   function positionDetailPopover(trigger: HTMLButtonElement | null, width: number) {
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
@@ -6970,10 +7038,6 @@ function EditDrawer(props: {
         </section>
 
         <section className="df-detail-status-row">
-          <button className="df-detail-pill-trevor action" onClick={props.onConvertToTask}>
-            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg>
-            <span>{t(props.lang, "drawer.convertToTask")}</span>
-          </button>
           <button className="df-detail-pill-trevor action danger" onClick={props.onDelete}>
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h8M4 3V2h4v1M3 3v6.5a1 1 0 001 1h4a1 1 0 001-1V3"/></svg>
             <span>{t(props.lang, "drawer.remove")}</span>
@@ -7103,10 +7167,12 @@ function EditDrawer(props: {
       durationMinutes: Math.max(Math.round((f.estimatedHours || 0.5) * 60), 30),
     };
     return (
+      <>
+      {dialog.host}
       <aside className="df-drawer df-task-detail" onMouseDown={(event) => event.stopPropagation()}>
         {/* ── Hero title area ── */}
         <section className="df-detail-hero-trevor">
-          <textarea className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.titlePlaceholder")} spellCheck={false} />
+          <textarea ref={titleRef} className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.titlePlaceholder")} spellCheck={false} />
         </section>
 
         {/* ── Project tag + action row ── */}
@@ -7160,10 +7226,6 @@ function EditDrawer(props: {
           <button className="df-detail-pill-trevor action" onClick={props.onCopy}>
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="2" width="7" height="9" rx="1"/><path d="M2 5v7a1 1 0 001 1h6"/></svg>
             <span>{t(props.lang, "drawer.duplicate")}</span>
-          </button>
-          <button className="df-detail-pill-trevor action" onClick={props.onConvertToEvent}>
-            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 6H3M6 3L3 6l3 3"/></svg>
-            <span>{t(props.lang, "drawer.convertToEvent")}</span>
           </button>
         </section>
 
@@ -7220,7 +7282,7 @@ function EditDrawer(props: {
         <section className="df-detail-subtasks-new">
           <div className="df-detail-section-head">
             <h3>{t(props.lang, "drawer.subtasks")}</h3>
-            <button className="df-detail-add-btn" onClick={() => void addSubtask()}>
+            <button type="button" className="df-detail-add-btn" onClick={() => void addSubtask()}>
               <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v8M2 6h8"/></svg>
               <span>{t(props.lang, "drawer.addSubtask")}</span>
             </button>
@@ -7255,12 +7317,13 @@ function EditDrawer(props: {
           )}
         </section>
       </aside>
+      </>
     );
   }
   return (
     <aside className="df-drawer">
       <div className="df-drawer-head"><h2>{props.editing ? t(props.lang, "form.edit") : t(props.lang, "form.add")}</h2><button className="df-icon-action i-close" data-tip={t(props.lang, "form.close")} aria-label={t(props.lang, "form.close")} onClick={props.onClose} /></div>
-      <div className="df-segment">{(["task", "project", "event"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} title={addTypeHints[type]} aria-label={addTypeHints[type]} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : t(props.lang, "form.event")}</button>)}</div>
+      <div className="df-segment">{(["task", "project"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} title={addTypeHints[type]} aria-label={addTypeHints[type]} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : t(props.lang, "form.project")}</button>)}</div>
       {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />{t(props.lang, "form.completed")}</label>}
       <label>{t(props.lang, "form.name")}<input autoFocus={!props.editing} value={f.title} onChange={(event) => set("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onSave(); } }} /></label>
       {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label></>}
@@ -7277,9 +7340,10 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate, model, onModelChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string; model: string; onModelChange: (model: string) => void }) {
+function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate, model, onModelChange, reasoningMode, onReasoningModeChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string; model: string; onModelChange: (model: string) => void; reasoningMode: Settings["reasoningMode"]; onReasoningModeChange: (mode: Settings["reasoningMode"]) => void }) {
   const projects = projectList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>(model ? [model] : []);
@@ -7296,7 +7360,9 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
+    const body = bodyRef.current;
+    if (!body || !followLatestRef.current) return;
+    body.scrollTo({ top: body.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, attachmentStatus]);
   useEffect(() => {
     if (!modelMenuOpen) return;
@@ -7323,13 +7389,17 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
   const modelGroups = groupAiModels(availableModels);
   const modelOptions = modelGroups.flatMap((group) => group.models);
   const selectedModel = modelOptions.find((option) => option.id === model);
+  const reasoningModes = reasoningModesForModel(model);
+  useEffect(() => {
+    if (!reasoningModes.includes(reasoningMode)) onReasoningModeChange("instant");
+  }, [model, reasoningMode]);
   const economyModels = modelOptions.filter((option) => option.tier === "economy");
   const standardModels = modelOptions.filter((option) => option.tier === "standard");
   const proModels = modelOptions.filter((option) => option.tier === "pro");
   const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
   const promptSuggestions = lang === "zh"
-    ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天", "从今日候选里制定计划", "查看我下一项日程", "你能帮我做什么？"]
-    : ["Plan my three priorities for today", "Schedule 90 minutes of focused study", "Move unfinished tasks to tomorrow", "Build a plan from today's candidates", "Show my next calendar event", "What can you help me do?"];
+    ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天", "从今日候选里制定计划", "查看我的下一个时间任务", "你能帮我做什么？"]
+    : ["Plan my three priorities for today", "Schedule 90 minutes of focused study", "Move unfinished tasks to tomorrow", "Build a plan from today's candidates", "Show my next scheduled task", "What can you help me do?"];
   const text = {
     thinking: lang === "zh" ? "正在思考" : "Thinking",
     chats: lang === "zh" ? "对话" : "Chats",
@@ -7395,7 +7465,10 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
         </button>
       ))}
     </div>}
-    <div className="df-ai-panel-body" ref={bodyRef}>
+    <div className="df-ai-panel-body" ref={bodyRef} onScroll={(event) => {
+      const element = event.currentTarget;
+      followLatestRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 72;
+    }}>
       {messages.length === 0 && <div className="df-ai-reference-empty">
         <div className="df-ai-reference-prompt">{lang === "zh" ? "需要我帮什么？直接问吧……" : "How can I help? Just ask…"}</div>
         <div className="df-ai-reference-suggestions">
@@ -7413,7 +7486,7 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
           </div>}
           {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.content}</div>}
           {message.plan && message.plan.length > 0 && <div className="df-ai-plan">
-            <div className="df-ai-plan-header"><span>📅 今日时间块</span><small>{message.plan.length} 项</small></div>
+            <div className="df-ai-plan-header"><span>{lang === "zh" ? "今日时间块" : "Today's time blocks"}</span><small>{message.plan.length} {text.itemUnit}</small></div>
             {message.plan.map((block, pi) => <div key={pi} className="df-ai-plan-row">
               <span className="df-ai-plan-time mono">{block.start} - {block.end}</span>
               <span className="df-ai-plan-title">{block.title}</span>
@@ -7448,7 +7521,7 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
                   {start && end && <button className="df-ai-chip-button mono" onClick={() => toggleMenu(message.id, i, "time")}>{start} - {end}</button>}
                 </div>
                 <div className="df-ai-task-row-mid">
-                  <button className="df-ai-chip-button" onClick={() => toggleMenu(message.id, i, "type")}>{kind === "event" ? text.event : text.task}</button>
+                  <span className="df-ai-task-project">{text.task}</span>
                   <button className="df-ai-chip-button" onClick={() => toggleMenu(message.id, i, "project")}># {finalProjectName}</button>
                   {a.recurrence ? <span className="df-ai-task-project">↻ {(a.recurrence as any).frequency}</span> : null}
                 </div>
@@ -7461,7 +7534,6 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
                 {menuIs(message.id, i, "time") && <div className="df-ai-action-menu">{timeOptions.map((option) => <button key={option} onClick={() => patchTime(message.id, i, a, option)}>{option}</button>)}</div>}
                 {menuIs(message.id, i, "duration") && <div className="df-ai-action-menu">{durationOptions.map((option) => <button key={option} onClick={() => patchDuration(message.id, i, a, option)}>{formatMinutes(option)}</button>)}</div>}
                 {menuIs(message.id, i, "project") && <div className="df-ai-action-menu"><button onClick={() => { onPatchAction(message.id, i, { projectId: "", projectName: "" }); setEditMenu(null); }}>{text.unassigned}</button>{projects.map((project) => <button key={project.id} onClick={() => { onPatchAction(message.id, i, { projectId: project.id, projectName: project.title }); setEditMenu(null); }}><span className="df-ai-project-dot" style={{ background: project.color || "var(--accent-active)" }} />{project.title}</button>)}</div>}
-                {menuIs(message.id, i, "type") && <div className="df-ai-action-menu compact"><button onClick={() => patchType(message.id, i, a, "task")}>{text.task}</button><button onClick={() => patchType(message.id, i, a, "event")}>{text.event}</button></div>}
               </div>
               {!isAccepted && (
                 <div className="df-ai-task-actions">
@@ -7511,6 +7583,12 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
             <button type="button" className="df-ai-model-manage" onClick={() => { setModelMenuOpen(false); onOpenMemorySettings(); }}>{lang === "zh" ? "管理模型…" : "Manage models…"}</button>
           </div>}
         </div>
+        <label className="df-ai-reasoning-picker">
+          <span>{lang === "zh" ? "思考" : "Reasoning"}</span>
+          <select value={reasoningMode} disabled={busy} onChange={(event) => onReasoningModeChange(event.target.value as Settings["reasoningMode"])}>
+            {reasoningModes.map((option) => <option key={option} value={option}>{option === "instant" ? (lang === "zh" ? "即时" : "Instant") : option === "high" ? "High" : "Xhigh"}</option>)}
+          </select>
+        </label>
       </div>
       <small className="df-ai-reference-disclaimer">{lang === "zh" ? "AI 生成内容可能有误，请核对重要安排。" : "AI can make mistakes. Check important schedule changes."}</small>
     </div>
@@ -7616,21 +7694,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
         </div>
         {kind === "settings" ? (
           <div className="df-utility-body">
-            <section className="df-settings-profile">
-              <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>
-                {settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}
-                <input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} />
-              </label>
-              <div>
-                <input
-                  className="df-settings-name-input"
-                  value={settings.displayName || ""}
-                  placeholder={t(lang, "settings.usernamePlaceholder")}
-                  onChange={(e) => onSave({ displayName: e.target.value })}
-                />
-                <small>{t(lang, "settings.freePlan")}</small>
-              </div>
-            </section>
+            <section className="df-settings-group"><h3>{lang === "zh" ? "页面" : "Page"}</h3>
             <label className="df-utility-select">
               {t(lang, "settings.uiMode")}
               <select value={settings.theme} onChange={(event) => onSave({ theme: event.target.value as Settings["theme"] })}>
@@ -7655,9 +7719,16 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             </label>
             <label className="df-utility-select">{t(lang, "settings.defaultView")}<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="weekly">{viewLabel(lang, "weekly")}</option><option value="month">{viewLabel(lang, "month")}</option></select></label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />{t(lang, "settings.hideCompleted")}</label>
-            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />{t(lang, "settings.allowAiContext")}</label>
+            <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
+            <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
+            <button className="df-settings-reset-accent" onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复主题默认点缀色" : "Restore theme accent defaults"}</button>
             <button className="df-settings-about" onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}</button>
-            <McpTokenManager lang={lang} />
+            </section>
+            <section className="df-settings-group"><h3>Navo AI</h3>
+            <label className="df-utility-select">{lang === "zh" ? "默认模型" : "Default model"}<input value={settings.model} readOnly /></label>
+            <label className="df-utility-select">{lang === "zh" ? "思考模式" : "Reasoning mode"}<select value={settings.reasoningMode || "instant"} onChange={(event) => onSave({ reasoningMode: event.target.value as Settings["reasoningMode"] })}><option value="instant">{lang === "zh" ? "即时" : "Instant"}</option>{reasoningModesForModel(settings.model).includes("high") && <option value="high">High</option>}{reasoningModesForModel(settings.model).includes("xhigh") && <option value="xhigh">Xhigh</option>}</select></label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />{t(lang, "settings.allowAiContext")}</label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
             <section className="df-ai-memory-settings">
               <div className="df-ai-memory-settings-head">
                 <div><strong>AI 记忆</strong><small>{visibleMemories.length} 条会参与上下文</small></div>
@@ -7680,22 +7751,18 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
               </div>
               <button className="df-ai-clear-history" disabled={(data.chat || []).length === 0} onClick={onClearChatHistory}>清空对话历史</button>
             </section>
-            <details className="df-settings-advanced">
-              <summary>{lang === "zh" ? "高级设置" : "Advanced settings"}</summary>
-              <div className="df-settings-advanced-body">
-                <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
-                <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
-                <button className="df-settings-reset-accent" onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复主题默认强调色" : "Restore theme default accents"}</button>
-                <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
-                {authEmail && <p className="df-settings-account">{t(lang, "settings.account")}：{authEmail}</p>}
-                <button className="df-settings-about" onClick={onShowAbout}>
-                  <span className="df-settings-about-icon">i</span>
-                  <span>{t(lang, "settings.about")}</span>
-                </button>
-                {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
-                {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}
-              </div>
-            </details>
+            </section>
+            <section className="df-settings-group"><h3>MCP</h3><McpTokenManager lang={lang} /></section>
+            <section className="df-settings-group"><h3>{lang === "zh" ? "账户" : "Account"}</h3>
+              <section className="df-settings-profile">
+                <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
+                <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /><small>{t(lang, "settings.freePlan")}</small></div>
+              </section>
+              {authEmail && <p className="df-settings-account">{authEmail}</p>}
+              <button className="df-settings-about" onClick={onShowAbout}><span className="df-settings-about-icon">i</span><span>{t(lang, "settings.about")}</span></button>
+              {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
+              {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}
+            </section>
           </div>
         ) : (
           <div className="df-utility-body">

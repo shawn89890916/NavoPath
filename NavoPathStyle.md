@@ -18,12 +18,13 @@ NavoPath is an editorial planning tool, not a generic SaaS dashboard.
 ## Brand And Theme
 
 - Core palette: brown `#584D3D`, sage `#7EA172`, coral `#D7816A`, aubergine `#0F0326`, and soft white `#FBF9FF`.
-- Execute default: coral `#D7816A`.
-- Planning and completion default: sage `#7EA172`.
+- Light mode uses charcoal `#27231E` as the primary text and ink color. It is not a large filled accent.
+- Dark mode uses warm ivory `#EEE9DF` as primary text and as the default interaction accent.
+- Execute coral `#D7816A` and Planning sage `#7EA172` are annotation colors for rules, checks, focus, and small status details only.
 - Shared application controls must use the active page theme variables,
   especially `--accent-active`, rather than hard-coded purple or lime.
-- Light mode uses brown ink on soft-white paper. Dark mode uses soft-white ink
-  on aubergine paper. Legacy purple and lime remain optional custom accents.
+- Light mode uses charcoal ink on warm soft-white paper. Dark mode uses warm
+  ivory ink on charcoal paper. Legacy purple and lime remain optional custom accents.
 - Product and portfolio pages map their local accent variables to the shared
   interaction tokens.
 

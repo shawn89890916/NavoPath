@@ -11,6 +11,17 @@ export type AiModelGroup = {
   models: AiModelOption[];
 };
 
+export type AiReasoningMode = "instant" | "high" | "xhigh";
+
+export function reasoningModesForModel(id: string): AiReasoningMode[] {
+  const label = id.replace(/^Pro\//i, "").split("/").pop() || id;
+  if (/DeepSeek-V4-Pro|Qwen3\.5-(?:122B|397B)|GLM-5\.2|Kimi-K2\.7|MiniMax-M3/i.test(label)) {
+    return ["instant", "high", "xhigh"];
+  }
+  if (/DeepSeek-(?:R1|V3\.2)|Qwen3|MiniMax-M2\.5/i.test(label)) return ["instant", "high"];
+  return ["instant"];
+}
+
 const MODEL_FAMILIES: Array<{ family: string; pattern: RegExp }> = [
   { family: "DeepSeek", pattern: /deepseek/i },
   { family: "Qwen", pattern: /qwen/i },

@@ -6,6 +6,8 @@ create table if not exists public.dayflow_profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.dayflow_profiles add column if not exists revision bigint not null default 0;
+
 alter table public.dayflow_profiles enable row level security;
 
 grant select, insert, update, delete on public.dayflow_profiles to authenticated;

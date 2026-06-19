@@ -167,6 +167,7 @@ export async function callAiAssistant(params: {
   mode: AiMode;
   message: string;
   model?: string;
+  reasoningMode?: "instant" | "high" | "xhigh";
   context?: unknown;
   history?: AiChatMessage[];
   memories?: AiMemoryPatch[];

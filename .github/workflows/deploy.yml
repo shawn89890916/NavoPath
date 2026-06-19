@@ -25,8 +25,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Enforce product changelog
+        shell: bash
+        run: |
+          node scripts/changelog-maintain.mjs --check
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            changed="$(git diff --name-only HEAD^ HEAD)"
+            if echo "$changed" | grep -Eq '^(src/|supabase/|mcp-worker/)' && ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
+              echo "User-visible product changes require a current CHANGELOG.md update."
+              exit 1
+            fi
+          fi
+
       - name: Build
         run: npm run build
+
+      - name: Check MCP Worker
+        run: npm ci --prefix mcp-worker && npm run typecheck --prefix mcp-worker
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}

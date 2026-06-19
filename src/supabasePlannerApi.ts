@@ -28,6 +28,7 @@ const defaultSettings: Settings = {
   aiDockOpen: false,
   appTitle: "NavoPath",
   model: "deepseek-ai/DeepSeek-V4-Flash",
+  reasoningMode: "instant",
   baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
   hasApiKey: false,
   apiKeyPreview: "",
@@ -72,6 +73,46 @@ function mergeSettings(settings: unknown): Settings {
   if (stored.model === "deepseek-v4-flash" || stored.model === "deepseek-chat") stored.model = "deepseek-ai/DeepSeek-V4-Flash";
   if (!stored.baseUrl || stored.baseUrl === "https://api.deepseek.com/chat/completions") stored.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
   return { ...defaultSettings, ...stored };
+}
+
+const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "longTasks", "notes", "drafts", "aiConversations", "aiMemories"] as const;
+
+function itemTime(item: any) {
+  return Date.parse(item?.updatedAt || item?.createdAt || item?.savedAt || "") || 0;
+}
+
+function mergePlannerData(remote: PlannerData, local: PlannerData): PlannerData {
+  const deleted = { ...(remote.sync?.deleted || {}), ...(local.sync?.deleted || {}) };
+  const merged: any = { ...remote, ...local, sync: { deleted } };
+  for (const collection of SYNC_COLLECTIONS) {
+    const byId = new Map<string, any>();
+    for (const item of ((remote as any)[collection] || [])) if (item?.id) byId.set(item.id, item);
+    for (const item of ((local as any)[collection] || [])) {
+      if (!item?.id) continue;
+      const current = byId.get(item.id);
+      if (!current || itemTime(item) >= itemTime(current)) byId.set(item.id, item);
+    }
+    merged[collection] = Array.from(byId.values()).filter((item: any) => {
+      const deletedAt = Date.parse(deleted[`${collection}:${item.id}`] || "") || 0;
+      return deletedAt < itemTime(item);
+    });
+  }
+  merged.chat = local.chat || remote.chat || [];
+  merged.events = [];
+  merged.savedAt = new Date().toISOString();
+  return normalizeData(merged);
+}
+
+function addDeletionTombstones(previous: PlannerData, next: PlannerData): PlannerData {
+  const deleted = { ...(previous.sync?.deleted || {}), ...(next.sync?.deleted || {}) };
+  const timestamp = new Date().toISOString();
+  for (const collection of SYNC_COLLECTIONS) {
+    const nextIds = new Set(((next as any)[collection] || []).map((item: any) => item?.id).filter(Boolean));
+    for (const item of ((previous as any)[collection] || [])) {
+      if (item?.id && !nextIds.has(item.id)) deleted[`${collection}:${item.id}`] = timestamp;
+    }
+  }
+  return { ...next, sync: { deleted } };
 }
 
 function emptyCloudData(): PlannerData {
@@ -127,8 +168,8 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
   });
   let cachedUser: User | null | undefined;
   let userPromise: Promise<User | null> | null = null;
-  let profileCache: { data: PlannerData; settings: Settings } | null = null;
-  let profilePromise: Promise<{ data: PlannerData; settings: Settings }> | null = null;
+  let profileCache: { data: PlannerData; settings: Settings; revision: number } | null = null;
+  let profilePromise: Promise<{ data: PlannerData; settings: Settings; revision: number }> | null = null;
 
   void supabase.auth.getSession().then(({ data }) => {
     cachedUser = data.session?.user ?? null;
@@ -171,7 +212,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     const pending = (async () => {
       const { data, error } = await supabase
         .from(PROFILE_TABLE)
-        .select("data, settings")
+        .select("data, settings, revision")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -179,7 +220,8 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       if (data) {
         profileCache = {
           data: normalizeData((data as any).data as PlannerData),
-          settings: mergeSettings((data as any).settings)
+          settings: mergeSettings((data as any).settings),
+          revision: Number((data as any).revision || 0),
         };
         return profileCache;
       }
@@ -201,7 +243,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         });
 
       if (insertError) throw new Error(insertError.message);
-      profileCache = { data: initialData, settings: initialSettings };
+      profileCache = { data: initialData, settings: initialSettings, revision: 0 };
       return profileCache;
     })();
     profilePromise = pending;
@@ -214,17 +256,24 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
   async function updateProfile(patch: { data?: PlannerData; settings?: Settings }) {
     const user = await requireUser();
-    if (profileCache) {
-      profileCache = {
-        data: patch.data ? normalizeData(patch.data) : profileCache.data,
-        settings: patch.settings ? mergeSettings(patch.settings) : profileCache.settings
-      };
+    let current = await ensureProfile(user);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const nextData = patch.data ? mergePlannerData(current.data, addDeletionTombstones(current.data, normalizeData(patch.data))) : current.data;
+      const nextSettings = patch.settings ? mergeSettings({ ...current.settings, ...patch.settings }) : current.settings;
+      const { data: rows, error } = await supabase.rpc("save_dayflow_profile", {
+        expected_revision: current.revision,
+        next_data: nextData,
+        next_settings: nextSettings,
+      });
+      if (!error && rows?.[0]) {
+        profileCache = { data: normalizeData(rows[0].data), settings: mergeSettings(rows[0].settings), revision: Number(rows[0].revision) };
+        return profileCache;
+      }
+      if (!/PROFILE_REVISION_CONFLICT|40001/i.test(error?.message || "") || attempt === 2) throw new Error(error?.message || "Sync failed");
+      profileCache = null;
+      current = await ensureProfile(user, true);
     }
-    const { error } = await supabase
-      .from(PROFILE_TABLE)
-      .update({ ...patch, updated_at: now() })
-      .eq("user_id", user.id);
-    if (error) throw new Error(error.message);
+    throw new Error("Sync failed");
   }
 
   const api: PlannerApi = {
@@ -373,8 +422,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
     saveData: async (data) => {
       const saved = normalizeData({ ...data, savedAt: now() });
-      await updateProfile({ data: saved });
-      return saved;
+      return (await updateProfile({ data: saved })).data;
     },
 
     applyActions: async (actions: AiAction[]) => {
@@ -422,8 +470,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
     resetSeed: async () => {
       const reset = fallbackData();
-      await updateProfile({ data: reset });
-      return reset;
+      return (await updateProfile({ data: reset })).data;
     },
 
     getSettings: async () => {
@@ -434,8 +481,29 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     saveSettings: async (settings) => {
       const current = await api.getSettings();
       const next = mergeSettings({ ...current, ...settings, hasApiKey: false, apiKeyPreview: "" });
-      await updateProfile({ settings: next });
-      return next;
+      return (await updateProfile({ settings: next })).settings;
+    },
+    subscribeToRemoteChanges: (listener) => {
+      let channel: ReturnType<typeof supabase.channel> | null = null;
+      let disposed = false;
+      void requireUser().then((user) => {
+        if (disposed) return;
+        channel = supabase.channel(`dayflow-profile-${user.id}`)
+          .on("postgres_changes", { event: "UPDATE", schema: "public", table: PROFILE_TABLE, filter: `user_id=eq.${user.id}` }, (payload) => {
+            const row = payload.new as any;
+            if (!row?.data || !row?.settings) return;
+            const next = { data: normalizeData(row.data), settings: mergeSettings(row.settings), revision: Number(row.revision || 0) };
+            if (!profileCache || next.revision > profileCache.revision) {
+              profileCache = next;
+              listener({ data: next.data, settings: next.settings });
+            }
+          })
+          .subscribe();
+      }).catch(() => undefined);
+      return () => {
+        disposed = true;
+        if (channel) void supabase.removeChannel(channel);
+      };
     },
     listMcpTokens: async () => {
       await requireUser();
