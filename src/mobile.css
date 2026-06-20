@@ -74,6 +74,26 @@
     max-height: none !important;
     margin: 0 !important;
     overflow-y: auto !important;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  #root .df-app .df-week-view .df-event-blocks-layer .df-time-block,
+  #root .df-app .df-week-view .df-time-block.df-time-block-week,
+  #root .df-app .df-week-view .df-time-block.df-time-block-week.recurring {
+    padding: 5px 3px !important;
+  }
+
+  #root .df-app .df-week-view .df-event-blocks-layer .df-time-block .df-block-check,
+  #root .df-app .df-week-view .df-time-block.df-time-block-week .df-block-check {
+    display: none !important;
+  }
+
+  #root .df-app .df-week-view .df-event-blocks-layer .df-block-title-row strong,
+  #root .df-app .df-week-view .df-time-block.df-time-block-week .df-block-title-row strong {
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    overflow-wrap: anywhere;
   }
 
   #root .df-app .df-task-card {

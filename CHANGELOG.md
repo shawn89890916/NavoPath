@@ -19,6 +19,7 @@
 - 竖屏日程控件紧贴日期并以单按钮切换日/月视图；从任务画布拖动候选任务时会自动进入时间轴继续选择落点。
 - 竖屏时间轴的日期严格居中，日期切换箭头移到 Day/Month 按钮左侧；时间块拖到左侧刻度区可直接放回今日候选。
 - 竖屏头部与底部工具坞移除可见控件边框，Navo 图标更靠左并略微放大，新增按钮使用更完整的圆形轮廓。
+- 竖屏 Day 控件改为视图菜单，可直接选择天、3 天、周和月；时间轴增加底部滚动安全空间，23:00 后的落点不再被工具坞遮挡。
 
 ### 修复
 - 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
@@ -76,6 +77,7 @@
 - Portrait schedule controls now sit beside the date with one Day/Month toggle; dragging a candidate from Tasks automatically enters the timeline for placement.
 - Portrait dates are now geometrically centered, with date arrows grouped before the Day/Month control; timed tasks can return to Today's Candidates from the left ruler area.
 - Removed visible control borders from the portrait header and dock, shifted and enlarged the Navo icon, and gave the add button a fuller circular shape.
+- The portrait Day control now opens a menu for Day, 3 Day, Week, and Month views; extra bottom scroll space keeps post-23:00 placement clear of the dock.
 
 ### Fixed
 - Fixed missing MCP configuration guidance, silent token-generation failures, and the misaligned Chinese Generate button.

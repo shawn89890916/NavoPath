@@ -1293,6 +1293,7 @@ function App() {
   const [mode, setModeState] = useState<Mode>("execute");
   const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 899.98px)").matches);
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
+  const [compactViewMenuOpen, setCompactViewMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
@@ -1367,6 +1368,7 @@ function App() {
   const [quickProjectTitle, setQuickProjectTitle] = useState("");
   const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
   const compactQuickInputRef = useRef<HTMLInputElement>(null);
+  const compactViewPickerRef = useRef<HTMLDivElement>(null);
   const [candidatePanelCollapsed, setCandidatePanelCollapsed] = useState(false);
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -1382,9 +1384,24 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!compactLayout || (timelineView !== "3day" && timelineView !== "weekly")) return;
-    setTimelineView("daily");
-  }, [compactLayout, timelineView]);
+    if (!compactViewMenuOpen) return;
+    const closeMenu = (event: PointerEvent) => {
+      if (!compactViewPickerRef.current?.contains(event.target as Node)) setCompactViewMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCompactViewMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [compactViewMenuOpen]);
+
+  useEffect(() => {
+    if (mode !== "execute" || compactExecuteView !== "schedule") setCompactViewMenuOpen(false);
+  }, [mode, compactExecuteView]);
 
   useEffect(() => {
     if (quickAddOpen) compactQuickInputRef.current?.focus();
@@ -5089,10 +5106,21 @@ function App() {
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
-                <button className="active" onClick={() => setTimelineView(timelineView === "month" ? "daily" : "month")} aria-label={timelineView === "month" ? viewLabel(lang, "daily") : viewLabel(lang, "month")}>
-                  {timelineView === "month" ? viewLabel(lang, "month") : viewLabel(lang, "daily")}
-                  <span className="df-compact-view-swap" aria-hidden="true">↕</span>
-                </button>
+                <div className="df-compact-view-picker" ref={compactViewPickerRef}>
+                  <button className="active df-compact-view-trigger" onClick={() => setCompactViewMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={compactViewMenuOpen}>
+                    {viewLabel(lang, timelineView)}
+                    <span className="df-compact-view-swap" aria-hidden="true">⌄</span>
+                  </button>
+                  {compactViewMenuOpen && <div className="df-compact-view-menu" role="menu">
+                    {(["daily", "3day", "weekly", "month"] as TimelineView[]).map((view) => (
+                      <button key={view} role="menuitemradio" aria-checked={timelineView === view} className={timelineView === view ? "active" : ""} onClick={() => {
+                        setTimelineView(view);
+                        setDragCreate(null);
+                        setCompactViewMenuOpen(false);
+                      }}>{viewLabel(lang, view)}</button>
+                    ))}
+                  </div>}
+                </div>
               </nav>
             )}
           </div>

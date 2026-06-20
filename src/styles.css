@@ -18729,6 +18729,48 @@ body:has(:active)::-webkit-scrollbar-thumb {
     font-size: 9px;
   }
 
+  .df-compact-view-picker {
+    position: relative;
+    height: 44px;
+  }
+
+  .df-compact-view-trigger {
+    min-width: 58px !important;
+  }
+
+  .df-compact-view-menu {
+    position: absolute;
+    z-index: 40;
+    top: 46px;
+    right: 0;
+    width: 128px;
+    display: grid;
+    padding: 4px 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--surface-raised);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--text-main) 12%, transparent);
+  }
+
+  .df-compact-calendar-tabs .df-compact-view-menu button {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    padding: 0 8px;
+    border-bottom-color: var(--border-subtle);
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .df-compact-calendar-tabs .df-compact-view-menu button:last-child {
+    border-bottom-color: transparent;
+  }
+
+  .df-compact-calendar-tabs .df-compact-view-menu button.active {
+    color: var(--text-main);
+    border-bottom-color: var(--accent-active);
+  }
+
   .df-execute > .df-candidate-panel,
   .df-execute > .df-timeline-panel {
     grid-column: auto !important;
