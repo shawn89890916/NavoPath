@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PlannerData, Project, Subtask, Task } from "./types";
-import { t, priLabels, type Language } from "./i18n";
+import { t, type Language } from "./i18n";
 import { useInAppDialog } from "./InAppDialog";
 import { localIsoDate } from "./utils/localDate";
 import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 
-type PlanPickPriority = "must" | "should" | "could";
 type TreeNodeKind = "project" | "task" | "subtask";
 type TreeDragNode = { kind: TreeNodeKind; id: string };
 type TreeDropTarget = TreeDragNode & { position: "before" | "inside" | "after"; top: number; left: number; width: number };
@@ -286,12 +285,12 @@ function PlanningSubtaskNode(props: {
 function PlanningTaskNode(props: {
   lang: Language;
   task: Task;
-  picked: boolean;
+  addedToToday: boolean;
   projectColor: string;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpen: () => void;
-  onAddToPick: () => void;
+  onToggleTodayCandidate: () => void;
   onRename: () => void;
   onAddSubtask: () => void;
   onSetDate: () => void;
@@ -309,7 +308,7 @@ function PlanningTaskNode(props: {
   return (
     <>
       {tooltipEl}
-      <div draggable className={`df-plan-task-node ${props.picked ? "picked" : ""}${props.task.plannedForDate === todayIso() ? " added-to-today" : ""}`} data-node-id={props.task.id} data-node-type="task">
+      <div draggable className={`df-plan-task-node${props.addedToToday ? " added-to-today" : ""}`} data-node-id={props.task.id} data-node-type="task">
         <div className="df-task-node-inner" onClick={props.onOpen}>
           <span
             className="df-task-title"
@@ -324,6 +323,7 @@ function PlanningTaskNode(props: {
             {props.task.title}
           </span>
           {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
+          {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "今日候选" : "Today"}</span>}
           {hasSubtasks && (
             <button
               className="df-task-chevron"
@@ -341,9 +341,12 @@ function PlanningTaskNode(props: {
               className="df-tree-icon-button"
               onClick={(event) => {
                 event.stopPropagation();
-                props.onAddToPick();
+                props.onToggleTodayCandidate();
               }}
-              aria-label={t(props.lang, "planning.addToCandidate")}
+              aria-label={props.addedToToday
+                ? (props.lang === "zh" ? "移回 Planning" : "Return to Planning")
+                : t(props.lang, "planning.addToCandidate")}
+              aria-pressed={props.addedToToday}
             >
               <ArrowRightIcon />
             </button>
@@ -621,16 +624,11 @@ export default function PlanningView(props: {
   data: PlannerData;
   projects: Project[];
   tasks: Task[];
+  compact: boolean;
   collapsed: Record<string, boolean>;
   setCollapsed: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  pickMode: boolean;
-  picks: Record<string, PlanPickPriority>;
-  onExitPickMode: () => void;
-  onAddPick: (taskId: string) => void;
-  onUpdatePick: (taskId: string, priority: PlanPickPriority) => void;
-  onRemovePick: (taskId: string) => void;
-  onClearPicks: () => void;
-  onApplyPicks: (scope: "today" | "week") => void;
+  onToggleTodayCandidate: (taskId: string) => void;
+  onPromoteSubtaskToToday: (parentTaskId: string, subtaskId: string) => void;
   onProjectEdit: (project: Project) => void;
   onTaskEdit: (task: Task) => void;
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
@@ -641,74 +639,15 @@ export default function PlanningView(props: {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
   const [collapsedSubtasks, setCollapsedSubtasks] = useState<Record<string, boolean>>({});
-  const [leftRatio, setLeftRatio] = useState(66);
   const [showAddedTasks, setShowAddedTasks] = useState(false);
   const [dragNode, setDragNode] = useState<TreeDragNode | null>(null);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
   const dialog = useInAppDialog(props.lang);
-
-  const startSplitterDrag = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    isDragging.current = true;
-    const startX = event.clientX;
-    const startRatio = leftRatio;
-    const onMove = (moveEvent: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      const pct = ((moveEvent.clientX - rect.left) / rect.width) * 100;
-      setLeftRatio(Math.max(40, Math.min(80, pct)));
-    };
-    const onUp = () => {
-      isDragging.current = false;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }, [leftRatio]);
-
-  const pickedTasks = Object.keys(props.picks)
-    .map((id) => {
-      const task = safeTasks.find((candidate) => candidate?.id === id);
-      if (task) return task;
-
-      const parentTask = safeTasks.find((candidate) => Boolean(findSubtaskInTree(candidate.subtasks || [], id)));
-      const subtask = parentTask ? findSubtaskInTree(parentTask.subtasks || [], id) : undefined;
-      if (!parentTask || !subtask) return null;
-
-      return {
-        ...parentTask,
-        id: subtask.id,
-        title: subtask.title,
-        completed: Boolean(subtask.completed || subtask.done),
-        parentTaskId: parentTask.id,
-        subtasks: [],
-      } satisfies Task;
-    })
-    .filter(Boolean) as Task[];
 
   const today = todayIso();
 
   const unassigned = safeTasks.filter((task) => task && !task.projectId && !task.completed && (showAddedTasks || task.plannedForDate !== today));
-
-  const priorityGroups: Array<[PlanPickPriority, string]> = useMemo(() => [
-    ["must", priLabels(props.lang)[0]],
-    ["should", priLabels(props.lang)[1]],
-    ["could", priLabels(props.lang)[2]],
-  ], [props.lang]);
-
-  const projectName = useCallback(
-    (task: Task) => safeProjects.find((project) => String(project.id) === String(task.projectId || ""))?.title || t(props.lang, "planning.unassigned"),
-    [safeProjects, props.lang],
-  );
 
   const renameTask = useCallback(async (task: Task) => {
     const title = await dialog.prompt(t(props.lang, "planning.editName"), task.title);
@@ -792,8 +731,9 @@ export default function PlanningView(props: {
   }, [dialog, safeTasks, props]);
 
   const promoteSubtask = useCallback((subtaskId: string) => {
-    props.onAddPick(subtaskId);
-  }, [props]);
+    const parent = safeTasks.find((task) => Boolean(findSubtaskInTree(task.subtasks || [], subtaskId)));
+    if (parent) props.onPromoteSubtaskToToday(parent.id, subtaskId);
+  }, [props, safeTasks]);
 
   const setSubtaskDate = useCallback(async (subtaskId: string) => {
     for (const task of safeTasks) {
@@ -996,21 +936,11 @@ export default function PlanningView(props: {
   const svgLines = useTreeLines(treeRef, safeProjects, safeTasks, props.collapsed, collapsedSubtasks);
 
   return (
-    <main className={`df-planning ${props.pickMode ? "pick-mode" : ""}`}>
+    <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
       {dialog.host}
-      <div className="df-planning-body" ref={containerRef}>
-        <section className="df-mindmap no-root" style={{ flex: `${leftRatio}%`, minWidth: 0 }}>
+      <div className="df-planning-body">
+        <section className="df-mindmap no-root">
           <div className="df-tree-wrap">
-          {props.pickMode && (
-            <div className="df-pick-banner">
-              <div>
-                <strong>{t(props.lang, "planning.selectingTasks")}</strong>
-                <span>{t(props.lang, "planning.selectInstruction")}</span>
-              </div>
-              <button onClick={props.onExitPickMode}>{t(props.lang, "planning.exit")}</button>
-            </div>
-          )}
-
           <div className="df-planning-filter-bar">
             <button className={`df-filter-toggle${showAddedTasks ? " active" : ""}`} onClick={() => setShowAddedTasks((v) => !v)}>
               {showAddedTasks ? t(props.lang, "sourceModal.hideAdded") : t(props.lang, "planning.showAdded")}
@@ -1021,6 +951,10 @@ export default function PlanningView(props: {
             className={`df-tree${dragNode ? " is-tree-dragging" : ""}`}
             ref={treeRef}
             onDragStartCapture={(event) => {
+              if (props.compact) {
+                event.preventDefault();
+                return;
+              }
               const origin = event.target as HTMLElement;
               if (origin.closest("button, input, textarea, select, [contenteditable='true']")) {
                 event.preventDefault();
@@ -1074,12 +1008,12 @@ export default function PlanningView(props: {
                         <PlanningTaskNode
                           lang={props.lang}
                           task={task}
-                          picked={Boolean(props.picks[task.id])}
+                          addedToToday={task.plannedForDate === today && task.executionLane === "candidate"}
                           projectColor={project.color || DEFAULT_PROJECT_COLOR}
                           collapsed={Boolean(collapsedSubtasks[task.id])}
                           onToggleCollapse={() => setCollapsedSubtasks((current) => ({ ...current, [task.id]: !current[task.id] }))}
                           onOpen={() => props.onTaskEdit(task)}
-                          onAddToPick={() => props.onAddPick(task.id)}
+                          onToggleTodayCandidate={() => props.onToggleTodayCandidate(task.id)}
                           onRename={() => renameTask(task)}
                           onAddSubtask={() => addSubtask(task)}
                           onSetDate={() => setTaskDate(task)}
@@ -1131,12 +1065,12 @@ export default function PlanningView(props: {
                         <PlanningTaskNode
                           lang={props.lang}
                           task={task}
-                          picked={Boolean(props.picks[task.id])}
+                          addedToToday={task.plannedForDate === today && task.executionLane === "candidate"}
                           projectColor={UNASSIGNED_COLOR}
                           collapsed={Boolean(collapsedSubtasks[task.id])}
                           onToggleCollapse={() => setCollapsedSubtasks((current) => ({ ...current, [task.id]: !current[task.id] }))}
                           onOpen={() => props.onTaskEdit(task)}
-                          onAddToPick={() => props.onAddPick(task.id)}
+                          onToggleTodayCandidate={() => props.onToggleTodayCandidate(task.id)}
                           onRename={() => renameTask(task)}
                           onAddSubtask={() => addSubtask(task)}
                           onSetDate={() => setTaskDate(task)}
@@ -1173,50 +1107,6 @@ export default function PlanningView(props: {
         </div>
       </section>
 
-      <div className="df-splitter" onMouseDown={startSplitterDrag} />
-
-      <section className="df-pick-panel" style={{ flex: `${100 - leftRatio}%`, minWidth: 0 }}>
-          <div className="df-pick-panel-head">
-            <strong>{t(props.lang, "planning.candidateTasks")}</strong>
-            <span>{pickedTasks.length}{t(props.lang, "planning.countItems")}</span>
-          </div>
-
-          {pickedTasks.length === 0 ? (
-            <div className="df-pick-empty">{t(props.lang, "planning.selectPrompt")}</div>
-          ) : (
-            priorityGroups.map(([priority, label]) => {
-              const groupTasks = pickedTasks.filter((task) => props.picks[task.id] === priority);
-              return (
-                <div className="df-pick-group" key={priority}>
-                  <h3>{label}</h3>
-                  {groupTasks.length === 0 ? (
-                    <small>{t(props.lang, "planning.none")}</small>
-                  ) : (
-                    groupTasks.map((task) => (
-                      <article key={task.id} className="df-pick-card">
-                        <div>
-                          <strong>{task.title}</strong>
-                          <span># {projectName(task)}</span>
-                        </div>
-                        <select value={props.picks[task.id]} onChange={(event) => props.onUpdatePick(task.id, event.target.value as PlanPickPriority)}>
-                          <option value="must">{priLabels(props.lang)[0]}</option>
-                          <option value="should">{priLabels(props.lang)[1]}</option>
-                          <option value="could">{priLabels(props.lang)[2]}</option>
-                        </select>
-                        <button onClick={() => props.onRemovePick(task.id)}>{t(props.lang, "planning.remove")}</button>
-                      </article>
-                    ))
-                  )}
-                </div>
-              );
-            })
-          )}
-
-          <div className="df-pick-actions">
-            <button className="primary" disabled={pickedTasks.length === 0} onClick={() => props.onApplyPicks("today")}>{t(props.lang, "planning.addToToday")}</button>
-            <button className="light" disabled={pickedTasks.length === 0} onClick={props.onClearPicks}>{t(props.lang, "planning.clearCandidates")}</button>
-          </div>
-        </section>
       </div>
     </main>
   );

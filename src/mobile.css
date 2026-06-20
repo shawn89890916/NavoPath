@@ -1,0 +1,70 @@
+@media (max-width: 1049.98px) {
+  #root .df-app .df-header {
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+  }
+
+  #root .df-app .df-execute,
+  #root .df-app .df-planning {
+    height: calc(100dvh - 56px) !important;
+    min-height: 0 !important;
+    padding: 0 8px calc(82px + env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  #root .df-app .df-execute > .compact-inactive {
+    display: none !important;
+  }
+
+  #root .df-app .df-execute > .compact-active {
+    display: flex !important;
+  }
+
+  #root .df-app .df-timeline-scroll {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  #root .df-app .df-task-card {
+    padding-left: 56px !important;
+  }
+
+  #root .df-app .df-task-card .df-block-check {
+    left: 6px !important;
+    top: 50% !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    transform: translateY(-50%) !important;
+  }
+
+  #root .df-app .df-task-node-actions,
+  #root .df-app .df-project-node-actions {
+    width: auto !important;
+    min-width: 88px !important;
+    gap: 0 !important;
+  }
+
+  #root .df-app .df-tree-icon-button,
+  #root .df-app .df-project-node-actions button {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+  }
+
+  #root .df-app .df-toast {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    transform: none !important;
+    z-index: 120 !important;
+  }
+}

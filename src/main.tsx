@@ -32,12 +32,14 @@ import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTit
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
 import { addSubtaskToTree, findSubtaskInTree } from "./utils/treeOrder";
+import { promoteSubtaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
 import "./navopath-buttons.css";
+import "./mobile.css";
 
 installBrowserFallback();
 
@@ -78,6 +80,7 @@ const categoryOrder: Category[] = ["exam", "project", "essay", "materials", "uk"
 
 type Mode = "execute" | "planning";
 type AddType = "task" | "project" | "event";
+type CompactExecuteView = "tasks" | "schedule";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
 type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
 type SettingsPatch = Partial<Settings> & { apiKey?: string; clearApiKey?: boolean };
@@ -254,7 +257,6 @@ type DragCreateState = {
   width: number;
   committed: boolean;
 } | null;
-type PlanPickPriority = "must" | "should" | "could";
 type AuthState = { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
 type AuthNotice = { type: "confirm-email"; email: string } | null;
 type AiAttachmentSnapshot = {
@@ -1289,6 +1291,11 @@ function App() {
   const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [mode, setModeState] = useState<Mode>("execute");
+  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 1049.98px)").matches);
+  const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [compactAiComposerOpen, setCompactAiComposerOpen] = useState(false);
+  const [compactAiInput, setCompactAiInput] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview>(null);
@@ -1349,8 +1356,6 @@ function App() {
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
-  const [planningPickMode, setPlanningPickMode] = useState(false);
-  const [planningPicks, setPlanningPicks] = useState<Record<string, PlanPickPriority>>({});
   const [toast, setToast] = useState("");
   // Enhanced toast with optional undo action (5-second window)
   const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null);
@@ -1363,11 +1368,40 @@ function App() {
   const [quickProjectOpen, setQuickProjectOpen] = useState(false);
   const [quickProjectTitle, setQuickProjectTitle] = useState("");
   const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
+  const compactQuickInputRef = useRef<HTMLInputElement>(null);
   const [candidatePanelCollapsed, setCandidatePanelCollapsed] = useState(false);
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const [yearPickerOpen, setYearPickerOpen] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1049.98px)");
+    const sync = () => setCompactLayout(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!compactLayout || (timelineView !== "3day" && timelineView !== "weekly")) return;
+    setTimelineView("daily");
+  }, [compactLayout, timelineView]);
+
+  useEffect(() => {
+    if (quickAddOpen) compactQuickInputRef.current?.focus();
+  }, [quickAddOpen]);
+
+  useEffect(() => {
+    if (!quickAddOpen && !compactAiComposerOpen) return;
+    const closeCompactLayer = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setQuickAddOpen(false);
+      setCompactAiComposerOpen(false);
+    };
+    document.addEventListener("keydown", closeCompactLayer);
+    return () => document.removeEventListener("keydown", closeCompactLayer);
+  }, [quickAddOpen, compactAiComposerOpen]);
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -1508,6 +1542,10 @@ function App() {
     settingsSaveTimerRef.current = null;
     settingsSaveRetryTimerRef.current = null;
     setModeState("execute");
+    setCompactExecuteView("schedule");
+    setQuickAddOpen(false);
+    setCompactAiComposerOpen(false);
+    setCompactAiInput("");
     setSelectedDate(todayIso());
     setTimelineView("daily");
     setDrag(null);
@@ -1530,8 +1568,6 @@ function App() {
     setAiAttachmentStatus("");
     setSchedulePreviews([]);
     setAutoScheduleState("idle");
-    setPlanningPickMode(false);
-    setPlanningPicks({});
     setQuickTitle("");
     setQuickProjectId("");
     setQuickProjectOpen(false);
@@ -2669,84 +2705,36 @@ function App() {
     }
   }
 
-  function openPlanningPicker() {
-    setPlanningPickMode(true);
-    void saveSettings({ activeMode: "planning" });
-  }
-
-  function addPlanningPick(taskId: string) {
-    setPlanningPicks((current) => current[taskId] ? current : { ...current, [taskId]: "should" });
-  }
-
-  function updatePlanningPick(taskId: string, priority: PlanPickPriority) {
-    setPlanningPicks((current) => ({ ...current, [taskId]: priority }));
-  }
-
-  function removePlanningPick(taskId: string) {
-    setPlanningPicks((current) => {
-      const next = { ...current };
-      delete next[taskId];
-      return next;
-    });
-  }
-
-  function clearPlanningPicks() {
-    setPlanningPicks({});
-  }
-
-  function applyPlanningPicks(scope: "today" | "week") {
+  function togglePlanningTodayCandidate(taskId: string) {
     if (!data) return;
-    const ids = Object.keys(planningPicks);
-    if (ids.length === 0) return;
-    const taskIds = new Set(data.tasks.map((task) => task.id));
-    const now = new Date().toISOString();
-    const promotedSubtasks = ids.flatMap((id) => {
-      if (taskIds.has(id)) return [];
-      const parentTask = data.tasks.find((task) => Boolean(findSubtaskInTree(task.subtasks || [], id)));
-      const subtask = parentTask ? findSubtaskInTree(parentTask.subtasks || [], id) : undefined;
-      if (!parentTask || !subtask) return [];
-      const picked = planningPicks[id];
-      return [{
-        ...parentTask,
-        id: uid("task"),
-        title: subtask.title,
-        priority: picked === "must" ? "high" : picked === "could" ? "low" : parentTask.priority,
-        completed: false,
-        parentTaskId: parentTask.id,
-        plannedForDate: scope === "today" ? today : undefined,
-        executionLane: scope === "today" ? "candidate" as const : undefined,
-        scheduledDate: undefined,
-        scheduledStart: undefined,
-        scheduledEnd: undefined,
-        executionStatus: undefined,
-        timelineRecords: [],
-        recurrence: undefined,
-        subtasks: [],
-        order: Date.now(),
-        createdAt: now,
-        updatedAt: now,
-      } satisfies Task];
-    });
-    void saveData({
-      ...data,
-      tasks: [...data.tasks.map((task) => {
-        if (!ids.includes(task.id)) return task;
-        const picked = planningPicks[task.id];
-        return {
-          ...task,
-          priority: picked === "must" ? "high" : picked === "could" ? "low" : task.priority,
-          plannedForDate: scope === "today" ? today : undefined,
-          executionLane: scope === "today" ? "candidate" as const : undefined,
-          scheduledDate: undefined,
-          scheduledStart: undefined,
-          scheduledEnd: undefined,
-          updatedAt: new Date().toISOString()
-        };
-      }), ...promotedSubtasks]
-    });
-    setPlanningPicks({});
-    if (scope === "today") void saveSettings({ activeMode: "execute" });
-    showToast(scope === "today" ? t(lang, "toast.addedToToday") : t(lang, "toast.addedToWeek"));
+    const previous = data;
+    const result = toggleTodayCandidate(data, taskId, today);
+    if (result.action === "existing") return;
+    void saveData(result.data);
+    const notice = result.action === "added"
+        ? (lang === "zh" ? "已加入今日候选" : "Added to today's candidates")
+        : (lang === "zh" ? "已移回 Planning" : "Returned to Planning");
+    window.setTimeout(() => showUndoToast(
+      notice,
+      lang === "zh" ? "撤销" : "Undo",
+      () => void saveData(previous),
+    ), 0);
+  }
+
+  function promotePlanningSubtask(parentTaskId: string, subtaskId: string) {
+    if (!data) return;
+    const previous = data;
+    const result = promoteSubtaskToToday(data, parentTaskId, subtaskId, today, () => uid("task"));
+    if (result.action === "existing") {
+      showToast(lang === "zh" ? "该子任务已在今日候选中" : "This subtask is already in today's candidates");
+      return;
+    }
+    void saveData(result.data);
+    window.setTimeout(() => showUndoToast(
+      lang === "zh" ? "子任务已加入今日候选" : "Subtask added to today's candidates",
+      lang === "zh" ? "撤销" : "Undo",
+      () => void saveData(previous),
+    ), 0);
   }
 
   function quickAddTask() {
@@ -2774,8 +2762,9 @@ function App() {
       dueDate: targetDate,
       estimatedHours: estimatedMinutes / 60,
     });
-    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, order: Date.now() }] });
+    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
     setQuickTitle("");
+    setQuickAddOpen(false);
     if ((settings?.onboardingVersion ?? 0) < 2 && settings?.onboardingStep === "add") {
       void saveSettings({ onboardingStep: "candidates" });
     }
@@ -4045,11 +4034,11 @@ function App() {
     setAiOpen(true);
   }
 
-  async function sendAi() {
-    if (!aiInput.trim() && !aiAttachment) return;
+  async function sendAi(messageOverride?: string) {
+    if (!(messageOverride ?? aiInput).trim() && !aiAttachment) return;
     if (!data) return;
     const task = tasks.find((item) => item.id === referencedTaskId);
-    const msg = aiInput.trim() || "解析附件中的任务和事件";
+    const msg = (messageOverride ?? aiInput).trim() || "解析附件中的任务和事件";
     const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
       name: aiAttachment.name,
       size: aiAttachment.size,
@@ -4327,7 +4316,9 @@ function App() {
   }
 
   function beginShelfDrag(event: React.PointerEvent, task: Task, source: "candidate" | "allDay") {
-    if (event.button !== 0 || (event.target as HTMLElement).closest("button,input,textarea,select,a")) return;
+    const target = event.target as HTMLElement;
+    const interactiveTarget = target.closest("button,input,textarea,select,a");
+    if (event.button !== 0 || (interactiveTarget && !target.closest(".icon-schedule"))) return;
     if (isEventDisplayTask(task) || hasRecurringRule(resolveOwningTask(task) || task)) return;
     const pointerId = event.pointerId;
     const dragElement = event.currentTarget as HTMLElement;
@@ -4388,7 +4379,7 @@ function App() {
     };
     const move = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
-      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < 5) return;
+      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < 8) return;
       if (!active) {
         active = true;
         dragElement.setPointerCapture(pointerId);
@@ -5032,6 +5023,33 @@ function App() {
         </div>
       </header>
       <div className="df-header-fade" />
+      {compactLayout && quickAddOpen && (
+        <form className="df-compact-quick-add" onSubmit={(event) => { event.preventDefault(); quickAddTask(); }}>
+          <input
+            ref={compactQuickInputRef}
+            value={quickTitle}
+            onChange={(event) => setQuickTitle(event.target.value)}
+            placeholder={lang === "zh" ? "添加今日任务" : "Add a task for today"}
+            aria-label={lang === "zh" ? "任务标题" : "Task title"}
+          />
+          <QuickProjectPicker
+            projects={projects}
+            value={quickProjectId}
+            open={quickProjectOpen}
+            newTitle={quickProjectTitle}
+            newColor={quickProjectColor}
+            onOpenChange={setQuickProjectOpen}
+            onChange={setQuickProjectId}
+            onTitleChange={setQuickProjectTitle}
+            onColorChange={setQuickProjectColor}
+            onProjectColorChange={(projectId, color) => updateProject(projectId, { color })}
+            onCreate={createQuickProject}
+            lang={lang}
+          />
+          <button type="submit" disabled={!quickTitle.trim()}>{lang === "zh" ? "添加" : "Add"}</button>
+          <button type="button" className="df-compact-quick-close" onClick={() => setQuickAddOpen(false)} aria-label={lang === "zh" ? "关闭快速添加" : "Close quick add"}>×</button>
+        </form>
+      )}
       <div id="df-portal-target" />
       {dialog.host}
       {onboardingActive && (
@@ -5049,7 +5067,19 @@ function App() {
 
       {mode === "execute" ? (
         <main className={`df-execute${candidatePanelCollapsed ? " candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
-          <section className={`df-candidate-panel${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+          <div className="df-compact-execute-controls">
+            <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
+              <button className={compactExecuteView === "tasks" ? "active" : ""} onClick={() => setCompactExecuteView("tasks")}>{lang === "zh" ? "任务" : "Tasks"}</button>
+              <button className={compactExecuteView === "schedule" ? "active" : ""} onClick={() => setCompactExecuteView("schedule")}>{lang === "zh" ? "日程" : "Schedule"}</button>
+            </nav>
+            {compactExecuteView === "schedule" && (
+              <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
+                <button className={timelineView === "daily" ? "active" : ""} onClick={() => setTimelineView("daily")}>{viewLabel(lang, "daily")}</button>
+                <button className={timelineView === "month" ? "active" : ""} onClick={() => setTimelineView("month")}>{viewLabel(lang, "month")}</button>
+              </nav>
+            )}
+          </div>
+          <section className={`df-candidate-panel${compactExecuteView === "tasks" ? " compact-active" : " compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`} aria-hidden={compactLayout && compactExecuteView !== "tasks"} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
             if (taskId) {
@@ -5148,7 +5178,7 @@ function App() {
             )}
           </section>
 
-          <section className="df-timeline-panel" id="df-execute-timeline" onWheelCapture={handleTimelinePanelWheel}>
+          <section className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`} aria-hidden={compactLayout && compactExecuteView !== "schedule"} id="df-execute-timeline" onWheelCapture={handleTimelinePanelWheel}>
             <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
             <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
@@ -5662,6 +5692,11 @@ function App() {
                                       onClick={(event) => {
                                         if (drawerOpen || drag) return;
                                         if ((event.target as HTMLElement).closest(".df-month-task,.df-month-task *")) return;
+                                        if (compactLayout) {
+                                          setSelectedDate(day);
+                                          setTimelineView("daily");
+                                          return;
+                                        }
                                         if ((event.target as HTMLElement).closest(".df-month-cell-strong")) {
                                           setSelectedDate(day);
                                           setTimelineView("daily");
@@ -6000,10 +6035,41 @@ function App() {
         </main>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} pickMode={planningPickMode} picks={planningPicks} onExitPickMode={() => setPlanningPickMode(false)} onAddPick={addPlanningPick} onUpdatePick={updatePlanningPick} onRemovePick={removePlanningPick} onClearPicks={clearPlanningPicks} onApplyPicks={applyPlanningPicks} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onTaskDelete={(taskId) => {
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onTaskDelete={(taskId) => {
             void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== taskId) });
           }} />
         </Suspense>
+      )}
+
+      {compactLayout && compactAiComposerOpen && !drawerOpen && !aiOpen && !utilityPanel && (
+        <form className="df-compact-ai-composer" onSubmit={(event) => {
+          event.preventDefault();
+          const message = compactAiInput.trim();
+          if (!message) return;
+          setCompactAiInput("");
+          setCompactAiComposerOpen(false);
+          setAiOpen(true);
+          void sendAi(message);
+        }}>
+          <input autoFocus value={compactAiInput} onChange={(event) => setCompactAiInput(event.target.value)} placeholder={lang === "zh" ? "告诉 Navo 你想安排什么" : "Tell Navo what you need"} />
+          <button type="submit" disabled={!compactAiInput.trim()}>{lang === "zh" ? "发送" : "Send"}</button>
+        </form>
+      )}
+
+      {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
+        <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
+          <div className="df-mobile-mode-switch">
+            <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>{t(lang, "header.planning")}</button>
+          </div>
+          {!settings.hideAi && <button className={`df-mobile-ai-entry${compactAiComposerOpen ? " active" : ""}`} onClick={() => { setCompactAiComposerOpen((open) => !open); setQuickAddOpen(false); }} aria-label={lang === "zh" ? "询问 Navo" : "Ask Navo"}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
+            <span>{lang === "zh" ? "问 Navo" : "Ask Navo"}</span>
+          </button>}
+          <button className="df-mobile-add" onClick={() => { setQuickAddOpen((open) => !open); setCompactAiComposerOpen(false); }} aria-label={t(lang, "fab.add")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </nav>
       )}
 
       <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />

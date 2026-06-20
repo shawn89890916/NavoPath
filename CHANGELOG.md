@@ -4,6 +4,7 @@
 
 ### 新功能
 - 设置中的 MCP 分区现在直接显示服务地址、客户端配置和可复制的个人访问令牌。
+- 竖屏工作区新增底部模式工具坞、顶部快速添加和可展开的 Navo AI 输入。
 
 ### 改进
 - 官网现在固定使用根路径，登录、注册、邮箱确认和密码重置后统一进入 `/app` 工作区。
@@ -12,6 +13,8 @@
 - 跨设备同步以云端为基线，只重放明确尚未上传的本地修改，并在保存后接收排队的实时更新。
 - 候选任务、全天任务和时间块使用一致的拖动反馈；全天任务可像 Trevor AI 一样直接拖回今日候选，拖动纸片会明确显示当前落点。
 - “关于 NavoPath”现在直接打开更新日志；日志默认跟随账户语言，并可在页面右上角单独切换。
+- Execute 在窄屏下改为任务与日程单画布切换，并提供适合手机的日视图和月视图。
+- Planning 移除临时候选篮，任务和子任务可从树中直接加入今日候选并撤销。
 
 ### 修复
 - 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
@@ -54,6 +57,7 @@
 
 ### Added
 - The MCP settings section now shows the server endpoint, client configuration, and copyable personal access tokens directly in the app.
+- Added a portrait workspace dock with mode switching, top quick add, and an expandable Navo AI prompt.
 
 ### Improved
 - The marketing site now stays at the root URL, while sign-in, sign-up, email confirmation, and password recovery consistently enter the workspace at `/app`.
@@ -62,6 +66,8 @@
 - Multi-device sync now treats cloud data as the baseline, replays only explicitly pending local changes, and refreshes queued realtime updates after saving.
 - Candidate tasks, all-day tasks, and timed blocks now share consistent drag feedback; like Trevor AI, all-day tasks can return directly to Today's Candidates with a paper preview that names the current target.
 - About NavoPath now opens the changelog directly; the changelog follows the account language by default and can be switched independently in the top-right corner.
+- Execute now switches between single-canvas Tasks and Schedule views on narrow screens, with touch-friendly Day and Month views.
+- Planning no longer uses a temporary candidate basket; tasks and subtasks can move directly from the tree into Today's Candidates with undo support.
 
 ### Fixed
 - Fixed missing MCP configuration guidance, silent token-generation failures, and the misaligned Chinese Generate button.
