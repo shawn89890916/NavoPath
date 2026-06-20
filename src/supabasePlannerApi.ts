@@ -148,7 +148,7 @@ function authErrorMessage(message: string) {
 }
 
 function emailConfirmationRedirectUrl() {
-  return new URL("/", window.location.origin).toString();
+  return new URL("/app?auth_callback=1", window.location.origin).toString();
 }
 
 function clearAuthCallbackUrl() {
@@ -395,7 +395,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
     sendPasswordResetEmail: async (email: string) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${window.location.pathname}?auth_callback=1`,
+        redirectTo: new URL("/app?auth_callback=1", window.location.origin).toString(),
       });
       if (error) throw new Error(authErrorMessage(error.message));
       return { message: "密码重置邮件已发送，请检查收件箱。" };

@@ -6,6 +6,7 @@
 - 设置中的 MCP 分区现在直接显示服务地址、客户端配置和可复制的个人访问令牌。
 
 ### 改进
+- 官网现在固定使用根路径，登录、注册、邮箱确认和密码重置后统一进入 `/app` 工作区。
 - 设置改为清晰的页面、Navo AI、MCP 和账户分区导航，并适配桌面与移动端。
 - 整个右侧日历面板都可驱动时间轴滚动，全天栏、标题和视图控件不再阻断滚轮操作。
 - 跨设备同步以云端为基线，只重放明确尚未上传的本地修改，并在保存后接收排队的实时更新。
@@ -55,6 +56,7 @@
 - The MCP settings section now shows the server endpoint, client configuration, and copyable personal access tokens directly in the app.
 
 ### Improved
+- The marketing site now stays at the root URL, while sign-in, sign-up, email confirmation, and password recovery consistently enter the workspace at `/app`.
 - Reorganized Settings into clear Page, Navo AI, MCP, and Account navigation for desktop and mobile.
 - The entire right calendar panel can now drive timeline scrolling, including its heading, all-day row, and view controls.
 - Multi-device sync now treats cloud data as the baseline, replays only explicitly pending local changes, and refreshes queued realtime updates after saving.

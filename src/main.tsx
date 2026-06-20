@@ -1279,6 +1279,7 @@ function OnboardingGuide(props: {
 }
 
 function App() {
+  const isWorkspaceRoute = window.location.pathname === "/app" || window.location.pathname.startsWith("/app/");
   const [data, setData] = useState<PlannerData | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [lang, setLang] = useState<Language>(detectSystemLanguage());
@@ -1691,6 +1692,7 @@ function App() {
         if (Object.keys(patch).length > 0) await saveSettings(patch);
       }
       if (feedbackMessage) setAuthError(feedbackMessage);
+      if (!isWorkspaceRoute) window.location.assign("/app");
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -4965,7 +4967,7 @@ function App() {
     return new Date(year, month + 1, 0).getDate();
   }
 
-  if (authState?.mode === "cloud" && !authState.user) {
+  if (!isWorkspaceRoute || (authState?.mode === "cloud" && !authState.user)) {
     return <Suspense fallback={<ExecuteSkeleton />}>
       <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} onForgotPassword={handleForgotPassword} />
     </Suspense>;
