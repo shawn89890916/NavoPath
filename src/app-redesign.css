@@ -2532,6 +2532,15 @@
 .df-app .df-floating-shelf-drag span {
   color: var(--accent-active);
 }
+.df-app .df-candidate-panel.drop-active {
+  box-shadow: inset 0 0 0 1px var(--accent-active) !important;
+}
+.df-app .df-candidate-panel.drop-active .df-candidate-list {
+  background: color-mix(in srgb, var(--accent-active) 3%, transparent) !important;
+}
+.df-app .df-floating-shelf-drag.candidate-target {
+  border-color: var(--accent-active) !important;
+}
 
 /* Pointer-driven scheduling uses one quiet paper preview in every timeline view. */
 body.df-timeline-pointer-drag,

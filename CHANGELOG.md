@@ -9,12 +9,12 @@
 - 设置改为清晰的页面、Navo AI、MCP 和账户分区导航，并适配桌面与移动端。
 - 整个右侧日历面板都可驱动时间轴滚动，全天栏、标题和视图控件不再阻断滚轮操作。
 - 跨设备同步以云端为基线，只重放明确尚未上传的本地修改，并在保存后接收排队的实时更新。
-- 候选任务、全天任务和时间块使用一致的拖动反馈；全天任务拖动时会跟随简洁纸片反馈，进入时间轴后切换为时间块落点预览。
+- 候选任务、全天任务和时间块使用一致的拖动反馈；全天任务可像 Trevor AI 一样直接拖回今日候选，拖动纸片会明确显示当前落点。
 - “关于 NavoPath”现在直接打开更新日志；日志默认跟随账户语言，并可在页面右上角单独切换。
 
 ### 修复
 - 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
-- 修复全天快速添加层意外覆盖任务、全天任务无法稳定拖回时间轴，以及拖入全天栏时出现大面积灰底的问题；全天任务移除与勾选框重叠的左侧色条。
+- 修复全天任务无法稳定拖回时间轴或今日候选，以及悬停在全天栏时底部时间轴仍继续滚动的问题；全天栏保持干净的无灰底、无重叠色条样式。
 
 ## 2026-06-19 · 更清晰的任务工作区
 
@@ -58,12 +58,12 @@
 - Reorganized Settings into clear Page, Navo AI, MCP, and Account navigation for desktop and mobile.
 - The entire right calendar panel can now drive timeline scrolling, including its heading, all-day row, and view controls.
 - Multi-device sync now treats cloud data as the baseline, replays only explicitly pending local changes, and refreshes queued realtime updates after saving.
-- Candidate tasks, all-day tasks, and timed blocks now share consistent drag feedback; all-day tasks follow the pointer as a clean paper card, then switch to a timed-block placement preview over the timeline.
+- Candidate tasks, all-day tasks, and timed blocks now share consistent drag feedback; like Trevor AI, all-day tasks can return directly to Today's Candidates with a paper preview that names the current target.
 - About NavoPath now opens the changelog directly; the changelog follows the account language by default and can be switched independently in the top-right corner.
 
 ### Fixed
 - Fixed missing MCP configuration guidance, silent token-generation failures, and the misaligned Chinese Generate button.
-- Fixed the all-day quick-add layer covering tasks, unreliable dragging from the all-day row back to the timeline, and the large gray drop fill; removed the all-day color strip that overlapped the completion check.
+- Fixed unreliable dragging from the all-day row back to the timeline or Today's Candidates, and stopped the timeline from scrolling while a task is held over the all-day row; the row remains clean without gray fill or an overlapping color strip.
 
 ## 2026-06-19 · A clearer task workspace
 

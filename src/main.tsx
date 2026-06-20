@@ -1343,6 +1343,7 @@ function App() {
   const [monthQuickAdd, setMonthQuickAdd] = useState<AllDayQuickAdd>(null);
   const [allDayDragOver, setAllDayDragOver] = useState(false);
   const [allDayDragDate, setAllDayDragDate] = useState("");
+  const [candidateDropActive, setCandidateDropActive] = useState(false);
   const [floatingTimeAdd, setFloatingTimeAdd] = useState<FloatingTimeAdd>(null);
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
@@ -1370,6 +1371,17 @@ function App() {
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
   const suppressBlockClickRef = useRef(false);
+
+  useEffect(() => {
+    const scrollElement = timelineRef.current;
+    if (!allDayDragDate || !scrollElement) return;
+    const lockedScrollTop = scrollElement.scrollTop;
+    const keepTimelineStill = () => {
+      if (scrollElement.scrollTop !== lockedScrollTop) scrollElement.scrollTop = lockedScrollTop;
+    };
+    scrollElement.addEventListener("scroll", keepTimelineStill, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", keepTimelineStill);
+  }, [allDayDragDate, timelineView]);
   const dragTargetDateRef = useRef<string>("");
   const lastTimelineAutoScrollKeyRef = useRef("");
   const dataRef = useRef<PlannerData | null>(null);
@@ -4332,12 +4344,24 @@ function App() {
       setHoverSlot("");
       setAllDayDragOver(false);
       setAllDayDragDate("");
+      setCandidateDropActive(false);
       dragTargetDateRef.current = "";
       if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
       if (active) window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
     };
     const updateTarget = (pointerEvent: PointerEvent) => {
-      const allDayCell = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest<HTMLElement>("[data-all-day-date]");
+      const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
+      const candidatePanel = source === "allDay" ? pointedElement?.closest<HTMLElement>(".df-candidate-panel") : null;
+      setCandidateDropActive(Boolean(candidatePanel));
+      if (candidatePanel) {
+        setAllDayDragOver(false);
+        setAllDayDragDate("");
+        dropTime = "";
+        setHoverSlot("");
+        dragTargetDateRef.current = "";
+        return;
+      }
+      const allDayCell = pointedElement?.closest<HTMLElement>("[data-all-day-date]");
       setAllDayDragOver(Boolean(allDayCell));
       if (allDayCell) {
         const targetDate = allDayCell.dataset.allDayDate || timelineDate;
@@ -4377,8 +4401,18 @@ function App() {
     const up = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
       if (active) {
-        const allDayCell = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest<HTMLElement>("[data-all-day-date]");
-        if (allDayCell) {
+        const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
+        const candidatePanel = source === "allDay" ? pointedElement?.closest<HTMLElement>(".df-candidate-panel") : null;
+        const allDayCell = pointedElement?.closest<HTMLElement>("[data-all-day-date]");
+        if (candidatePanel) {
+          applyCandidateTimeSettings(task.id, {
+            date: today,
+            startTime: "",
+            durationMinutes: duration,
+            allDay: false,
+            clearSchedule: true,
+          });
+        } else if (allDayCell) {
           makeAllDay(task.id, allDayCell.dataset.allDayDate || timelineDate);
         } else if (dropTime && dragTargetDateRef.current) {
           scheduleTask(task.id, dropTime);
@@ -5013,7 +5047,7 @@ function App() {
 
       {mode === "execute" ? (
         <main className={`df-execute${candidatePanelCollapsed ? " candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
-          <section className={`df-candidate-panel${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+          <section className={`df-candidate-panel${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
             if (taskId) {
@@ -5978,7 +6012,7 @@ function App() {
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
-      {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} lang={lang} />}
+      {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
@@ -5997,9 +6031,12 @@ function FloatingUnschedulePreview({ task, pointer, lang }: { task?: Task; point
   return <div className="df-floating-unschedule" style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>{t(lang, "toast.draggedBackToCandidates")}</span></div>;
 }
 
-function FloatingShelfDragPreview({ task, pointer, lang }: { task?: Task; pointer: { x: number; y: number }; lang: Language }) {
+function FloatingShelfDragPreview({ task, pointer, candidateTarget, lang }: { task?: Task; pointer: { x: number; y: number }; candidateTarget: boolean; lang: Language }) {
   if (!task) return null;
-  return <div className="df-floating-unschedule df-floating-shelf-drag" style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>{lang === "zh" ? "拖到时间轴安排" : "Drag to timeline to schedule"}</span></div>;
+  const hint = candidateTarget
+    ? (lang === "zh" ? "放回今日候选" : "Return to Today's Candidates")
+    : (lang === "zh" ? "拖到时间轴安排" : "Drag to timeline to schedule");
+  return <div className={`df-floating-unschedule df-floating-shelf-drag${candidateTarget ? " candidate-target" : ""}`} style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>{hint}</span></div>;
 }
 
 /** Floating quick-add popup for time-slot clicks on day / 3-day / week views. */
