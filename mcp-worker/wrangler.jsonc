@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-18",
   "compatibility_flags": ["nodejs_compat"],
+  "secrets": { "required": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "durable_objects": { "bindings": [{ "name": "MCP_OBJECT", "class_name": "NavoPathMCP" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NavoPathMCP"] }],

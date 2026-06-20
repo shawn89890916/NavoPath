@@ -292,7 +292,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       };
       if (!user) return { auth, data: null, settings: null };
       const profile = await ensureProfile(user);
-      return { auth, data: profile.data, settings: profile.settings };
+      return { auth, data: profile.data, settings: profile.settings, revision: profile.revision };
     },
 
     signUp: async (email, password) => {
@@ -495,7 +495,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
             const next = { data: normalizeData(row.data), settings: mergeSettings(row.settings), revision: Number(row.revision || 0) };
             if (!profileCache || next.revision > profileCache.revision) {
               profileCache = next;
-              listener({ data: next.data, settings: next.settings });
+              listener({ data: next.data, settings: next.settings, revision: next.revision });
             }
           })
           .subscribe();

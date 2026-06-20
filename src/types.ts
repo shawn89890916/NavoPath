@@ -318,6 +318,7 @@ export interface PlannerApi {
     auth: { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
     data: PlannerData | null;
     settings: Settings | null;
+    revision?: number;
   }>;
   signUp?: (email: string, password: string) => Promise<{
     user: { id: string; email?: string } | null;
@@ -339,7 +340,7 @@ export interface PlannerApi {
   clearAuthCallbackUrl?: () => void;
   getData: () => Promise<PlannerData>;
   saveData: (data: PlannerData) => Promise<PlannerData>;
-  subscribeToRemoteChanges?: (listener: (payload: { data: PlannerData; settings: Settings }) => void) => () => void;
+  subscribeToRemoteChanges?: (listener: (payload: { data: PlannerData; settings: Settings; revision?: number }) => void) => () => void;
   applyActions: (actions: AiAction[]) => Promise<{ data: PlannerData; applied: Array<{ type: string; id: string; title: string }> }>;
   resetSeed: () => Promise<PlannerData>;
   getSettings: () => Promise<Settings>;

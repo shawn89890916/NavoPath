@@ -1,5 +1,20 @@
 # NavoPath 更新日志
 
+## 2026-06-20 · 更可靠的排程与连接
+
+### 新功能
+- 设置中的 MCP 分区现在直接显示服务地址、客户端配置和可复制的个人访问令牌。
+
+### 改进
+- 设置改为清晰的页面、Navo AI、MCP 和账户分区导航，并适配桌面与移动端。
+- 整个右侧日历面板都可驱动时间轴滚动，全天栏、标题和视图控件不再阻断滚轮操作。
+- 跨设备同步以云端为基线，只重放明确尚未上传的本地修改，并在保存后接收排队的实时更新。
+- 候选任务、全天任务和时间块使用一致的拖动反馈，时间轴预览改为简洁的无边框纸面样式。
+
+### 修复
+- 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
+- 修复今日候选无法拖入时间轴或全天栏、全天任务无法重新排程，以及拖动时选中文字的问题。
+
 ## 2026-06-19 · 更清晰的任务工作区
 
 ### 新功能
@@ -32,6 +47,21 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-20 · More reliable scheduling and connections
+
+### Added
+- The MCP settings section now shows the server endpoint, client configuration, and copyable personal access tokens directly in the app.
+
+### Improved
+- Reorganized Settings into clear Page, Navo AI, MCP, and Account navigation for desktop and mobile.
+- The entire right calendar panel can now drive timeline scrolling, including its heading, all-day row, and view controls.
+- Multi-device sync now treats cloud data as the baseline, replays only explicitly pending local changes, and refreshes queued realtime updates after saving.
+- Candidate tasks, all-day tasks, and timed blocks now share consistent drag feedback, with a clean borderless paper preview on the timeline.
+
+### Fixed
+- Fixed missing MCP configuration guidance, silent token-generation failures, and the misaligned Chinese Generate button.
+- Fixed dragging Today's Candidates into the timeline or all-day row, rescheduling all-day tasks, and accidental text selection while dragging.
 
 ## 2026-06-19 · A clearer task workspace
 
