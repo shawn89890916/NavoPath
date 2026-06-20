@@ -1,9 +1,26 @@
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 
 const path = new URL("../CHANGELOG.md", import.meta.url);
 const checkOnly = process.argv.includes("--check");
 const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
 const source = fs.readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+
+function historicalEntries(value) {
+  return [...value.matchAll(/^## (\d{4}-\d{2}-\d{2})\b[^\n]*\n[\s\S]*?(?=^## \d{4}-\d{2}-\d{2}\b|^# NavoPath |\s*$)/gm)]
+    .filter((match) => match[1] < date)
+    .map((match) => match[0].trim());
+}
+
+try {
+  const baseline = execFileSync("git", ["show", "HEAD:CHANGELOG.md"], { encoding: "utf8" }).replace(/\r\n/g, "\n");
+  if (JSON.stringify(historicalEntries(source)) !== JSON.stringify(historicalEntries(baseline))) {
+    throw new Error("CHANGELOG.md entries before today are immutable.");
+  }
+} catch (error) {
+  if (error instanceof Error && error.message === "CHANGELOG.md entries before today are immutable.") throw error;
+  // Allow the script to run in release archives that do not include Git history.
+}
 
 if (source.includes("�") || /鏇存柊|鏂板姛|浠诲姟/.test(source)) {
   throw new Error("CHANGELOG.md contains mojibake and must be repaired before delivery.");

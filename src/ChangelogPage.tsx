@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import changelog from "../CHANGELOG.md?raw";
+import type { Language } from "./types";
 import "./changelog.css";
 
 type Block = { type: "h1" | "h2" | "h3" | "li" | "p"; text: string };
@@ -15,10 +17,48 @@ function parseMarkdown(source: string): Block[] {
   });
 }
 
+function accountLanguage(): Language {
+  try {
+    const cached = Object.keys(localStorage)
+      .filter((key) => key.startsWith("navopath-bootstrap:"))
+      .map((key) => JSON.parse(localStorage.getItem(key) || "null"))
+      .filter((value) => value?.settings?.language === "zh" || value?.settings?.language === "en")
+      .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")))[0];
+    if (cached) return cached.settings.language;
+    const preview = JSON.parse(localStorage.getItem("planner-preview-settings") || "null");
+    if (preview?.language === "zh" || preview?.language === "en") return preview.language;
+  } catch {
+    // Fall through to the browser language when storage is unavailable.
+  }
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+function localizedSource(language: Language) {
+  const englishHeading = "# NavoPath Changelog";
+  const englishStart = changelog.indexOf(englishHeading);
+  if (englishStart === -1) return changelog;
+  return language === "zh" ? changelog.slice(0, englishStart).trim() : changelog.slice(englishStart).trim();
+}
+
 export default function ChangelogPage() {
-  const blocks = parseMarkdown(changelog);
+  const [language, setLanguage] = useState<Language>(accountLanguage);
+  const blocks = parseMarkdown(localizedSource(language));
+
+  useEffect(() => {
+    document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+  }, [language]);
+
   return <main className="np-changelog">
-    <nav><a href="/">← 返回 NavoPath</a><span>RELEASE NOTES</span></nav>
+    <nav>
+      <a href="/">&larr; {language === "zh" ? "返回 NavoPath" : "Back to NavoPath"}</a>
+      <div className="np-changelog-tools">
+        <span>{language === "zh" ? "更新日志" : "RELEASE NOTES"}</span>
+        <div className="np-changelog-language" aria-label={language === "zh" ? "更新日志语言" : "Changelog language"}>
+          <button type="button" className={language === "zh" ? "active" : ""} aria-pressed={language === "zh"} onClick={() => setLanguage("zh")}>中文</button>
+          <button type="button" className={language === "en" ? "active" : ""} aria-pressed={language === "en"} onClick={() => setLanguage("en")}>EN</button>
+        </div>
+      </div>
+    </nav>
     <article>{blocks.map((block, index) => {
       if (block.type === "h1") return <h1 key={index}>{block.text}</h1>;
       if (block.type === "h2") return <h2 key={index}>{block.text}</h2>;
