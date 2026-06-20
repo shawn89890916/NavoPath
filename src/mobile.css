@@ -5,6 +5,52 @@
     max-height: 56px !important;
   }
 
+  #root .df-app .df-user-avatar,
+  #root .df-app .df-user-avatar:hover,
+  #root .df-app .df-brand-ai-button,
+  #root .df-app .df-brand-ai-button:hover {
+    border: 0 !important;
+    outline-offset: 3px;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  #root .df-app .df-brand {
+    margin-left: -8px !important;
+  }
+
+  #root .df-app .df-brand-ai-button {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  #root .df-app .df-brand-ai-button .dayflow-icon.compact {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  #root .df-app .df-mobile-dock,
+  #root .df-app .df-mobile-mode-switch,
+  #root .df-app .df-mobile-mode-switch button,
+  #root .df-app .df-mobile-add {
+    border: 0 !important;
+  }
+
+  #root .df-app .df-mobile-add {
+    border-radius: 999px !important;
+    background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-main)) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--text-main) 12%, transparent) !important;
+  }
+
+  #root .df-app .df-mobile-dock {
+    box-shadow: 0 8px 26px color-mix(in srgb, var(--text-main) 14%, transparent) !important;
+  }
+
+  #root .df-app .df-date-title-compact {
+    padding: 5px 0 !important;
+  }
+
   #root .df-app .df-execute,
   #root .df-app .df-planning {
     height: calc(100dvh - 56px) !important;

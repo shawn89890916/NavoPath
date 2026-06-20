@@ -18708,6 +18708,15 @@ body:has(:active)::-webkit-scrollbar-thumb {
     font-weight: 650;
   }
 
+  .df-compact-calendar-tabs .df-compact-date-arrow {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    color: var(--text-main);
+    font-size: 20px;
+    font-weight: 800;
+  }
+
   .df-compact-execute-tabs button.active,
   .df-compact-calendar-tabs button.active {
     color: var(--text-main);
@@ -18822,8 +18831,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-date-title-compact {
+    position: relative;
+    left: 50%;
+    width: max-content;
     min-height: 54px;
-    padding: 5px 118px;
+    padding: 5px 0;
+    transform: translateX(-50%);
   }
 
   .df-date-title-compact .df-date-num {
@@ -18981,8 +18994,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-self: stretch;
-    border: 1px solid color-mix(in srgb, var(--border-soft) 68%, transparent);
-    border-radius: 14px;
+    border: 0;
+    border-radius: 16px;
   }
 
   .df-ai-panel-plan {
@@ -19005,7 +19018,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
   .df-mobile-mode-switch button.active {
     color: var(--text-main);
-    border-bottom-color: var(--accent-active);
+    border-bottom-color: transparent;
+    background: color-mix(in srgb, var(--accent-active) 6%, transparent);
+    font-weight: 750;
   }
 
   .df-mobile-add svg {
@@ -19024,7 +19039,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
     display: grid;
     place-items: center;
     border: 0;
-    border-radius: 50%;
+    border-radius: 999px;
     background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-main));
     color: var(--text-main);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--text-main) 12%, transparent);

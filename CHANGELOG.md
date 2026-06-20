@@ -17,6 +17,8 @@
 - Planning 移除临时候选篮，任务和子任务可从树中直接加入今日候选并撤销。
 - 竖屏布局改为仅在 900px 以下启用；Navo AI 移到左上角图标，计划建议并入对话面板，底部工具坞收敛为模式切换与新增。
 - 竖屏日程控件紧贴日期并以单按钮切换日/月视图；从任务画布拖动候选任务时会自动进入时间轴继续选择落点。
+- 竖屏时间轴的日期严格居中，日期切换箭头移到 Day/Month 按钮左侧；时间块拖到左侧刻度区可直接放回今日候选。
+- 竖屏头部与底部工具坞移除可见控件边框，Navo 图标更靠左并略微放大，新增按钮使用更完整的圆形轮廓。
 
 ### 修复
 - 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
@@ -72,6 +74,8 @@
 - Planning no longer uses a temporary candidate basket; tasks and subtasks can move directly from the tree into Today's Candidates with undo support.
 - Portrait layout now activates only below 900px; Navo AI opens from the top-left icon, Plan Suggestions live in the conversation panel, and the bottom dock is limited to mode switching and add.
 - Portrait schedule controls now sit beside the date with one Day/Month toggle; dragging a candidate from Tasks automatically enters the timeline for placement.
+- Portrait dates are now geometrically centered, with date arrows grouped before the Day/Month control; timed tasks can return to Today's Candidates from the left ruler area.
+- Removed visible control borders from the portrait header and dock, shifted and enlarged the Navo icon, and gave the add button a fuller circular shape.
 
 ### Fixed
 - Fixed missing MCP configuration guidance, silent token-generation failures, and the misaligned Chinese Generate button.

@@ -3033,6 +3033,14 @@ function App() {
       ? timelineRef.current?.getBoundingClientRect()
       : timelineCanvasRef.current?.getBoundingClientRect();
     if (!rect) return false;
+    const scrollRect = timelineRef.current?.getBoundingClientRect();
+    const compactLeftReturn = Boolean(compactLayout
+      && scrollRect
+      && clientX >= 0
+      && clientX < rect.left
+      && clientY >= scrollRect.top
+      && clientY <= scrollRect.bottom);
+    if (compactLeftReturn) return true;
     return clientX < rect.left - 80 || clientX > rect.right + 80 || clientY < rect.top - 40 || clientY > rect.bottom + 40;
   }
 
@@ -5079,6 +5087,8 @@ function App() {
             </nav>
             {compactExecuteView === "schedule" && (
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
+                <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
+                <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
                 <button className="active" onClick={() => setTimelineView(timelineView === "month" ? "daily" : "month")} aria-label={timelineView === "month" ? viewLabel(lang, "daily") : viewLabel(lang, "month")}>
                   {timelineView === "month" ? viewLabel(lang, "month") : viewLabel(lang, "daily")}
                   <span className="df-compact-view-swap" aria-hidden="true">↕</span>
@@ -5186,8 +5196,10 @@ function App() {
           </section>
 
           <section className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`} aria-hidden={compactLayout && compactExecuteView !== "schedule"} id="df-execute-timeline" onWheelCapture={handleTimelinePanelWheel}>
-            <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
-            <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
+            {!compactLayout && <>
+              <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
+              <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
+            </>}
             <div className="df-execute-top">
               {!settings.hideAi && <div className="df-ai-planner" aria-hidden={compactLayout}>
                 <button className={`df-ai-plan ${autoScheduleState === "generating" ? "thinking" : ""} ${autoScheduleState === "committing" ? "committing" : ""}`} data-tip={drawerOpen ? t(lang, "timeline.aiPlanToday") : t(lang, "timeline.planningSuggestion")} aria-label={t(lang, "timeline.aiPlanToday")} disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen} onClick={() => void planMyDay()}>
