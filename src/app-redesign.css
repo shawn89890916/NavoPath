@@ -2466,11 +2466,15 @@
 
 .df-app .df-timeline-allday-content.drop-active,
 .df-app .df-timeline-3day-allday-cell.drop-active,
-.df-app .df-timeline-allday.drag-over,
-.df-app .df-timeline-3day-allday.drag-over,
 .df-app .df-timeline-allday-content:has(.df-all-day-block:hover),
 .df-app .df-timeline-3day-allday-cell:has(.df-all-day-block:hover) {
   background: var(--paper-note) !important;
+}
+.df-app .df-timeline-allday.drag-over,
+.df-app .df-timeline-3day-allday.drag-over {
+  min-height: 36px !important;
+  background: transparent !important;
+  border-bottom-color: var(--paper-rule) !important;
 }
 
 /* Keep the daily all-day row on the same horizontal grid as the time canvas. */
@@ -2496,23 +2500,13 @@
   min-height: 32px;
   display: flex;
   align-items: center;
-  padding: 0 12px 0 28px;
+  padding: 0 12px;
   overflow: hidden;
   border: 1px dashed color-mix(in srgb, var(--cat, var(--accent-active)) 58%, var(--paper-rule-strong));
   border-radius: 3px;
-  background: color-mix(in srgb, var(--cat, var(--accent-active)) 7%, var(--surface-main));
+  background: var(--surface-main);
   color: var(--text-main);
   pointer-events: none;
-}
-.df-app .df-all-day-drop-preview::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  width: 1px;
-  height: 20px;
-  background: var(--cat, var(--accent-active));
-  transform: translateY(-50%);
 }
 .df-app .df-all-day-drop-preview strong {
   overflow: hidden;
@@ -2521,8 +2515,22 @@
   font-size: 12px;
 }
 .df-app .df-all-day-block.is-dragging {
-  opacity: .24 !important;
+  opacity: .32 !important;
   pointer-events: none !important;
+}
+.df-app .df-all-day-block .df-category-strip {
+  display: none !important;
+}
+.df-app .df-floating-shelf-drag {
+  min-width: 180px;
+  max-width: min(280px, calc(100vw - 32px));
+  border-radius: 3px !important;
+  background: var(--surface-raised) !important;
+  border-color: var(--paper-rule-strong) !important;
+  box-shadow: none !important;
+}
+.df-app .df-floating-shelf-drag span {
+  color: var(--accent-active);
 }
 
 /* Pointer-driven scheduling uses one quiet paper preview in every timeline view. */
