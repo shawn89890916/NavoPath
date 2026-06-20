@@ -1342,6 +1342,7 @@ function App() {
   const [allDayQuickAdd, setAllDayQuickAdd] = useState<AllDayQuickAdd>(null);
   const [monthQuickAdd, setMonthQuickAdd] = useState<AllDayQuickAdd>(null);
   const [allDayDragOver, setAllDayDragOver] = useState(false);
+  const [allDayDragDate, setAllDayDragDate] = useState("");
   const [floatingTimeAdd, setFloatingTimeAdd] = useState<FloatingTimeAdd>(null);
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
@@ -4329,17 +4330,22 @@ function App() {
       setDrag(null);
       setHoverSlot("");
       setAllDayDragOver(false);
+      setAllDayDragDate("");
       dragTargetDateRef.current = "";
+      if (active) window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
     };
     const updateTarget = (pointerEvent: PointerEvent) => {
       const allDayCell = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest<HTMLElement>("[data-all-day-date]");
       setAllDayDragOver(Boolean(allDayCell));
       if (allDayCell) {
+        const targetDate = allDayCell.dataset.allDayDate || timelineDate;
+        setAllDayDragDate(targetDate);
         dropTime = "";
         setHoverSlot("");
-        dragTargetDateRef.current = allDayCell.dataset.allDayDate || timelineDate;
+        dragTargetDateRef.current = targetDate;
         return;
       }
+      setAllDayDragDate("");
       const { gridEl, scrollEl, visDays } = getDropGridAndDays();
       if (!gridEl || !scrollEl) return;
       const rect = scrollEl.getBoundingClientRect();
@@ -4358,6 +4364,7 @@ function App() {
       if (!active) {
         active = true;
         document.body.classList.add("df-timeline-pointer-drag");
+        suppressBlockClickRef.current = true;
         setDragCreate(null);
       }
       pointerEvent.preventDefault();
@@ -4935,6 +4942,11 @@ function App() {
 
   const onboardingActive = (settings.onboardingVersion ?? 0) < 2 && settings.onboardingStep !== "done";
   const onboardingStep = (settings.onboardingStep || "add") as OnboardingStep;
+  const draggedTask = drag
+    ? tasks.find((task) => task.id === drag.taskId)
+      || recordToTaskMap.get(drag.taskId)
+      || eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId)
+    : undefined;
 
   return (
     <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
@@ -5170,7 +5182,7 @@ function App() {
                           })}
                         </div>
                       </div>
-                      <div className={`df-timeline-3day-allday${allDayDragOver && drag ? " drag-over" : ""}`}
+                      <div className={`df-timeline-3day-allday${allDayDragDate && drag ? " drag-over" : ""}`}
                         onDragEnter={(e) => { e.preventDefault(); setAllDayDragOver(true); }}
                         onDragOver={(e) => { e.preventDefault(); if (!allDayDragOver) setAllDayDragOver(true); }}
                         onDragLeave={(e) => {
@@ -5182,6 +5194,7 @@ function App() {
                         onDrop={(e) => {
                           e.preventDefault();
                           setAllDayDragOver(false);
+                          setAllDayDragDate("");
                           const taskId = e.dataTransfer.getData("taskId") || drag?.taskId;
                           if (taskId) {
                             // Determine which column by x coordinate
@@ -5226,8 +5239,9 @@ function App() {
                                 {allDayQuickAdd && !drag && allDayQuickAdd.date === colDate && (
                                   <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, colDate, null)} onCancel={() => setAllDayQuickAdd(null)} />
                                 )}
+                                {allDayDragDate === colDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
                                 {adTasks.map((task) => (
-                                  <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />
+                                  <AllDayBlock key={task.id} task={task} dragging={drag?.source === "allDay" && drag.taskId === task.id} projectName={projectName(task)} projects={projects} onEdit={() => { if (!suppressBlockClickRef.current) openTaskEdit(task); }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />
                                 ))}
                               </div>
                             );
@@ -5694,7 +5708,7 @@ function App() {
                       <span className="df-date-wd">{(() => { const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const d = new Date(`${timelineDate}T00:00:00`); return weekdayShort[d.getDay()]; })()}</span>
                     </div>
                     <div
-                      className={`df-timeline-allday${allDayDragOver && drag ? " drag-over" : ""}`}
+                      className={`df-timeline-allday${allDayDragDate === timelineDate && drag ? " drag-over" : ""}`}
                       data-all-day-date={timelineDate}
                       onDragEnter={(e) => { e.preventDefault(); setAllDayDragOver(true); }}
                       onDragOver={(e) => { e.preventDefault(); if (!allDayDragOver) setAllDayDragOver(true); }}
@@ -5708,6 +5722,7 @@ function App() {
                       onDrop={(e) => {
                         e.preventDefault();
                         setAllDayDragOver(false);
+                        setAllDayDragDate("");
                         const taskId = e.dataTransfer.getData("taskId") || drag?.taskId;
                         if (taskId) makeAllDay(taskId, timelineDate);
                       }}
@@ -5725,8 +5740,9 @@ function App() {
                         {allDayQuickAdd && !drag && (
                           <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, allDayQuickAdd.date, null)} onCancel={() => setAllDayQuickAdd(null)} />
                         )}
+                        {allDayDragDate === timelineDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
                         {[...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineDate), ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineDate)].map((task) => (
-                          <AllDayBlock key={task.id} task={task} projectName={projectName(task)} projects={projects} onEdit={() => openTaskEdit(task)} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />
+                          <AllDayBlock key={task.id} task={task} dragging={drag?.source === "allDay" && drag.taskId === task.id} projectName={projectName(task)} projects={projects} onEdit={() => { if (!suppressBlockClickRef.current) openTaskEdit(task); }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />
                         ))}
                       </div>
                     </div>
@@ -5957,7 +5973,7 @@ function App() {
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign("/changelog")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
@@ -6175,6 +6191,8 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
   const popup = (
     <>
       <div ref={inputBoxRef} className="df-quick-add-input-box"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
         style={{ position: pos, top, left, width, height: INPUT_H, zIndex: 999999 } as React.CSSProperties}
       >
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
@@ -6928,7 +6946,12 @@ function QuickProjectPicker(props: {
   );
 }
 
-function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onPointerDragStart, lang }: { task: Task; projectName: string; projects: Project[]; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onPointerDragStart: (event: React.PointerEvent) => void; lang: Language }) {
+function AllDayDropPreview({ task }: { task: Task }) {
+  const color = categories[task.category]?.color || "#888";
+  return <div className="df-all-day-drop-preview" style={{ "--cat": color } as CSSProperties}><strong>{task.title}</strong></div>;
+}
+
+function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onPointerDragStart, lang }: { task: Task; dragging?: boolean; projectName: string; projects: Project[]; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onPointerDragStart: (event: React.PointerEvent) => void; lang: Language }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
@@ -6947,7 +6970,7 @@ function AllDayBlock({ task, projectName, projects, onEdit, onToggleDone, onProj
     }
   }, [hovered]);
   return (
-    <article className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}`} data-kind={isEvent ? "event" : "task"} style={{ "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+    <article className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} data-kind={isEvent ? "event" : "task"} style={{ "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
       {!isReturnedUnfinished && <div className="df-category-strip" />}
       {!isEvent && <button className={`df-block-check ${task.completed ? "completed" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""}`} onClick={(event) => {
         event.stopPropagation();

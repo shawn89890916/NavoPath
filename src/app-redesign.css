@@ -2466,9 +2466,63 @@
 
 .df-app .df-timeline-allday-content.drop-active,
 .df-app .df-timeline-3day-allday-cell.drop-active,
+.df-app .df-timeline-allday.drag-over,
+.df-app .df-timeline-3day-allday.drag-over,
 .df-app .df-timeline-allday-content:has(.df-all-day-block:hover),
 .df-app .df-timeline-3day-allday-cell:has(.df-all-day-block:hover) {
   background: var(--paper-note) !important;
+}
+
+/* Keep the daily all-day row on the same horizontal grid as the time canvas. */
+.df-app .df-timeline-daily .df-timeline-allday {
+  width: min(500px, calc(100% - 24px)) !important;
+  max-width: 500px !important;
+  margin-inline: auto !important;
+  padding-inline: 0 !important;
+}
+.df-app .df-timeline-daily .df-timeline-allday-label {
+  width: 56px !important;
+  left: 0 !important;
+  padding-right: 12px !important;
+}
+.df-app .df-timeline-daily .df-timeline-allday-content {
+  padding-right: 16px;
+}
+
+.df-app .df-all-day-drop-preview {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 28px;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--cat, var(--accent-active)) 58%, var(--paper-rule-strong));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 7%, var(--surface-main));
+  color: var(--text-main);
+  pointer-events: none;
+}
+.df-app .df-all-day-drop-preview::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 1px;
+  height: 20px;
+  background: var(--cat, var(--accent-active));
+  transform: translateY(-50%);
+}
+.df-app .df-all-day-drop-preview strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.df-app .df-all-day-block.is-dragging {
+  opacity: .24 !important;
+  pointer-events: none !important;
 }
 
 /* Pointer-driven scheduling uses one quiet paper preview in every timeline view. */

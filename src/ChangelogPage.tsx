@@ -19,6 +19,8 @@ function parseMarkdown(source: string): Block[] {
 
 function accountLanguage(): Language {
   try {
+    const requested = new URLSearchParams(window.location.search).get("lang");
+    if (requested === "zh" || requested === "en") return requested;
     const cached = Object.keys(localStorage)
       .filter((key) => key.startsWith("navopath-bootstrap:"))
       .map((key) => JSON.parse(localStorage.getItem(key) || "null"))
