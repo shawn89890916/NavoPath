@@ -15,6 +15,8 @@
 - “关于 NavoPath”现在直接打开更新日志；日志默认跟随账户语言，并可在页面右上角单独切换。
 - Execute 在窄屏下改为任务与日程单画布切换，并提供适合手机的日视图和月视图。
 - Planning 移除临时候选篮，任务和子任务可从树中直接加入今日候选并撤销。
+- 竖屏布局改为仅在 900px 以下启用；Navo AI 移到左上角图标，计划建议并入对话面板，底部工具坞收敛为模式切换与新增。
+- 竖屏日程控件紧贴日期并以单按钮切换日/月视图；从任务画布拖动候选任务时会自动进入时间轴继续选择落点。
 
 ### 修复
 - 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
@@ -68,6 +70,8 @@
 - About NavoPath now opens the changelog directly; the changelog follows the account language by default and can be switched independently in the top-right corner.
 - Execute now switches between single-canvas Tasks and Schedule views on narrow screens, with touch-friendly Day and Month views.
 - Planning no longer uses a temporary candidate basket; tasks and subtasks can move directly from the tree into Today's Candidates with undo support.
+- Portrait layout now activates only below 900px; Navo AI opens from the top-left icon, Plan Suggestions live in the conversation panel, and the bottom dock is limited to mode switching and add.
+- Portrait schedule controls now sit beside the date with one Day/Month toggle; dragging a candidate from Tasks automatically enters the timeline for placement.
 
 ### Fixed
 - Fixed missing MCP configuration guidance, silent token-generation failures, and the misaligned Chinese Generate button.

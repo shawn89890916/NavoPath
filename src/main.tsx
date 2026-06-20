@@ -1291,11 +1291,9 @@ function App() {
   const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [mode, setModeState] = useState<Mode>("execute");
-  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 1049.98px)").matches);
+  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 899.98px)").matches);
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [compactAiComposerOpen, setCompactAiComposerOpen] = useState(false);
-  const [compactAiInput, setCompactAiInput] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview>(null);
@@ -1376,7 +1374,7 @@ function App() {
   const [yearPickerOpen, setYearPickerOpen] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 1049.98px)");
+    const media = window.matchMedia("(max-width: 899.98px)");
     const sync = () => setCompactLayout(media.matches);
     sync();
     media.addEventListener("change", sync);
@@ -1393,15 +1391,14 @@ function App() {
   }, [quickAddOpen]);
 
   useEffect(() => {
-    if (!quickAddOpen && !compactAiComposerOpen) return;
+    if (!quickAddOpen) return;
     const closeCompactLayer = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setQuickAddOpen(false);
-      setCompactAiComposerOpen(false);
     };
     document.addEventListener("keydown", closeCompactLayer);
     return () => document.removeEventListener("keydown", closeCompactLayer);
-  }, [quickAddOpen, compactAiComposerOpen]);
+  }, [quickAddOpen]);
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -1544,8 +1541,6 @@ function App() {
     setModeState("execute");
     setCompactExecuteView("schedule");
     setQuickAddOpen(false);
-    setCompactAiComposerOpen(false);
-    setCompactAiInput("");
     setSelectedDate(todayIso());
     setTimelineView("daily");
     setDrag(null);
@@ -4386,6 +4381,11 @@ function App() {
         document.body.classList.add("df-timeline-pointer-drag");
         suppressBlockClickRef.current = true;
         setDragCreate(null);
+        if (compactLayout && source === "candidate") {
+          setCompactExecuteView("schedule");
+          if (timelineView === "month") setTimelineView("daily");
+          window.requestAnimationFrame(() => updateTarget(pointerEvent));
+        }
       }
       pointerEvent.preventDefault();
       setDrag({ taskId: task.id, kind: "candidate", source, duration, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
@@ -4982,7 +4982,12 @@ function App() {
     <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
-          <div className="df-brand"><ProductIcon compact /><div><strong>NavoPath</strong></div></div>
+          <div className="df-brand">
+            <button className="df-brand-ai-button" type="button" onClick={() => { if (compactLayout && !settings.hideAi) setAiOpen(true); }} aria-label={compactLayout ? (lang === "zh" ? "打开 Navo AI" : "Open Navo AI") : undefined} disabled={!compactLayout || settings.hideAi}>
+              <ProductIcon compact />
+            </button>
+            <div><strong>NavoPath</strong></div>
+          </div>
           <div className="df-month-year-selector" onClick={(e) => e.stopPropagation()}>
             <button className="df-month-year-btn" onClick={() => setYearPickerOpen((open) => !open)}>
               {(() => { const d = new Date(`${timelineDate}T00:00:00`); return `${d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" })} ${d.getFullYear()}`; })()}
@@ -5074,8 +5079,10 @@ function App() {
             </nav>
             {compactExecuteView === "schedule" && (
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
-                <button className={timelineView === "daily" ? "active" : ""} onClick={() => setTimelineView("daily")}>{viewLabel(lang, "daily")}</button>
-                <button className={timelineView === "month" ? "active" : ""} onClick={() => setTimelineView("month")}>{viewLabel(lang, "month")}</button>
+                <button className="active" onClick={() => setTimelineView(timelineView === "month" ? "daily" : "month")} aria-label={timelineView === "month" ? viewLabel(lang, "daily") : viewLabel(lang, "month")}>
+                  {timelineView === "month" ? viewLabel(lang, "month") : viewLabel(lang, "daily")}
+                  <span className="df-compact-view-swap" aria-hidden="true">↕</span>
+                </button>
               </nav>
             )}
           </div>
@@ -5182,7 +5189,7 @@ function App() {
             <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
             <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
             <div className="df-execute-top">
-              {!settings.hideAi && <div className="df-ai-planner">
+              {!settings.hideAi && <div className="df-ai-planner" aria-hidden={compactLayout}>
                 <button className={`df-ai-plan ${autoScheduleState === "generating" ? "thinking" : ""} ${autoScheduleState === "committing" ? "committing" : ""}`} data-tip={drawerOpen ? t(lang, "timeline.aiPlanToday") : t(lang, "timeline.planningSuggestion")} aria-label={t(lang, "timeline.aiPlanToday")} disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen} onClick={() => void planMyDay()}>
                   {autoScheduleState === "generating" ? <><i />{t(lang, "timeline.analyzing")}</>
                     : autoScheduleState === "committing" ? <><i />{t(lang, "timeline.adopting")}</>
@@ -6041,32 +6048,13 @@ function App() {
         </Suspense>
       )}
 
-      {compactLayout && compactAiComposerOpen && !drawerOpen && !aiOpen && !utilityPanel && (
-        <form className="df-compact-ai-composer" onSubmit={(event) => {
-          event.preventDefault();
-          const message = compactAiInput.trim();
-          if (!message) return;
-          setCompactAiInput("");
-          setCompactAiComposerOpen(false);
-          setAiOpen(true);
-          void sendAi(message);
-        }}>
-          <input autoFocus value={compactAiInput} onChange={(event) => setCompactAiInput(event.target.value)} placeholder={lang === "zh" ? "告诉 Navo 你想安排什么" : "Tell Navo what you need"} />
-          <button type="submit" disabled={!compactAiInput.trim()}>{lang === "zh" ? "发送" : "Send"}</button>
-        </form>
-      )}
-
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
           <div className="df-mobile-mode-switch">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
             <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>{t(lang, "header.planning")}</button>
           </div>
-          {!settings.hideAi && <button className={`df-mobile-ai-entry${compactAiComposerOpen ? " active" : ""}`} onClick={() => { setCompactAiComposerOpen((open) => !open); setQuickAddOpen(false); }} aria-label={lang === "zh" ? "询问 Navo" : "Ask Navo"}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
-            <span>{lang === "zh" ? "问 Navo" : "Ask Navo"}</span>
-          </button>}
-          <button className="df-mobile-add" onClick={() => { setQuickAddOpen((open) => !open); setCompactAiComposerOpen(false); }} aria-label={t(lang, "fab.add")}>
+          <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </nav>
@@ -6077,7 +6065,7 @@ function App() {
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
@@ -7638,7 +7626,7 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate, model, onModelChange, reasoningMode, onReasoningModeChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string; model: string; onModelChange: (model: string) => void; reasoningMode: Settings["reasoningMode"]; onReasoningModeChange: (mode: Settings["reasoningMode"]) => void }) {
+function AiPanel({ input, setInput, busy, onSend, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate, model, onModelChange, reasoningMode, onReasoningModeChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string; model: string; onModelChange: (model: string) => void; reasoningMode: Settings["reasoningMode"]; onReasoningModeChange: (mode: Settings["reasoningMode"]) => void }) {
   const projects = projectList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
@@ -7858,6 +7846,10 @@ function AiPanel({ input, setInput, busy, onSend, onClose, messages, conversatio
       </section>)}
     </div>
     <div className="df-ai-panel-foot">
+      <button className={`df-ai-panel-plan${planState === "generating" || planState === "committing" ? " thinking" : ""}`} type="button" onClick={onPlanToday} disabled={planState === "generating" || planState === "committing"}>
+        <span>{lang === "zh" ? "计划建议" : "Plan Suggestions"}</span>
+        <small>{planState === "generating" ? (lang === "zh" ? "分析中" : "Analyzing") : planState === "committing" ? (lang === "zh" ? "采用中" : "Adopting") : planState === "preview" ? (lang === "zh" ? "重新生成" : "Regenerate") : (lang === "zh" ? "为今天生成时间安排" : "Build today's schedule")}</small>
+      </button>
       {messages.length === 0 && sortedConversations.length > 0 && <button className="df-ai-continue-chat" onClick={() => onSelectConversation(sortedConversations[0].id)}>↻ <span>{lang === "zh" ? "继续上次对话" : "Continue last conversation"}</span></button>}
       {memoryNotice && <button className="df-ai-memory-notice" onClick={onOpenMemorySettings}>{memoryNotice} · {text.viewMemory}</button>}
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}

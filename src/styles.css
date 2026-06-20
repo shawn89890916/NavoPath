@@ -18482,12 +18482,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 /* ============================================================
-   Compact workspace shell (< 1050px)
+   Compact workspace shell (< 900px)
    ============================================================ */
 
 .df-compact-execute-controls,
 .df-mobile-dock,
-.df-compact-ai-composer,
 .df-compact-quick-add {
   display: none;
 }
@@ -18516,7 +18515,54 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent-active) 5%, var(--surface-card)) !important;
 }
 
-@media (max-width: 1049.98px) {
+.df-brand-ai-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.df-brand-ai-button:disabled {
+  opacity: 1;
+}
+
+.df-ai-panel-plan {
+  width: 100%;
+  min-height: 52px;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 2px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-active) 48%, var(--border-soft));
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-main);
+  box-shadow: none;
+  text-align: left;
+}
+
+.df-ai-panel-plan span {
+  font-family: var(--paper-display);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.df-ai-panel-plan small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.df-ai-panel-plan:hover:not(:disabled),
+.df-ai-panel-plan:focus-visible {
+  color: var(--accent-active);
+  background: color-mix(in srgb, var(--accent-active) 5%, transparent);
+}
+
+@media (max-width: 899.98px) {
   html,
   body,
   #root {
@@ -18551,8 +18597,17 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-header .df-brand strong {
-    color: var(--text-main) !important;
-    font-size: 15px;
+    display: none;
+  }
+
+  .df-brand-ai-button {
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+  }
+
+  .df-brand-ai-button:disabled {
+    cursor: default;
   }
 
   .df-header .df-tabs {
@@ -18602,47 +18657,54 @@ body:has(:active)::-webkit-scrollbar-thumb {
     width: 100%;
     height: calc(100dvh - 56px) !important;
     min-height: 0 !important;
-    padding: 0 8px calc(82px + env(safe-area-inset-bottom)) !important;
+    padding: 0 8px !important;
     overflow: hidden !important;
     background: var(--bg-app) !important;
   }
 
   .df-app .df-execute {
+    position: relative;
     display: flex !important;
     flex-direction: column;
     gap: 0 !important;
   }
 
   .df-compact-execute-controls {
+    position: absolute;
+    z-index: 12;
+    top: 2px;
+    left: 18px;
+    right: 18px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    flex: 0 0 48px;
-    min-height: 48px;
-    padding: 0 6px;
-    border-bottom: 1px solid var(--border-subtle);
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    pointer-events: none;
   }
 
   .df-compact-execute-tabs,
   .df-compact-calendar-tabs {
     display: flex;
     align-items: stretch;
-    height: 48px;
+    height: 44px;
+    pointer-events: auto;
   }
 
   .df-compact-execute-tabs button,
   .df-compact-calendar-tabs button {
-    min-width: 68px;
+    min-width: 52px;
     min-height: 44px;
-    padding: 0 12px;
+    padding: 0 7px;
     border: 0;
     border-bottom: 1px solid transparent;
     border-radius: 0;
     background: transparent;
     color: var(--text-muted);
     box-shadow: none;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 650;
   }
 
@@ -18650,6 +18712,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
   .df-compact-calendar-tabs button.active {
     color: var(--text-main);
     border-bottom-color: var(--accent-active);
+  }
+
+  .df-compact-view-swap {
+    margin-left: 4px;
+    color: var(--text-muted);
+    font-size: 9px;
   }
 
   .df-execute > .df-candidate-panel,
@@ -18677,12 +18745,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
   .df-candidate-panel.compact-active {
     flex-direction: column;
-    padding: 12px 6px 0 !important;
+    padding: 52px 6px 0 !important;
     background: transparent !important;
   }
 
   .df-candidate-list {
-    padding-bottom: 16px;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
   }
 
@@ -18707,6 +18775,10 @@ body:has(:active)::-webkit-scrollbar-thumb {
     position: relative;
     flex-direction: column;
     background: var(--surface-main) !important;
+  }
+
+  .df-timeline-panel.compact-active .df-ai-planner {
+    display: none !important;
   }
 
   .df-app .df-timeline-body,
@@ -18745,8 +18817,17 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-execute-top {
-    min-height: 48px;
-    padding: 4px 54px 2px 8px;
+    min-height: 2px;
+    padding: 0;
+  }
+
+  .df-date-title-compact {
+    min-height: 54px;
+    padding: 5px 118px;
+  }
+
+  .df-date-title-compact .df-date-num {
+    font-size: 34px;
   }
 
   .df-date-arrow {
@@ -18755,7 +18836,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-month-view {
-    padding: 4px 2px 8px !important;
+    padding: 48px 2px 8px !important;
   }
 
   .df-month-title {
@@ -18874,67 +18955,38 @@ body:has(:active)::-webkit-scrollbar-thumb {
     border-bottom-color: transparent !important;
   }
 
-  .df-compact-ai-composer {
-    position: fixed;
-    z-index: 81;
-    left: 50%;
-    bottom: calc(82px + env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    width: min(560px, calc(100% - 24px));
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid var(--border-soft);
-    border-bottom-color: color-mix(in srgb, var(--accent-active) 50%, var(--border-soft));
-    border-radius: 14px;
-    background: var(--surface-main);
-    box-shadow: 0 10px 30px color-mix(in srgb, var(--text-main) 9%, transparent);
-  }
-
-  .df-compact-ai-composer input {
-    min-width: 0;
-    height: 44px;
-    border: 0;
-    border-bottom: 1px solid var(--border-soft);
-    border-radius: 0;
-    background: transparent;
-    color: var(--text-main);
-  }
-
-  .df-compact-ai-composer button {
-    min-height: 44px;
-    border: 0;
-    border-bottom: 1px solid var(--accent-active);
-    border-radius: 0;
-    background: color-mix(in srgb, var(--accent-active) 7%, transparent);
-    color: var(--text-main);
-  }
-
   .df-mobile-dock {
     position: fixed;
     z-index: 70;
     left: 50%;
     bottom: calc(10px + env(safe-area-inset-bottom));
     transform: translateX(-50%);
-    width: min(620px, calc(100% - 20px));
-    min-height: 62px;
+    width: min(420px, calc(100% - 32px));
+    min-height: 58px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 52px;
+    grid-template-columns: minmax(0, 1fr) 52px;
     align-items: center;
     gap: 8px;
-    padding: 7px 8px 7px 12px;
-    border: 1px solid var(--border-soft);
-    border-radius: 18px;
-    background: var(--surface-main);
+    padding: 5px 6px 5px 10px;
+    border: 0;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface-main) 88%, transparent);
     color: var(--text-main);
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--text-main) 10%, transparent);
+    box-shadow: 0 8px 26px color-mix(in srgb, var(--text-main) 14%, transparent), 0 1px 1px color-mix(in srgb, var(--surface-card) 70%, transparent) inset;
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
   }
 
   .df-mobile-mode-switch {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-self: stretch;
+    border: 1px solid color-mix(in srgb, var(--border-soft) 68%, transparent);
+    border-radius: 14px;
+  }
+
+  .df-ai-panel-plan {
+    display: flex;
   }
 
   .df-mobile-mode-switch button {
@@ -18956,30 +19008,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
     border-bottom-color: var(--accent-active);
   }
 
-  .df-mobile-ai-entry {
-    min-width: 74px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 0 8px;
-    border: 0;
-    border-bottom: 1px solid transparent;
-    border-radius: 0;
-    background: transparent;
-    color: var(--text-muted);
-    box-shadow: none;
-    font-size: 11px;
-    font-weight: 650;
-  }
-
-  .df-mobile-ai-entry.active {
-    color: var(--text-main);
-    border-bottom-color: var(--accent-active);
-  }
-
-  .df-mobile-ai-entry svg,
   .df-mobile-add svg {
     width: 20px;
     height: 20px;
@@ -18995,11 +19023,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
     height: 52px;
     display: grid;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--accent-active) 45%, var(--border-soft));
+    border: 0;
     border-radius: 50%;
     background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-main));
     color: var(--text-main);
-    box-shadow: none;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--text-main) 12%, transparent);
   }
 
   .df-add-fab,
@@ -19042,18 +19070,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-mobile-dock {
-    grid-template-columns: minmax(0, 1fr) 52px 48px;
+    grid-template-columns: minmax(0, 1fr) 48px;
     gap: 4px;
     padding-left: 8px;
-  }
-
-  .df-mobile-ai-entry {
-    min-width: 52px;
-    padding: 0;
-  }
-
-  .df-mobile-ai-entry span {
-    display: none;
   }
 
   .df-mobile-add {
@@ -19072,7 +19091,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   .df-mobile-dock,
-  .df-compact-ai-composer,
   .df-compact-quick-add {
     animation: none !important;
     transition: none !important;

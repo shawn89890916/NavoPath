@@ -1,4 +1,4 @@
-@media (max-width: 1049.98px) {
+@media (max-width: 899.98px) {
   #root .df-app .df-header {
     height: 56px !important;
     min-height: 56px !important;
@@ -9,7 +9,7 @@
   #root .df-app .df-planning {
     height: calc(100dvh - 56px) !important;
     min-height: 0 !important;
-    padding: 0 8px calc(82px + env(safe-area-inset-bottom)) !important;
+    padding: 0 8px !important;
     overflow: hidden !important;
   }
 
