@@ -1,11 +1,10 @@
 // Supabase Edge Function: NavoPath AI Agent (lightweight 3-stage pipeline)
-// Stages: Router (intent) -> Planner (structured plan) -> Actor (final actions)
-// Each stage is independently observable and can degrade gracefully.
+// Stages: Planner (structured plan) -> Actor (final actions)
 // Deploy: supabase functions deploy ai-assistant
 // Set secret: supabase secrets set SILICONFLOW_API_KEY=sk-xxx
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { chatPrompt, importSchedulePrompt, routerPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
+import { chatPrompt, importSchedulePrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
 
 function localDateForTimeZone(timeZone: string) {
   try {
@@ -29,9 +28,14 @@ const corsHeaders = {
   "Content-Type": "application/json; charset=utf-8",
 };
 
-// Flagship reasoning models can take more than 12 seconds for structured JSON.
-// Keep a hard ceiling, but allow enough time for the planner stage to finish.
-const STAGE_TIMEOUT_MS = 30_000;
+const STABLE_MODEL = "deepseek-ai/DeepSeek-V3.2";
+const PROVIDER_ATTEMPT_TIMEOUT_MS = 18_000;
+
+function resolveModel(model: string): string {
+  // These models currently exceed the Edge Function request window on
+  // SiliconFlow. Keep accepting saved settings while routing them safely.
+  return /deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(model) ? STABLE_MODEL : model;
+}
 
 function getTomorrow(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -147,71 +151,52 @@ async function callDeepSeek(
   reasoningMode: "instant" | "high" | "xhigh" = "instant",
   signal?: AbortSignal,
 ): Promise<string> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), STAGE_TIMEOUT_MS);
-  // Forward caller abort.
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
-  try {
-    const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        response_format: { type: "json_object" },
-        max_tokens: maxTokens,
-        stream: false,
-        ...(reasoningMode === "instant" ? {} : { reasoning_effort: reasoningMode }),
-      }),
-      signal: controller.signal,
-    });
-    if (!dsResponse.ok) {
-      const errorText = await dsResponse.text();
-      throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
-    }
-    const dsData = await dsResponse.json();
-    const content = dsData.choices?.[0]?.message?.content;
-    if (!content) throw new Error("AI service returned no content");
-    return content;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+  const candidates = Array.from(new Set([resolveModel(model), STABLE_MODEL]));
+  let lastError: unknown;
 
-// ---------------------------------------------------------------------------
-// Router stage: classify intent with a short, separate call.
-// Degrades silently if it fails (Planner still runs with full context).
-// ---------------------------------------------------------------------------
-async function routeStage(
-  apiKey: string,
-  model: string,
-  ctx: PromptContext,
-  message: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): Promise<{ intent?: string; requiresPlanning?: boolean; requiresActions?: boolean } | null> {
-  try {
-    const messages = [
-      { role: "system", content: routerPrompt(ctx) },
-      ...history.slice(-6),
-      { role: "user", content: message.slice(0, 1000) },
-    ];
-    const content = await callDeepSeek(apiKey, model, messages, 200);
-    const parsed = extractJsonObject(content) as Record<string, unknown>;
-    return {
-      intent: typeof parsed.intent === "string" ? parsed.intent : undefined,
-      requiresPlanning: parsed.requiresPlanning === true,
-      requiresActions: parsed.requiresActions === true,
-    };
-  } catch (err) {
-    console.warn("Router stage degraded:", err);
-    return null;
+  for (const candidate of candidates) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), PROVIDER_ATTEMPT_TIMEOUT_MS);
+    const abort = () => controller.abort();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener("abort", abort, { once: true });
+    }
+    try {
+      const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: candidate,
+          messages,
+          response_format: { type: "json_object" },
+          max_tokens: maxTokens,
+          stream: false,
+          ...(reasoningMode === "instant" ? {} : { reasoning_effort: reasoningMode }),
+        }),
+        signal: controller.signal,
+      });
+      if (!dsResponse.ok) {
+        const errorText = await dsResponse.text();
+        throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
+      }
+      const dsData = await dsResponse.json();
+      const content = dsData.choices?.[0]?.message?.content;
+      if (!content) throw new Error("AI service returned no content");
+      return content;
+    } catch (error) {
+      lastError = error;
+      console.warn("AI provider attempt failed", { model: candidate, error: String(error) });
+    } finally {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", abort);
+    }
   }
+
+  throw lastError instanceof Error ? lastError : new Error("AI provider unavailable");
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +299,7 @@ serve(async (req: Request) => {
 
     const selectedModel = typeof model === "string" && /^[A-Za-z0-9._/-]{2,160}$/.test(model)
       ? model
-      : Deno.env.get("SILICONFLOW_MODEL") || "deepseek-ai/DeepSeek-V4-Flash";
+      : Deno.env.get("SILICONFLOW_MODEL") || STABLE_MODEL;
     const supportedReasoning = /DeepSeek-V4-Pro|Qwen3\.5-(?:122B|397B)|GLM-5\.2|Kimi-K2\.7|MiniMax-M3/i.test(selectedModel);
     const selectedReasoning = supportedReasoning && (reasoningMode === "high" || reasoningMode === "xhigh") ? reasoningMode : "instant";
 
@@ -364,10 +349,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // Stage 1: Router (best-effort)
-    const route = await routeStage(apiKey, selectedModel, promptCtx, userContent, historyMessages);
-
-    // Stage 2: Planner (required)
+    // Stage 1: Planner. Intent is already part of its structured response, so
+    // a separate model call would only add latency and another failure point.
     let plannerValue: unknown;
     try {
       plannerValue = await plannerStage(apiKey, selectedModel, mode, promptCtx, userContent, historyMessages, selectedReasoning);
@@ -378,16 +361,12 @@ serve(async (req: Request) => {
         steps: [{ label: "AI 服务", status: "error" }],
         actions: [],
         memories: [],
-        ...(route?.intent ? { intent: route.intent } : {}),
       };
       return new Response(JSON.stringify(fallback), { status: 502, headers: corsHeaders });
     }
 
-    // Stage 3: Actor — merge Router intent into the normalized payload.
+    // Stage 2: Actor — normalize the planner payload.
     const normalized = normalizeAssistantPayload(plannerValue);
-    if (route?.intent && !normalized.intent) {
-      normalized.intent = route.intent;
-    }
 
     return new Response(JSON.stringify(normalized), { headers: corsHeaders });
   } catch (err) {

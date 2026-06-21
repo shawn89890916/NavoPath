@@ -244,8 +244,6 @@ export async function callAiAssistant(params: {
 }
 
 export const FALLBACK_AI_MODELS = [
-  "deepseek-ai/DeepSeek-V4-Flash",
-  "deepseek-ai/DeepSeek-V4-Pro",
   "deepseek-ai/DeepSeek-V3.2",
   "Qwen/Qwen3.6-35B-A3B",
   "Qwen/Qwen3.5-397B-A17B",

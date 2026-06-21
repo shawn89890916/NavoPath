@@ -426,7 +426,7 @@ export function installBrowserFallback() {
     planningView: "tree",
     aiDockOpen: false,
     appTitle: "NavoPath",
-    model: "deepseek-ai/DeepSeek-V4-Flash",
+    model: "deepseek-ai/DeepSeek-V3.2",
     reasoningMode: "instant",
     baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
     hasApiKey: false,
@@ -466,7 +466,7 @@ export function installBrowserFallback() {
     if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
     if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
     const merged: any = { ...defaultSettings, ...stored };
-    if (merged.model === "deepseek-v4-flash" || merged.model === "deepseek-chat") merged.model = "deepseek-ai/DeepSeek-V4-Flash";
+    if (merged.model === "deepseek-v4-flash" || merged.model === "deepseek-chat" || /^deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(merged.model || "")) merged.model = "deepseek-ai/DeepSeek-V3.2";
     if (!merged.baseUrl || merged.baseUrl === "https://api.deepseek.com/chat/completions") merged.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
     if (merged._apiKey && !merged.hasApiKey) {
       merged.hasApiKey = true;
@@ -582,7 +582,7 @@ export function installBrowserFallback() {
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-              model: settings.model || "deepseek-ai/DeepSeek-V4-Flash",
+              model: settings.model || "deepseek-ai/DeepSeek-V3.2",
             messages,
             temperature: 0.7,
             max_tokens: 4096,

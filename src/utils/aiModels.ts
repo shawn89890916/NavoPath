@@ -37,7 +37,6 @@ const PRO_MODEL = /(?:deepseek-v4-pro|qwen3\.5-397|glm-5\.2|kimi-k2\.7|minimax-m
 const ECONOMY_MODEL = /(?:deepseek-v3\.2|qwen3\.5-35b|qwen3\.6-27b|step-3\.5-flash|ling-flash)/i;
 const NON_ASSISTANT_MODEL = /(?:ocr|vision|[-_.]vl(?:[-_.]|$)|omni|caption|audio|image|embedding|rerank|translate|mt[-_.])/i;
 const ASSISTANT_MODEL_ALLOWLIST = [
-  /DeepSeek-V4-(?:Flash|Pro)$/i,
   /DeepSeek-V3\.2$/i,
   /Qwen3\.6-(?:27B|35B-A3B)$/i,
   /Qwen3\.5-(?:35B-A3B|122B-A10B|397B-A17B)$/i,
