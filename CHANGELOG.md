@@ -12,7 +12,7 @@
 - Windows 桌面应用现在使用与网页端相同的账户和云端工作区，登录同一账户即可同步任务、日程与设置。
 
 ### 修复
-- 修复竖屏快速添加中的归属项目列表被页头遮挡，以及任务或事件详情缺少明确退出按钮的问题。
+- 修复竖屏快速添加中的归属项目列表被页头遮挡、任务标题输入框未适配深色模式，以及任务或事件详情缺少明确退出按钮的问题。
 
 ## 2026-06-20 · 更可靠的排程与连接
 
@@ -84,7 +84,7 @@
 - The Windows desktop app now uses the same account and cloud workspace as the web app, so tasks, schedules, and settings sync when users sign in with the same account.
 
 ### Fixed
-- Fixed the project list being obscured during portrait quick add and restored an explicit close button in task and event details.
+- Fixed the project list being obscured during portrait quick add, matched the task title field to dark mode, and restored an explicit close button in task and event details.
 
 ## 2026-06-20 · More reliable scheduling and connections
 

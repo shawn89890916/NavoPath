@@ -18984,11 +18984,24 @@ body:has(:active)::-webkit-scrollbar-thumb {
   .df-compact-quick-add input {
     min-width: 0;
     height: 44px;
-    border: 0;
-    border-bottom: 1px solid var(--border-soft);
-    border-radius: 0;
-    background: transparent;
-    color: var(--text-main);
+    border: 0 !important;
+    border-bottom: 1px solid var(--border-soft) !important;
+    border-radius: 0 !important;
+    background: var(--surface-main) !important;
+    box-shadow: none !important;
+    color: var(--text-main) !important;
+    -webkit-text-fill-color: var(--text-main);
+    caret-color: var(--accent-active);
+  }
+
+  .df-compact-quick-add input::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 1;
+  }
+
+  .df-compact-quick-add input:focus {
+    border-bottom-color: var(--accent-active) !important;
+    outline: 0;
   }
 
   .df-compact-quick-add > button {
