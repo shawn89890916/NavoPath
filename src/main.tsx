@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopUpdateState, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -34,6 +34,7 @@ import { buildWeekWindow } from "./utils/monthWindow";
 import { addSubtaskToTree, findSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
+import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import "./styles.css";
 import "./app-redesign.css";
@@ -1280,6 +1281,112 @@ function OnboardingGuide(props: {
   );
 }
 
+function YearCalendarOverview({
+  year,
+  selectedDate,
+  today,
+  lang,
+  tasks,
+  events,
+  onYearChange,
+  onSelectDate,
+  onToday,
+}: {
+  year: number;
+  selectedDate: string;
+  today: string;
+  lang: Language;
+  tasks: Task[];
+  events: CalendarEvent[];
+  onYearChange: (year: number) => void;
+  onSelectDate: (date: string) => void;
+  onToday: () => void;
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const initialMonth = new Date(`${selectedDate}T00:00:00`).getMonth();
+  const monthNames = useMemo(
+    () => Array.from({ length: 12 }, (_, month) => new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", { month: "long" }).format(new Date(year, month, 1))),
+    [lang, year],
+  );
+  const weekdays = lang === "zh" ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const occupiedDates = useMemo(() => {
+    const dates = new Set<string>();
+    tasks.forEach((task) => {
+      const date = task.scheduledDate || task.plannedForDate || task.dueDate;
+      if (date) dates.add(date);
+    });
+    events.forEach((event) => dates.add(event.startDate || event.date));
+    return dates;
+  }, [events, tasks]);
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const month = scroller?.querySelector<HTMLElement>(`[data-overview-month="${initialMonth}"]`);
+    if (scroller && month) scroller.scrollTop = Math.max(0, month.offsetTop - 12);
+  }, [initialMonth, year]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || typeof ResizeObserver === "undefined") return;
+    let previousWidth = scroller.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (scroller.clientWidth === previousWidth) return;
+      previousWidth = scroller.clientWidth;
+      const month = scroller.querySelector<HTMLElement>(`[data-overview-month="${initialMonth}"]`);
+      if (month) window.requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, month.offsetTop - 12); });
+    });
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [initialMonth, year]);
+
+  return (
+    <section className="df-year-overview" aria-label={lang === "zh" ? `${year} 年日历` : `${year} calendar`}>
+      <div className="df-year-overview-toolbar">
+        <button type="button" onClick={() => onYearChange(year - 1)}>{lang === "zh" ? "上一年" : "Previous year"}</button>
+        <button className="df-year-overview-today" type="button" onClick={onToday}>{lang === "zh" ? "回到今天" : "Go to today"}</button>
+      </div>
+      <div className="df-year-months" ref={scrollerRef}>
+        {monthNames.map((monthName, month) => {
+          const firstWeekday = new Date(year, month, 1).getDay();
+          const dayCount = new Date(year, month + 1, 0).getDate();
+          return (
+            <article className="df-year-month" data-overview-month={month} key={`${year}-${month}`}>
+              <button className="df-year-month-title" type="button" onClick={() => onSelectDate(`${year}-${String(month + 1).padStart(2, "0")}-01`)}>
+                {monthName}
+              </button>
+              <div className="df-year-weekdays" aria-hidden="true">
+                {weekdays.map((weekday) => <span key={weekday}>{weekday}</span>)}
+              </div>
+              <div className="df-year-days">
+                {Array.from({ length: firstWeekday }, (_, index) => <span className="df-year-day-empty" key={`empty-${index}`} />)}
+                {Array.from({ length: dayCount }, (_, index) => {
+                  const day = index + 1;
+                  const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                  return (
+                    <button
+                      type="button"
+                      key={iso}
+                      className={`df-year-day${iso === today ? " today" : ""}${iso === selectedDate ? " selected" : ""}${occupiedDates.has(iso) ? " occupied" : ""}`}
+                      aria-label={new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", { dateStyle: "full" }).format(new Date(`${iso}T00:00:00`))}
+                      aria-current={iso === today ? "date" : undefined}
+                      onClick={() => onSelectDate(iso)}
+                    >
+                      <span>{day}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <div className="df-year-overview-toolbar df-year-overview-toolbar-bottom">
+        <button type="button" onClick={() => onYearChange(year + 1)}>{lang === "zh" ? "下一年" : "Next year"}</button>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const isWorkspaceRoute = window.location.pathname === "/app" || window.location.pathname.startsWith("/app/");
   const [data, setData] = useState<PlannerData | null>(null);
@@ -1373,7 +1480,8 @@ function App() {
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
-  const [yearPickerOpen, setYearPickerOpen] = useState(false);
+  const [yearOverviewOpen, setYearOverviewOpen] = useState(false);
+  const [overviewYear, setOverviewYear] = useState(() => new Date(`${todayIso()}T00:00:00`).getFullYear());
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 899.98px)");
@@ -4947,38 +5055,6 @@ function App() {
     });
   }
 
-  function prevYear() {
-    setSelectedDate((date) => {
-      const d = new Date(`${date}T00:00:00`);
-      const year = d.getFullYear() - 1;
-      const month = d.getMonth();
-      const day = Math.min(d.getDate(), daysInMonth(year, month));
-      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    });
-    setYearPickerOpen(false);
-  }
-
-  function nextYear() {
-    setSelectedDate((date) => {
-      const d = new Date(`${date}T00:00:00`);
-      const year = d.getFullYear() + 1;
-      const month = d.getMonth();
-      const day = Math.min(d.getDate(), daysInMonth(year, month));
-      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    });
-    setYearPickerOpen(false);
-  }
-
-  function selectYear(year: number) {
-    setSelectedDate((date) => {
-      const d = new Date(`${date}T00:00:00`);
-      const month = d.getMonth();
-      const day = Math.min(d.getDate(), daysInMonth(year, month));
-      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    });
-    setYearPickerOpen(false);
-  }
-
   function daysInMonth(year: number, month: number): number {
     return new Date(year, month + 1, 0).getDate();
   }
@@ -5004,7 +5080,7 @@ function App() {
     : undefined;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand">
@@ -5013,38 +5089,26 @@ function App() {
             </button>
             <div><strong>NavoPath</strong></div>
           </div>
-          <div className="df-month-year-selector" onClick={(e) => e.stopPropagation()}>
-            <button className="df-month-year-btn" onClick={() => setYearPickerOpen((open) => !open)}>
-              {(() => { const d = new Date(`${timelineDate}T00:00:00`); return `${d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" })} ${d.getFullYear()}`; })()}
+          <div className="df-month-year-selector">
+            <button className="df-month-year-btn" aria-expanded={yearOverviewOpen} onClick={() => {
+              const nextOpen = !yearOverviewOpen;
+              setYearOverviewOpen(nextOpen);
+              if (nextOpen) {
+                setOverviewYear(new Date(`${timelineDate}T00:00:00`).getFullYear());
+                setCompactExecuteView("schedule");
+                if (mode !== "execute") void saveSettings({ activeMode: "execute" });
+              }
+            }}>
+              {yearOverviewOpen
+                ? overviewYear
+                : (() => { const d = new Date(`${timelineDate}T00:00:00`); return `${d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" })} ${d.getFullYear()}`; })()}
               <span className="df-month-year-chevron" />
             </button>
-            {yearPickerOpen && <div className="df-month-year-dropdown">
-              <div className="df-month-year-header">
-                <button className="df-month-year-nav" onClick={() => prevYear()} title={lang === "zh" ? "上一年" : "Previous year"}>‹</button>
-                <span className="df-month-year-current">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.getFullYear(); })()}</span>
-                <button className="df-month-year-nav" onClick={() => nextYear()} title={lang === "zh" ? "下一年" : "Next year"}>›</button>
-              </div>
-              <div className="df-month-grid">
-                {(() => { const months = lang === "zh" ? ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"] : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return months; })().map((month, mi) => {
-                  const d = new Date(`${timelineDate}T00:00:00`);
-                  const isCurrent = mi === d.getMonth();
-                  return (
-                    <button key={mi} className={`df-month-option${isCurrent ? " selected" : ""}`} onClick={() => {
-                      const year = d.getFullYear();
-                      const day = Math.min(d.getDate(), daysInMonth(year, mi));
-                      setSelectedDate(`${year}-${String(mi + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-                    }}>
-                      {month}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>}
           </div>
           <div className="df-header-right">
           <nav className="df-tabs df-tabs-right">
             <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
-            <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>{t(lang, "header.planning")}</button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => { setYearOverviewOpen(false); void saveSettings({ activeMode: "planning" }); }}>{t(lang, "header.planning")}</button>
           </nav>
           <button className="df-user-avatar" onClick={() => setUtilityPanel("settings")} aria-label={t(lang, "header.settings")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -5224,6 +5288,28 @@ function App() {
           </section>
 
           <section className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`} aria-hidden={compactLayout && compactExecuteView !== "schedule"} id="df-execute-timeline" onWheelCapture={handleTimelinePanelWheel}>
+            {yearOverviewOpen ? (
+              <YearCalendarOverview
+                year={overviewYear}
+                selectedDate={selectedDate}
+                today={today}
+                lang={lang}
+                tasks={tasks}
+                events={events}
+                onYearChange={setOverviewYear}
+                onSelectDate={(date) => {
+                  setSelectedDate(date);
+                  setTimelineView("daily");
+                  setYearOverviewOpen(false);
+                }}
+                onToday={() => {
+                  setSelectedDate(today);
+                  setOverviewYear(new Date(`${today}T00:00:00`).getFullYear());
+                  setTimelineView("daily");
+                  setYearOverviewOpen(false);
+                }}
+              />
+            ) : <>
             {!compactLayout && <>
               <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
               <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
@@ -6078,6 +6164,7 @@ function App() {
                 ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => { setTimelineView(view); setDragCreate(null); }}>{label}</button>)}
               </div>
             </div>
+            </>}
           </section>
         </main>
       ) : (
@@ -6090,13 +6177,28 @@ function App() {
 
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
-          <div className="df-mobile-mode-switch">
-            <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
-            <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>{t(lang, "header.planning")}</button>
-          </div>
-          <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
+          {yearOverviewOpen ? <>
+            <button className="df-year-dock-action" onClick={() => { setYearOverviewOpen(false); setCompactExecuteView("tasks"); }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" /></svg>
+              <span>{lang === "zh" ? "任务" : "Tasks"}</span>
+            </button>
+            <button className="df-year-dock-action active" onClick={() => { setSelectedDate(today); setTimelineView("daily"); setYearOverviewOpen(false); setCompactExecuteView("schedule"); }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v3M18 3v3M4 9h16M5 5h14v16H5zM9 13h6M9 17h4" /></svg>
+              <span>{lang === "zh" ? "回到今天" : "Go to today"}</span>
+            </button>
+            <button className="df-year-dock-action" onClick={() => openAdd("task")}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              <span>{lang === "zh" ? "添加任务" : "Add task"}</span>
+            </button>
+          </> : <>
+            <div className="df-mobile-mode-switch">
+              <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
+              <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>{t(lang, "header.planning")}</button>
+            </div>
+            <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </>}
         </nav>
       )}
 
@@ -7352,6 +7454,7 @@ function EditDrawer(props: {
     const recurrenceText = recurrenceLabel(f.recurrence);
     return (
       <aside className="df-drawer df-task-detail df-event-detail" onMouseDown={(event) => event.stopPropagation()}>
+        <button className="df-detail-close df-icon-action i-close" type="button" aria-label={t(props.lang, "form.close")} onClick={props.onClose} />
         <section className="df-detail-hero-trevor">
           <textarea className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.eventTitlePlaceholder")} spellCheck={false} />
         </section>
@@ -7496,6 +7599,7 @@ function EditDrawer(props: {
       <>
       {dialog.host}
       <aside className="df-drawer df-task-detail" onMouseDown={(event) => event.stopPropagation()}>
+        <button className="df-detail-close df-icon-action i-close" type="button" aria-label={t(props.lang, "form.close")} onClick={props.onClose} />
         {/* ── Hero title area ── */}
         <section className="df-detail-hero-trevor">
           <textarea ref={titleRef} className="df-detail-title-trevor" value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.titlePlaceholder")} spellCheck={false} />
@@ -8005,6 +8109,46 @@ function McpTokenManager({ lang }: { lang: Language }) {
   );
 }
 
+function DesktopUpdateControl({ lang }: { lang: Language }) {
+  const api = window.desktopApi;
+  const [state, setState] = useState<DesktopUpdateState | null>(null);
+  const updaterAvailable = Boolean(api);
+
+  useEffect(() => {
+    if (!updaterAvailable || !api) return;
+    void api.getUpdateState().then(setState);
+    return api.onUpdateState(setState);
+  }, [api, updaterAvailable]);
+
+  if (!updaterAvailable) {
+    return <a className="df-download-link" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">{lang === "zh" ? "一键下载最新版 Windows 应用" : "Download the latest Windows app"}<span aria-hidden="true">↓</span></a>;
+  }
+
+  const statusText = (() => {
+    if (!state) return lang === "zh" ? "正在读取版本…" : "Reading version…";
+    if (state.status === "checking") return lang === "zh" ? "正在检查更新…" : "Checking for updates…";
+    if (state.status === "available") return lang === "zh" ? `发现 ${state.availableVersion}，点击下载` : `${state.availableVersion} is available. Click to download.`;
+    if (state.status === "downloading") return lang === "zh" ? `正在下载 ${state.progress}%` : `Downloading ${state.progress}%`;
+    if (state.status === "downloaded") return lang === "zh" ? `${state.availableVersion} 已准备好安装` : `${state.availableVersion} is ready to install`;
+    if (state.status === "current") return lang === "zh" ? "当前已是最新版" : "You're up to date";
+    if (state.status === "error") return lang === "zh" ? `更新失败：${state.message}` : `Update failed: ${state.message}`;
+    return lang === "zh" ? "每 24 小时自动检查更新" : "Updates are checked every 24 hours";
+  })();
+  const busy = !state || state.status === "checking" || state.status === "downloading";
+  const actionLabel = state?.status === "downloaded"
+    ? (lang === "zh" ? "重启并安装" : "Restart and install")
+    : state?.status === "available"
+      ? (lang === "zh" ? "下载更新" : "Download update")
+      : (lang === "zh" ? "立即检查更新" : "Check for updates");
+
+  return <section className="df-update-card">
+    <div><strong>{lang === "zh" ? "桌面应用更新" : "Desktop app updates"}</strong><small>{statusText}</small>{state?.currentVersion && <small>{lang === "zh" ? "当前版本" : "Current version"} {state.currentVersion}</small>}</div>
+    {state?.status === "downloading" && <progress max="100" value={state.progress} />}
+    <button type="button" disabled={busy} onClick={() => state?.status === "downloaded" ? void api?.installUpdate() : void api?.checkForUpdates().then(setState)}>{actionLabel}</button>
+    <a href={DESKTOP_RELEASES_URL}>{lang === "zh" ? "查看发布说明" : "View release notes"}</a>
+  </section>;
+}
+
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; lang: Language }) {
   const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "account">("page");
   const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
@@ -8131,6 +8275,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                 <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /><small>{t(lang, "settings.freePlan")}</small></div>
               </section>
               {authEmail && <p className="df-settings-account">{authEmail}</p>}
+              <DesktopUpdateControl lang={lang} />
               <button className="df-settings-about" onClick={onShowAbout}><span className="df-settings-about-icon">i</span><span>{t(lang, "settings.about")}</span></button>
               {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
               {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}
@@ -8142,6 +8287,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             <strong>{t(lang, "settings.version")}</strong>
             <p>{t(lang, "settings.aboutDesc")}</p>
             <small>{t(lang, "settings.lastUpdated")}</small>
+            <DesktopUpdateControl lang={lang} />
             <a className="df-settings-row" href="/changelog">
               <strong>{lang === "zh" ? "查看更新日志" : "View changelog"}</strong>
               <span aria-hidden="true">↗</span>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ProductIcon } from "./main";
+import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 
 type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
@@ -14,6 +15,7 @@ const copy = {
     intro: "NavoPath connects long-range project thinking with a realistic daily timeline, so your plans survive contact with the day.",
     start: "Start planning",
     signIn: "Open workspace",
+    download: "Download for Windows",
     proof: ["Tree-based planning", "Timeline execution", "AI-assisted scheduling"],
     workflowTitle: "One continuous path from intention to action.",
     workflowIntro: "Planning and execution stay connected. Select the work that matters, then give it a real place in your day.",
@@ -44,6 +46,7 @@ const copy = {
     intro: "NavoPath 把长期项目规划与真实日程连接起来。先想清楚要推进什么，再把它放进今天真正可用的时间。",
     start: "开始规划",
     signIn: "打开工作区",
+    download: "下载 Windows 版",
     proof: ["树状项目规划", "时间轴执行", "AI 辅助排程"],
     workflowTitle: "从长期目标，到今天真正完成的工作。",
     workflowIntro: "规划与执行保持连接。选择值得推进的任务，再为它安排一段真实可用的时间。",
@@ -219,6 +222,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
             <div className="landing-actions">
               <button className="landing-button primary hero-cta" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
               <button className="landing-button quiet hero-cta" onClick={() => openAuth("signin")}>{c.signIn}</button>
+              <a className="landing-button quiet hero-cta landing-download" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">{c.download}<span>↓</span></a>
             </div>
             <div className="landing-hero-path" aria-label={lang === "zh" ? "规划、选择、执行" : "Plan, choose, execute"}>
               <span><i className="plan" />{lang === "zh" ? "规划" : "Plan"}</span>
@@ -261,7 +265,10 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
           <ProductIcon />
           <h2>{c.ctaTitle}</h2>
           <p>{c.ctaBody}</p>
-          <button className="landing-button primary" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
+          <div className="landing-actions">
+            <button className="landing-button primary" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
+            <a className="landing-button quiet landing-download" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">{c.download}<span>↓</span></a>
+          </div>
         </section>
       </main>
 

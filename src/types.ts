@@ -352,8 +352,22 @@ export interface PlannerApi {
   chat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
 }
 
+export interface DesktopUpdateState {
+  status: "idle" | "unsupported" | "checking" | "current" | "available" | "downloading" | "downloaded" | "error";
+  currentVersion: string;
+  availableVersion: string;
+  progress: number;
+  message: string;
+}
+
 declare global {
   interface Window {
     plannerApi: PlannerApi;
+    desktopApi?: {
+      getUpdateState: () => Promise<DesktopUpdateState>;
+      checkForUpdates: () => Promise<DesktopUpdateState>;
+      installUpdate: () => Promise<boolean>;
+      onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
+    };
   }
 }

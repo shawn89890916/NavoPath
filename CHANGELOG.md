@@ -1,5 +1,19 @@
 # NavoPath 更新日志
 
+## 2026-06-21 · 连续年度日历
+
+### 新功能
+- 点击工作区顶部的月份和年份可打开连续年度日历，并通过上一年、下一年、回到今天或任意日期直接导航。
+- 官网与 Web 工作区设置新增最新版 Windows 安装包下载入口；桌面应用每 24 小时自动检查更新，也支持手动下载并重启安装。
+
+### 改进
+- 年度日历在横屏下保留今日候选任务，在竖屏下使用全宽月份画布与任务、回到今天、添加任务工具坞；当前月份、所选日期、今天和已有安排均有清晰标记。
+- 年度日历会自动定位当前月份，切换年份或横竖屏方向时保持正在查看的月份，并继承当前页面的明暗主题与交互强调色。
+- Windows 桌面应用现在使用与网页端相同的账户和云端工作区，登录同一账户即可同步任务、日程与设置。
+
+### 修复
+- 修复竖屏快速添加中的归属项目列表被页头遮挡，以及任务或事件详情缺少明确退出按钮的问题。
+
 ## 2026-06-20 · 更可靠的排程与连接
 
 ### 新功能
@@ -57,6 +71,20 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-21 · Continuous year calendar
+
+### Added
+- Clicking the workspace month and year now opens a continuous year calendar with direct navigation to the previous year, next year, today, or any date.
+- Added latest Windows installer downloads to the website and Web workspace settings; the desktop app checks for updates every 24 hours and also supports manual download and restart-to-install.
+
+### Improved
+- The year calendar keeps Today's Candidates visible in landscape and uses a full-width month canvas with Tasks, Go to today, and Add task actions in portrait; the current month, selected date, today, and scheduled dates are clearly marked.
+- The year calendar automatically focuses the current month, preserves the viewed month across year and orientation changes, and inherits the active page theme and interaction accent.
+- The Windows desktop app now uses the same account and cloud workspace as the web app, so tasks, schedules, and settings sync when users sign in with the same account.
+
+### Fixed
+- Fixed the project list being obscured during portrait quick add and restored an explicit close button in task and event details.
 
 ## 2026-06-20 · More reliable scheduling and connections
 

@@ -51,6 +51,7 @@
 .landing-lang { width: 36px; min-height: 36px; padding: 0; color: var(--l-muted); font: 11px var(--l-mono); }
 .landing-lang:hover { color: var(--l-ink); border-bottom-color: var(--l-rule-strong); }
 .landing-button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 22px; padding: 0 4px; color: var(--l-ink); font-weight: 650; }
+.landing a.landing-button { text-decoration: none; }
 .landing-button.primary { padding: 0 16px; border: 1px solid var(--l-rule-strong); border-bottom: 2px solid var(--l-ink); background: color-mix(in srgb, var(--l-paper-deep) 78%, white); }
 .landing-button.quiet { border: 1px solid var(--l-rule-strong); border-bottom-color: var(--l-rule-strong); }
 .landing-button.primary:hover { background: var(--l-annotation); }
@@ -80,6 +81,7 @@
 .landing .landing-button.hero-cta.primary:hover { color: var(--l-ink) !important; background: color-mix(in srgb, var(--l-paper-deep) 72%, #d7816a) !important; }
 .landing-button.hero-cta.quiet { color: var(--l-ink); background: color-mix(in srgb, var(--l-paper-soft) 68%, transparent); }
 .landing-button.hero-cta.quiet:hover { background: var(--l-paper-deep); }
+.landing-download span { font-size: 17px; font-weight: 400; }
 .landing-hero-path { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 38px; color: var(--l-muted); font: 10px var(--l-mono); letter-spacing: .1em; text-transform: uppercase; }
 .landing-hero-path span { display: flex; align-items: center; gap: 8px; }
 .landing-hero-path i { width: 6px; height: 6px; border: 1px solid var(--l-rule-strong); background: var(--l-paper); }

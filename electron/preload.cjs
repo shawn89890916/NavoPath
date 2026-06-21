@@ -1,12 +1,12 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("plannerApi", {
-  getData: () => ipcRenderer.invoke("planner:getData"),
-  saveData: (data) => ipcRenderer.invoke("planner:saveData", data),
-  applyActions: (actions) => ipcRenderer.invoke("planner:applyActions", actions),
-  resetSeed: () => ipcRenderer.invoke("planner:resetSeed"),
-  getSettings: () => ipcRenderer.invoke("settings:get"),
-  saveSettings: (settings) => ipcRenderer.invoke("settings:save", settings),
-  selectBackgroundImage: () => ipcRenderer.invoke("settings:selectBackgroundImage"),
-  chat: (payload) => ipcRenderer.invoke("ai:chat", payload)
+contextBridge.exposeInMainWorld("desktopApi", {
+  getUpdateState: () => ipcRenderer.invoke("updater:getState"),
+  checkForUpdates: () => ipcRenderer.invoke("updater:check"),
+  installUpdate: () => ipcRenderer.invoke("updater:install"),
+  onUpdateState: (listener) => {
+    const handler = (_event, state) => listener(state);
+    ipcRenderer.on("updater:state", handler);
+    return () => ipcRenderer.removeListener("updater:state", handler);
+  }
 });

@@ -1,10 +1,77 @@
-const { app, BrowserWindow, ipcMain, safeStorage, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { autoUpdater } = require("electron-updater");
 
 const DEFAULT_MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
+const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let manualUpdateRequested = false;
+let updateState = {
+  status: app.isPackaged ? "idle" : "unsupported",
+  currentVersion: app.getVersion(),
+  availableVersion: "",
+  progress: 0,
+  message: app.isPackaged ? "" : "Update checks are available in the installed desktop app."
+};
+
+function publishUpdateState(patch) {
+  updateState = { ...updateState, ...patch, currentVersion: app.getVersion() };
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send("updater:state", updateState);
+  return updateState;
+}
+
+async function checkForDesktopUpdate(manual = false) {
+  if (!app.isPackaged) return publishUpdateState({ status: "unsupported" });
+  if (["checking", "downloading"].includes(updateState.status)) return updateState;
+  if (manual && updateState.status === "available") {
+    manualUpdateRequested = false;
+    publishUpdateState({ status: "downloading", progress: 0 });
+    await autoUpdater.downloadUpdate();
+    return updateState;
+  }
+  manualUpdateRequested = manual;
+  publishUpdateState({ status: "checking", progress: 0, message: "" });
+  await autoUpdater.checkForUpdates();
+  return updateState;
+}
+
+function configureAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("update-available", async (info) => {
+    publishUpdateState({ status: "available", availableVersion: info.version, progress: 0 });
+    if (!manualUpdateRequested) return;
+    manualUpdateRequested = false;
+    publishUpdateState({ status: "downloading", progress: 0 });
+    try {
+      await autoUpdater.downloadUpdate();
+    } catch (error) {
+      publishUpdateState({ status: "error", message: error instanceof Error ? error.message : String(error) });
+    }
+  });
+  autoUpdater.on("update-not-available", () => {
+    manualUpdateRequested = false;
+    publishUpdateState({ status: "current", availableVersion: "", progress: 0 });
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    publishUpdateState({ status: "downloading", progress: Math.round(progress.percent || 0) });
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    publishUpdateState({ status: "downloaded", availableVersion: info.version, progress: 100 });
+  });
+  autoUpdater.on("error", (error) => {
+    manualUpdateRequested = false;
+    publishUpdateState({ status: "error", message: error instanceof Error ? error.message : String(error) });
+  });
+
+  if (!app.isPackaged) return;
+  const initialTimer = setTimeout(() => void checkForDesktopUpdate(false).catch((error) => publishUpdateState({ status: "error", message: String(error) })), 30_000);
+  const interval = setInterval(() => void checkForDesktopUpdate(false).catch((error) => publishUpdateState({ status: "error", message: String(error) })), UPDATE_INTERVAL_MS);
+  initialTimer.unref?.();
+  interval.unref?.();
+}
 
 function todayIso() {
   return localDateIso(new Date());
@@ -587,6 +654,8 @@ async function callDeepSeek({ messages = [], draftText = "" }) {
 }
 
 function createWindow() {
+  const productionUrl = process.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev/app";
+  const allowedOrigin = new URL(productionUrl).origin;
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -604,12 +673,23 @@ function createWindow() {
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path.join(__dirname, "../dist/index.html"));
+    win.webContents.on("will-navigate", (event, url) => {
+      if (new URL(url).origin === allowedOrigin) return;
+      event.preventDefault();
+      void shell.openExternal(url);
+    });
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (new URL(url).origin === allowedOrigin) return { action: "allow" };
+      void shell.openExternal(url);
+      return { action: "deny" };
+    });
+    win.loadURL(productionUrl);
   }
 }
 
 app.whenReady().then(() => {
   ensureData();
+  configureAutoUpdater();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -631,3 +711,16 @@ ipcMain.handle("settings:get", () => getSettings());
 ipcMain.handle("settings:save", (_event, settings) => saveSettings(settings));
 ipcMain.handle("settings:selectBackgroundImage", () => selectBackgroundImage());
 ipcMain.handle("ai:chat", (_event, payload) => callDeepSeek(payload));
+ipcMain.handle("updater:getState", () => updateState);
+ipcMain.handle("updater:check", async () => {
+  try {
+    return await checkForDesktopUpdate(true);
+  } catch (error) {
+    return publishUpdateState({ status: "error", message: error instanceof Error ? error.message : String(error) });
+  }
+});
+ipcMain.handle("updater:install", () => {
+  if (updateState.status !== "downloaded") return false;
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  return true;
+});
