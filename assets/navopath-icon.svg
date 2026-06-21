@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="6" dy="8" stdDeviation="5" flood-color="#000000" flood-opacity="0.45"/>
+      <feDropShadow dx="2" dy="3" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.2"/>
+    </filter>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#151A22"/>
+      <stop offset="100%" stop-color="#1E242E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded dark background -->
+  <rect width="1024" height="1024" rx="180" fill="url(#bgGrad)"/>
+
+  <!-- "N" drawn with thick rounded strokes - clear N shape -->
+  <g filter="url(#shadow)">
+    <!-- Left stem -->
+    <line x1="304" y1="252" x2="318" y2="748"
+          stroke="#FFFFFF" stroke-width="52" stroke-linecap="round"/>
+    <!-- Diagonal: top-left to bottom-right -->
+    <line x1="320" y1="260" x2="708" y2="744"
+          stroke="#FFFFFF" stroke-width="52" stroke-linecap="round"/>
+    <!-- Right stem -->
+    <line x1="696" y1="256" x2="710" y2="748"
+          stroke="#FFFFFF" stroke-width="52" stroke-linecap="round"/>
+  </g>
+</svg>
