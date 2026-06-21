@@ -1,7 +1,8 @@
 {
-  "name": "admission-goal-calendar",
-  "version": "1.1.1",
-  "description": "NavoPath",
+  "name": "navopath",
+  "version": "1.1.2",
+  "description": "NavoPath — Navigate your next step.",
+  "author": "NavoPath",
   "main": "electron/main.cjs",
   "private": true,
   "scripts": {
@@ -47,6 +48,7 @@
   "build": {
     "appId": "com.local.admission.goal.calendar",
     "productName": "NavoPath",
+    "afterPack": "scripts/brand-electron-build.cjs",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -56,6 +58,8 @@
       "output": "release"
     },
     "win": {
+      "icon": "build/icon.ico",
+      "executableName": "NavoPath",
       "signAndEditExecutable": false,
       "forceCodeSigning": false,
       "target": [
@@ -67,6 +71,11 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "shortcutName": "NavoPath",
+      "uninstallDisplayName": "NavoPath",
       "artifactName": "NavoPath-Setup.exe"
     },
     "portable": {
@@ -99,6 +108,7 @@
     "concurrently": "^9.1.2",
     "electron": "^37.0.0",
     "electron-builder": "^25.1.8",
+    "rcedit": "^5.0.2",
     "size-limit": "^12.1.0",
     "vitest": "^4.1.9",
     "wait-on": "^8.0.1",

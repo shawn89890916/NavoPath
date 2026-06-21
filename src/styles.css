@@ -18709,8 +18709,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-compact-calendar-tabs .df-compact-date-arrow {
-    width: 44px;
-    min-width: 44px;
+    width: 32px;
+    min-width: 32px;
     padding: 0;
     color: var(--text-main);
     font-size: 20px;
@@ -18886,8 +18886,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 
   .df-date-arrow {
-    width: 44px !important;
+    width: 34px !important;
     height: 44px !important;
+  }
+
+  .df-time-block.is-drag-armed {
+    outline: 1px solid color-mix(in srgb, var(--accent-active) 56%, transparent);
+    outline-offset: 2px;
   }
 
   .df-month-view {

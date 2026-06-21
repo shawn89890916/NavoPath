@@ -4,6 +4,8 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { autoUpdater } = require("electron-updater");
 
+app.setName("NavoPath");
+
 const DEFAULT_MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -366,7 +368,7 @@ function getSettings() {
     activeMode: ["today", "calendar", "planning"].includes(raw.activeMode) ? raw.activeMode : "today",
     planningView: ["tree", "matrix", "split"].includes(raw.planningView) ? raw.planningView : "tree",
     aiDockOpen: Boolean(raw.aiDockOpen),
-    appTitle: raw.appTitle || "DayFlow",
+    appTitle: "NavoPath",
     model: raw.model || DEFAULT_MODEL,
     baseUrl: raw.baseUrl || DEEPSEEK_URL,
     hasApiKey: Boolean(apiKey),
@@ -407,7 +409,7 @@ function saveSettings(settings) {
     planningView: ["tree", "matrix", "split"].includes(settings.planningView) ? settings.planningView : existing.planningView || "tree",
     aiDockOpen: typeof settings.aiDockOpen === "boolean" ? settings.aiDockOpen : Boolean(existing.aiDockOpen),
     addAdvancedOpen: typeof settings.addAdvancedOpen === "boolean" ? settings.addAdvancedOpen : Boolean(existing.addAdvancedOpen),
-    appTitle: settings.appTitle || existing.appTitle || "DayFlow",
+    appTitle: "NavoPath",
     model: settings.model || existing.model || DEFAULT_MODEL,
     baseUrl: settings.baseUrl || existing.baseUrl || DEEPSEEK_URL,
     displayName: settings.displayName || existing.displayName || "陈潇杨",
@@ -654,14 +656,27 @@ async function callDeepSeek({ messages = [], draftText = "" }) {
 }
 
 function createWindow() {
-  const productionUrl = process.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev/app";
-  const allowedOrigin = new URL(productionUrl).origin;
+  const configuredUrl = process.env.VITE_DEV_SERVER_URL || process.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
+  const appUrl = new URL("/app", configuredUrl);
+  const allowedOrigin = appUrl.origin;
+  const iconPath = app.isPackaged
+    ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
+    : path.join(__dirname, "..", "public", "navopath-icon.png");
+  const isWorkspaceUrl = (url) => {
+    try {
+      const target = new URL(url);
+      return target.origin === allowedOrigin && (target.pathname === "/app" || target.pathname.startsWith("/app/"));
+    } catch {
+      return false;
+    }
+  };
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1180,
     minHeight: 720,
-    title: getSettings().appTitle || "DayFlow",
+    title: "NavoPath",
+    icon: iconPath,
     backgroundColor: "#f5f7fb",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -670,21 +685,22 @@ function createWindow() {
     }
   });
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    win.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else {
-    win.webContents.on("will-navigate", (event, url) => {
-      if (new URL(url).origin === allowedOrigin) return;
-      event.preventDefault();
-      void shell.openExternal(url);
-    });
-    win.webContents.setWindowOpenHandler(({ url }) => {
-      if (new URL(url).origin === allowedOrigin) return { action: "allow" };
-      void shell.openExternal(url);
-      return { action: "deny" };
-    });
-    win.loadURL(productionUrl);
-  }
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isWorkspaceUrl(url)) return;
+    event.preventDefault();
+    const target = new URL(url);
+    if (target.origin === allowedOrigin && target.pathname === "/") {
+      void win.loadURL(appUrl.toString());
+      return;
+    }
+    void shell.openExternal(url);
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isWorkspaceUrl(url)) return { action: "allow" };
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.loadURL(appUrl.toString());
 }
 
 app.whenReady().then(() => {

@@ -7,9 +7,11 @@
 - 官网与 Web 工作区设置新增最新版 Windows 安装包下载入口；桌面应用每 24 小时自动检查更新，也支持手动下载并重启安装。
 
 ### 改进
-- 年度日历在横屏下保留今日候选任务，在竖屏下使用全宽月份画布与任务、回到今天、添加任务工具坞；当前月份、所选日期、今天和已有安排均有清晰标记。
+- 年度日历在横屏下保留今日候选任务，在竖屏下使用全宽月份画布并继续显示主屏的执行、规划与添加工具坞；当前月份、所选日期、今天和已有安排均有清晰标记。
 - 年度日历会自动定位当前月份，切换年份或横竖屏方向时保持正在查看的月份，并继承当前页面的明暗主题与交互强调色。
 - Windows 桌面应用现在使用与网页端相同的账户和云端工作区，登录同一账户即可同步任务、日程与设置。
+- Windows 桌面应用现在始终直接进入 `/app` 工作区，不再在应用窗口中显示官网首页；窗口、可执行文件、安装器与快捷方式统一使用 NavoPath 名称和品牌图标。
+- 竖屏时间轴任务改为短暂长按后才可拖动，并缩窄日期切换箭头的横向触控区域。
 
 ### 修复
 - 修复竖屏快速添加中的归属项目列表被页头遮挡、任务标题输入框未适配深色模式，以及任务或事件详情缺少明确退出按钮的问题。
@@ -79,9 +81,11 @@
 - Added latest Windows installer downloads to the website and Web workspace settings; the desktop app checks for updates every 24 hours and also supports manual download and restart-to-install.
 
 ### Improved
-- The year calendar keeps Today's Candidates visible in landscape and uses a full-width month canvas with Tasks, Go to today, and Add task actions in portrait; the current month, selected date, today, and scheduled dates are clearly marked.
+- The year calendar keeps Today's Candidates visible in landscape and uses a full-width month canvas while retaining the main Execute, Planning, and Add dock in portrait; the current month, selected date, today, and scheduled dates are clearly marked.
 - The year calendar automatically focuses the current month, preserves the viewed month across year and orientation changes, and inherits the active page theme and interaction accent.
 - The Windows desktop app now uses the same account and cloud workspace as the web app, so tasks, schedules, and settings sync when users sign in with the same account.
+- The Windows desktop app now opens the `/app` workspace directly and no longer shows the marketing homepage inside the app window; the window, executable, installer, and shortcut consistently use the NavoPath name and brand icon.
+- Portrait timeline tasks now require a short hold before dragging, with narrower horizontal hit areas for date arrows.
 
 ### Fixed
 - Fixed the project list being obscured during portrait quick add, matched the task title field to dark mode, and restored an explicit close button in task and event details.

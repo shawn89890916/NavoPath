@@ -3631,14 +3631,34 @@ function App() {
     const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
     const offsetMinutes = Math.min(Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0), Math.max(duration - SLOT_MINUTES, 0));
     let active = false;
+    let holdCancelled = false;
+    let holdReady = !compactLayout || event.pointerType !== "touch";
+    const holdTimer = holdReady ? undefined : window.setTimeout(() => {
+      holdReady = true;
+      target.classList.add("is-drag-armed");
+      window.navigator.vibrate?.(8);
+    }, 320);
+    const clearHold = () => {
+      if (holdTimer !== undefined) window.clearTimeout(holdTimer);
+      target.classList.remove("is-drag-armed");
+    };
     suppressBlockClickRef.current = false;
     const move = (moveEvent: PointerEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+      if (!holdReady) {
+        if (distance >= 8) {
+          holdCancelled = true;
+          clearHold();
+        }
+        return;
+      }
+      if (holdCancelled) return;
       if (!active && distance < 5) return;
       if (!active) {
         moveEvent.preventDefault();
         active = true;
+        clearHold();
         target.classList.add("is-dragging");
         document.body.classList.add("df-timeline-pointer-drag");
         suppressBlockClickRef.current = true;
@@ -3700,6 +3720,7 @@ function App() {
             setDrag(null);
             setHoverSlot("");
             dragTargetDateRef.current = "";
+            clearHold();
             target.classList.remove("is-dragging");
             document.body.classList.remove("df-timeline-pointer-drag");
             window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
@@ -3744,6 +3765,7 @@ function App() {
       setDrag(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
+      clearHold();
       target.classList.remove("is-dragging");
       document.body.classList.remove("df-timeline-pointer-drag");
       window.setTimeout(() => {
@@ -3761,6 +3783,7 @@ function App() {
       setDrag(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
+      clearHold();
       suppressBlockClickRef.current = false;
     };
     const keydown = (keyboardEvent: KeyboardEvent) => {
@@ -6177,28 +6200,13 @@ function App() {
 
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
-          {yearOverviewOpen ? <>
-            <button className="df-year-dock-action" onClick={() => { setYearOverviewOpen(false); setCompactExecuteView("tasks"); }}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" /></svg>
-              <span>{lang === "zh" ? "任务" : "Tasks"}</span>
-            </button>
-            <button className="df-year-dock-action active" onClick={() => { setSelectedDate(today); setTimelineView("daily"); setYearOverviewOpen(false); setCompactExecuteView("schedule"); }}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v3M18 3v3M4 9h16M5 5h14v16H5zM9 13h6M9 17h4" /></svg>
-              <span>{lang === "zh" ? "回到今天" : "Go to today"}</span>
-            </button>
-            <button className="df-year-dock-action" onClick={() => openAdd("task")}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-              <span>{lang === "zh" ? "添加任务" : "Add task"}</span>
-            </button>
-          </> : <>
-            <div className="df-mobile-mode-switch">
-              <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
-              <button className={mode === "planning" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "planning" })}>{t(lang, "header.planning")}</button>
-            </div>
-            <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </>}
+          <div className="df-mobile-mode-switch">
+            <button className={mode === "execute" ? "active" : ""} onClick={() => { setYearOverviewOpen(false); void saveSettings({ activeMode: "execute" }); }}>{t(lang, "header.execute")}</button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => { setYearOverviewOpen(false); void saveSettings({ activeMode: "planning" }); }}>{t(lang, "header.planning")}</button>
+          </div>
+          <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
         </nav>
       )}
 

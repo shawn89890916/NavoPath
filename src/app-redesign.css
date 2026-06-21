@@ -2829,8 +2829,6 @@ body.df-timeline-pointer-drag * {
 
 .df-month-year-btn[aria-expanded="true"] .df-month-year-chevron { transform: rotate(180deg); }
 
-.df-year-dock-action { display: none; }
-
 @media (max-width: 899.98px) {
   #root .df-app.is-year-overview .df-compact-execute-controls,
   #root .df-app.is-year-overview .df-candidate-panel,
@@ -2884,12 +2882,7 @@ body.df-timeline-pointer-drag * {
   .df-year-day, .df-year-day-empty { min-height: 64px; }
   .df-year-day { font-size: clamp(22px, 7vw, 31px); }
 
-  #root .df-app.is-year-overview .df-mobile-dock {
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr);
-    min-height: 72px;
-    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
-  }
+  #root .df-app.is-year-overview .df-mobile-dock { display: grid !important; }
 
   #root .df-app .df-compact-quick-add .df-quick-project-popover.up {
     position: fixed !important;
@@ -2909,35 +2902,6 @@ body.df-timeline-pointer-drag * {
     margin: -10px -4px 0 8px;
   }
 
-  #root .df-app .df-year-dock-action {
-    min-width: 0;
-    min-height: 58px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    border: 0;
-    border-bottom: 1px solid transparent;
-    background: transparent;
-    color: var(--text-muted);
-    font: 500 12px/1.15 var(--paper-sans);
-  }
-
-  #root .df-app .df-year-dock-action svg {
-    width: 25px;
-    height: 25px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  #root .df-app .df-year-dock-action.active {
-    color: var(--accent-active);
-    border-bottom-color: var(--accent-active);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
