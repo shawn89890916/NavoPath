@@ -1,8 +1,15 @@
 const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-const crypto = require("node:crypto");
-const { autoUpdater } = require("electron-updater");
+let _crypto; // lazy: only when uid() is first called
+function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
+
+// Lazy-loaded: electron-updater is not needed until autoUpdater is configured
+let _autoUpdater;
+function getAutoUpdater() {
+  if (!_autoUpdater) _autoUpdater = require("electron-updater");
+  return _autoUpdater;
+}
 
 app.setName("NavoPath");
 
@@ -40,6 +47,7 @@ async function checkForDesktopUpdate(manual = false) {
 }
 
 function configureAutoUpdater() {
+  const { autoUpdater } = getAutoUpdater();
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on("update-available", async (info) => {
@@ -87,7 +95,7 @@ function localDateIso(date) {
 }
 
 function uid(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${crypto.randomBytes(3).toString("hex")}`;
+  return `${prefix}_${Date.now().toString(36)}_${getCrypto().randomBytes(3).toString("hex")}`;
 }
 
 function makeTask(title, dueDate, category, priority = "medium", notes = "", goalId = "goal_admission") {
@@ -117,7 +125,10 @@ function makeEvent(title, date, category, details = "") {
   };
 }
 
-const smartNoteTemplates = {
+let _smartNoteTemplates = null;
+function getSmartNoteTemplates() {
+  if (!_smartNoteTemplates) {
+    _smartNoteTemplates = Object.freeze({
   "确认英国 UCAS 工程专业组合": "目标：在 2026-06-15 前锁定 5 个 UCAS 志愿的专业名称、课程代码和替代顺序，避免后续 PS 与考试准备方向反复摇摆。\n衡量：产出 1 张对比表，至少包含剑桥、Imperial、UCL、KCL 与 1 个替代工程项目；每个项目写清入学要求、ESAT/TARA 要求、核心课程匹配度和风险等级。\n行动：逐校打开官网课程页，核对 2027 Entry 要求；把不确定项标红；最后按“冲刺、匹配、保底”给出排序。\n资料：UCAS Search、各大学 Engineering/Robotics/AI/Mechanical/Aerospace 官网页面、升学指导报告。\n完成标准：对比表没有空项，并能用 3 句话解释为什么这 5 个专业组合适合工程/机器人/航空航天方向。",
   "启动 ESAT/TARA 训练计划": "目标：在 2026-06-20 前建立 ESAT Maths 1、Maths 2、Physics 和 TARA 的固定训练系统。\n衡量：建好 1 个错题表、1 个分数记录表和 1 个每周训练表；每个科目至少完成 1 次基线测试或样题训练。\n行动：下载官方样题和 guide；按 40 分钟限时做 ESAT module；TARA 单独整理题型、时间限制和弱点；每次训练后记录错误原因。\n资料：UAT ESAT 页面 https://esat-tmua.ac.uk/about-the-tests/esat-test/；UAT 备考材料 https://esat-tmua.ac.uk/esat-preparation-materials/；Pearson UAT 页面 https://www.pearsonvue.com/us/en/uatuk.html。\n完成标准：打开任务文件夹时能看到资料库、错题表、分数表和下一周训练安排，不需要临时找材料。",
   "整理项目证据文件夹": "目标：在 2026-06-25 前把 ISSDC、3D 打印、论文、火箭、TI-BASIC 等项目整理成可用于文书、活动表和推荐信的证据库。\n衡量：每个项目至少有 1 个项目简介、2-5 张图片/截图、关键成果数据、本人贡献说明和可引用链接或文件。\n行动：按项目建文件夹；把原始文件、照片、代码、论文、证书放入对应目录；写 100-150 字英文项目摘要；标注最能体现工程能力的证据。\n资料：电脑本地项目文件、照片、证书、论文稿、GitHub/网盘链接、升学指导报告。\n完成标准：任意打开一个项目文件夹，都能直接找到“我做了什么、结果是什么、能证明什么”的材料。",
@@ -134,7 +145,10 @@ const smartNoteTemplates = {
   "ESAT W1D5：ENGAA/NSAA 风格入门 + 三科错题整理": "目标：在 2026-06-05 用 ENGAA/NSAA archive 补充 ESAT 相近题型，并整理本周三科弱点。\n衡量：完成 2022 或 2023 Section 1 中相关 Maths/Physics 题；整理 1-10 的弱点清单，按影响分排序。\n行动：选与 ESAT Maths/Physics 相近的题做限时练习；把本周 Maths 1、Maths 2、Physics 错题合并归类。\n资料：UAT ENGAA/NSAA archive https://esat-tmua.ac.uk/esat-preparation-materials/；ENGAA/NSAA walkthrough 搜索结果。\n完成标准：弱点清单每一项都有对应题号、错误原因和下一步练习方式。",
   "ESAT W1D6：两科连练 + 时间策略": "目标：在 2026-06-06 完成两个 ESAT module 连续限时训练，测试体力和时间策略。\n衡量：连续完成两个 40 分钟 module；记录每个 module 的正确率、跳题数量、flag 数量和最后 5 分钟处理情况。\n行动：模拟考试节奏，中间只短休息；训练 60-90 秒判断是否跳题；最后 5 分钟检查未答题并完成全填。\n资料：Pearson sample/specimen https://www.pearsonvue.com/us/en/uatuk.html；UAT 备考材料 https://esat-tmua.ac.uk/esat-preparation-materials/。\n完成标准：写出 3 条个人时间策略，例如哪些题先跳、何时回看、最后 5 分钟怎么分配。",
   "ESAT W1D7：周复盘 + 下周计划": "目标：在 2026-06-07 完成 ESAT 第一周复盘，并制定第二周训练重点。\n衡量：汇总 Maths 1、Maths 2、Physics 原始分；每科选出 2 个下周优先 topic；写 1 页周报。\n行动：看分数趋势和错因分类；不要只看正确率，要判断是知识问题、速度问题还是策略问题；把下周任务拆到每天。\n资料：Praneel Physics ESAT Hub https://praneelphysics.com/esat/hub；UAT 备考材料；YouTube ESAT Maths/Physics walkthrough。\n完成标准：周报包含本周数据、主要问题、下周每日安排和检查标准。"
-};
+    });
+  }
+  return _smartNoteTemplates;
+}
 
 function smartNoteForTask(task) {
   return task.notes || "";
@@ -705,8 +719,9 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ensureData();
-  configureAutoUpdater();
   createWindow();
+  // Defer autoUpdater init so window appears faster; runs in background
+  setImmediate(() => configureAutoUpdater());
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -737,6 +752,6 @@ ipcMain.handle("updater:check", async () => {
 });
 ipcMain.handle("updater:install", () => {
   if (updateState.status !== "downloaded") return false;
-  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  setImmediate(() => getAutoUpdater().quitAndInstall(false, true));
   return true;
 });
