@@ -32,6 +32,7 @@ function publishUpdateState(patch) {
 }
 
 async function checkForDesktopUpdate(manual = false) {
+  const { autoUpdater } = getAutoUpdater();
   if (!app.isPackaged) return publishUpdateState({ status: "unsupported" });
   if (["checking", "downloading"].includes(updateState.status)) return updateState;
   if (manual && updateState.status === "available") {
