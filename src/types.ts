@@ -259,6 +259,10 @@ export interface Settings {
   hideAi: boolean;
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
+  /** 自动同步频率（分钟）。0 或未设置表示仅手动同步。 */
+  syncIntervalMinutes?: number;
+  /** 最近一次成功同步时间（ISO 字符串）。 */
+  lastSyncedAt?: string;
 }
 
 export interface AiAction {

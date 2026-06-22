@@ -59,7 +59,9 @@ const defaultSettings: Settings = {
   aiMemoryEnabled: true,
   hideAi: false,
   addAdvancedOpen: false,
-  uiStyle: "gradient"
+  uiStyle: "gradient",
+  syncIntervalMinutes: 60,
+  lastSyncedAt: undefined
 };
 
 function publicUser(user: User | null) {
@@ -72,6 +74,10 @@ function mergeSettings(settings: unknown): Settings {
   if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
   if (stored.model === "deepseek-v4-flash" || stored.model === "deepseek-chat" || /^deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(stored.model || "")) stored.model = "deepseek-ai/DeepSeek-V3.2";
   if (!stored.baseUrl || stored.baseUrl === "https://api.deepseek.com/chat/completions") stored.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
+  // Migrate syncIntervalMinutes: accept legacy plain numbers, fall back to default 60, normalize invalid values
+  if (typeof stored.syncIntervalMinutes !== "number" || !Number.isFinite(stored.syncIntervalMinutes) || stored.syncIntervalMinutes < 0) {
+    stored.syncIntervalMinutes = 60;
+  }
   return { ...defaultSettings, ...stored };
 }
 

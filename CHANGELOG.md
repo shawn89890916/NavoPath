@@ -2,6 +2,11 @@
 
 ## 2026-06-22 · 更清晰的周视图与桌面图标
 
+### 新功能
+- 网页端与桌面端默认每小时自动同步一次云端任务、计划与设置；可在设置 → 账户 → 云端同步里改为每 15 分钟、每 6 小时、每 24 小时，或关闭自动同步、只保留手动同步。
+- 设置 → 账户新增“立即同步”按钮，可随时把本地修改推上云端并拉回最新版本，同步过程中按钮显示“正在同步”并被禁用。
+- 同步时间会被记录并跟随账户同步到所有设备，账户页会显示“刚刚 / N 分钟前 / N 小时前”相对时间与绝对时间，方便查看上次同步时间。
+
 ### 改进
 - 桌面应用图标使用白色 N 表面、黑色立体阴影和透明外围，在浅色与深色系统界面中都保持清晰。
 - 收起今日候选后，三日、周和月视图会统一进入简洁阅读模式。
@@ -103,6 +108,11 @@
 # NavoPath Changelog
 
 ## 2026-06-22 · Clearer week view and desktop icon
+
+### Added
+- The web and desktop apps now auto-sync cloud tasks, schedules, and settings every hour by default; open Settings → Account → Cloud sync to change it to every 15 minutes, every 6 hours, every 24 hours, or to disable auto-sync and rely on manual sync only.
+- Settings → Account now includes a "Sync now" button that pushes local changes to the cloud and pulls the latest version on demand; the button shows "Syncing…" and is disabled while a sync is in flight.
+- The last sync time is recorded and synced with the account across devices, and the Account page shows a relative timestamp ("Just now / N minutes ago / N hours ago") plus the absolute date and time.
 
 ### Improved
 - The desktop icon now uses a white N face, black dimensional shadow, and transparent outer canvas so it stays clear in light and dark system surfaces.

@@ -2241,6 +2241,84 @@
   border-bottom: 1px solid var(--paper-rule);
 }
 
+.df-app .df-settings-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.df-app .df-settings-sync-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.df-app .df-settings-sync-head strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, var(--ink, #27231E));
+}
+
+.df-app .df-settings-sync-head small {
+  font-size: 12px;
+  opacity: .7;
+}
+
+.df-app .df-settings-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.df-app .df-settings-sync-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.df-app .df-settings-sync-row strong {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: .8;
+}
+
+.df-app .df-settings-sync-row small {
+  font-size: 12px;
+  opacity: .65;
+}
+
+.df-app .df-settings-sync-absolute {
+  font-variant-numeric: tabular-nums;
+  opacity: .45;
+}
+
+.df-app .df-settings-sync-now {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--accent-active, currentColor);
+  background: transparent;
+  color: var(--accent-active, currentColor);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.df-app .df-settings-sync-now:hover:not(:disabled) {
+  background: var(--accent-active, currentColor);
+  color: var(--bg-surface, #151A22);
+}
+
+.df-app .df-settings-sync-now:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
 .df-app .df-settings-advanced-body .df-settings-about,
 .df-app .df-settings-advanced-body .df-settings-logout {
   justify-self: start;

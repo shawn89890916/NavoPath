@@ -37,6 +37,7 @@ import { promoteSubtaskToToday, toggleTodayCandidate } from "./utils/todayCandid
 import { useInAppDialog } from "./InAppDialog";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -1561,6 +1562,8 @@ function App() {
   const settingsSaveNoticeShownRef = useRef(false);
   const queuedRemoteRefreshRef = useRef(false);
   const remoteRevisionRef = useRef(0);
+  const syncSchedulerRef = useRef<SyncScheduler | null>(null);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
   const colsContainerRef = useRef<HTMLDivElement | null>(null);
   const timeGridRef = useRef<HTMLDivElement | null>(null);
   const [multiColWidth, setMultiColWidth] = useState(0);
@@ -2314,6 +2317,77 @@ function App() {
     if (patch.activeMode) setModeState(patch.activeMode as Mode);
     scheduleSettingsFlush();
   }
+
+  /**
+   * Manual sync: push any pending local changes, pull the latest remote baseline,
+   * then persist lastSyncedAt. Called by the Account → "Sync now" button and by
+   * the auto-sync scheduler itself. Concurrent invocations share a single
+   * in-flight run via the SyncScheduler.
+   */
+  async function handleSyncNow({ silent = false }: { silent?: boolean } = {}): Promise<boolean> {
+    if (authState?.mode !== "cloud" || !authState.user) {
+      if (!silent) showToast(lang === "zh" ? "登录后即可同步。" : "Sign in to sync.");
+      return false;
+    }
+    const scheduler = syncSchedulerRef.current;
+    if (!scheduler) return false;
+    if (!silent) setIsManualSyncing(true);
+    try {
+      await scheduler.runNow();
+      return true;
+    } catch (error) {
+      if (!silent) showToast(t(lang, "sync.failure"));
+      console.warn("Manual sync failed", error);
+      return false;
+    } finally {
+      if (!silent) setIsManualSyncing(false);
+    }
+  }
+
+  function persistSyncTimestamp(syncedAt: string) {
+    const current = settingsRef.current;
+    if (!current) return;
+    if (current.lastSyncedAt === syncedAt) return;
+    // Avoid triggering the scheduler to re-arm during its own writeback.
+    void saveSettings({ lastSyncedAt: syncedAt });
+  }
+
+  useEffect(() => {
+    const scheduler = new SyncScheduler({
+      isBusy: () =>
+        Boolean(
+          pendingDataSaveRef.current ||
+            pendingSettingsSaveRef.current ||
+            dataSaveInFlightRef.current ||
+            settingsSaveInFlightRef.current,
+        ),
+      isPaused: () => (typeof document === "undefined" ? false : document.visibilityState !== "visible"),
+      pushLocal: async () => {
+        if (pendingDataSaveRef.current) await flushPendingSave({ urgent: true });
+        if (pendingSettingsSaveRef.current) await flushPendingSettings({ urgent: true });
+      },
+      pullRemote: async () => {
+        queuedRemoteRefreshRef.current = true;
+        await refreshQueuedRemote();
+      },
+      onTick: (result) => {
+        if (!result.ok) return;
+        if (result.pushedLocal || result.pulledRemote) persistSyncTimestamp(result.syncedAt);
+      },
+    });
+    syncSchedulerRef.current = scheduler;
+    return () => {
+      scheduler.stop();
+      if (syncSchedulerRef.current === scheduler) syncSchedulerRef.current = null;
+    };
+  }, []);
+
+  // Re-arm the scheduler whenever the user changes the sync interval.
+  useEffect(() => {
+    const scheduler = syncSchedulerRef.current;
+    if (!scheduler) return;
+    scheduler.setIntervalMinutes(readSyncInterval(settings));
+  }, [settings?.syncIntervalMinutes, authState?.user?.id]);
 
   const today = todayIso();
   const timelineDate = selectedDate;
@@ -6235,7 +6309,7 @@ function App() {
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} lang={lang} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={() => handleSyncNow()} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -8136,6 +8210,90 @@ function McpTokenManager({ lang }: { lang: Language }) {
   );
 }
 
+function SyncSettingsControl({
+  settings,
+  lang,
+  cloudReady,
+  isManualSyncing,
+  onChange,
+  onSyncNow,
+}: {
+  settings: Settings;
+  lang: Language;
+  cloudReady: boolean;
+  isManualSyncing: boolean;
+  onChange: (patch: Partial<Settings>) => void;
+  onSyncNow?: () => Promise<boolean> | void;
+}) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const presetKey = presetForMinutes(settings.syncIntervalMinutes);
+  const lastSyncedLabel = formatLastSyncedAt(settings.lastSyncedAt, lang, now);
+  const lastSyncedAbsolute = settings.lastSyncedAt
+    ? new Date(settings.lastSyncedAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+  return (
+    <section className="df-settings-sync">
+      <div className="df-settings-sync-head">
+        <strong>{t(lang, "sync.heading")}</strong>
+        {!cloudReady && <small>{t(lang, "sync.requiresAccount")}</small>}
+      </div>
+      <label className="df-utility-select" data-disabled={!cloudReady}>
+        {t(lang, "sync.frequency")}
+        <select
+          value={presetKey}
+          disabled={!cloudReady}
+          onChange={(event) => {
+            const next = SYNC_INTERVAL_PRESETS.find((preset) => preset.key === event.target.value);
+            if (!next) return;
+            onChange({ syncIntervalMinutes: next.minutes });
+          }}
+        >
+          {SYNC_INTERVAL_PRESETS.map((preset) => (
+            <option key={preset.key} value={preset.key}>
+              {preset.minutes === 0
+                ? t(lang, "sync.manual")
+                : preset.minutes === 15
+                  ? t(lang, "sync.every15m")
+                  : preset.minutes === 60
+                    ? t(lang, "sync.every1h")
+                    : preset.minutes === 360
+                      ? t(lang, "sync.every6h")
+                      : t(lang, "sync.every24h")}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="df-settings-sync-row">
+        <span>
+          <strong>{t(lang, "sync.lastSynced")}</strong>
+          <small>{lastSyncedLabel}</small>
+          {lastSyncedAbsolute && <small className="df-settings-sync-absolute">{lastSyncedAbsolute}</small>}
+        </span>
+        <button
+          type="button"
+          className="df-settings-sync-now"
+          disabled={!cloudReady || isManualSyncing}
+          onClick={() => {
+            void onSyncNow?.();
+          }}
+        >
+          {isManualSyncing ? t(lang, "sync.syncing") : t(lang, "sync.syncNow")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function DesktopUpdateControl({ lang }: { lang: Language }) {
   const api = window.desktopApi;
   const [state, setState] = useState<DesktopUpdateState | null>(null);
@@ -8176,7 +8334,7 @@ function DesktopUpdateControl({ lang }: { lang: Language }) {
   </section>;
 }
 
-function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; lang: Language }) {
+function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: () => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
   const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "account">("page");
   const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
   const visibleMemories = (data.aiMemories || [])
@@ -8302,6 +8460,14 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                 <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /><small>{t(lang, "settings.freePlan")}</small></div>
               </section>
               {authEmail && <p className="df-settings-account">{authEmail}</p>}
+              <SyncSettingsControl
+                settings={settings}
+                lang={lang}
+                cloudReady={Boolean(cloudReady)}
+                isManualSyncing={Boolean(isManualSyncing)}
+                onChange={(patch) => onSave(patch)}
+                onSyncNow={onSyncNow}
+              />
               <DesktopUpdateControl lang={lang} />
               <button className="df-settings-about" onClick={onShowAbout}><span className="df-settings-about-icon">i</span><span>{t(lang, "settings.about")}</span></button>
               {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
