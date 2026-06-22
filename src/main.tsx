@@ -27,6 +27,7 @@ import {
   TIMELINE_START as GEOMETRY_TIMELINE_START,
   TIMELINE_END as GEOMETRY_TIMELINE_END,
   HOUR_HEIGHT,
+  type TimelineViewMode,
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
 import { localIsoDate } from "./utils/localDate";
@@ -2023,6 +2024,19 @@ function App() {
     const autoScrollKey = `${timelineView}:${selectedDate}`;
     if (lastTimelineAutoScrollKeyRef.current === autoScrollKey) return;
     lastTimelineAutoScrollKeyRef.current = autoScrollKey;
+
+    // When no tasks exist for the visible dates, park at the top so
+    // the 0:00 marker sits directly beneath the all-day bar with no
+    // wasted blank area.  Task creation triggers a focus scroll instead.
+    const visibleDays = getVisibleDays(timelineView as TimelineViewMode, selectedDate);
+    const hasVisibleTasks = expandedVisibleTimelineTasks.some(
+      (t) => t.scheduledDate && visibleDays.includes(t.scheduledDate),
+    );
+    if (!hasVisibleTasks) {
+      timelineRef.current.scrollTop = 0;
+      return;
+    }
+
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const fallbackMinutes = 9 * 60;
@@ -6109,7 +6123,6 @@ function App() {
                           return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
                         })}
                         {isViewingToday && <NowLine lang={lang} />}
-                        {scheduledTasks.length === 0 && schedulePreviews.length === 0 && !drag && <div className="df-timeline-empty"><div className="blob-accent" />{t(lang, "timeline.dragHere")}</div>}
                         {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
                         {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
                           <PreviewBlock

@@ -5,10 +5,12 @@
 ### 改进
 - 桌面应用图标使用白色 N 表面、黑色立体阴影和透明外围，在浅色与深色系统界面中都保持清晰。
 - 收起今日候选后，三日、周和月视图会统一进入简洁阅读模式。
+- 周视图中 15 分钟长度的任务块标题现在清晰可读，去掉了多余的勾选与缩进，使短时长块也能在窄列里完整显示。
 
 ### 修复
 - 修复时间轴全屏后仍受普通工作区高度约束、顶部留下大块空白的问题；全屏现在会铺满整个可用视口。
 - “查看发布说明”现在稳定打开应用内更新日志，不再依赖临时或未标记的 GitHub 发布地址。
+- 修复单日时间轴在当日未添加任何任务时，0:00 顶部与全天栏下方出现大段空白的问题；0:00 现在紧贴在全天栏下方。
 
 ## 1.2.1 · 图标重绘与启动加速
 
@@ -105,10 +107,12 @@
 ### Improved
 - The desktop icon now uses a white N face, black dimensional shadow, and transparent outer canvas so it stays clear in light and dark system surfaces.
 - Collapsing Today's Candidates now consistently switches 3 Day, Week, and Month views into the compact reading mode.
+- 15‑minute task blocks in the week view now show readable titles by removing the redundant check and inner padding so the title fits the narrow column.
 
 ### Fixed
 - Fixed timeline fullscreen inheriting the normal workbench height and leaving a large blank area; fullscreen now fills the entire available viewport.
 - View release notes now reliably opens the in-app changelog instead of depending on a temporary or untagged GitHub release URL.
+- Fixed the daily timeline leaving a large blank band above 0:00 and below the all‑day bar when the day had no tasks; 0:00 now sits directly under the all‑day bar.
 
 ## 2026-06-21 · Continuous year calendar
 

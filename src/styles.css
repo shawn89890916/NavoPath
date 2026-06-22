@@ -12395,16 +12395,32 @@ body:has(:active)::-webkit-scrollbar-thumb {
   overflow-wrap: normal;
 }
 
-/* Short time blocks: hide non-essential elements */
-.df-time-block.short-block .df-block-project,
-.df-time-block.short-block .df-next,
-.df-time-block.short-block .df-preview-badge,
-.df-time-block.short-block .df-preview-actions,
-.df-time-block.short-block .df-block-time {
+/* Short time blocks: hide non-essential elements.
+   The .df-time-block-week (week view) variants keep their check button visible
+   via higher-specificity rules further down, so this generic rule must
+   not target the week view. */
+.df-time-block.short-block:not(.df-time-block-week) .df-block-project,
+.df-time-block.short-block:not(.df-time-block-week) .df-next,
+.df-time-block.short-block:not(.df-time-block-week) .df-preview-badge,
+.df-time-block.short-block:not(.df-time-block-week) .df-preview-actions,
+.df-time-block.short-block:not(.df-time-block-week) .df-block-time,
+.df-time-block.short-block:not(.df-time-block-week) .df-block-check,
+.df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
   display: none;
 }
-.df-time-block.short-block .df-block-title-row strong {
+.df-time-block.short-block:not(.df-time-block-week) {
+  padding: 0 4px;
+  justify-content: center;
+}
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row {
+  width: 100%;
+  max-width: 100%;
+}
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
   font-size: 12px;
+  line-height: 1.1;
+  width: 100%;
+  max-width: 100%;
 }
 
 .df-time-block.recurring .df-block-title-row strong,
@@ -13065,6 +13081,27 @@ body:has(:active)::-webkit-scrollbar-thumb {
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.25;
+}
+
+/* Short blocks in week view: compact padding and smaller text so title remains legible */
+.df-week-view .df-time-block.short-block.df-time-block-week,
+.df-week-view .df-event-blocks-layer .df-time-block.short-block {
+  padding: 2px 5px 2px 24px !important;
+}
+.df-week-view .df-time-block.short-block .df-block-title-row strong,
+.df-week-view .df-event-blocks-layer .df-time-block.short-block .df-block-title-row strong {
+  font-size: 10px;
+  line-height: 1.2;
+  -webkit-line-clamp: 1;
+}
+.df-week-view .df-time-block.short-block .df-block-check,
+.df-week-view .df-event-blocks-layer .df-time-block.short-block .df-block-check {
+  left: 5px;
+  top: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  border-width: 1.2px;
 }
 
 /* Completed task in week view: muted */
