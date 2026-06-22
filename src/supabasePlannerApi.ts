@@ -166,10 +166,12 @@ function clearAuthCallbackUrl() {
 }
 
 export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: string): PlannerApi {
+  const desktopStorage = window.desktopApi?.authStorage;
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
-      autoRefreshToken: true
+      autoRefreshToken: true,
+      ...(desktopStorage ? { storage: desktopStorage } : {})
     }
   });
   let cachedUser: User | null | undefined;
@@ -545,3 +547,4 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
   return api;
 }
+
