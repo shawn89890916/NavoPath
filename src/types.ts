@@ -368,6 +368,11 @@ declare global {
   interface Window {
     plannerApi: PlannerApi;
     desktopApi?: {
+      authStorage: {
+        getItem: (key: string) => Promise<string | null>;
+        setItem: (key: string, value: string) => Promise<void>;
+        removeItem: (key: string) => Promise<void>;
+      };
       getUpdateState: () => Promise<DesktopUpdateState>;
       checkForUpdates: () => Promise<DesktopUpdateState>;
       installUpdate: () => Promise<boolean>;
@@ -375,3 +380,4 @@ declare global {
     };
   }
 }
+

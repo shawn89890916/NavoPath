@@ -8,6 +8,7 @@
 - 同步时间会被记录并跟随账户同步到所有设备，账户页会显示“刚刚 / N 分钟前 / N 小时前”相对时间与绝对时间，方便查看上次同步时间。
 
 ### 改进
+- Windows 桌面端现在会使用系统加密存储长期保留登录会话，关闭应用或重启电脑后仍可直接进入工作区，主动退出登录后才会清除会话。
 - 桌面应用图标使用白色 N 表面、黑色立体阴影和透明外围，在浅色与深色系统界面中都保持清晰。
 - 收起今日候选后，三日、周和月视图会统一进入简洁阅读模式。
 - 周视图中 15 分钟长度的任务块标题现在清晰可读，去掉了多余的勾选与缩进，使短时长块也能在窄列里完整显示。
@@ -115,6 +116,7 @@
 - The last sync time is recorded and synced with the account across devices, and the Account page shows a relative timestamp ("Just now / N minutes ago / N hours ago") plus the absolute date and time.
 
 ### Improved
+- The Windows desktop app now keeps sign-in sessions in encrypted system storage, so users return directly to the workspace after closing the app or restarting the computer; signing out explicitly clears the session.
 - The desktop icon now uses a white N face, black dimensional shadow, and transparent outer canvas so it stays clear in light and dark system surfaces.
 - Collapsing Today's Candidates now consistently switches 3 Day, Week, and Month views into the compact reading mode.
 - 15‑minute task blocks in the week view now show readable titles by removing the redundant check and inner padding so the title fits the narrow column.
@@ -195,3 +197,4 @@
 - Follow and restart the complete onboarding workflow.
 - Resolve relative AI dates using the user's local timezone.
 - Prevent accidental text selection while dragging timeline tasks.
+

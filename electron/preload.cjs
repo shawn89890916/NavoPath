@@ -1,6 +1,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktopApi", {
+  authStorage: {
+    getItem: (key) => ipcRenderer.invoke("auth-storage:get", key),
+    setItem: (key, value) => ipcRenderer.invoke("auth-storage:set", key, value),
+    removeItem: (key) => ipcRenderer.invoke("auth-storage:remove", key)
+  },
   getUpdateState: () => ipcRenderer.invoke("updater:getState"),
   checkForUpdates: () => ipcRenderer.invoke("updater:check"),
   installUpdate: () => ipcRenderer.invoke("updater:install"),
@@ -10,3 +15,4 @@ contextBridge.exposeInMainWorld("desktopApi", {
     return () => ipcRenderer.removeListener("updater:state", handler);
   }
 });
+
