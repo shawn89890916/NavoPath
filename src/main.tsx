@@ -1637,7 +1637,13 @@ function App() {
     }
   }, [timelineView]);
 
-  // simpleView is only controlled by the user toggle button; do not auto-set.
+  // Range views become the compact reading mode when the candidate shelf is
+  // collapsed. Keep this derived here so every collapse/expand entry point is
+  // consistent, including the week-view fullscreen control.
+  useEffect(() => {
+    const supportsCompactRange = timelineView === "3day" || timelineView === "weekly" || timelineView === "month";
+    setSimpleView(candidatePanelCollapsed && supportsCompactRange);
+  }, [candidatePanelCollapsed, timelineView]);
 
   useEffect(() => {
     if (mode !== "execute") {

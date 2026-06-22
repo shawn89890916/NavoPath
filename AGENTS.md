@@ -13,6 +13,23 @@ Every agent turn that changes user-visible behavior must update `CHANGELOG.md` b
 
 Visual and interaction work must follow `NavoPathStyle.md`.
 
+## Protected product contracts
+
+- `NavoPathStyle.md` is the visual source of truth. Do not replace its palette,
+  theme-variable rules, or editorial interaction language with generic defaults.
+- The application icon must keep a transparent outer canvas, a white front-facing
+  `N`, and black extrusion/shadow. Never ship a white/colored background or a black
+  front face. Keep `public/navopath-icon.png`, `build/icon.ico`, and the editable
+  source in sync, and verify alpha transparency before publishing.
+- Desktop releases must include `latest.yml`, `NavoPath-Setup.exe`, its `.blockmap`,
+  and `NavoPath-Portable.exe` under a real semver tag. Do not publish updater assets
+  to an `untagged-*` URL, overwrite an existing version, or change the GitHub
+  provider in `package.json`.
+- The in-app `View release notes` action must continue to open the product changelog
+  route (`/changelog`) rather than a transient GitHub asset or draft-release URL.
+- Any user-visible change requires mirrored Chinese and English `CHANGELOG.md`
+  entries and a version bump before a desktop release.
+
 ## End-of-turn GitHub publish
 
 After every conversation that changes files in this repository, finish the turn by publishing the completed work to GitHub:

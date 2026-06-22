@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 2026-06-22 · 更清晰的周视图与桌面图标
+
+### 改进
+- 桌面应用图标使用白色 N 表面、黑色立体阴影和透明外围，在浅色与深色系统界面中都保持清晰。
+- 收起今日候选后，三日、周和月视图会统一进入简洁阅读模式。
+
+### 修复
+- 修复时间轴全屏后仍受普通工作区高度约束、顶部留下大块空白的问题；全屏现在会铺满整个可用视口。
+- “查看发布说明”现在稳定打开应用内更新日志，不再依赖临时或未标记的 GitHub 发布地址。
+
 ## 1.2.1 · 图标重绘与启动加速
 
 ### 改进
@@ -89,6 +99,16 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-22 · Clearer week view and desktop icon
+
+### Improved
+- The desktop icon now uses a white N face, black dimensional shadow, and transparent outer canvas so it stays clear in light and dark system surfaces.
+- Collapsing Today's Candidates now consistently switches 3 Day, Week, and Month views into the compact reading mode.
+
+### Fixed
+- Fixed timeline fullscreen inheriting the normal workbench height and leaving a large blank area; fullscreen now fills the entire available viewport.
+- View release notes now reliably opens the in-app changelog instead of depending on a temporary or untagged GitHub release URL.
 
 ## 2026-06-21 · Continuous year calendar
 

@@ -1865,6 +1865,38 @@
   flex: 1 1 auto !important;
   height: 100% !important;
 }
+
+/* Fullscreen is a viewport mode, not merely a hidden-header variant. Keep the
+   entire timeline height chain independent from the desktop workbench offset. */
+#root .df-app.is-timeline-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+}
+
+#root .df-app.is-timeline-fullscreen .df-execute {
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  grid-template-columns: 0 minmax(0, 1fr) !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+#root .df-app.is-timeline-fullscreen .df-timeline-panel,
+#root .df-app.is-timeline-fullscreen .df-timeline-body,
+#root .df-app.is-timeline-fullscreen .df-timeline-content,
+#root .df-app.is-timeline-fullscreen .df-timeline-3day,
+#root .df-app.is-timeline-fullscreen .df-month-view,
+#root .df-app.is-timeline-fullscreen .df-month-body {
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+}
 .df-app .df-timeline-canvas {
   margin-bottom: 0 !important;
 }
@@ -2902,6 +2934,37 @@ body.df-timeline-pointer-drag * {
     margin: -10px -4px 0 8px;
   }
 
+}
+
+/* Final fullscreen contract. This must remain after every responsive and theme
+   override so hidden chrome cannot create implicit grid rows or viewport gaps. */
+#root .df-app.is-timeline-fullscreen .df-header,
+#root .df-app.is-timeline-fullscreen .df-candidate-panel {
+  display: none !important;
+}
+
+#root .df-app.is-timeline-fullscreen .df-execute {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+#root .df-app.is-timeline-fullscreen .df-timeline-panel {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

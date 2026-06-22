@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <filter id="ns">
-      <feDropShadow dx="10" dy="12" stdDeviation="3.5" flood-color="#000" flood-opacity="1"/>
-      <feDropShadow dx="4" dy="5" stdDeviation="2" flood-color="#000" flood-opacity="0.65"/>
+    <filter id="black-extrusion" x="-30%" y="-20%" width="170%" height="170%">
+      <feDropShadow dx="-18" dy="24" stdDeviation="0" flood-color="#000000" flood-opacity="1"/>
+      <feDropShadow dx="-28" dy="38" stdDeviation="0" flood-color="#000000" flood-opacity="1"/>
     </filter>
   </defs>
-
-  <g filter="url(#ns)" stroke="#fff" stroke-width="58" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <line x1="300" y1="210" x2="320" y2="760"/>
-    <line x1="338" y1="280" x2="710" y2="756"/>
-    <line x1="700" y1="228" x2="722" y2="754"/>
+  <g fill="#FFFFFF" stroke="#000000" stroke-width="8" stroke-linejoin="round" filter="url(#black-extrusion)">
+    <path d="M280 200C250 195 225 215 230 250L235 720C237 760 275 780 310 775C345 770 360 735 355 695L350 280C348 245 325 220 295 215C290 214 285 215 280 200Z"/>
+    <path d="M340 320C365 300 395 305 415 330L690 710C710 740 745 755 775 740C805 725 815 690 795 660C785 645 770 635 755 625L420 295C395 270 360 265 335 285C315 300 310 330 325 355L370 410C385 430 410 435 430 420L735 720C755 745 790 750 815 735C840 720 845 685 825 660L425 270C400 245 365 240 340 260C320 275 315 300 340 320Z"/>
+    <path d="M680 180C715 165 755 145 775 175C795 205 785 245 775 285L620 180C595 165 570 185 575 220L590 380C595 410 625 425 655 415C685 405 695 375 690 345L675 245C670 220 685 205 710 215L740 760C745 795 780 815 815 805C850 795 865 760 855 725L790 220C785 185 755 165 720 175C705 180 692 188 680 180Z"/>
   </g>
 </svg>
