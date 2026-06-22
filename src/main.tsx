@@ -5177,6 +5177,18 @@ function App() {
   }
 
   if (!isWorkspaceRoute || (authState?.mode === "cloud" && !authState.user)) {
+    if (isWorkspaceRoute && window.desktopApi) {
+      return <AuthGate
+        busy={authBusy}
+        error={authError}
+        notice={authNotice}
+        onSubmit={(email, password, displayName, intent) => (
+          handleAuthSubmit(email, password, displayName, intent, "dark")
+        )}
+        onResend={resendConfirmation}
+        onContinueAfterConfirm={continueAfterConfirm}
+      />;
+    }
     return <Suspense fallback={<ExecuteSkeleton />}>
       <LandingPageLazy busy={authBusy} error={authError} notice={authNotice} onLogin={handleAuthSubmit} onResend={resendConfirmation} onContinueAfterConfirm={continueAfterConfirm} onForgotPassword={handleForgotPassword} />
     </Suspense>;

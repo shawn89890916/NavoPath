@@ -1,5 +1,11 @@
 # NavoPath 更新日志
 
+## 2026-06-23 · 更可靠的桌面登录
+
+### 改进
+- Windows 桌面端现在会使用系统加密存储长期保留登录会话，关闭应用或重启电脑后仍可直接进入工作区，主动退出登录后才会清除会话。
+- Windows 桌面端未登录时直接显示简洁的登录与注册页面，不再先展示网站介绍；网页端首页保持不变。
+
 ## 2026-06-22 · 更清晰的周视图与桌面图标
 
 ### 新功能
@@ -106,6 +112,12 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-23 · More reliable desktop sign-in
+
+### Improved
+- The Windows desktop app now keeps sign-in sessions in encrypted system storage, so users return directly to the workspace after closing the app or restarting the computer; signing out explicitly clears the session.
+- Signed-out Windows desktop users now see a focused sign-in and registration screen instead of the marketing introduction; the website landing page remains unchanged.
 
 ## 2026-06-22 · Clearer week view and desktop icon
 

@@ -8552,19 +8552,16 @@ body.df-resizing, body.df-resizing * {
   display: grid;
   place-items: center;
   padding: 32px;
-  background:
-    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--mode-primary) 18%, transparent), transparent 30%),
-    linear-gradient(135deg, #fbf7ff 0%, #f8fafc 44%, #f3f7ff 100%);
-  color: var(--color-text);
+  background: #FBF9FF;
+  color: #27231E;
 }
 
 .df-auth-card {
   width: min(420px, calc(100vw - 40px));
-  padding: 24px;
-  border: 1px solid color-mix(in srgb, var(--mode-primary) 28%, transparent);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24px 70px rgba(92, 62, 137, 0.16);
+  padding: 32px;
+  border: 1px solid #D8D1C7;
+  border-radius: 2px;
+  background: #FFFDF8;
 }
 
 .df-auth-brand {
@@ -8591,30 +8588,45 @@ body.df-resizing, body.df-resizing * {
 .df-auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 4px;
+  gap: 20px;
+  padding: 0;
   margin-bottom: 18px;
-  border-radius: 14px;
-  background: #f3f4f6;
+  border-bottom: 1px solid #D8D1C7;
+  background: transparent;
 }
 
 .df-auth-tabs button,
 .df-auth-submit {
   border: 0;
-  border-radius: 11px;
-  font-weight: 800;
+  border-radius: 0;
+  cursor: pointer;
+  font-weight: 650;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, opacity 160ms ease;
+}
+
+.df-auth-tabs button:focus-visible,
+.df-auth-submit:focus-visible {
+  outline: 1px solid #7EA172;
+  outline-offset: 3px;
+}
+
+.df-auth-tabs button:active,
+.df-auth-submit:active {
+  transform: translateY(1px);
 }
 
 .df-auth-tabs button {
   height: 38px;
-  color: var(--color-muted);
+  margin-bottom: -1px;
+  border-bottom: 1px solid transparent;
+  color: #756B5E;
   background: transparent;
 }
 
 .df-auth-tabs button.active {
-  color: #5b21b6;
-  background: var(--color-primary-soft);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--mode-primary) 18%, transparent);
+  color: #584D3D;
+  border-bottom-color: #D7816A;
+  background: transparent;
 }
 
 .df-auth-card form {
@@ -8633,16 +8645,16 @@ body.df-resizing, body.df-resizing * {
 .df-auth-card input {
   height: 42px;
   padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--color-text);
+  border: 1px solid #D8D1C7;
+  border-radius: 2px;
+  background: #FBF9FF;
+  color: #27231E;
   outline: none;
 }
 
 .df-auth-card input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mode-primary) 16%, transparent);
+  border-color: #7EA172;
+  box-shadow: 0 0 0 1px #7EA172;
 }
 
 .df-auth-check {
@@ -8693,14 +8705,26 @@ body.df-resizing, body.df-resizing * {
 .df-auth-submit {
   height: 42px;
   margin-top: 4px;
-  color: #fff;
-  background: linear-gradient(135deg, #8b5cf6, #c69cf9);
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--mode-primary) 24%, transparent);
+  border-bottom: 1px solid #D7816A;
+  color: #584D3D;
+  background: color-mix(in srgb, #D7816A 12%, #FFFDF8);
 }
 
 .df-auth-submit:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.df-auth-submit:not(:disabled):hover {
+  color: #27231E;
+  background: color-mix(in srgb, #D7816A 18%, #FFFDF8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df-auth-tabs button,
+  .df-auth-submit {
+    transition: none;
+  }
 }
 
 .df-auth-error {

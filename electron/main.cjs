@@ -322,6 +322,7 @@ function getPaths() {
     dir,
     dataPath: path.join(dir, "planner-data.json"),
     settingsPath: path.join(dir, "settings.json"),
+    authSessionPath: path.join(dir, "auth-session.json"),
     backgroundDir: path.join(dir, "backgrounds")
   };
 }
@@ -345,6 +346,51 @@ function readJson(file, fallback) {
 
 function writeJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf8");
+}
+
+function validateAuthStorageKey(key) {
+  if (typeof key !== "string" || !/^sb-[a-z0-9-]+-(?:auth-token|code-verifier)$/i.test(key)) {
+    throw new Error("Invalid authentication storage key.");
+  }
+}
+
+function readAuthStorage(key) {
+  validateAuthStorageKey(key);
+  const { authSessionPath } = getPaths();
+  const stored = readJson(authSessionPath, {});
+  const encryptedValue = stored[key];
+  if (typeof encryptedValue !== "string" || !encryptedValue) return null;
+  try {
+    return safeStorage.decryptString(Buffer.from(encryptedValue, "base64"));
+  } catch {
+    delete stored[key];
+    writeJson(authSessionPath, stored);
+    return null;
+  }
+}
+
+function writeAuthStorage(key, value) {
+  validateAuthStorageKey(key);
+  if (typeof value !== "string" || value.length > 1024 * 1024) {
+    throw new Error("Invalid authentication storage value.");
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("Secure session storage is unavailable on this device.");
+  }
+  const { dir, authSessionPath } = getPaths();
+  fs.mkdirSync(dir, { recursive: true });
+  const stored = readJson(authSessionPath, {});
+  stored[key] = safeStorage.encryptString(value).toString("base64");
+  writeJson(authSessionPath, stored);
+}
+
+function removeAuthStorage(key) {
+  validateAuthStorageKey(key);
+  const { authSessionPath } = getPaths();
+  const stored = readJson(authSessionPath, {});
+  if (!(key in stored)) return;
+  delete stored[key];
+  writeJson(authSessionPath, stored);
 }
 
 function backupCurrentData(reason) {
@@ -742,6 +788,9 @@ ipcMain.handle("planner:resetSeed", () => {
 ipcMain.handle("settings:get", () => getSettings());
 ipcMain.handle("settings:save", (_event, settings) => saveSettings(settings));
 ipcMain.handle("settings:selectBackgroundImage", () => selectBackgroundImage());
+ipcMain.handle("auth-storage:get", (_event, key) => readAuthStorage(key));
+ipcMain.handle("auth-storage:set", (_event, key, value) => writeAuthStorage(key, value));
+ipcMain.handle("auth-storage:remove", (_event, key) => removeAuthStorage(key));
 ipcMain.handle("ai:chat", (_event, payload) => callDeepSeek(payload));
 ipcMain.handle("updater:getState", () => updateState);
 ipcMain.handle("updater:check", async () => {
