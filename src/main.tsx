@@ -1,4 +1,4 @@
-﻿import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+﻿﻿﻿﻿import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
@@ -182,6 +182,8 @@ function themeVars(settings: Settings, mode: Mode) {
   const activeLight = mode === "execute" ? executeLight : planningLight;
   const { r, g, b } = hexToRgb(activeAccent);
   const isDark = settings.theme === "dark";
+  const glassBlur = Number.isFinite(settings.glassBlur) ? `${settings.glassBlur}px` : "18px";
+  const glassOpacity = Number.isFinite(settings.glassOpacity) ? settings.glassOpacity / 100 : 0.88;
   if (isDark) {
     const darkAccent = settings.executeAccentColor || settings.planningAccentColor ? activeAccent : "#EEE9DF";
     const darkAccentRgb = hexToRgb(darkAccent);
@@ -211,6 +213,8 @@ function themeVars(settings: Settings, mode: Mode) {
       "--header-fg-muted": "#B8B1C2",
       "--input-bg": "#1B1033",
       "--input-border": "rgba(255,255,255,0.12)",
+      "--glass-blur": glassBlur,
+      "--glass-opacity": glassOpacity,
     } as CSSProperties;
   }
   return {
@@ -239,6 +243,8 @@ function themeVars(settings: Settings, mode: Mode) {
     "--header-fg-muted": "#7B7062",
     "--input-bg": "#FFFFFF",
     "--input-border": "#DED8D8",
+    "--glass-blur": glassBlur,
+    "--glass-opacity": glassOpacity,
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
@@ -5197,7 +5203,7 @@ function App() {
     : undefined;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${settings.glassEnabled ? " glass-enabled" : ""}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand">

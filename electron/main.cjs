@@ -738,7 +738,8 @@ function createWindow() {
     minHeight: 720,
     title: "NavoPath",
     icon: iconPath,
-    backgroundColor: "#f5f7fb",
+    transparent: true,
+    backgroundColor: "transparent",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
