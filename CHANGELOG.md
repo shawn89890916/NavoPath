@@ -22,6 +22,21 @@
 
 访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
 
+## 2026-06-24 · 时间轴快速添加与短任务修复
+
+### 改进
+- 时间轴点击空白时段快速添加任务后，弹窗会保持打开并记住上次选择的项目，连续安排多个任务时无需重复选色。
+
+### 修复
+- 修复三日、周视图中点击某天快速添加任务后，被点击的当天会跳到视图最左侧的问题；现在若目标日期已在可见范围内就保持原位。
+- 修复时间轴中 15 分钟时长的短任务标题被截断、无法正常显示的问题。
+- 修复深色模式下快速添加确认按钮变成白色、几乎看不见的问题，现在恢复为强调色圆形按钮。
+- 修复时间轴左右翻页切换日期失灵的问题。
+
+---
+
+访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
+
 ## 2026-06-22 · 桌面端体验全面提升
 
 ### 新功能
@@ -162,6 +177,21 @@
 - Fixed the desktop "Restart and install" action crashing with `quitAndInstall is not a function` after an update download, preventing the installer from launching.
 - Fixed some text in dark mode remaining black and hard to read.
 - Fixed 15-minute task titles being truncated in the timeline.
+
+---
+
+Visit [www.navopath.com](https://www.navopath.com) to start your NavoPath journey!
+
+## 2026-06-24 · Timeline quick-add and short-block fixes
+
+### Improved
+- After quick-adding a task from a timeline slot, the popup stays open and remembers the last selected project, so scheduling several tasks in a row no longer requires re-picking the color each time.
+
+### Fixed
+- Fixed the clicked day jumping to the leftmost column in 3-day and week views after quick-adding a task; the view now stays put when the target date is already visible.
+- Fixed 15-minute short task blocks having their titles clipped and not displaying properly in the timeline.
+- Fixed the quick-add confirm button turning white and nearly invisible in dark mode; it is now a solid accent-colored round button again.
+- Fixed left/right date switching in the timeline not responding.
 
 ---
 

@@ -245,7 +245,7 @@ type ResizePreview = { taskId: string; start: string; end: string } | null;
 type ScheduleSuggestion = SchedulePreview; // legacy alias kept for compatibility; replaced by SchedulePreview
 type QuickSchedule = { startTime: string; title: string; projectId: string; isAllDay?: boolean } | null;
 /** Floating popup for time‑slot quick‑add on timeline (used by day / 3‑day / week views) */
-type FloatingTimeAdd = { date: string; startTime: string; endTime: string; top: number; left: number; width: number } | null;
+type FloatingTimeAdd = { date: string; startTime: string; endTime: string; top: number; left: number; width: number; lastProjectId?: string } | null;
 /** Floating popup for all‑day bar quick‑add */
 type AllDayQuickAdd = { date: string; left: number; top: number; width: number; dayIndex: number } | null;
 /** Drag‑create state for timeline area (day / 3‑day / week views) */
@@ -2083,8 +2083,10 @@ function App() {
 
   useEffect(() => {
     if (mode !== "execute" || !pendingTimelineFocus) return;
-    const anchorDate = resolveVisibleAnchorForDate(pendingTimelineFocus.date);
-    if (selectedDate !== anchorDate) {
+    const targetDate = pendingTimelineFocus.date;
+    const visibleDays = getVisibleDays(timelineView === "weekly" ? "weekly" : (timelineView === "3day" ? "3day" : "daily"), selectedDate);
+    if (!visibleDays.includes(targetDate)) {
+      const anchorDate = resolveVisibleAnchorForDate(targetDate);
       setSelectedDate(anchorDate);
       return;
     }
@@ -3221,7 +3223,7 @@ function App() {
       tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
     });
     requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
-    setFloatingTimeAdd(null);
+    setFloatingTimeAdd({ ...floatingTimeAdd, lastProjectId: projectId || undefined });
     showToast(t(lang, "toast.addedToTimeline"));
   }
 
@@ -6387,8 +6389,9 @@ function FloatingShelfDragPreview({ task, pointer, candidateTarget, lang }: { ta
 
 /** Floating quick-add popup for time-slot clicks on day / 3-day / week views. */
 function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNullable<FloatingTimeAdd>; projects: Project[]; onSave: (title: string, projectId: string | null) => void; onCancel: () => void }) {
-  const [input, setInput] = useState("");
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const lastProject = add.lastProjectId ? projects.find((p) => p.id === add.lastProjectId) : null;
+  const [input, setInput] = useState(lastProject ? `#${lastProject.title} ` : "");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(lastProject ?? null);
   const [projectQuery, setProjectQuery] = useState("");
   const inputBoxRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
