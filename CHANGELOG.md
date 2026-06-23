@@ -6,12 +6,17 @@
 - Windows 桌面端现在会使用系统加密存储长期保留登录会话，关闭应用或重启电脑后仍可直接进入工作区，主动退出登录后才会清除会话。
 - Windows 桌面端未登录时直接显示简洁的登录与注册页面，不再先展示网站介绍；网页端首页保持不变。
 - 多设备同步改为以最新版本合并，不再把本地数据固定覆盖到云端，其他设备新增的任务和计划不会再被误删。
-- 左上角 NavoPath logo 增加轻微投影，浅色模式下不再灰蒙蒙。
+- 深色模式整体改为简约中性灰风格，移除蓝紫色调，文字、卡片与设置面板对比度更高，长时间使用更舒适。
+- 设置面板的强调色与导航项在深色模式下改为中性背景，去除蓝紫色高亮。
+- 左上角 NavoPath logo 在浅色与深色模式下都保持清晰，去除灰蒙蒙的反色滤镜。
 - 设置"一天开始时间"后时间轴会平滑滚动到对应时刻并显示确认提示。
 - 默认字号略微调大，阅读更舒适。
 
 ### 修复
 - 修复三日、周和月视图切换按钮被时间轴左右翻页热区遮挡而无法点击的问题。
+- 修复桌面端检查更新后点击"重启并安装"按钮报错 `quitAndInstall is not a function` 的问题。
+- 修复深色模式下部分文字仍为黑色难以辨认的问题。
+- 修复时间轴中 15 分钟时长的任务标题显示不全的问题。
 
 ---
 
@@ -146,12 +151,17 @@
 - The Windows desktop app now keeps sign-in sessions in encrypted system storage, so users return directly to the workspace after closing the app or restarting the computer; signing out explicitly clears the session.
 - Signed-out Windows desktop users now see a focused sign-in and registration screen instead of the marketing introduction; the website landing page remains unchanged.
 - Multi-device sync now merges the latest version instead of overwriting cloud data with local data, so tasks and plans added on other devices are no longer accidentally deleted.
-- The NavoPath logo in the top-left corner now has a subtle drop-shadow so it stays clear on light backgrounds.
+- Dark mode now uses a minimal neutral-gray palette inspired by Claude Code, removing blue-purple tints for higher contrast on text, cards, and settings panels.
+- Accent color swatches and navigation items in Settings now use neutral backgrounds in dark mode instead of blue-purple highlights.
+- The NavoPath logo in the top-left corner stays crisp in both light and dark modes, with the inverted-color filter removed.
 - Setting the day start time now smoothly scrolls the timeline to that hour and shows a confirmation toast.
 - The default font size is slightly larger for more comfortable reading.
 
 ### Fixed
 - Fixed 3 Day, Week, and Month view switch buttons being blocked by the timeline left/right navigation hot zones.
+- Fixed the desktop "Restart and install" button after an update failing with `quitAndInstall is not a function`.
+- Fixed some text in dark mode remaining black and hard to read.
+- Fixed 15-minute task titles being truncated in the timeline.
 
 ---
 

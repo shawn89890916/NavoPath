@@ -12237,7 +12237,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
   gap: 4px;
   padding: 12px 6px;
   flex-shrink: 0;
-  z-index: 10;
+  position: relative;
+  z-index: 20;
 }
 
 .df-view-switch-vertical button {
@@ -19398,4 +19399,242 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-date-arrow:hover {
   background: color-mix(in srgb, var(--accent-active) 6%, transparent) !important;
   border-radius: 0 !important;
+}
+
+/* ===== Dark mode fixes: override hardcoded black text ===== */
+.df-app.theme-dark .df-toast,
+.df-app.theme-dark .exec-progress-label,
+.df-app.theme-dark .execute-pool-header h2,
+.df-app.theme-dark .tb-action-btn:hover,
+.df-app.theme-dark .df-ai-step.running .df-ai-step-label,
+.df-app.theme-dark .df-ai-fab,
+.df-app.theme-dark input,
+.df-app.theme-dark textarea,
+.df-app.theme-dark select,
+.df-app.theme-dark .df-utility-select,
+.df-app.theme-dark .df-utility-check,
+.df-app.theme-dark .df-theme-setting,
+.df-app.theme-dark .df-settings-profile,
+.df-app.theme-dark .df-detail-subtasks-new,
+.df-app.theme-dark .df-detail-notes-new,
+.df-app.theme-dark .df-detail-project-pick,
+.df-app.theme-dark .df-block-title,
+.df-app.theme-dark .df-project-name,
+.df-app.theme-dark .df-task-title,
+.df-app.theme-dark .df-tree-menu button,
+.df-app.theme-dark .df-candidate-title,
+.df-app.theme-dark .df-candidate-task-title,
+.df-app.theme-dark .df-utility-head h2,
+.df-app.theme-dark .df-ai-title strong,
+.df-app.theme-dark .df-settings-nav button,
+.df-app.theme-dark .df-month-year-btn,
+.df-app.theme-dark .df-date-title,
+.df-app.theme-dark .df-view-switch-vertical button,
+.df-app.theme-dark .df-execute-top,
+.df-app.theme-dark .df-timeline-actions,
+.df-app.theme-dark .df-ai-plan,
+.df-app.theme-dark .df-ai-plan-summary,
+.df-app.theme-dark .df-brand strong,
+.df-app.theme-dark .df-header,
+.df-app.theme-dark .df-header-inner,
+.df-app.theme-dark .df-tabs button,
+.df-app.theme-dark .df-top-view-switch button,
+.df-app.theme-dark .df-view-switch button,
+.df-app.theme-dark .df-quick-add-submit,
+.df-app.theme-dark .df-quick-add-input,
+.df-app.theme-dark .df-all-day-block,
+.df-app.theme-dark .df-time-ruler,
+.df-app.theme-dark .df-time-ruler-tick,
+.df-app.theme-dark .df-time-ruler-label,
+.df-app.theme-dark .df-exit-fullscreen-btn,
+.df-app.theme-dark .df-mobile-dock,
+.df-app.theme-dark .df-mobile-mode-switch button,
+.df-app.theme-dark .df-mobile-add,
+.df-app.theme-dark .df-add-fab,
+.df-app.theme-dark .df-clarify-action,
+.df-app.theme-dark .df-form-label,
+.df-app.theme-dark .df-form-input,
+.df-app.theme-dark .df-form-select,
+.df-app.theme-dark .df-form-textarea,
+.df-app.theme-dark .df-detail-field-label,
+.df-app.theme-dark .df-detail-field-value,
+.df-app.theme-dark .df-detail-section-title,
+.df-app.theme-dark .df-subtask-item,
+.df-app.theme-dark .df-subtask-title,
+.df-app.theme-dark .df-note-editor,
+.df-app.theme-dark .df-note-textarea,
+.df-app.theme-dark .df-recurrence-rule,
+.df-app.theme-dark .df-recurrence-summary,
+.df-app.theme-dark .df-planning-header,
+.df-app.theme-dark .df-planning-tree,
+.df-app.theme-dark .df-plan-project-node,
+.df-app.theme-dark .df-plan-task-node,
+.df-app.theme-dark .df-plan-subtask-node,
+.df-app.theme-dark .df-year-overview,
+.df-app.theme-dark .df-year-month,
+.df-app.theme-dark .df-year-month-title,
+.df-app.theme-dark .df-year-day,
+.df-app.theme-dark .df-changelog-page,
+.df-app.theme-dark .df-changelog-content,
+.df-app.theme-dark .df-changelog-section h2,
+.df-app.theme-dark .df-changelog-section h3,
+.df-app.theme-dark .df-changelog-section p,
+.df-app.theme-dark .df-changelog-section li,
+.df-app.theme-dark .df-loading-inline,
+.df-app.theme-dark .df-skeleton-brand,
+.df-app.theme-dark .df-skeleton-tab,
+.df-app.theme-dark .df-skeleton-avatar,
+.df-app.theme-dark .df-empty-state,
+.df-app.theme-dark .df-empty-state-title,
+.df-app.theme-dark .df-empty-state-text,
+.df-app.theme-dark .df-toast-message,
+.df-app.theme-dark .df-toast-undo-btn,
+.df-app.theme-dark .df-drawer-backdrop,
+.df-app.theme-dark .df-ai-backdrop,
+.df-app.theme-dark .df-floating-preview,
+.df-app.theme-dark .df-floating-time-add,
+.df-app.theme-dark .df-exit-fullscreen-btn,
+.df-app.theme-dark .df-ai-plan-menu,
+.df-app.theme-dark .df-ai-plan-menu label,
+.df-app.theme-dark .df-ai-plan-menu select,
+.df-app.theme-dark .df-ai-plan-toggle,
+.df-app.theme-dark .df-ai-plan-confirm,
+.df-app.theme-dark .df-ai-plan-cancel,
+.df-app.theme-dark .df-ai-plan-chevron,
+.df-app.theme-dark .df-ai-step,
+.df-app.theme-dark .df-ai-step-label,
+.df-app.theme-dark .df-ai-step-status,
+.df-app.theme-dark .df-ai-message,
+.df-app.theme-dark .df-ai-message-content,
+.df-app.theme-dark .df-ai-message-actions,
+.df-app.theme-dark .df-ai-input,
+.df-app.theme-dark .df-ai-input textarea,
+.df-app.theme-dark .df-ai-send,
+.df-app.theme-dark .df-ai-attachment,
+.df-app.theme-dark .df-ai-memory-notice,
+.df-app.theme-dark .df-ai-conversation-list,
+.df-app.theme-dark .df-ai-conversation-item,
+.df-app.theme-dark .df-ai-conversation-title,
+.df-app.theme-dark .df-ai-conversation-meta,
+.df-app.theme-dark .df-ai-model-select,
+.df-app.theme-dark .df-ai-reasoning-select,
+.df-app.theme-dark .df-ai-conversation-actions,
+.df-app.theme-dark .df-ai-conversation-delete,
+.df-app.theme-dark .df-ai-conversation-rename,
+.df-app.theme-dark .df-ai-attachment-status,
+.df-app.theme-dark .df-ai-attachment-clear,
+.df-app.theme-dark .df-ai-attachment-preview,
+.df-app.theme-dark .df-ai-attachment-name,
+.df-app.theme-dark .df-ai-plan-confirm,
+.df-app.theme-dark .df-ai-plan-cancel,
+.df-app.theme-dark .df-month-view,
+.df-app.theme-dark .df-month-title,
+.df-app.theme-dark .df-month-grid,
+.df-app.theme-dark .df-month-day,
+.df-app.theme-dark .df-month-day-label,
+.df-app.theme-dark .df-month-day-number,
+.df-app.theme-dark .df-month-day-tasks,
+.df-app.theme-dark .df-month-task,
+.df-app.theme-dark .df-month-more,
+.df-app.theme-dark .df-week-view,
+.df-app.theme-dark .df-week-header,
+.df-app.theme-dark .df-week-header-day,
+.df-app.theme-dark .df-week-header-label,
+.df-app.theme-dark .df-week-header-date,
+.df-app.theme-dark .df-all-day-row,
+.df-app.theme-dark .df-all-day-block,
+.df-app.theme-dark .df-all-day-label,
+.df-app.theme-dark .df-timeline-3day,
+.df-app.theme-dark .df-timeline-3day-header,
+.df-app.theme-dark .df-timeline-3day-header-day,
+.df-app.theme-dark .df-timeline-3day-header-label,
+.df-app.theme-dark .df-timeline-3day-header-date,
+.df-app.theme-dark .df-time-block,
+.df-app.theme-dark .df-time-block .df-block-title,
+.df-app.theme-dark .df-time-block .df-block-project,
+.df-app.theme-dark .df-time-block .df-block-time,
+.df-app.theme-dark .df-time-block .df-block-check,
+.df-app.theme-dark .df-time-block .df-next,
+.df-app.theme-dark .df-time-block .df-resize-dot,
+.df-app.theme-dark .df-time-block .df-preview-badge,
+.df-app.theme-dark .df-time-block .df-preview-actions,
+.df-app.theme-dark .df-candidate-panel,
+.df-app.theme-dark .df-candidate-list,
+.df-app.theme-dark .df-candidate-item,
+.df-app.theme-dark .df-candidate-item-title,
+.df-app.theme-dark .df-candidate-item-meta,
+.df-app.theme-dark .df-candidate-empty,
+.df-app.theme-dark .df-quick-add,
+.df-app.theme-dark .df-quick-add-form,
+.df-app.theme-dark .df-quick-add-row,
+.df-app.theme-dark .df-quick-add-input,
+.df-app.theme-dark .df-quick-add-project,
+.df-app.theme-dark .df-quick-add-submit,
+.df-app.theme-dark .df-quick-schedule,
+.df-app.theme-dark .df-quick-schedule-input,
+.df-app.theme-dark .df-quick-schedule-submit,
+.df-app.theme-dark .df-all-day-quick,
+.df-app.theme-dark .df-all-day-quick-input,
+.df-app.theme-dark .df-all-day-quick-submit,
+.df-app.theme-dark .df-month-quick-add,
+.df-app.theme-dark .df-month-quick-add-input,
+.df-app.theme-dark .df-month-quick-add-submit,
+.df-app.theme-dark .df-floating-unschedule-preview,
+.df-app.theme-dark .df-floating-shelf-drag-preview,
+.df-app.theme-dark .df-placement-preview,
+.df-app.theme-dark .df-placement-card,
+.df-app.theme-dark .df-placement-card-title,
+.df-app.theme-dark .df-placement-card-meta,
+.df-app.theme-dark .df-placement-card-actions,
+.df-app.theme-dark .df-placement-card-confirm,
+.df-app.theme-dark .df-placement-card-cancel,
+.df-app.theme-dark .df-drag-create-popover,
+.df-app.theme-dark .df-drag-create-input,
+.df-app.theme-dark .df-drag-create-submit,
+.df-app.theme-dark .df-drag-create-cancel {
+  color: var(--text-main) !important;
+}
+
+/* ===== Fix: Logo invert filter in dark mode ===== */
+.df-app.theme-dark .dayflow-icon img {
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)) !important;
+}
+
+/* ===== Fix: 15-minute task title display ===== */
+.df-time-block.short-block:not(.df-time-block-week) {
+  padding: 1px 4px !important;
+  overflow: visible !important;
+}
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.df-week-view .df-time-block.short-block .df-block-title-row strong,
+.df-week-view .df-event-blocks-layer .df-time-block.short-block .df-block-title-row strong {
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+  -webkit-line-clamp: 2 !important;
+  white-space: normal !important;
+}
+
+/* ===== Fix: Settings neutral background, remove blue-purple ===== */
+.df-app.theme-dark .df-settings-nav button:hover,
+.df-app.theme-dark .df-settings-nav button.active {
+  background: rgba(255,255,255,0.04) !important;
+  border-bottom-color: var(--text-muted) !important;
+}
+.df-app.theme-dark .df-settings-nav button:focus-visible {
+  outline: 1px solid var(--text-muted) !important;
+}
+.df-app.theme-dark .df-theme-setting .df-project-color-picker {
+  border-color: var(--border-soft) !important;
+}
+.df-app.theme-dark .df-add-fab,
+.df-app.theme-dark .df-ai-fab {
+  background: var(--surface-raised) !important;
 }

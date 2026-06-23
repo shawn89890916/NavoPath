@@ -843,6 +843,9 @@ ipcMain.handle("updater:check", async () => {
 });
 ipcMain.handle("updater:install", () => {
   if (updateState.status !== "downloaded") return false;
-  setImmediate(() => getAutoUpdater().quitAndInstall(false, true));
+  setImmediate(() => {
+    const { autoUpdater } = getAutoUpdater();
+    autoUpdater.quitAndInstall(false, true);
+  });
   return true;
 });
