@@ -5,9 +5,23 @@ let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
 // Lazy-loaded: electron-updater is not needed until autoUpdater is configured
+let _autoUpdaterModule;
 let _autoUpdater;
+function getAutoUpdaterModule() {
+  if (!_autoUpdaterModule) _autoUpdaterModule = require("electron-updater");
+  return _autoUpdaterModule;
+}
 function getAutoUpdater() {
-  if (!_autoUpdater) _autoUpdater = require("electron-updater");
+  if (_autoUpdater) return _autoUpdater;
+  const updaterModule = getAutoUpdaterModule();
+  const resolvedUpdater = updaterModule?.autoUpdater
+    ?? updaterModule?.default?.autoUpdater
+    ?? updaterModule?.default
+    ?? updaterModule;
+  if (!resolvedUpdater || typeof resolvedUpdater.on !== "function") {
+    throw new TypeError("electron-updater autoUpdater instance is unavailable");
+  }
+  _autoUpdater = resolvedUpdater;
   return _autoUpdater;
 }
 
@@ -32,7 +46,7 @@ function publishUpdateState(patch) {
 }
 
 async function checkForDesktopUpdate(manual = false) {
-  const { autoUpdater } = getAutoUpdater();
+  const autoUpdater = getAutoUpdater();
   if (!app.isPackaged) return publishUpdateState({ status: "unsupported" });
   if (["checking", "downloading"].includes(updateState.status)) return updateState;
   if (manual && updateState.status === "available") {
@@ -48,7 +62,7 @@ async function checkForDesktopUpdate(manual = false) {
 }
 
 function configureAutoUpdater() {
-  const { autoUpdater } = getAutoUpdater();
+  const autoUpdater = getAutoUpdater();
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on("update-available", async (info) => {
@@ -844,7 +858,14 @@ ipcMain.handle("updater:check", async () => {
 ipcMain.handle("updater:install", () => {
   if (updateState.status !== "downloaded") return false;
   setImmediate(() => {
-    const { autoUpdater } = getAutoUpdater();
+    const autoUpdater = getAutoUpdater();
+    if (typeof autoUpdater.quitAndInstall !== "function") {
+      publishUpdateState({
+        status: "error",
+        message: "The downloaded update cannot be installed automatically. Please download the latest installer manually."
+      });
+      return;
+    }
     autoUpdater.quitAndInstall(false, true);
   });
   return true;

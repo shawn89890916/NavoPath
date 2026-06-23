@@ -14,7 +14,7 @@
 
 ### 修复
 - 修复三日、周和月视图切换按钮被时间轴左右翻页热区遮挡而无法点击的问题。
-- 修复桌面端检查更新后点击"重启并安装"按钮报错 `quitAndInstall is not a function` 的问题。
+- 修复桌面端下载更新后点击"重启并安装"会触发 `quitAndInstall is not a function` 异常、导致无法进入安装流程的问题。
 - 修复深色模式下部分文字仍为黑色难以辨认的问题。
 - 修复时间轴中 15 分钟时长的任务标题显示不全的问题。
 
@@ -159,7 +159,7 @@
 
 ### Fixed
 - Fixed 3 Day, Week, and Month view switch buttons being blocked by the timeline left/right navigation hot zones.
-- Fixed the desktop "Restart and install" button after an update failing with `quitAndInstall is not a function`.
+- Fixed the desktop "Restart and install" action crashing with `quitAndInstall is not a function` after an update download, preventing the installer from launching.
 - Fixed some text in dark mode remaining black and hard to read.
 - Fixed 15-minute task titles being truncated in the timeline.
 
