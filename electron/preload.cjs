@@ -13,5 +13,7 @@ contextBridge.exposeInMainWorld("desktopApi", {
     const handler = (_event, state) => listener(state);
     ipcRenderer.on("updater:state", handler);
     return () => ipcRenderer.removeListener("updater:state", handler);
-  }
+  },
+  aiChat: (payload) => ipcRenderer.invoke("ai:chat", payload),
+  isDesktop: () => true
 });

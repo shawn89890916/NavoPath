@@ -259,6 +259,7 @@ export interface Settings {
   hideAi: boolean;
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
+  dayStartTime: string;
   /** 自动同步频率（分钟）。0 或未设置表示仅手动同步。 */
   syncIntervalMinutes?: number;
   /** 最近一次成功同步时间（ISO 字符串）。 */
@@ -377,6 +378,8 @@ declare global {
       checkForUpdates: () => Promise<DesktopUpdateState>;
       installUpdate: () => Promise<boolean>;
       onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
+      aiChat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
+      isDesktop: () => boolean;
     };
   }
 }

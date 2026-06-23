@@ -60,6 +60,7 @@ const defaultSettings: Settings = {
   hideAi: false,
   addAdvancedOpen: false,
   uiStyle: "gradient",
+  dayStartTime: "00:00",
   syncIntervalMinutes: 60,
   lastSyncedAt: undefined
 };

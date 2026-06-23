@@ -459,6 +459,7 @@ export function installBrowserFallback() {
     hideAi: false,
     addAdvancedOpen: false,
     uiStyle: "gradient",
+    dayStartTime: "00:00",
   };
 
   const readSettings = () => {

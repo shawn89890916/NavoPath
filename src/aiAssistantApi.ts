@@ -173,15 +173,6 @@ export async function callAiAssistant(params: {
   memories?: AiMemoryPatch[];
   signal?: AbortSignal;
 }): Promise<AiAssistantResponse> {
-  const client = getClient();
-  if (!client) {
-    return {
-      reply: "AI 服务未配置，请在设置中连接 Supabase。",
-      actions: [],
-      steps: [{ label: "连接 AI 服务", status: "error" }],
-    };
-  }
-
   // Always include current date context for date parsing
   const currentDate = localIsoDate();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -190,6 +181,40 @@ export async function callAiAssistant(params: {
     currentDate,
     timezone,
   };
+
+  // Try desktop IPC first if available (more reliable than edge function on desktop)
+  const isDesktop = typeof window !== "undefined" && window.desktopApi?.isDesktop?.();
+  if (isDesktop && window.desktopApi?.aiChat) {
+    try {
+      if (params.signal?.aborted) {
+        return { reply: "请求已取消。", actions: [], steps: [{ label: "请求已取消", status: "error" }] };
+      }
+      const systemPrompt = buildDesktopSystemPrompt(params.mode, enrichedContext, params.memories);
+      const messages: AiChatMessage[] = [
+        { role: "system", content: systemPrompt },
+        ...(params.history || []),
+        { role: "user", content: params.message },
+      ];
+      const result = await window.desktopApi.aiChat({ messages, draftText: "" });
+      return {
+        reply: result.reply || "完成",
+        actions: Array.isArray(result.actions) ? result.actions.map((a: any) => adaptDesktopAction(a)) : [],
+        steps: [{ label: "AI 回复", status: "done" }],
+      };
+    } catch (err) {
+      console.warn("Desktop AI fallback failed, trying Supabase:", err);
+      // Fall through to Supabase
+    }
+  }
+
+  const client = getClient();
+  if (!client) {
+    return {
+      reply: "AI 服务未配置，请在设置中连接 Supabase。",
+      actions: [],
+      steps: [{ label: "连接 AI 服务", status: "error" }],
+    };
+  }
 
   try {
     if (params.signal?.aborted) {
@@ -241,6 +266,26 @@ export async function callAiAssistant(params: {
       steps: [{ label: "网络连接", status: "error" }],
     };
   }
+}
+
+function buildDesktopSystemPrompt(mode: AiMode, context: Record<string, unknown>, memories?: AiMemoryPatch[]): string {
+  const ctxStr = JSON.stringify(context).slice(0, 4000);
+  const memStr = memories && memories.length > 0 ? JSON.stringify(memories).slice(0, 2000) : "";
+  return [
+    "你是一个留学升学对话助手。你需要根据用户输入决定返回格式。",
+    "如果需要创建任务 / 事件 / 笔记 / 记忆，必须只返回纯 JSON，不要用 markdown 代码块（不要用 ```），不要加任何前缀文字：",
+    '{"reply":"你的中文回复","actions":[{"type":"add_task","title":"...","dueDate":"YYYY-MM-DD","category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","notes":"...","subtasks":[{"title":"子任务"}]}]}',
+    "如果只是普通聊天、不需要创建/修改任何数据，直接返回纯文本，不要用 JSON。",
+    "可用 action：add_task、reschedule_task、add_event、add_note、add_memory。",
+    `当前模式：${mode}`,
+    `上下文：${ctxStr}`,
+    memStr ? `记忆：${memStr}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function adaptDesktopAction(a: any): AiAction {
+  // Desktop returns AiAction-like objects from DeepSeek; pass through
+  return a as AiAction;
 }
 
 export const FALLBACK_AI_MODELS = [

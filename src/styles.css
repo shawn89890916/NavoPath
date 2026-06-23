@@ -1,4 +1,4 @@
-﻿﻿/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
+﻿/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 /*  NavoPath Stylesheet 锟斤拷 Reorganized                               */
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
@@ -11729,26 +11729,31 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-date-arrow {
   position: absolute;
-  top: 54%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
+  transform: none;
   z-index: 12;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 100%;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--text-muted) !important;
   font-size: 22px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
-.df-date-arrow.left { left: 8px; }
+.df-date-arrow.left { left: 0; }
 
-.df-date-arrow.right { right: 8px; }
+.df-date-arrow.right { right: 0; }
 
-.df-timeline-panel:has(.df-timeline-3day) .df-date-arrow.left { left: 70px; }
+.df-timeline-panel:has(.df-timeline-3day) .df-date-arrow.left { left: 0; }
 
-.df-timeline-panel:has(.df-timeline-3day) .df-date-arrow.right { right: 10px; }
+.df-timeline-panel:has(.df-timeline-3day) .df-date-arrow.right { right: 0; }
 
 .df-date-arrow:hover {
   color: var(--accent-active) !important;
@@ -12266,7 +12271,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-timeline-canvas {
   position: relative;
   width: calc(100% - 2px);
-  margin: 0 0 80px;
+  margin: 0;
   overflow: visible;
   background:
     repeating-linear-gradient(
@@ -13288,18 +13293,18 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-ai-plan {
   width: auto;
-  min-width: 118px;
-  height: 36px;
-  padding: 0 14px !important;
+  min-width: 90px;
+  height: 30px;
+  padding: 0 10px !important;
   border-radius: 999px !important;
-  font-size: 11px;
-  letter-spacing: .035em;
+  font-size: 10px;
+  letter-spacing: .03em;
 }
 
 .df-ai-plan::before {
   content: "\2728";
-  margin-right: 7px;
-  font-size: 12px;
+  margin-right: 5px;
+  font-size: 10px;
 }
 
 .df-ai-plan.thinking::before {
@@ -19231,4 +19236,163 @@ body:has(:active)::-webkit-scrollbar-thumb {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* === Batch UI fixes === */
+
+/* Task & Project segment buttons: full width, 2 columns */
+.df-drawer .df-segment {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
+.df-drawer .df-segment button {
+  width: 100%;
+  text-align: center;
+  padding: 8px 0;
+  font-weight: 600;
+}
+
+/* Remove shadow from accent color picker */
+.df-theme-setting .df-project-color-picker,
+.df-theme-setting .df-color-swatch,
+.df-theme-setting button {
+  box-shadow: none !important;
+}
+.df-theme-setting span[style*="--project-color"] {
+  box-shadow: none !important;
+  border: 1px solid var(--border-soft) !important;
+}
+
+/* Settings divider and subhead */
+.df-settings-divider {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 16px 0 8px;
+}
+.df-settings-subhead {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* 3-day view: fix checkbox overlapping task name */
+.df-time-block .df-block-check {
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.df-time-block.short-block .df-block-check {
+  margin-right: 2px;
+}
+.df-time-block .df-block-title-row {
+  min-width: 0;
+  overflow: hidden;
+}
+.df-time-block .df-block-title-row strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Light mode: checkmark color black */
+.df-app:not(.theme-dark) .df-block-check.completed svg {
+  stroke: #27231E !important;
+}
+.df-app:not(.theme-dark) .df-block-check.completed {
+  color: #27231E !important;
+}
+
+/* Bold today candidates title and task names */
+.df-panel-title h2 {
+  font-weight: 800 !important;
+  letter-spacing: -0.01em;
+}
+.df-candidate-title {
+  font-weight: 700 !important;
+}
+
+/* Logo: remove border, enlarge */
+.df-brand-ai-button {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.df-brand-ai-button:focus-visible {
+  outline: none !important;
+}
+.dayflow-icon img {
+  width: 36px;
+  height: 36px;
+}
+.dayflow-icon.compact img {
+  width: 32px;
+  height: 32px;
+}
+
+/* Clarify action loading state */
+.df-clarify-action.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.df-clarify-action.loading::after {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: dfSpin 0.8s linear infinite;
+}
+@keyframes dfSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Planning area: paper-like surface per NavoPathStyle.md */
+.df-app .df-planning,
+.df-app.theme-dark .df-planning {
+  background: var(--bg-app) !important;
+}
+.df-app:not(.theme-dark) .df-planning {
+  background: var(--bg-app) !important;
+}
+.df-app .df-mindmap {
+  background: var(--surface-main) !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  box-shadow: none !important;
+}
+.df-app:not(.theme-dark) .df-mindmap {
+  background: var(--surface-main) !important;
+}
+.df-app.theme-dark .df-mindmap {
+  background: var(--surface-main) !important;
+}
+.df-app .df-plan-project-node {
+  border: 1px solid var(--border-soft) !important;
+  background: var(--surface-card) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.df-app .df-task-node-inner,
+.df-app .df-plan-subtask-node {
+  border: 1px solid var(--border-subtle) !important;
+  background: var(--surface-raised) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+/* Plan Suggestions: move left, don't block dates */
+.df-ai-planner {
+  margin-right: auto !important;
+}
+
+/* Timeline date arrows: full height hover area */
+.df-date-arrow:hover {
+  background: color-mix(in srgb, var(--accent-active) 6%, transparent) !important;
+  border-radius: 0 !important;
 }

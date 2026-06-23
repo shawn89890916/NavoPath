@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nativeImage } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 let _crypto; // lazy: only when uid() is first called
@@ -459,7 +459,8 @@ function getSettings() {
     },
     chatMessageMaxHeight: Number.isFinite(raw.chatMessageMaxHeight) ? raw.chatMessageMaxHeight : 220,
     aiMemoryEnabled: raw.aiMemoryEnabled !== false,
-    addAdvancedOpen: Boolean(raw.addAdvancedOpen)
+    addAdvancedOpen: Boolean(raw.addAdvancedOpen),
+    dayStartTime: raw.dayStartTime || "00:00"
   };
 }
 
@@ -512,6 +513,7 @@ function saveSettings(settings) {
         ? existing.chatMessageMaxHeight
         : 220,
     aiMemoryEnabled: typeof settings.aiMemoryEnabled === "boolean" ? settings.aiMemoryEnabled : existing.aiMemoryEnabled !== false,
+    dayStartTime: settings.dayStartTime || existing.dayStartTime || "00:00",
     updatedAt: new Date().toISOString()
   };
   if (settings.apiKey && settings.apiKey.trim()) {
@@ -767,6 +769,7 @@ function createWindow() {
 app.whenReady().then(() => {
   ensureData();
   createWindow();
+  createTray();
   // Defer autoUpdater init so window appears faster; runs in background
   setImmediate(() => configureAutoUpdater());
   app.on("activate", () => {
@@ -774,8 +777,46 @@ app.whenReady().then(() => {
   });
 });
 
+let isQuitting = false;
+let tray = null;
+
+function createTray() {
+  const iconPath = app.isPackaged
+    ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
+    : path.join(__dirname, "..", "public", "navopath-icon.png");
+  let trayIcon;
+  try {
+    trayIcon = nativeImage.createFromPath(iconPath);
+    if (trayIcon.isEmpty()) trayIcon = nativeImage.createEmpty();
+  } catch {
+    trayIcon = nativeImage.createEmpty();
+  }
+  tray = new Tray(trayIcon);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: "显示 NavoPath", click: () => { const win = BrowserWindow.getAllWindows()[0]; if (win) { win.show(); win.focus(); } else createWindow(); } },
+    { type: "separator" },
+    { label: "退出", click: () => { isQuitting = true; app.quit(); } }
+  ]);
+  tray.setToolTip("NavoPath");
+  tray.setContextMenu(contextMenu);
+  tray.on("click", () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) { win.show(); win.focus(); } else createWindow();
+  });
+}
+
+app.on("before-quit", () => { isQuitting = true; });
+
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") {
+    // Keep app alive in tray; only quit when user explicitly exits from tray
+    if (!isQuitting) {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.hide();
+    } else {
+      app.quit();
+    }
+  }
 });
 
 ipcMain.handle("planner:getData", () => readData());
