@@ -19638,3 +19638,65 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-app.theme-dark .df-ai-fab {
   background: var(--surface-raised) !important;
 }
+
+/* ===== Fix: Quick-add confirm button styling (overrides app-redesign.css) ===== */
+.df-app.theme-dark .df-quick-add-confirm:not(:disabled),
+.df-app:not(.theme-dark) .df-quick-add-confirm:not(:disabled) {
+  flex: 0 0 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  margin-left: 4px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: var(--accent-active, #C69CF9) !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+.df-app.theme-dark .df-quick-add-confirm:disabled,
+.df-app:not(.theme-dark) .df-quick-add-confirm:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+}
+
+/* ===== Fix: Date arrow buttons in timeline body ===== */
+.df-timeline-body {
+  position: relative;
+}
+.df-date-arrow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  height: 100%;
+  z-index: 12;
+  cursor: pointer;
+}
+.df-date-arrow.left { left: 0; }
+.df-date-arrow.right { right: 0; }
+
+/* ===== Fix: 15-minute short block title display ===== */
+.df-time-block.short-block:not(.df-time-block-week) {
+  padding: 0 4px !important;
+  min-height: 20px !important;
+}
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.df-event-blocks-layer .df-time-block.short-block .df-block-title-row strong {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
