@@ -1,10 +1,21 @@
 # NavoPath 更新日志
 
-## 2026-06-23 · 更可靠的桌面登录
+## 2026-06-23 · 更可靠的桌面登录与同步
 
 ### 改进
 - Windows 桌面端现在会使用系统加密存储长期保留登录会话，关闭应用或重启电脑后仍可直接进入工作区，主动退出登录后才会清除会话。
 - Windows 桌面端未登录时直接显示简洁的登录与注册页面，不再先展示网站介绍；网页端首页保持不变。
+- 多设备同步改为以最新版本合并，不再把本地数据固定覆盖到云端，其他设备新增的任务和计划不会再被误删。
+- 左上角 NavoPath logo 增加轻微投影，浅色模式下不再灰蒙蒙。
+- 设置"一天开始时间"后时间轴会平滑滚动到对应时刻并显示确认提示。
+- 默认字号略微调大，阅读更舒适。
+
+### 修复
+- 修复三日、周和月视图切换按钮被时间轴左右翻页热区遮挡而无法点击的问题。
+
+---
+
+访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
 
 ## 2026-06-22 · 桌面端体验全面提升
 
@@ -129,11 +140,22 @@
 
 # NavoPath Changelog
 
-## 2026-06-23 · More reliable desktop sign-in
+## 2026-06-23 · More reliable desktop sign-in and sync
 
 ### Improved
 - The Windows desktop app now keeps sign-in sessions in encrypted system storage, so users return directly to the workspace after closing the app or restarting the computer; signing out explicitly clears the session.
 - Signed-out Windows desktop users now see a focused sign-in and registration screen instead of the marketing introduction; the website landing page remains unchanged.
+- Multi-device sync now merges the latest version instead of overwriting cloud data with local data, so tasks and plans added on other devices are no longer accidentally deleted.
+- The NavoPath logo in the top-left corner now has a subtle drop-shadow so it stays clear on light backgrounds.
+- Setting the day start time now smoothly scrolls the timeline to that hour and shows a confirmation toast.
+- The default font size is slightly larger for more comfortable reading.
+
+### Fixed
+- Fixed 3 Day, Week, and Month view switch buttons being blocked by the timeline left/right navigation hot zones.
+
+---
+
+Visit [www.navopath.com](https://www.navopath.com) to start your NavoPath journey!
 
 ## 2026-06-22 · Clearer week view and desktop icon
 

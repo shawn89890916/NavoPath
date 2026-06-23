@@ -2064,6 +2064,23 @@ function App() {
     container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
   }, [mode, data, selectedDate, timelineView, pendingTimelineFocus]);
 
+  // Scroll timeline to day start time when the setting changes
+  const prevDayStartRef = useRef<string>("");
+  useEffect(() => {
+    if (mode !== "execute") return;
+    const dayStart = settings?.dayStartTime || "00:00";
+    if (prevDayStartRef.current && prevDayStartRef.current !== dayStart) {
+      const [h, m] = dayStart.split(":").map(Number);
+      const startMinutes = (h || 0) * 60 + (m || 0);
+      if (timelineRef.current) {
+        const targetTop = ((startMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+        timelineRef.current.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      }
+      showToast(lang === "zh" ? `一天开始时间已设为 ${dayStart}` : `Day start time set to ${dayStart}`);
+    }
+    prevDayStartRef.current = dayStart;
+  }, [settings?.dayStartTime, mode, lang]);
+
   useEffect(() => {
     if (mode !== "execute" || !pendingTimelineFocus) return;
     const anchorDate = resolveVisibleAnchorForDate(pendingTimelineFocus.date);
@@ -5457,10 +5474,6 @@ function App() {
                 }}
               />
             ) : <>
-            {!compactLayout && <>
-              <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
-              <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
-            </>}
             <div className="df-execute-top">
               {!settings.hideAi && <div className="df-ai-planner" aria-hidden={compactLayout}>
                 <button className={`df-ai-plan ${autoScheduleState === "generating" ? "thinking" : ""} ${autoScheduleState === "committing" ? "committing" : ""}`} data-tip={drawerOpen ? t(lang, "timeline.aiPlanToday") : t(lang, "timeline.planningSuggestion")} aria-label={t(lang, "timeline.aiPlanToday")} disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen} onClick={() => void planMyDay()}>
@@ -5490,6 +5503,10 @@ function App() {
               </div>
             </div>
             <div className="df-timeline-body">
+              {!compactLayout && <>
+                <button className="df-date-arrow left" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}>‹</button>
+                <button className="df-date-arrow right" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}>›</button>
+              </>}
               <div className="df-timeline-content">
                 {fullscreen && (
                   <button

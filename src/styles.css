@@ -1,4 +1,4 @@
-﻿/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
+/* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 /*  NavoPath Stylesheet 锟斤拷 Reorganized                               */
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
@@ -2933,12 +2933,13 @@
 
 
 :root {
-  /* 锟斤拷锟斤拷 Typography 锟斤拷锟斤拷 */
+  /* Typography */
   --df-font-brand: "Sora", Inter, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
   --df-font-ui: Inter, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
   --df-font-task: Inter, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
   font-family: var(--df-font-ui);
   font-weight: 400;
+  font-size: 17px;
 
   /* 锟斤拷锟斤拷 Design tokens (overridden by JS themeVars) 锟斤拷锟斤拷 */
   --bg-app: #F8FAFC;
@@ -8196,6 +8197,7 @@ input[type="range"] {
 }
 
 .df-timeline-body {
+  position: relative;
   display: flex;
   flex-direction: row;
   flex: 1;
@@ -19326,6 +19328,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .dayflow-icon img {
   width: 36px;
   height: 36px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18));
 }
 .dayflow-icon.compact img {
   width: 32px;

@@ -105,21 +105,9 @@ function mergePlannerData(remote: PlannerData, local: PlannerData): PlannerData 
     });
   }
   merged.chat = local.chat || remote.chat || [];
-  merged.events = [];
+  merged.events = local.events || remote.events || [];
   merged.savedAt = new Date().toISOString();
   return normalizeData(merged);
-}
-
-function addDeletionTombstones(previous: PlannerData, next: PlannerData): PlannerData {
-  const deleted = { ...(previous.sync?.deleted || {}), ...(next.sync?.deleted || {}) };
-  const timestamp = new Date().toISOString();
-  for (const collection of SYNC_COLLECTIONS) {
-    const nextIds = new Set(((next as any)[collection] || []).map((item: any) => item?.id).filter(Boolean));
-    for (const item of ((previous as any)[collection] || [])) {
-      if (item?.id && !nextIds.has(item.id)) deleted[`${collection}:${item.id}`] = timestamp;
-    }
-  }
-  return { ...next, sync: { deleted } };
 }
 
 function emptyCloudData(): PlannerData {
@@ -267,7 +255,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     const user = await requireUser();
     let current = await ensureProfile(user);
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const nextData = patch.data ? mergePlannerData(current.data, addDeletionTombstones(current.data, normalizeData(patch.data))) : current.data;
+      const nextData = patch.data ? mergePlannerData(current.data, normalizeData(patch.data)) : current.data;
       const nextSettings = patch.settings ? mergeSettings({ ...current.settings, ...patch.settings }) : current.settings;
       const { data: rows, error } = await supabase.rpc("save_dayflow_profile", {
         expected_revision: current.revision,
