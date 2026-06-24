@@ -1,4 +1,4 @@
-import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+﻿import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
@@ -2034,6 +2034,13 @@ function App() {
     };
   }, []);
 
+  const dayStartHour = useMemo(() => {
+    const ds = settings?.dayStartTime;
+    if (!ds) return 0;
+    const h = parseInt(ds.split(":")[0], 10);
+    return Number.isFinite(h) && h >= 0 && h <= 23 ? h : 0;
+  }, [settings?.dayStartTime]);
+
   useEffect(() => {
     if (pendingTimelineFocus) return;
     if (mode !== "execute" || !data || !timelineRef.current) return;
@@ -2056,30 +2063,35 @@ function App() {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const fallbackMinutes = 9 * 60;
-    const targetMinutes = selectedDate === todayIso() && currentMinutes >= TIMELINE_START * 60 && currentMinutes <= TIMELINE_END * 60
+    const targetMinutes = selectedDate === todayIso() && currentMinutes >= 0 && currentMinutes <= 24 * 60
       ? currentMinutes
       : fallbackMinutes;
-    const targetTop = ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+    let diff = targetMinutes - dayStartHour * 60;
+    if (diff < 0) diff += 24 * 60;
+    const targetTop = (diff / SLOT_MINUTES) * SLOT_HEIGHT;
     const container = timelineRef.current;
     container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
-  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus]);
+  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour]);
 
   // Scroll timeline to day start time when the setting changes
   const prevDayStartRef = useRef<string>("");
   useEffect(() => {
     if (mode !== "execute") return;
     const dayStart = settings?.dayStartTime || "00:00";
-    if (prevDayStartRef.current && prevDayStartRef.current !== dayStart) {
+    const isInitial = !prevDayStartRef.current;
+    if (isInitial || prevDayStartRef.current !== dayStart) {
       const [h, m] = dayStart.split(":").map(Number);
       const startMinutes = (h || 0) * 60 + (m || 0);
       if (timelineRef.current) {
-        const targetTop = ((startMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+        const targetTop = ((startMinutes - dayStartHour * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
         timelineRef.current.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
       }
-      showToast(lang === "zh" ? `一天开始时间已设为 ${dayStart}` : `Day start time set to ${dayStart}`);
+      if (!isInitial) {
+        showToast(lang === "zh" ? `一天开始时间已设为 ${dayStart}` : `Day start time set to ${dayStart}`);
+      }
     }
     prevDayStartRef.current = dayStart;
-  }, [settings?.dayStartTime, mode, lang]);
+  }, [settings?.dayStartTime, mode, lang, dayStartHour]);
 
   useEffect(() => {
     if (mode !== "execute" || !pendingTimelineFocus) return;
@@ -2724,7 +2736,7 @@ function App() {
       .filter((t) => conflictLayout.has(t.id))
       .map((t) => {
         const cl = conflictLayout.get(t.id)!;
-        const top = timeBlockTop(t.scheduledStart || "09:00");
+        const top = timeBlockTop(t.scheduledStart || "09:00", dayStartHour);
         const height = Math.max(timeBlockHeight(t.scheduledStart || "09:00", t.scheduledEnd || addMinutes(t.scheduledStart || "09:00", 30)), SLOT_HEIGHT);
         return {
           title: t.title,
@@ -3275,6 +3287,7 @@ function App() {
       gridElement: gridEl,
       scrollElement: scrollEl,
       visibleDays: visDays,
+      startHour: dayStartHour,
     });
     return minutesToTime(clampSlot(target.minutes - offsetMinutes));
   }
@@ -3331,6 +3344,7 @@ function App() {
       }],
       scheduledEvents: getScheduledEventsForRange(dateRange),
       dateRange,
+      settings: { dayStart: settings?.dayStartTime || "00:00" },
     }).proposedEvents[0];
     return tryRange(visibleRange) || tryRange(fallbackRange);
   }
@@ -3802,6 +3816,7 @@ function App() {
             gridElement: gridEl,
             scrollElement: scrollEl,
             visibleDays: visDays,
+            startHour: dayStartHour,
             debugLabel: `block-move-${timelineView}`,
           });
           const adjustedTime = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
@@ -3871,6 +3886,7 @@ function App() {
               gridElement: gridEl,
               scrollElement: scrollEl,
               visibleDays: visDays,
+              startHour: dayStartHour,
               debugLabel: `block-up-${timelineView}`,
             });
             dragTargetDateRef.current = target.date;
@@ -4959,6 +4975,7 @@ function App() {
       tasks: tasksForSchedule,
       scheduledEvents: existingEvents,
       dateRange,
+      settings: { dayStart: settings?.dayStartTime || "00:00" },
     });
 
     // One task = one preview block. NO splitting.
@@ -5621,11 +5638,11 @@ function App() {
                           <div className="df-timeline-3day-ruler">
                             <div className="df-timeline-canvas" style={{ height: `${canvasHeight}px`, width: "52px", margin: 0, borderLeft: "none", background: "transparent" }}>
                               {Array.from({ length: slotCount }).map((_, index) => {
-                                const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                                const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                                 const isHour = minutes % 60 === 0;
-                                const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
+                                const isMajor = minutes % (6 * 60) === 0;
                                 return (
-                                  <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}>
+                                  <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}>
                                     {isHour ? <span>{hourLabel(minutes)}</span> : null}
                                   </div>
                                 );
@@ -5643,6 +5660,7 @@ function App() {
                                   gridElement: gridEl,
                                   scrollElement: scrollEl,
                                   visibleDays: threeDates,
+                                  startHour: dayStartHour,
                                   debugLabel: `drag-${timelineView}`,
                                 });
                                 dragTargetDateRef.current = target.date;
@@ -5661,6 +5679,7 @@ function App() {
                                     gridElement: gridEl,
                                     scrollElement: scrollEl,
                                     visibleDays: threeDates,
+                                    startHour: dayStartHour,
                                   });
                                   dragTargetDateRef.current = target.date;
                                   if (drag?.kind === "block" && recordByIdMap.has(taskId)) {
@@ -5696,6 +5715,7 @@ function App() {
                                   clientX: event.clientX, clientY: event.clientY,
                                   gridElement: gridEl, scrollElement: scrollEl,
                                   visibleDays: threeDates,
+                                  startHour: dayStartHour,
                                 });
                                 const startMinutes = startTarget.minutes;
                                 const startDayIndex = startTarget.dayIndex;
@@ -5763,6 +5783,7 @@ function App() {
                                   gridElement: gridEl,
                                   scrollElement: scrollEl,
                                   visibleDays: threeDates,
+                                  startHour: dayStartHour,
                                 });
                                 const endTime = addMinutes(target.startTime, 30);
                                 const maxEnd = minutesToTime(TIMELINE_END * 60);
@@ -5792,10 +5813,10 @@ function App() {
                               {/* Layer 1: Shared hour lines across all columns */}
                               <div className="df-hour-lines-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
                                 {Array.from({ length: slotCount }).map((_, index) => {
-                                  const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                                  const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                                   const isHour = minutes % 60 === 0;
-                                  const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
-                                  return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes} />;
+                                  const isMajor = minutes % (6 * 60) === 0;
+                                  return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index} />;
                                 })}
                               </div>
                               {/* Layer 2: Day column backgrounds and separators */}
@@ -5845,6 +5866,7 @@ function App() {
                                       onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       viewMode={timelineView}
                                       lang={lang}
+                                      dayStartHour={dayStartHour}
                                     />
                                   );
                                 })}
@@ -5857,6 +5879,7 @@ function App() {
                                   return (
                                     <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
+                                      dayStartHour={dayStartHour}
                                     />
                                   );
                                 })()}
@@ -5875,6 +5898,7 @@ function App() {
                                         width: multiColWidth - gutter * 2,
                                         ["--df-preview" as any]: "1",
                                       } as CSSProperties}
+                                      dayStartHour={dayStartHour}
                                     />
                                   );
                                 })()}
@@ -6129,6 +6153,7 @@ function App() {
                           gridElement: gridEl,
                           scrollElement: scrollEl,
                           visibleDays: [timelineDate],
+                          startHour: dayStartHour,
                           debugLabel: "drag-daily",
                         });
                         dragTargetDateRef.current = target.date;
@@ -6177,6 +6202,7 @@ function App() {
                               clientX: moveEvent.clientX, clientY: moveEvent.clientY,
                               gridElement: gridEl, scrollElement: scrollEl,
                               visibleDays: [timelineDate],
+                              startHour: dayStartHour,
                             });
                             let s = startMinutes, e = currentTarget.minutes;
                             if (s > e) { const t = s; s = e; e = t; }
@@ -6240,12 +6266,12 @@ function App() {
                           });
                         }}>
                         {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
-                          const minutes = TIMELINE_START * 60 + index * SLOT_MINUTES;
+                          const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                           const isHour = minutes % 60 === 0;
-                          const isMajor = minutes % (6 * 60) === 0 && minutes < TIMELINE_END * 60;
-                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={minutes}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
+                          const isMajor = minutes % (6 * 60) === 0;
+                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
                         })}
-                        {isViewingToday && <NowLine lang={lang} />}
+                        {isViewingToday && <NowLine lang={lang} dayStartHour={dayStartHour} />}
                         {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
                         {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
                           <PreviewBlock
@@ -6253,6 +6279,7 @@ function App() {
                             startTime={placementPreview.startTime}
                             duration={placementPreview.durationMinutes}
                             extraStyle={{ ["--df-preview" as any]: "1" } as CSSProperties}
+                            dayStartHour={dayStartHour}
                           />
                         )}
                         {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => {
@@ -6280,6 +6307,7 @@ function App() {
                               onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                               viewMode="daily"
                               lang={lang}
+                              dayStartHour={dayStartHour}
                             />
                           );
                         })}
@@ -7150,14 +7178,14 @@ function ReturnedToPlanIcon({ color }: { color?: string }) {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0 }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const isWeekView = viewMode === "weekly";
   const start = preview?.start || task.scheduledStart || "09:00";
   const end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task));
-  const top = timeBlockTop(start);
+  const top = timeBlockTop(start, dayStartHour);
   const height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT);
   const next = extractNextAction(task.notes);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
@@ -7249,9 +7277,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   );
 }
 
-function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extraStyle }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean; extraStyle?: CSSProperties }) {
+function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extraStyle, dayStartHour = 0 }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean; extraStyle?: CSSProperties; dayStartHour?: number }) {
   if (!task) return null;
-  const top = timeBlockTop(startTime);
+  const top = timeBlockTop(startTime, dayStartHour);
   const endTime = addMinutes(startTime, duration);
   const height = Math.max(timeBlockHeight(startTime, endTime), SLOT_HEIGHT);
   const color = categories[task.category]?.color || "#888";
@@ -7403,15 +7431,15 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
   );
 }
 
-function NowLine({ extraStyle }: { extraStyle?: CSSProperties; lang?: Language }) {
+function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties; lang?: Language; dayStartHour?: number }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(timer);
   }, []);
   const minutes = now.getHours() * 60 + now.getMinutes();
-  if (minutes < TIMELINE_START * 60 || minutes > TIMELINE_END * 60) return null;
-  const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`);
+  if (minutes < 0 || minutes > 24 * 60) return null;
+  const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, dayStartHour);
   return <div className="df-now-line" style={{ top, ...extraStyle }} />;
 }
 

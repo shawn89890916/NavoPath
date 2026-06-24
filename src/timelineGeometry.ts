@@ -154,12 +154,9 @@ export function pointerToDateTime(input: PointerToDateTimeInput): PointerDateTim
   const y = input.clientY - m.gridRect.top;
   const minutesFromStart = y / m.pxPerMinute;
   const snap = input.snapMinutes ?? SLOT_MINUTES;
-  const snapped = Math.round(minutesFromStart / snap) * snap;
-  const minutes = clamp(
-    m.startHour * 60 + snapped,
-    m.startHour * 60,
-    (input.endHour ?? TIMELINE_END) * 60 - snap,
-  );
+  const snapped = clamp(Math.round(minutesFromStart / snap) * snap, 0, 24 * 60 - snap);
+  let minutes = m.startHour * 60 + snapped;
+  minutes = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60);
 
   const startTime = minutesToTime(minutes);
   const endTime = addMinutes(startTime, snap);
@@ -224,7 +221,9 @@ export function eventToRect(input: EventToRectInput): EventRect {
   const duration = Math.max(endMin - startMin, SLOT_MINUTES);
 
   const left = dayIndex * columnWidth + gutter;
-  const top = ((startMin - startHour * 60) / 60) * hourHeight;
+  let diff = startMin - startHour * 60;
+  if (diff < 0) diff += 24 * 60;
+  const top = (diff / 60) * hourHeight;
   const width = columnWidth - gutter * 2;
   const height = Math.max((duration / 60) * hourHeight, SLOT_HEIGHT);
 
@@ -234,7 +233,9 @@ export function eventToRect(input: EventToRectInput): EventRect {
 // ── 5. Utility — compute top/height for a time block inside a column ──
 
 export function timeBlockTop(startTime: string, startHour = TIMELINE_START, hourHeight = HOUR_HEIGHT): number {
-  return ((timeToMinutes(startTime) - startHour * 60) / 60) * hourHeight;
+  let diff = timeToMinutes(startTime) - startHour * 60;
+  if (diff < 0) diff += 24 * 60;
+  return (diff / 60) * hourHeight;
 }
 
 export function timeBlockHeight(startTime: string, endTime: string, startHour = TIMELINE_START, hourHeight = HOUR_HEIGHT): number {
