@@ -6171,6 +6171,7 @@ function App() {
                             gridElement: gridEl,
                             scrollElement: scrollEl,
                             visibleDays: [timelineDate],
+                            startHour: dayStartHour,
                           });
                           dragTargetDateRef.current = target.date;
                           scheduleTask(taskId, target.startTime);
@@ -6191,6 +6192,7 @@ function App() {
                             clientX: event.clientX, clientY: event.clientY,
                             gridElement: gridEl, scrollElement: scrollEl,
                             visibleDays: [timelineDate],
+                            startHour: dayStartHour,
                           });
                           const startMinutes = startTarget.minutes;
                           const snap = SLOT_MINUTES;
@@ -6272,7 +6274,7 @@ function App() {
                           return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
                         })}
                         {isViewingToday && <NowLine lang={lang} dayStartHour={dayStartHour} />}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} />}
                         {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
                           <PreviewBlock
                             task={placementPreviewTask}
