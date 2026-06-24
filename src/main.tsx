@@ -32,7 +32,7 @@ import {
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
-import { addSubtaskToTree, findSubtaskInTree } from "./utils/treeOrder";
+import { addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
@@ -599,9 +599,11 @@ function replaceNextAction(notes: string, nextAction: string) {
  *    - count: total columns in the group (= max overlap depth)
  *    - Non-conflicting tasks are NOT included (use default full-width layout)
  */
-/** Preserve the existing daily-view column limit; multi-day views never stack. */
-const MAX_DAILY_COLLISION_COLUMNS = 4;
-
+/**
+ * Conflict layout: assigns each overlapping task to a column index.
+ * No hard column cap — all overlapping tasks get their own column so
+ * nothing is ever hidden behind another block.
+ */
 function computeConflictLayout(tasks: Task[], maxColumns = Infinity): Map<string, { index: number; count: number }> {
   if (tasks.length <= 1) return new Map();
 
@@ -1461,6 +1463,9 @@ function App() {
   const [allDayDragDate, setAllDayDragDate] = useState("");
   const [candidateDropActive, setCandidateDropActive] = useState(false);
   const [floatingTimeAdd, setFloatingTimeAdd] = useState<FloatingTimeAdd>(null);
+  // Persist the last-used project across quick-add sessions so the next
+  // panel can pre-select it without keeping the panel open after save.
+  const lastQuickAddProjectIdRef = useRef<string | null>(null);
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
@@ -2037,8 +2042,15 @@ function App() {
   const dayStartHour = useMemo(() => {
     const ds = settings?.dayStartTime;
     if (!ds) return 0;
-    const h = parseInt(ds.split(":")[0], 10);
-    return Number.isFinite(h) && h >= 0 && h <= 23 ? h : 0;
+    const parts = ds.split(":").map(Number);
+    const h = parts[0];
+    const m = parts[1] || 0;
+    if (!Number.isFinite(h) || h < 0 || h > 23) return 0;
+    if (!Number.isFinite(m) || m < 0 || m >= 60) return h;
+    // Return float hours so dayStartHour * 60 yields correct minutes
+    // (e.g. "09:30" → 9.5 → 570 minutes). All downstream math uses
+    // startHour * 60, so a float works transparently.
+    return h + m / 60;
   }, [settings?.dayStartTime]);
 
   useEffect(() => {
@@ -2710,7 +2722,7 @@ function App() {
   const conflictLayout = useMemo(() => {
     const map = new Map<string, { index: number; count: number }>();
     if (timelineView === "daily") {
-      computeConflictLayout(scheduledTasks, MAX_DAILY_COLLISION_COLUMNS).forEach((v, k) => map.set(k, v));
+      computeConflictLayout(scheduledTasks).forEach((v, k) => map.set(k, v));
     } else {
       const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
       const dayTasks: Task[] = expandedVisibleTimelineTasks.filter((task) => threeDates.includes(task.scheduledDate || ""));
@@ -2798,6 +2810,20 @@ function App() {
       ...current,
       tasks: current.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
     });
+  }
+
+  /** Delete a subtask by ID — uses dataRef.current to avoid stale-closure races. */
+  function deleteSubtaskById(subtaskId: string) {
+    const current = dataRef.current;
+    if (!current) return;
+    let found = false;
+    const nextTasks = current.tasks.map((task) => {
+      if (!findSubtaskInTree(task.subtasks || [], subtaskId)) return task;
+      found = true;
+      return { ...task, subtasks: removeSubtaskFromTree(task.subtasks || [], subtaskId), updatedAt: new Date().toISOString() };
+    });
+    if (!found) return;
+    void saveData({ ...current, tasks: nextTasks });
   }
 
   /** Update a specific TimelineRecord by recordId. Finds the owning task. */
@@ -3235,7 +3261,9 @@ function App() {
       tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
     });
     requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
-    setFloatingTimeAdd({ ...floatingTimeAdd, lastProjectId: projectId || undefined });
+    // Persist project choice for next quick-add, then close the panel.
+    lastQuickAddProjectIdRef.current = projectId || null;
+    setFloatingTimeAdd(null);
     showToast(t(lang, "toast.addedToTimeline"));
   }
 
@@ -5807,6 +5835,7 @@ function App() {
                                   top: event.clientY,
                                   left: popLeft,
                                   width: popWidth,
+                                  lastProjectId: lastQuickAddProjectIdRef.current || undefined,
                                 });
                               }}
                             >
@@ -6265,6 +6294,7 @@ function App() {
                             top: event.clientY,
                             left: colLeft,
                             width: colWidth,
+                            lastProjectId: lastQuickAddProjectIdRef.current || undefined,
                           });
                         }}>
                         {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
@@ -6364,8 +6394,8 @@ function App() {
         </main>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onTaskDelete={(taskId) => {
-            void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== taskId) });
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => {
+            void saveData({ ...dataRef.current!, tasks: dataRef.current!.tasks.filter((task) => task.id !== taskId) });
           }} />
         </Suspense>
       )}
@@ -6423,17 +6453,16 @@ function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNul
   const [input, setInput] = useState(lastProject ? `#${lastProject.title} ` : "");
   const [selectedProject, setSelectedProject] = useState<Project | null>(lastProject ?? null);
   const [projectQuery, setProjectQuery] = useState("");
-  const inputBoxRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Dismiss on click outside BOTH input box and project menu
+  // Dismiss on click outside the unified container
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (inputBoxRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      if (containerRef.current?.contains(t)) return;
       onCancel();
     };
     const timer = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
@@ -6477,31 +6506,23 @@ function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNul
   const placeholder = compact ? "任务名" : "输入任务名，#选择项目";
 
   // Clamp popup position to viewport; use column-aligned width
-  const INPUT_H = 36;
   const GAP = 8;
   const popW = Math.min(add.width || 300, window.innerWidth - GAP * 2);
   let left = Math.min(add.left, window.innerWidth - popW - GAP);
   left = Math.max(left, GAP);
-  let top = Math.min(add.top, window.innerHeight - INPUT_H - 60);
+  let top = Math.min(add.top, window.innerHeight - 120);
   top = Math.max(top, GAP);
 
-  // Project menu position (sibling, below input box)
-  const MENU_LEFT = left;
-  const menuTop = top + INPUT_H + 6;
-  const menuWidth = Math.max(220, popW);
-  let menuLeft = MENU_LEFT;
-  if (menuLeft + menuWidth > window.innerWidth - 8) {
-    menuLeft = window.innerWidth - menuWidth - 8;
-  }
+  // Flip above if not enough space below
+  const flipAbove = top + 120 > window.innerHeight && top > 120;
 
   return (
-    <>
-      {/* Input box — independent floating layer */}
-      <div ref={inputBoxRef} className="df-quick-add-input-box"
-        style={{
-          position: "fixed", top, left, width: popW, height: INPUT_H, zIndex: 999999,
-        }}
-      >
+    <div ref={containerRef} className="df-quick-add-popover" style={{ position: "fixed", top, left, width: popW, zIndex: 999999 }}>
+      <div className="df-quick-add-header">
+        <span className="df-quick-add-time">{add.startTime} – {add.endTime}</span>
+        <button className="df-quick-add-close" onClick={onCancel} aria-label="Close">×</button>
+      </div>
+      <div className="df-quick-add-row">
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
           placeholder={placeholder} />
@@ -6509,20 +6530,15 @@ function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNul
           disabled={!input.replace(/#[^\s#]+/g, "").trim()}
           className="df-quick-add-confirm">✓</button>
       </div>
-      {/* Project menu — independent floating layer (sibling, not child) */}
       {showProjectMenu && filtered.length > 0 && (
-        <div ref={menuRef} className="df-quick-add-project-menu"
-          style={{
-            position: "fixed", top: menuTop, left: menuLeft, width: menuWidth, zIndex: 1000000,
-          }}
-        >
+        <div className={`df-quick-add-project-menu${flipAbove ? " flip-above" : ""}`}>
           {filtered.map((p) => (
             <button key={p.id} onMouseDown={(e) => { e.preventDefault(); selectProject(p); }}
             >#{p.title}</button>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -7219,9 +7235,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   return (
     <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 38 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
-    }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={onEdit} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
+    }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} />}
+      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       {isEvent ? (
         <span className="df-event-indicator" title={t(lang, "timeBlock.eventTooltip")} aria-label={t(lang, "timeBlock.eventTooltip")} />
       ) : (
@@ -7249,7 +7265,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
         }}># {projectName}</button>
       </span>}
       {next && <span className="df-next">{t(lang, "timeBlock.nextStep")}：{next}</span>}
-      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} />}
+      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{

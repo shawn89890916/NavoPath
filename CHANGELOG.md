@@ -25,16 +25,20 @@
 ## 2026-06-24 · 时间轴快速添加与短任务修复
 
 ### 改进
-- 时间轴点击空白时段快速添加任务后，弹窗会保持打开并记住上次选择的项目，连续安排多个任务时无需重复选色。
-- "一天开始时间"设置现在会真正改变时间轴网格的起始时刻：设为 1:00 时网格从 1:00 开始并循环显示到次日 0:00，任务块、当前时间线、拖放定位与自动排程均按新起点对齐。
+- 时间轴快速添加弹窗重新设计为统一卡片样式，包含时间标签、输入框与项目选择菜单，视觉更连贯，不再出现割裂的浮层。
+- "一天开始时间"设置现在支持分钟精度（如 09:30），时间轴网格、任务块、当前时间线与拖放定位均按精确起点对齐。
+- 时间轴同一时段超过 4 个重叠任务时不再被压缩到同一列，每个任务都会获得独立列，不再互相遮挡。
 
 ### 修复
+- 修复点击时间轴上已有任务块时仍会弹出快速添加面板的问题；现在仅在点击空白时段时触发。
+- 修复 15 分钟时长的短任务标题被截断、调整大小手柄不可操作的问题。
+- 修复快速添加任务后面板不关闭、持续残留的问题；现在保存后面板自动关闭并记住上次选择的项目。
+- 修复修改"一天开始时间"后快速点击添加任务导致时间轴错位的问题。
+- 修复规划页面删除子任务后子任务暂时消失又重新出现、无法成功删除的问题。
+- 修复规划页面添加大量子任务后按钮与图标布局错位的问题。
 - 修复三日、周视图中点击某天快速添加任务后，被点击的当天会跳到视图最左侧的问题；现在若目标日期已在可见范围内就保持原位。
-- 修复时间轴中 15 分钟时长的短任务标题被截断、无法正常显示的问题。
-- 修复深色模式下快速添加确认按钮变成白色、几乎看不见的问题，现在恢复为强调色圆形按钮。
 - 修复时间轴左右翻页切换日期失灵的问题。
-- 修复时间轴中 15 分钟时长的任务无法拖动的问题。
-- 修复更改每日开始时间后从今日候选中拖入时间轴会错位的问题；日视图拖拽预览、拖放放置和拖拽创建现在都正确使用自定义开始时间。
+- 修复深色模式下快速添加确认按钮变成白色、几乎看不见的问题，现在恢复为强调色按钮。
 
 ---
 
@@ -188,13 +192,20 @@ Visit [www.navopath.com](https://www.navopath.com) to start your NavoPath journe
 ## 2026-06-24 · Timeline quick-add and short-block fixes
 
 ### Improved
-- After quick-adding a task from a timeline slot, the popup stays open and remembers the last selected project, so scheduling several tasks in a row no longer requires re-picking the color each time.
+- Redesigned the timeline quick-add popup as a unified card with a time label, input field, and project picker menu for a more cohesive look — no more fragmented floating layers.
+- The "Day start time" setting now supports minute precision (e.g. 09:30); the timeline grid, task blocks, now-line, and drop targeting all align to the exact start.
+- Overlapping tasks in the same time slot are no longer capped at 4 columns — every task gets its own column and none are hidden behind another.
 
 ### Fixed
+- Fixed the quick-add panel appearing when clicking on an existing task block; it now only triggers on blank timeline slots.
+- Fixed 15-minute short task blocks having clipped titles and non-functional resize handles.
+- Fixed the quick-add panel staying open and persisting after saving a task; it now closes automatically while remembering the last selected project.
+- Fixed timeline misalignment when rapidly clicking the add button after changing the day start time.
+- Fixed deleted sub-pages on the Planning page temporarily disappearing then reappearing, preventing successful deletion.
+- Fixed button and icon layout misalignment on the Planning page after adding a large number of subtasks.
 - Fixed the clicked day jumping to the leftmost column in 3-day and week views after quick-adding a task; the view now stays put when the target date is already visible.
-- Fixed 15-minute short task blocks having their titles clipped and not displaying properly in the timeline.
-- Fixed the quick-add confirm button turning white and nearly invisible in dark mode; it is now a solid accent-colored round button again.
 - Fixed left/right date switching in the timeline not responding.
+- Fixed the quick-add confirm button turning white and nearly invisible in dark mode; it is now a solid accent-colored button again.
 
 ---
 

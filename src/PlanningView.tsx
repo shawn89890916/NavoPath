@@ -634,6 +634,7 @@ export default function PlanningView(props: {
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onTaskCreate: (projectId: string) => void;
   onTaskDelete: (taskId: string) => void;
+  onDeleteSubtask: (subtaskId: string) => void;
   onDataChange: (data: PlannerData) => void;
 }) {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
@@ -722,13 +723,8 @@ export default function PlanningView(props: {
   const deleteSubtask = useCallback(async (subtaskId: string) => {
     const confirmed = await dialog.confirm(props.lang === "zh" ? "确定删除此子任务？" : "Delete this subtask?");
     if (!confirmed) return;
-    for (const task of safeTasks) {
-      if (findSubtaskInTree(task.subtasks || [], subtaskId)) {
-        props.onTaskUpdate(task.id, { subtasks: removeSubtaskFromTree(task.subtasks || [], subtaskId) });
-        return;
-      }
-    }
-  }, [dialog, safeTasks, props]);
+    props.onDeleteSubtask(subtaskId);
+  }, [dialog, props]);
 
   const promoteSubtask = useCallback((subtaskId: string) => {
     const parent = safeTasks.find((task) => Boolean(findSubtaskInTree(task.subtasks || [], subtaskId)));

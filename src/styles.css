@@ -2822,6 +2822,31 @@
   color: #8B93A3 !important;
 }
 
+/* Unified popover dark mode */
+.df-app.theme-dark .df-quick-add-popover {
+  background: #20242D !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.20) !important;
+}
+.df-app.theme-dark .df-quick-add-row input {
+  background: #2A2F3A !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  color: #F5F7FA !important;
+}
+.df-app.theme-dark .df-quick-add-row input::placeholder {
+  color: #6B7280 !important;
+}
+.df-app.theme-dark .df-quick-add-project-menu {
+  background: #1A1E26 !important;
+  border-top: 1px solid rgba(255,255,255,0.08) !important;
+}
+.df-app.theme-dark .df-quick-add-project-menu button {
+  color: #F5F7FA !important;
+}
+.df-app.theme-dark .df-quick-add-project-menu button:hover {
+  background: rgba(198,156,249,0.16) !important;
+}
+
 .df-app.theme-dark .df-quick-add-confirm:not(:disabled) {
   background: rgba(198,156,249,0.18);
   color: #F5F7FA;
@@ -12435,15 +12460,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-time-block.short-block:not(.df-time-block-week) .df-next,
 .df-time-block.short-block:not(.df-time-block-week) .df-preview-badge,
 .df-time-block.short-block:not(.df-time-block-week) .df-preview-actions,
-.df-time-block.short-block:not(.df-time-block-week) .df-block-time,
-.df-time-block.short-block:not(.df-time-block-week) .df-block-check,
-.df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
+.df-time-block.short-block:not(.df-time-block-week) .df-block-time {
   display: none;
 }
 .df-time-block.short-block:not(.df-time-block-week) {
   padding: 1px 6px !important;
   justify-content: center;
-  min-height: 20px !important;
+  min-height: 24px !important;
 }
 .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row {
   width: 100%;
@@ -12454,6 +12477,22 @@ body:has(:active)::-webkit-scrollbar-thumb {
   line-height: 1.1;
   width: 100%;
   max-width: 100%;
+}
+/* Keep resize dots visible on short blocks — smaller and at edges */
+.df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
+  display: block !important;
+  width: 8px !important;
+  height: 4px !important;
+  border-radius: 2px !important;
+  min-width: 8px !important;
+}
+/* Keep check button visible on short blocks — smaller */
+.df-time-block.short-block:not(.df-time-block-week) .df-block-check {
+  display: inline-flex !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  flex-shrink: 0 !important;
 }
 
 .df-time-block.recurring .df-block-title-row strong,
@@ -14370,50 +14409,100 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border: 1px solid color-mix(in srgb, var(--mode-primary) 48%, transparent) !important;
 }
 
-/* 锟斤拷锟斤拷 Quick-add input box 锟斤拷 independent floating layer 锟斤拷锟斤拷 */
-.df-quick-add-input-box {
+/* ── Unified Quick-add popover (single cohesive container) ── */
+.df-quick-add-popover {
   position: fixed;
-  z-index: 99999;
+  z-index: 999999;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: visible;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 16px 40px rgba(17,24,39,0.16), 0 2px 8px rgba(17,24,39,0.06);
+}
+
+.df-quick-add-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
+  gap: 8px;
+}
+
+.df-quick-add-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-active, #C69CF9);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.df-quick-add-close {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8B93A7;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s, color .12s;
+}
+
+.df-quick-add-close:hover {
+  background: rgba(0,0,0,0.06);
+  color: #111827;
+}
+
+.df-quick-add-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  height: 36px;
-  padding: 4px 8px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  box-shadow: 0 16px 36px rgba(17,24,39,0.12);
+  gap: 6px;
+  padding: 4px 12px 10px;
 }
 
-.df-quick-add-input-box input {
+.df-quick-add-row input {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  height: 26px;
+  height: 30px;
   margin: 0;
-  padding: 0 4px;
-  border: none;
+  padding: 0 6px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
   outline: none;
-  background: transparent;
+  background: #F9FAFB;
   color: #111827;
   font-size: 13px;
-  line-height: 26px;
+  line-height: 30px;
+  transition: border-color .12s, background .12s;
 }
 
-.df-quick-add-input-box input::placeholder {
+.df-quick-add-row input:focus {
+  border-color: var(--accent-active, #C69CF9);
+  background: #FFFFFF;
+}
+
+.df-quick-add-row input::placeholder {
   color: #8B93A7;
 }
 
 .df-quick-add-confirm {
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  margin-left: 4px;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   background: var(--accent-active, #C69CF9);
   color: #fff;
   font-size: 14px;
@@ -14422,7 +14511,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: opacity .15s;
+  transition: opacity .15s, transform .1s;
+}
+
+.df-quick-add-confirm:not(:disabled):active {
+  transform: scale(0.94);
 }
 
 .df-quick-add-confirm:disabled {
@@ -14430,16 +14523,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   cursor: not-allowed;
 }
 
-/* 锟斤拷锟斤拷 Quick-add project menu 锟斤拷 independent floating layer 锟斤拷锟斤拷 */
+/* Project menu — now a child of the unified container */
 .df-quick-add-project-menu {
-  position: fixed;
-  z-index: 1000000;
-  max-height: 240px;
+  max-height: 220px;
   overflow-y: auto;
-  border-radius: 12px;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  box-shadow: 0 16px 36px rgba(17,24,39,0.12);
+  border-top: 1px solid #E5E7EB;
+  border-radius: 0 0 14px 14px;
+  background: #FAFBFC;
 }
 
 .df-quick-add-project-menu button {
@@ -14456,35 +14546,67 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-quick-add-project-menu button:hover {
-  background: rgba(198,156,249,0.1);
-}
-
-.df-app.theme-dark .df-quick-add-project-menu {
-  background: #20242D;
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 16px 36px rgba(0,0,0,0.34);
-}
-
-.df-app.theme-dark .df-quick-add-project-menu button {
-  color: #F5F7FA;
-}
-
-.df-app.theme-dark .df-quick-add-project-menu button:hover {
-  background: rgba(198,156,249,0.14);
-}
-
-.df-app.theme-dark .df-quick-add-project-menu {
-  background: #20242D;
-  border: 1px solid rgba(255,255,255,0.12);
-  color: #F5F7FA;
-}
-
-.df-app.theme-dark .df-quick-add-project-menu button {
-  color: #F5F7FA;
-}
-
-.df-app.theme-dark .df-quick-add-project-menu button:hover {
   background: rgba(198,156,249,0.12);
+}
+
+.df-quick-add-project-menu button:last-child {
+  border-radius: 0 0 14px 14px;
+}
+
+/* Dark theme */
+.df-app.theme-dark .df-quick-add-popover {
+  background: #20242D;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.20);
+}
+
+.df-app.theme-dark .df-quick-add-close {
+  color: #8B93A7;
+}
+
+.df-app.theme-dark .df-quick-add-close:hover {
+  background: rgba(255,255,255,0.08);
+  color: #F5F7FA;
+}
+
+.df-app.theme-dark .df-quick-add-row input {
+  background: #2A2F3A;
+  border-color: rgba(255,255,255,0.10);
+  color: #F5F7FA;
+}
+
+.df-app.theme-dark .df-quick-add-row input::placeholder {
+  color: #6B7280;
+}
+
+.df-app.theme-dark .df-quick-add-project-menu {
+  background: #1A1E26;
+  border-top-color: rgba(255,255,255,0.08);
+}
+
+.df-app.theme-dark .df-quick-add-project-menu button {
+  color: #F5F7FA;
+}
+
+.df-app.theme-dark .df-quick-add-project-menu button:hover {
+  background: rgba(198,156,249,0.16);
+}
+
+/* Legacy input-box selector kept for any remaining references */
+.df-quick-add-input-box {
+  position: fixed;
+  z-index: 99999;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 36px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 16px 36px rgba(17,24,39,0.12);
 }
 
 
@@ -15606,6 +15728,58 @@ body:has(:active)::-webkit-scrollbar-thumb {
   color: var(--text-faint) !important;
 }
 
+/* Subtask inner row — flex container for check, title, chevron, actions */
+.df-app .df-subtask-inner,
+.df-app.theme-dark .df-subtask-inner,
+.df-app:not(.theme-dark) .df-subtask-inner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 34px !important;
+  box-sizing: border-box !important;
+}
+
+/* Subtask node with children — switch to column layout so children appear below the row */
+.df-app .df-plan-subtask-node.has-children,
+.df-app.theme-dark .df-plan-subtask-node.has-children,
+.df-app:not(.theme-dark) .df-plan-subtask-node.has-children {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  height: auto !important;
+  min-height: 34px !important;
+}
+
+/* Subtask children container — nested subtask list */
+.df-app .df-subtask-children,
+.df-app.theme-dark .df-subtask-children,
+.df-app:not(.theme-dark) .df-subtask-children {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  margin-top: 4px !important;
+  margin-left: 24px !important;
+  width: calc(100% - 24px) !important;
+}
+
+/* Subtask chevron — align with task chevron */
+.df-app .df-subtask-chevron,
+.df-app.theme-dark .df-subtask-chevron,
+.df-app:not(.theme-dark) .df-subtask-chevron {
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+}
+
 /* Subtask left indicator (subtle) */
 .df-app .df-plan-subtask-node::before,
 .df-app.theme-dark .df-plan-subtask-node::before,
@@ -16320,16 +16494,31 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-app:not(.theme-dark) .df-quick-add-input-box input::placeholder {
   color: #8B93A7 !important;
 }
-.df-app:not(.theme-dark) .df-quick-add-project-menu {
+/* Unified popover light theme overrides */
+.df-app:not(.theme-dark) .df-quick-add-popover {
   background: #FFFFFF !important;
   border: 1px solid rgba(15,23,42,0.12) !important;
-  box-shadow: 0 16px 36px rgba(15,23,42,0.12) !important;
+  box-shadow: 0 16px 40px rgba(15,23,42,0.16), 0 2px 8px rgba(15,23,42,0.06) !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-row input {
+  background: #F9FAFB !important;
+  border: 1px solid rgba(15,23,42,0.12) !important;
+  color: #111827 !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-row input:focus {
+  border-color: var(--accent-active) !important;
+  background: #FFFFFF !important;
+}
+.df-app:not(.theme-dark) .df-quick-add-project-menu {
+  background: #FAFBFC !important;
+  border-top: 1px solid rgba(15,23,42,0.10) !important;
+  box-shadow: none !important;
 }
 .df-app:not(.theme-dark) .df-quick-add-project-menu button {
   color: #111827 !important;
 }
 .df-app:not(.theme-dark) .df-quick-add-project-menu button:hover {
-  background: color-mix(in srgb, var(--accent-active) 8%, #FFFFFF) !important;
+  background: color-mix(in srgb, var(--accent-active) 12%, #FAFBFC) !important;
 }
 .df-app:not(.theme-dark) .df-quick-add-confirm:not(:disabled) {
   background: var(--accent-active) !important;
@@ -19643,13 +19832,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
 /* ===== Fix: Quick-add confirm button styling (overrides app-redesign.css) ===== */
 .df-app.theme-dark .df-quick-add-confirm:not(:disabled),
 .df-app:not(.theme-dark) .df-quick-add-confirm:not(:disabled) {
-  flex: 0 0 26px !important;
-  width: 26px !important;
-  height: 26px !important;
-  margin-left: 4px !important;
+  flex: 0 0 30px !important;
+  width: 30px !important;
+  height: 30px !important;
+  margin-left: 0 !important;
   padding: 0 !important;
   border: none !important;
-  border-radius: 50% !important;
+  border-radius: 8px !important;
   background: var(--accent-active, #C69CF9) !important;
   color: #fff !important;
   font-size: 14px !important;
