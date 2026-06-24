@@ -1,5 +1,21 @@
 # NavoPath 更新日志
 
+## 2026-06-25 · 短任务显示与删除稳定性优化
+
+### 改进
+- 时间轴短任务（15 分钟）标题字体最小提升至 12px 并启用抗锯齿渲染，解决文字模糊不清的问题；设置 → 外观新增"时间轴字体大小"滑块（85% – 130%），可在不同屏幕尺寸下自由调整。
+- 时间轴快速添加面板重构为单行紧凑布局：移除顶部时间显示区域，仅保留任务名输入框与确认勾选按钮，添加效率更高。
+- 时间轴左右翻页按钮宽度从 36px 扩大至 48px，并通过伪元素扩展横向触摸识别区域，减少误触与操作无效。
+
+### 修复
+- 修复执行页候选任务卡片删除后任务重新出现的问题；所有删除路径现在统一使用 `dataRef.current` 读取最新数据，彻底消除 stale-closure 竞态。
+- 修复任务详情抽屉中删除任务后任务重新出现的问题。
+- 修复将任务转换为事件时删除原任务可能被恢复的问题。
+
+---
+
+访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
+
 ## 2026-06-23 · 更可靠的桌面登录与同步
 
 ### 改进
@@ -166,6 +182,22 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-25 · Short-block display and deletion stability
+
+### Improved
+- Raised the minimum font size for 15-minute short task titles to 12px with antialiasing enabled, fixing blurry text; added a "Timeline font size" slider (85% – 130%) under Settings → Appearance so the size can be tuned for any screen.
+- Redesigned the timeline quick-add popup as a single-line compact layout: removed the top time-display area, keeping only the task-name input and a confirm check button for faster entry.
+- Widened the timeline left/right navigation buttons from 36px to 48px and extended the horizontal touch hit area via a pseudo-element, reducing missed taps and misfires.
+
+### Fixed
+- Fixed deleted candidate task cards on the Execute page reappearing after deletion; all deletion paths now read from `dataRef.current` to eliminate stale-closure races.
+- Fixed tasks reappearing after being deleted from the task detail drawer.
+- Fixed the original task reappearing after being converted to an event.
+
+---
+
+Visit [www.navopath.com](https://www.navopath.com) to start your NavoPath journey!
 
 ## 2026-06-23 · More reliable desktop sign-in and sync
 

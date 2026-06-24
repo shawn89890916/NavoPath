@@ -182,6 +182,8 @@ function themeVars(settings: Settings, mode: Mode) {
   const activeLight = mode === "execute" ? executeLight : planningLight;
   const { r, g, b } = hexToRgb(activeAccent);
   const isDark = settings.theme === "dark";
+  // Timeline font scale: clamp to safe range, default 1
+  const fontScale = Math.max(0.85, Math.min(1.3, settings.timelineFontScale ?? 1));
   if (isDark) {
     const darkAccent = settings.executeAccentColor || settings.planningAccentColor ? activeAccent : "#EEE9DF";
     const darkAccentRgb = hexToRgb(darkAccent);
@@ -211,6 +213,7 @@ function themeVars(settings: Settings, mode: Mode) {
       "--header-fg-muted": "#999999",
       "--input-bg": "#252525",
       "--input-border": "rgba(255,255,255,0.10)",
+      "--timeline-font-scale": String(fontScale),
     } as CSSProperties;
   }
   return {
@@ -239,6 +242,7 @@ function themeVars(settings: Settings, mode: Mode) {
     "--header-fg-muted": "#7B7062",
     "--input-bg": "#FFFFFF",
     "--input-border": "#DED8D8",
+    "--timeline-font-scale": String(fontScale),
   } as CSSProperties;
 }
 type ResizePreview = { taskId: string; start: string; end: string } | null;
@@ -4220,10 +4224,11 @@ function App() {
   }
 
   function deleteEditingItem() {
-    if (!data || !editingId) return;
-    if (addType === "task") void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== editingId) });
-    if (addType === "project") void saveData({ ...data, projects: data.projects.filter((project) => project.id !== editingId) });
-    if (addType === "event") void saveData({ ...data, events: data.events.filter((event) => event.id !== editingId) });
+    if (!dataRef.current || !editingId) return;
+    const current = dataRef.current;
+    if (addType === "task") void saveData({ ...current, tasks: current.tasks.filter((task) => task.id !== editingId) });
+    if (addType === "project") void saveData({ ...current, projects: current.projects.filter((project) => project.id !== editingId) });
+    if (addType === "event") void saveData({ ...current, events: current.events.filter((event) => event.id !== editingId) });
     closeTaskDrawer();
   }
 
@@ -4287,9 +4292,9 @@ function App() {
       : task;
     const event = buildEventFromTask(sourceTask, activeRecord);
     void saveData({
-      ...data,
-      tasks: data.tasks.filter((item) => item.id !== task.id),
-      events: [...data.events, event],
+      ...dataRef.current!,
+      tasks: dataRef.current!.tasks.filter((item) => item.id !== task.id),
+      events: [...dataRef.current!.events, event],
     });
     setEditingId(event.id);
     setEditingRecordId(undefined);
@@ -5459,7 +5464,7 @@ function App() {
                         </div>
                         {tasks.map((task) => (
                           <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
-                            void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
+                            void saveData({ ...dataRef.current!, tasks: dataRef.current!.tasks.filter((item) => item.id !== task.id) });
                             showToast(t(lang, "candidate.deletedTask"));
                           }} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
                         ))}
@@ -5468,7 +5473,7 @@ function App() {
                   })
               ) : visibleCandidates.map((task) => (
                 <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
-                  void saveData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) });
+                  void saveData({ ...dataRef.current!, tasks: dataRef.current!.tasks.filter((item) => item.id !== task.id) });
                   showToast(t(lang, "candidate.deletedTask"));
                 }} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
               ))}
@@ -6518,17 +6523,13 @@ function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNul
 
   return (
     <div ref={containerRef} className="df-quick-add-popover" style={{ position: "fixed", top, left, width: popW, zIndex: 999999 }}>
-      <div className="df-quick-add-header">
-        <span className="df-quick-add-time">{add.startTime} – {add.endTime}</span>
-        <button className="df-quick-add-close" onClick={onCancel} aria-label="Close">×</button>
-      </div>
       <div className="df-quick-add-row">
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
           placeholder={placeholder} />
         <button onClick={handleSave}
           disabled={!input.replace(/#[^\s#]+/g, "").trim()}
-          className="df-quick-add-confirm">✓</button>
+          className="df-quick-add-confirm" aria-label={compact ? "Add" : "✓"}>{compact ? "+" : "✓"}</button>
       </div>
       {showProjectMenu && filtered.length > 0 && (
         <div className={`df-quick-add-project-menu${flipAbove ? " flip-above" : ""}`}>
@@ -8516,6 +8517,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             </label>
             <label className="df-utility-select">{t(lang, "settings.defaultView")}<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="weekly">{viewLabel(lang, "weekly")}</option><option value="month">{viewLabel(lang, "month")}</option></select></label>
             <label className="df-utility-select">{lang === "zh" ? "一天开始时间" : "Day start time"}<input type="time" value={settings.dayStartTime || "00:00"} onChange={(event) => onSave({ dayStartTime: event.target.value })} /></label>
+            <label className="df-utility-range">{lang === "zh" ? "时间轴字体大小" : "Timeline font size"}<input type="range" min="0.85" max="1.3" step="0.05" value={settings.timelineFontScale ?? 1} onChange={(event) => onSave({ timelineFontScale: Number(event.target.value) })} /><span className="df-utility-range-value">{Math.round((settings.timelineFontScale ?? 1) * 100)}%</span></label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />{t(lang, "settings.hideCompleted")}</label>
             <div className="df-settings-divider" />
             <div className="df-settings-subhead">{lang === "zh" ? "强调色" : "Accent Colors"}</div>

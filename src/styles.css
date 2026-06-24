@@ -1436,6 +1436,37 @@
   border-color: var(--accent-active);
 }
 
+/* Range slider setting (e.g. timeline font size) */
+.df-utility-range {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 18%, var(--border-soft));
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--df-muted);
+}
+
+.df-utility-range input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--accent-active);
+  cursor: pointer;
+}
+
+.df-utility-range-value {
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 12px;
+}
+
 .df-utility-body p,
 .df-utility-body small {
   margin: 0;
@@ -11760,23 +11791,37 @@ body:has(:active)::-webkit-scrollbar-thumb {
   bottom: 0;
   transform: none;
   z-index: 12;
-  width: 36px;
+  width: 48px;
   height: 100%;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--text-muted) !important;
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  /* Expand the clickable hit area without affecting visual layout */
+  padding: 0 8px;
+  box-sizing: border-box;
 }
 
 .df-date-arrow.left { left: 0; }
 
 .df-date-arrow.right { right: 0; }
+
+/* Expand touch hit area horizontally without visual change */
+.df-date-arrow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  right: -8px;
+  z-index: -1;
+}
 
 .df-timeline-panel:has(.df-timeline-3day) .df-date-arrow.left { left: 0; }
 
@@ -14416,50 +14461,19 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
+  border-radius: 10px;
   overflow: visible;
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
-  box-shadow: 0 16px 40px rgba(17,24,39,0.16), 0 2px 8px rgba(17,24,39,0.06);
+  box-shadow: 0 8px 24px rgba(17,24,39,0.14), 0 1px 4px rgba(17,24,39,0.06);
 }
 
-.df-quick-add-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px 4px;
-  gap: 8px;
-}
-
-.df-quick-add-time {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-active, #C69CF9);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.df-quick-add-close {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: #8B93A7;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .12s, color .12s;
-}
-
+/* Legacy header/time/close styles kept for backward compat but no longer rendered */
+.df-quick-add-header,
+.df-quick-add-time,
+.df-quick-add-close,
 .df-quick-add-close:hover {
-  background: rgba(0,0,0,0.06);
-  color: #111827;
+  display: none;
 }
 
 .df-quick-add-row {
@@ -14467,23 +14481,23 @@ body:has(:active)::-webkit-scrollbar-thumb {
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
-  padding: 4px 12px 10px;
+  padding: 6px;
 }
 
 .df-quick-add-row input {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  height: 30px;
+  height: 32px;
   margin: 0;
-  padding: 0 6px;
+  padding: 0 10px;
   border: 1px solid #E5E7EB;
   border-radius: 8px;
   outline: none;
   background: #F9FAFB;
   color: #111827;
   font-size: 13px;
-  line-height: 30px;
+  line-height: 32px;
   transition: border-color .12s, background .12s;
 }
 
@@ -14497,15 +14511,15 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 .df-quick-add-confirm {
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: 8px;
   background: var(--accent-active, #C69CF9);
   color: #fff;
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -19790,26 +19804,38 @@ body:has(:active)::-webkit-scrollbar-thumb {
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)) !important;
 }
 
-/* ===== Fix: 15-minute task title display ===== */
+/* ===== Fix: 15-minute task title display =====
+   Font sizes use calc() with --timeline-font-scale (default 1) so users
+   can adjust the size in Settings. Min size raised to 12px to fix blur. */
 .df-time-block.short-block:not(.df-time-block-week) {
   padding: 1px 4px !important;
   overflow: visible !important;
 }
 .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
-  font-size: 11px !important;
-  line-height: 1.1 !important;
+  font-size: calc(12px * var(--timeline-font-scale, 1)) !important;
+  line-height: 1.15 !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   width: 100% !important;
   max-width: 100% !important;
+  /* Improve rendering clarity on small text */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 .df-week-view .df-time-block.short-block .df-block-title-row strong,
 .df-week-view .df-event-blocks-layer .df-time-block.short-block .df-block-title-row strong {
-  font-size: 10px !important;
-  line-height: 1.15 !important;
+  font-size: calc(11px * var(--timeline-font-scale, 1)) !important;
+  line-height: 1.2 !important;
   -webkit-line-clamp: 2 !important;
   white-space: normal !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* Regular (non-short) blocks also honor the font scale */
+.df-time-block:not(.short-block) .df-block-title-row strong {
+  font-size: calc(13px * var(--timeline-font-scale, 1));
 }
 
 /* ===== Fix: Settings neutral background, remove blue-purple ===== */
@@ -19832,16 +19858,16 @@ body:has(:active)::-webkit-scrollbar-thumb {
 /* ===== Fix: Quick-add confirm button styling (overrides app-redesign.css) ===== */
 .df-app.theme-dark .df-quick-add-confirm:not(:disabled),
 .df-app:not(.theme-dark) .df-quick-add-confirm:not(:disabled) {
-  flex: 0 0 30px !important;
-  width: 30px !important;
-  height: 30px !important;
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  height: 32px !important;
   margin-left: 0 !important;
   padding: 0 !important;
   border: none !important;
   border-radius: 8px !important;
   background: var(--accent-active, #C69CF9) !important;
   color: #fff !important;
-  font-size: 14px !important;
+  font-size: 16px !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
@@ -19864,7 +19890,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 36px;
+  width: 48px;
   height: 100%;
   z-index: 12;
   cursor: pointer;

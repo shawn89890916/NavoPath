@@ -260,6 +260,8 @@ export interface Settings {
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
   dayStartTime: string;
+  /** 时间轴任务标题字体缩放系数（0.85 ~ 1.3）。1 表示默认大小。 */
+  timelineFontScale?: number;
   /** 自动同步频率（分钟）。0 或未设置表示仅手动同步。 */
   syncIntervalMinutes?: number;
   /** 最近一次成功同步时间（ISO 字符串）。 */
