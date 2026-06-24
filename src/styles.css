@@ -19916,3 +19916,59 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-size: 10px !important;
   line-height: 1.15 !important;
 }
+
+/* ===== Optimization: Date arrow touch area expansion ===== */
+/* Expand touch hit area for better mobile usability */
+.df-date-arrow::before {
+  left: -16px !important;
+  right: -16px !important;
+}
+
+/* Compact date arrow touch area expansion */
+.df-compact-date-arrow {
+  position: relative;
+  min-width: 44px !important;
+  width: 44px !important;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.df-compact-date-arrow::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -12px;
+  right: -12px;
+  z-index: -1;
+}
+
+/* ===== Optimization: 15-minute task title clarity ===== */
+/* Improve font rendering for small text */
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-weight: 500;
+}
+
+/* Honor timeline font scale for short blocks */
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  font-size: calc(11px * var(--timeline-font-scale, 1)) !important;
+}
+
+/* Week view short blocks also honor font scale */
+.df-week-view .df-time-block.short-block .df-block-title-row strong {
+  font-size: calc(10px * var(--timeline-font-scale, 1)) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Regular blocks also honor font scale with better rendering */
+.df-time-block:not(.short-block) .df-block-title-row strong {
+  font-size: calc(13px * var(--timeline-font-scale, 1));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

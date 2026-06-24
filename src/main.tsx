@@ -2920,6 +2920,58 @@ function App() {
     updateTask(taskId, patch);
   }
 
+  function deleteTaskById(taskId: string) {
+    if (!data) return;
+    // Check if this is a recurrence occurrence
+    const occurrenceMeta = parseRecurrenceOccurrenceId(taskId);
+    if (occurrenceMeta) {
+      const realTask = occurrenceToTaskMap.get(taskId);
+      if (!realTask) return;
+      // Cancel this occurrence instead of deleting the whole task
+      const now = new Date().toISOString();
+      void saveData({
+        ...data,
+        tasks: data.tasks.map((task) => {
+          if (task.id !== realTask.id) return task;
+          const records = task.timelineRecords || [];
+          const hasExisting = records.some((record) => matchesOccurrence(record, occurrenceMeta.scheduledDate, occurrenceMeta.scheduledStart));
+          return {
+            ...task,
+            timelineRecords: hasExisting
+              ? records.map((record) =>
+                  matchesOccurrence(record, occurrenceMeta.scheduledDate, occurrenceMeta.scheduledStart)
+                    ? { ...record, executionStatus: "cancelled" as const }
+                    : record
+                )
+              : [...records, createOccurrenceExceptionRecord(task, occurrenceMeta.scheduledDate, occurrenceMeta.scheduledStart, "cancelled")],
+            updatedAt: now,
+          };
+        }),
+      });
+      showToast(t(lang, "toast.cancelledPlan"));
+      return;
+    }
+    // Check if this is a timeline record
+    const realTask = recordToTaskMap.get(taskId);
+    if (realTask) {
+      // Delete the record and also check if we should delete the whole task
+      deleteTimelineRecord(taskId);
+      // If the task has no other records and is not a recurring task, delete the whole task
+      const remainingRecords = (realTask.timelineRecords || []).filter((r) => r.id !== taskId);
+      if (remainingRecords.length === 0 && !hasRecurringRule(realTask) && !realTask.plannedForDate) {
+        void saveData({
+          ...dataRef.current!,
+          tasks: dataRef.current!.tasks.filter((t) => t.id !== realTask.id),
+        });
+      }
+      showToast(t(lang, "candidate.deletedTask"));
+      return;
+    }
+    // Regular task deletion
+    void saveData({ ...data, tasks: data.tasks.filter((task) => task.id !== taskId) });
+    showToast(t(lang, "candidate.deletedTask"));
+  }
+
   function moveCandidateToPlanning(taskId: string) {
     const task = data?.tasks.find((item) => item.id === taskId);
     if (!task) return;
@@ -5463,19 +5515,13 @@ function App() {
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
                         {tasks.map((task) => (
-                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
-                            void saveData({ ...dataRef.current!, tasks: dataRef.current!.tasks.filter((item) => item.id !== task.id) });
-                            showToast(t(lang, "candidate.deletedTask"));
-                          }} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
+                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
                         ))}
                       </div>
                     );
                   })
               ) : visibleCandidates.map((task) => (
-                <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => {
-                  void saveData({ ...dataRef.current!, tasks: dataRef.current!.tasks.filter((item) => item.id !== task.id) });
-                  showToast(t(lang, "candidate.deletedTask"));
-                }} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
+                <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
               ))}
             </div>
             <form className="df-quick-add" onSubmit={(event) => {
@@ -6399,9 +6445,7 @@ function App() {
         </main>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => {
-            void saveData({ ...dataRef.current!, tasks: dataRef.current!.tasks.filter((task) => task.id !== taskId) });
-          }} />
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} />
         </Suspense>
       )}
 
