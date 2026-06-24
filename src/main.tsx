@@ -3769,7 +3769,7 @@ function App() {
     const duration = taskDuration(task);
     const rect = event.currentTarget.getBoundingClientRect();
     const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-    const offsetMinutes = Math.min(Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0), Math.max(duration - SLOT_MINUTES, 0));
+    const offsetMinutes = Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0);
     let active = false;
     let holdCancelled = false;
     let holdReady = !compactLayout || event.pointerType !== "touch";
@@ -4665,7 +4665,7 @@ function App() {
       if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
       if (pointerEvent.clientY < rect.top + 48) scrollEl.scrollTop -= 18;
       else if (pointerEvent.clientY > rect.bottom - 48) scrollEl.scrollTop += 18;
-      const target = getDropTargetFromPointer({ clientX: pointerEvent.clientX, clientY: pointerEvent.clientY, gridElement: gridEl, scrollElement: scrollEl, visibleDays: visDays });
+      const target = getDropTargetFromPointer({ clientX: pointerEvent.clientX, clientY: pointerEvent.clientY, gridElement: gridEl, scrollElement: scrollEl, visibleDays: visDays, startHour: dayStartHour });
       dragTargetDateRef.current = target.date;
       dropTime = target.startTime;
       setHoverSlot(target.startTime);

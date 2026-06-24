@@ -12441,8 +12441,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
   display: none;
 }
 .df-time-block.short-block:not(.df-time-block-week) {
-  padding: 0 4px;
+  padding: 1px 6px !important;
   justify-content: center;
+  min-height: 20px !important;
 }
 .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row {
   width: 100%;
@@ -19684,11 +19685,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 /* ===== Fix: 15-minute short block title display ===== */
 .df-time-block.short-block:not(.df-time-block-week) {
-  padding: 0 4px !important;
+  padding: 1px 6px !important;
   min-height: 20px !important;
 }
 .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
-  font-size: 12px !important;
+  font-size: 11px !important;
   line-height: 1.2 !important;
   white-space: nowrap !important;
   overflow: hidden !important;
@@ -19697,6 +19698,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   max-width: 100% !important;
 }
 .df-event-blocks-layer .df-time-block.short-block .df-block-title-row strong {
-  font-size: 11px !important;
+  font-size: 10px !important;
   line-height: 1.15 !important;
 }
