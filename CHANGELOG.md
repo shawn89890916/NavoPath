@@ -10,6 +10,8 @@
 - 时间轴左右翻页按钮宽度从 36px 扩大至 48px，并通过伪元素扩展横向触摸识别区域，减少误触与操作无效。
 
 ### 修复
+- 修复已登录用户在云端 profile 查询失败时被强制进入本地预览模式、无法退出登录的问题；profile 查询失败现在降级为内存空数据，保持登录状态可用。
+- 修复运行时降级标志被持久化到 localStorage 导致应用永久困在预览模式的问题；降级现在仅在当前会话生效，重启后重新尝试云端后端，并清理旧版本残留的持久化标志。
 - 修复执行页候选任务卡片删除后任务重新出现的问题；所有删除路径现在统一使用 `dataRef.current` 读取最新数据，彻底消除 stale-closure 竞态。
 - 修复任务详情抽屉中删除任务后任务重新出现的问题。
 - 修复将任务转换为事件时删除原任务可能被恢复的问题。
@@ -199,11 +201,12 @@
 - Widened the timeline left/right navigation buttons from 36px to 48px and extended the horizontal touch hit area via a pseudo-element, reducing missed taps and misfires.
 
 ### Fixed
+- Fixed signed-in users being forced into local preview mode (and unable to sign out) when the cloud profile query failed; profile failures now degrade to in-memory empty data so the signed-in session stays usable.
+- Fixed the runtime fallback flag being persisted to localStorage, which permanently trapped the app in preview mode; the fallback now lasts only for the current session, the next launch retries the cloud backend, and stale persisted flags from earlier builds are cleaned up.
 - Fixed deleted candidate task cards on the Execute page reappearing after deletion; all deletion paths now read from `dataRef.current` to eliminate stale-closure races.
 - Fixed tasks reappearing after being deleted from the task detail drawer.
 - Fixed the original task reappearing after being converted to an event.
 - Fixed the app getting stuck on the loading screen when the cloud database query fails; it now automatically falls back to local preview mode so the workspace remains usable.
-- Fixed the app being permanently trapped in local preview mode; runtime fallback now lasts only for the current session, and the next launch retries the cloud backend.
 - Fixed 15-minute single-line task titles being clipped by resize handles and the checkbox in the timeline; the title now owns the full block height and is vertically centered without clipping.
 - Fixed garbled encoding in the `package.json` description field.
 

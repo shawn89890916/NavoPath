@@ -412,15 +412,15 @@ function write(data: PlannerData): PlannerData {
 }
 
 // Session-level fallback flag (NOT persisted to localStorage).
-// Set when the cloud API fails at runtime so the current session can keep working,
-// but a fresh app start will retry the cloud backend instead of staying in preview.
+// Set only by forceLocalPreviewMode() so a single runtime failure does not trap
+// the user in preview mode across restarts.
 let sessionLocalFallback = false;
 
 export function forceLocalPreviewMode() {
-  sessionLocalFallback = true;
-  // Clear any stale persisted preview flag that earlier builds may have written,
-  // so the next cold start retries the cloud backend instead of being stuck in preview.
+  // Clear any stale persisted preview flag from earlier builds so the next cold
+  // start retries the cloud backend instead of being trapped in preview mode.
   try { localStorage.removeItem(PREVIEW_MODE_KEY); } catch { /* ignore */ }
+  sessionLocalFallback = true;
   window.plannerApi = undefined as any;
   installBrowserFallback();
 }
