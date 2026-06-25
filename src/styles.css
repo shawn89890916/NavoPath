@@ -20453,3 +20453,135 @@ body:has(:active)::-webkit-scrollbar-thumb {
   word-break: break-all;
 }
 
+
+
+/* ===== v1.2.20: Refactor time block display logic ===== */
+/* Clean up conflicting styles and ensure reliable display for all task durations */
+
+/* Base time block - restore proper vertical layout */
+.df-app .df-time-block {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  padding-left: 34px !important;
+  padding-right: 32px !important;
+  overflow: hidden !important;
+}
+
+/* Short blocks (30 min and below) - optimized for compact display */
+.df-app .df-time-block.short-block:not(.df-time-block-week) {
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+  padding-left: 28px !important;
+  padding-right: 12px !important;
+  justify-content: center !important;
+  min-height: 28px !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+
+/* Title row - takes available space */
+.df-app .df-time-block .df-block-title-row {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
+}
+
+/* Short block title - ensure text is visible and properly sized */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* Improve text rendering */
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+/* Checkbox sizing for short blocks */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-check {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+}
+
+/* Resize dots - keep them functional but not intrusive */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
+  display: block !important;
+  width: 100% !important;
+  height: 6px !important;
+  min-width: 100% !important;
+  position: relative !important;
+  cursor: ns-resize !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::before {
+  content: "" !important;
+  position: absolute !important;
+  top: -3px !important;
+  bottom: -3px !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.top {
+  top: 0 !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.bottom {
+  bottom: 0 !important;
+}
+
+/* Hide secondary elements on very short blocks */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-project,
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-next,
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-preview-badge,
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-preview-actions,
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-time {
+  display: none !important;
+}
+
+/* Week view adjustments */
+.df-app .df-week-view .df-time-block.short-block .df-block-title-row strong,
+.df-app .df-week-view .df-event-blocks-layer .df-time-block.short-block .df-block-title-row strong {
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  -webkit-line-clamp: 2 !important;
+  white-space: normal !important;
+}
+
+/* Regular (non-short) blocks - proper font sizing */
+.df-app .df-time-block:not(.short-block) .df-block-title-row strong {
+  font-size: 13px !important;
+  line-height: 1.3 !important;
+}
+
+/* Honor timeline font scale setting */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  font-size: calc(12px * var(--timeline-font-scale, 1)) !important;
+}
+
+.df-app .df-time-block:not(.short-block) .df-block-title-row strong {
+  font-size: calc(13px * var(--timeline-font-scale, 1)) !important;
+}
+
