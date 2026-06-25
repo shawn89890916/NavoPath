@@ -8475,6 +8475,56 @@ function DesktopUpdateControl({ lang }: { lang: Language }) {
   </section>;
 }
 
+function exportDataAsJson(data: PlannerData, settings: Settings) {
+  const exportData = {
+    exportedAt: new Date().toISOString(),
+    version: data.version,
+    data: data,
+    settings: settings,
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `navopath-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportTasksAsCsv(data: PlannerData) {
+  const headers = ["ID", "Title", "Project", "Status", "Due Date", "Estimated Hours", "Priority", "Created At", "Completed"];
+  const projectMap = new Map(data.projects.map((p) => [p.id, p.title]));
+  
+  const rows = data.tasks.map((task) => {
+    const projectTitle = projectMap.get(task.projectId || "") || "";
+    const status = task.completed ? "Completed" : (task.plannedForDate ? "Scheduled" : "Pending");
+    return [
+      task.id,
+      `"${task.title.replace(/"/g, '""')}"`,
+      `"${projectTitle.replace(/"/g, '""')}"`,
+      status,
+      task.dueDate || "",
+      task.estimatedHours || "",
+      task.priority || "",
+      task.createdAt || "",
+      task.completed ? "Yes" : "No",
+    ].join(",");
+  });
+  
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `navopath-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: () => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
   const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "account">("page");
   const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
@@ -8614,6 +8664,14 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                 onSyncNow={onSyncNow}
               />
               <DesktopUpdateControl lang={lang} />
+              <div className="df-settings-divider" />
+              <div className="df-settings-subhead">{lang === "zh" ? "数据导出" : "Data Export"}</div>
+              <button className="df-settings-export" onClick={() => exportDataAsJson(data, settings)}>
+                {lang === "zh" ? "导出为 JSON（完整数据）" : "Export as JSON (Full Data)"}
+              </button>
+              <button className="df-settings-export" onClick={() => exportTasksAsCsv(data)}>
+                {lang === "zh" ? "导出任务为 CSV" : "Export Tasks as CSV"}
+              </button>
               <button className="df-settings-about" onClick={onShowAbout}><span className="df-settings-about-icon">i</span><span>{t(lang, "settings.about")}</span></button>
               {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
               {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}

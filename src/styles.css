@@ -17448,6 +17448,49 @@ body:has(:active)::-webkit-scrollbar-thumb {
   overflow: auto;
   padding: 8px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--mode-primary) 14%, var(--border-soft));
+}
+
+/* ===== Data Export Buttons ===== */
+.df-settings-export {
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border: 1px solid color-mix(in srgb, var(--mode-primary) 20%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-card) 95%, transparent);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.df-settings-export:hover {
+  background: color-mix(in srgb, var(--mode-primary) 8%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--mode-primary) 35%, var(--border-soft));
+}
+
+.df-settings-export:active {
+  background: color-mix(in srgb, var(--mode-primary) 12%, var(--surface-card));
+  transform: scale(0.98);
+}
+
+.df-settings-subhead {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  margin-top: 4px;
+}
+
+.df-settings-divider {
+  height: 1px;
+  background: color-mix(in srgb, var(--mode-primary) 10%, var(--border-soft));
+  margin: 14px 0;
+}
   background: color-mix(in srgb, var(--surface-card) 96%, transparent);
 }
 .df-ai-conversation-list p {
