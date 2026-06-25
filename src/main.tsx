@@ -2390,7 +2390,10 @@ function App() {
       return false;
     }
     const scheduler = syncSchedulerRef.current;
-    if (!scheduler) return false;
+    if (!scheduler) {
+      if (!silent) showToast(lang === "zh" ? "同步功能初始化中，请稍后再试。" : "Sync is initializing, please try again later.");
+      return false;
+    }
     if (!silent) setIsManualSyncing(true);
     try {
       await scheduler.runNow();

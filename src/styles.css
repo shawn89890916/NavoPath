@@ -20206,3 +20206,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
   line-height: 1.2 !important;
   font-size: 12px !important;
 }
+
+/* ===== Fix: Move right arrow to the far right of timeline panel ===== */
+.df-app .df-timeline-panel .df-date-arrow.right {
+  right: 0 !important;
+}
