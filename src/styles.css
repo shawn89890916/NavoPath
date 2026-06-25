@@ -19995,20 +19995,34 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 /* ===== Optimization: Improve 15-minute short task display and resizing ===== */
-/* Increase minimum height of short blocks for better readability */
+/* Remove vertical padding and use row layout for better vertical centering */
 .df-time-block.short-block:not(.df-time-block-week) {
   min-height: 32px !important;
-  padding: 4px 8px !important;
+  padding: 0 8px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px;
+}
+
+/* Title row takes remaining space and aligns center */
+.df-time-block.short-block:not(.df-time-block-week) .df-block-title-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 /* Improve font rendering for short block titles */
 .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
   font-size: 13px !important;
-  line-height: 1.3 !important;
+  line-height: 1 !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-weight: 500;
+  margin: 0;
+  padding: 0;
 }
 
 /* Larger resize dots for short blocks with expanded hit area */
@@ -20172,4 +20186,23 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-size: calc(13px * var(--timeline-font-scale, 1));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Fix: Remove bottom white space in task blocks ===== */
+.df-app .df-time-block {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  justify-content: flex-start !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+  min-height: 28px !important;
+  justify-content: center !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  line-height: 1.2 !important;
+  font-size: 12px !important;
 }
