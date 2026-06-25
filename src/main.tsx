@@ -1396,7 +1396,7 @@ function YearCalendarOverview({
 }
 
 function App() {
-  const isWorkspaceRoute = window.location.pathname === "/app" || window.location.pathname.startsWith("/app/");
+  const isWorkspaceRoute = window.location.pathname === "/app" || window.location.pathname.startsWith("/app/") || Boolean(window.desktopApi);
   const [data, setData] = useState<PlannerData | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [lang, setLang] = useState<Language>(detectSystemLanguage());
