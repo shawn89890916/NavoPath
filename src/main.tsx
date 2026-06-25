@@ -1,4 +1,4 @@
-﻿import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
@@ -38,6 +38,8 @@ import { useInAppDialog } from "./InAppDialog";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
+import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, resolveConfig as resolvePluginConfig, type PluginHost } from "./plugins/registry";
+import { registerBuiltinPlugins } from "./plugins/builtin";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -1593,6 +1595,7 @@ function App() {
   const syncSchedulerRef = useRef<SyncScheduler | null>(null);
   const snapshotTimerRef = useRef<number | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const pluginHostRef = useRef<PluginHost | null>(null);
   const colsContainerRef = useRef<HTMLDivElement | null>(null);
   const timeGridRef = useRef<HTMLDivElement | null>(null);
   const [multiColWidth, setMultiColWidth] = useState(0);
@@ -2441,8 +2444,17 @@ function App() {
     }
     if (!silent) setIsManualSyncing(true);
     try {
-      await scheduler.runNow();
-      return true;
+      const result = await scheduler.runNow();
+      if (!silent) {
+        if (!result.ok) {
+          showToast(t(lang, "sync.failure"));
+        } else if (result.pushedLocal || result.pulledRemote) {
+          showToast(lang === "zh" ? "同步完成。" : "Sync complete.");
+        } else {
+          showToast(lang === "zh" ? "已是最新数据。" : "Already up to date.");
+        }
+      }
+      return result.ok;
     } catch (error) {
       if (!silent) showToast(t(lang, "sync.failure"));
       console.warn("Manual sync failed", error);
@@ -2496,6 +2508,46 @@ function App() {
     if (!scheduler) return;
     scheduler.setIntervalMinutes(readSyncInterval(settings));
   }, [settings?.syncIntervalMinutes, authState?.user?.id]);
+
+  // Plugin system bootstrap. The host exposes saveSettings + data + toast so
+  // plugin lifecycle hooks can do useful work without reaching into internals.
+  useEffect(() => {
+    registerBuiltinPlugins();
+    if (!pluginHostRef.current) {
+      pluginHostRef.current = {
+        getData: () => dataRef.current,
+        savePluginConfig: (pluginId, patch) => {
+          const current = settingsRef.current;
+          if (!current) return;
+          const existing = current.pluginConfigs?.[pluginId] ?? {};
+          const merged = { ...existing, ...patch };
+          const nextConfigs = { ...(current.pluginConfigs ?? {}), [pluginId]: merged };
+          void saveSettings({ pluginConfigs: nextConfigs });
+        },
+        emit: (event, payload) => {
+          // Lightweight local event bus — listeners registered via window events.
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("navopath:plugin", { detail: { event, payload } }));
+          }
+        },
+        toast: (message) => showToast(message),
+      };
+    }
+    // Activate every plugin id listed in settings.enabledPlugins that is not
+    // already active. We also deactivate any plugin that has been removed.
+    const enabled = new Set(settings?.enabledPlugins ?? []);
+    const host = pluginHostRef.current;
+    for (const plugin of listRegisteredPlugins()) {
+      const should = enabled.has(plugin.id);
+      const active = isPluginActive(plugin.id);
+      if (should && !active) {
+        activatePlugin(plugin.id, host, resolvePluginConfig(plugin, settings?.pluginConfigs?.[plugin.id]));
+      } else if (!should && active) {
+        deactivatePlugin(plugin.id, host);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.enabledPlugins, settings?.pluginConfigs]);
 
   const today = todayIso();
   const timelineDate = selectedDate;
@@ -8473,7 +8525,7 @@ function SyncSettingsControl({
         </span>
         <button
           type="button"
-          className="df-settings-sync-now"
+          className={`df-settings-sync-now${isManualSyncing ? " is-syncing" : ""}`}
           disabled={!cloudReady || isManualSyncing}
           onClick={() => {
             void onSyncNow?.();
@@ -8606,6 +8658,42 @@ function exportTasksAsCsv(data: PlannerData) {
 
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: () => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
   const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "plugins" | "account">("page");
+  const [pluginConfigDialogId, setPluginConfigDialogId] = useState<string | null>(null);
+  const [pluginConfigDraft, setPluginConfigDraft] = useState<Record<string, unknown>>({});
+  // Force a re-render of the plugin list when activation state changes (the
+  // registry holds state outside React).
+  const [, setPluginRefreshTick] = useState(0);
+
+  function togglePlugin(pluginId: string) {
+    const list = settings.enabledPlugins ?? [];
+    const enabled = list.includes(pluginId);
+    const next = enabled ? list.filter((id) => id !== pluginId) : [...list, pluginId];
+    onSave({ enabledPlugins: next });
+  }
+
+  function openPluginConfig(pluginId: string) {
+    const plugin = listRegisteredPlugins().find((p) => p.id === pluginId);
+    if (!plugin) return;
+    const resolved = resolvePluginConfig(plugin, settings.pluginConfigs?.[pluginId]);
+    setPluginConfigDraft(resolved);
+    setPluginConfigDialogId(pluginId);
+  }
+
+  function savePluginConfigField(key: string, value: unknown) {
+    setPluginConfigDraft((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function commitPluginConfig() {
+    if (!pluginConfigDialogId) return;
+    const existing = settings.pluginConfigs?.[pluginConfigDialogId] ?? {};
+    const merged = { ...existing, ...pluginConfigDraft };
+    const nextConfigs = { ...(settings.pluginConfigs ?? {}), [pluginConfigDialogId]: merged };
+    onSave({ pluginConfigs: nextConfigs });
+    setPluginConfigDialogId(null);
+    setPluginConfigDraft({});
+    setPluginRefreshTick((n) => n + 1);
+  }
+
   const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
   const visibleMemories = (data.aiMemories || [])
     .filter((memory) => !memory.archived)
@@ -8845,83 +8933,72 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             {settingsSection === "plugins" && <section className="df-settings-group">
               <h3>{lang === "zh" ? "插件市场" : "Plugin Marketplace"}</h3>
               <p className="df-settings-desc">{lang === "zh" ? "扩展 NavoPath 的功能，发现和安装社区插件。" : "Extend NavoPath's functionality with community plugins."}</p>
-              
+
               <div className="df-settings-divider" />
               <div className="df-settings-subhead">{lang === "zh" ? "可用插件" : "Available Plugins"}</div>
-              
+
               <div className="df-plugin-list">
-                {[
-                  {
-                    id: "pomodoro",
-                    name: lang === "zh" ? "番茄钟" : "Pomodoro Timer",
-                    description: lang === "zh" ? "集成番茄工作法，帮助你专注工作。" : "Integrate the Pomodoro technique to help you stay focused.",
-                    version: "1.0.0",
-                    author: "NavoPath Team",
-                    icon: "🍅",
-                    installed: false,
-                  },
-                  {
-                    id: "habit-tracker",
-                    name: lang === "zh" ? "习惯追踪" : "Habit Tracker",
-                    description: lang === "zh" ? "追踪你的日常习惯，建立更好的生活节奏。" : "Track your daily habits and build better routines.",
-                    version: "1.2.0",
-                    author: "Community",
-                    icon: "✅",
-                    installed: true,
-                  },
-                  {
-                    id: "weather",
-                    name: lang === "zh" ? "天气信息" : "Weather Info",
-                    description: lang === "zh" ? "在日历中显示天气信息，帮助你规划日程。" : "Display weather information in your calendar to help plan your day.",
-                    version: "0.9.0",
-                    author: "NavoPath Team",
-                    icon: "🌤️",
-                    installed: false,
-                  },
-                  {
-                    id: "notes",
-                    name: lang === "zh" ? "笔记增强" : "Notes Enhanced",
-                    description: lang === "zh" ? "为任务添加富文本笔记和 Markdown 支持。" : "Add rich text notes and Markdown support to tasks.",
-                    version: "2.1.0",
-                    author: "Community",
-                    icon: "📝",
-                    installed: true,
-                  },
-                ].map((plugin) => (
-                  <div key={plugin.id} className={`df-plugin-card ${plugin.installed ? "installed" : ""}`}>
-                    <div className="df-plugin-icon">{plugin.icon}</div>
-                    <div className="df-plugin-info">
-                      <div className="df-plugin-header">
-                        <strong className="df-plugin-name">{plugin.name}</strong>
-                        <span className="df-plugin-version">v{plugin.version}</span>
+                {listRegisteredPlugins().map((plugin) => {
+                  const enabled = Boolean(settings?.enabledPlugins?.includes(plugin.id));
+                  const active = isPluginActive(plugin.id);
+                  return (
+                    <div key={plugin.id} className={`df-plugin-card ${enabled ? "installed" : ""}`}>
+                      <div className="df-plugin-icon">{plugin.icon}</div>
+                      <div className="df-plugin-info">
+                        <div className="df-plugin-header">
+                          <strong className="df-plugin-name">{plugin.name}</strong>
+                          <span className="df-plugin-version">v{plugin.version}</span>
+                        </div>
+                        <p className="df-plugin-desc">{plugin.description}</p>
+                        <div className="df-plugin-meta">
+                          <span className="df-plugin-author">{plugin.author}</span>
+                          {enabled && (
+                            <span className="df-plugin-status">
+                              {active ? (lang === "zh" ? "已启用" : "Active") : (lang === "zh" ? "已安装" : "Installed")}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="df-plugin-desc">{plugin.description}</p>
-                      <div className="df-plugin-meta">
-                        <span className="df-plugin-author">{plugin.author}</span>
-                        {plugin.installed && <span className="df-plugin-status">{lang === "zh" ? "已安装" : "Installed"}</span>}
+                      <div className="df-plugin-actions">
+                        {enabled ? (
+                          <>
+                            <button
+                              type="button"
+                              className="df-plugin-config"
+                              onClick={() => openPluginConfig(plugin.id)}
+                            >
+                              {lang === "zh" ? "配置" : "Configure"}
+                            </button>
+                            <button
+                              type="button"
+                              className="df-plugin-uninstall"
+                              onClick={() => togglePlugin(plugin.id)}
+                            >
+                              {lang === "zh" ? "停用" : "Disable"}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="df-plugin-install"
+                            onClick={() => togglePlugin(plugin.id)}
+                          >
+                            {lang === "zh" ? "启用" : "Enable"}
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="df-plugin-actions">
-                      {plugin.installed ? (
-                        <>
-                          <button className="df-plugin-config">{lang === "zh" ? "配置" : "Configure"}</button>
-                          <button className="df-plugin-uninstall">{lang === "zh" ? "卸载" : "Uninstall"}</button>
-                        </>
-                      ) : (
-                        <button className="df-plugin-install">{lang === "zh" ? "安装" : "Install"}</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              
+
               <div className="df-settings-divider" />
               <div className="df-settings-subhead">{lang === "zh" ? "插件配置指南" : "Plugin Configuration Guide"}</div>
-              
+
               <div className="df-plugin-guide">
                 <h4>{lang === "zh" ? "如何开发插件" : "How to Develop Plugins"}</h4>
                 <p>{lang === "zh" ? "NavoPath 插件基于 Web 标准构建，使用 HTML、CSS 和 JavaScript。" : "NavoPath plugins are built on web standards using HTML, CSS, and JavaScript."}</p>
-                
+
                 <ol className="df-plugin-steps">
                   <li>
                     <strong>{lang === "zh" ? "创建插件目录" : "Create Plugin Directory"}</strong>
@@ -8949,7 +9026,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                     <p>{lang === "zh" ? "在设置中启用插件，重启应用后生效。" : "Enable the plugin in settings, and restart the app to take effect."}</p>
                   </li>
                 </ol>
-                
+
                 <div className="df-plugin-api">
                   <h4>{lang === "zh" ? "插件 API 参考" : "Plugin API Reference"}</h4>
                   <ul>
@@ -8959,7 +9036,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                     <li><code>navopath.events</code> - {lang === "zh" ? "事件系统 API" : "Event system API"}</li>
                   </ul>
                 </div>
-                
+
                 <div className="df-plugin-location">
                   <h4>{lang === "zh" ? "插件目录位置" : "Plugin Directory Location"}</h4>
                   <p>{lang === "zh" ? "桌面版插件存储在用户数据目录下的 plugins 文件夹中。" : "Desktop plugins are stored in the plugins folder under the user data directory."}</p>
@@ -9024,6 +9101,88 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
           </div>
         )}
       </aside>
+      {pluginConfigDialogId && (() => {
+        const plugin = listRegisteredPlugins().find((p) => p.id === pluginConfigDialogId);
+        if (!plugin) return null;
+        return createPortal(
+          <div className="df-dialog-overlay" role="presentation" onMouseDown={() => { setPluginConfigDialogId(null); }}>
+            <section
+              className="df-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="df-plugin-config-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <form onSubmit={(event) => { event.preventDefault(); commitPluginConfig(); }}>
+                <h2 id="df-plugin-config-title">{plugin.icon} {plugin.name}</h2>
+                <p className="df-settings-desc">{plugin.description}</p>
+                <div className="df-plugin-config-fields">
+                  {plugin.configFields.map((field) => {
+                    const value = pluginConfigDraft[field.key];
+                    if (field.type === "boolean") {
+                      return (
+                        <label key={field.key} className="df-utility-check">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(value)}
+                            onChange={(event) => savePluginConfigField(field.key, event.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      );
+                    }
+                    if (field.type === "select") {
+                      return (
+                        <label key={field.key} className="df-plugin-config-field">
+                          <span>{field.label}</span>
+                          <select value={String(value ?? "")} onChange={(event) => savePluginConfigField(field.key, event.target.value)}>
+                            {(field.options ?? []).map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+                    if (field.type === "number") {
+                      return (
+                        <label key={field.key} className="df-plugin-config-field">
+                          <span>{field.label}</span>
+                          <input
+                            type="number"
+                            value={Number(value ?? 0)}
+                            min={field.min}
+                            max={field.max}
+                            onChange={(event) => savePluginConfigField(field.key, Number(event.target.value))}
+                          />
+                        </label>
+                      );
+                    }
+                    return (
+                      <label key={field.key} className="df-plugin-config-field">
+                        <span>{field.label}</span>
+                        <textarea
+                          rows={3}
+                          value={String(value ?? "")}
+                          onChange={(event) => savePluginConfigField(field.key, event.target.value)}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="df-dialog-actions">
+                  <button type="button" className="df-dialog-secondary" onClick={() => { setPluginConfigDialogId(null); }}>
+                    {lang === "zh" ? "取消" : "Cancel"}
+                  </button>
+                  <button type="submit" className="df-dialog-primary">
+                    {lang === "zh" ? "保存" : "Save"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>,
+          document.body,
+        );
+      })()}
     </>
   );
 }

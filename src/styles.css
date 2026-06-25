@@ -20686,8 +20686,10 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 8px 22px color-mix(in srgb, var(--cat, var(--accent-active)) 30%, transparent) !important;
 }
 .df-app.task-block-fill .df-time-block:not(.is-event).completed:not(.df-time-block-preview) {
-  background: color-mix(in srgb, var(--cat, var(--accent-active)) 55%, #9aa6b2) !important;
-  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 40%, transparent) !important;
+  /* Keep the original project color on completion — only add a subtle desaturation
+     via opacity, never swap to a different hue. */
+  opacity: 0.78;
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 55%, transparent) !important;
 }
 .df-app.task-block-fill .df-time-block:not(.is-event) .df-block-title,
 .df-app.task-block-fill .df-time-block:not(.is-event) .df-block-title-row,

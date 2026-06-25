@@ -268,6 +268,10 @@ export interface Settings {
   syncIntervalMinutes?: number;
   /** 最近一次成功同步时间（ISO 字符串）。 */
   lastSyncedAt?: string;
+  /** 已启用（已安装并激活）的插件 ID 列表。 */
+  enabledPlugins?: string[];
+  /** 各插件的配置数据，key 为插件 ID。 */
+  pluginConfigs?: Record<string, Record<string, unknown>>;
 }
 
 export interface AiAction {

@@ -2319,6 +2319,62 @@
   cursor: not-allowed;
 }
 
+.df-app .df-settings-sync-now.is-syncing {
+  position: relative;
+  opacity: .85;
+  pointer-events: none;
+}
+
+.df-app .df-settings-sync-now.is-syncing::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: df-sync-spin .8s linear infinite;
+}
+
+@keyframes df-sync-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Plugin config dialog fields */
+.df-app .df-plugin-config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.df-app .df-plugin-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.df-app .df-plugin-config-field span {
+  color: var(--text-muted);
+}
+.df-app .df-plugin-config-field input,
+.df-app .df-plugin-config-field select,
+.df-app .df-plugin-config-field textarea {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font-size: 13px;
+  font-family: inherit;
+}
+.df-app .df-plugin-config-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
 .df-app .df-settings-advanced-body .df-settings-about,
 .df-app .df-settings-advanced-body .df-settings-logout {
   justify-self: start;

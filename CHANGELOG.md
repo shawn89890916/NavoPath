@@ -3,6 +3,8 @@
 ## 2026-06-25 · 同步、本地备份与任务块填充
 
 ### 改进
+- 设置 → 插件页面完成重构：所有插件卡片现由统一插件注册表驱动，「启用/停用」按钮真正写入设置并触发插件生命周期钩子；点击「配置」会弹出表单对话框编辑该插件的字段（番茄时长、城市、Markdown 开关等），保存后即时生效。
+- 同步按钮点击后现显示旋转加载动画，并根据结果给出明确反馈：同步完成、已是最新数据或同步失败均有对应提示，不再静默无响应。
 - 设置 → 外观新增「任务块颜色填充」开关：开启后时间轴任务块以归属项目色整块填充，任务名与悬停后的归属项目文字加上细微白色描边，在饱和色块上依旧清晰可读。
 - 每次打开桌面应用时自动将当前数据与设置导出为本地 JSON 快照（保留最近 10 份历史快照与一份最新副本），即便云端异常也不会丢失数据。
 - 桌面应用新增「开机自启动」开关（设置页），登录系统时可自动打开 NavoPath。
@@ -12,6 +14,7 @@
 - 时间轴左右翻页按钮宽度从 36px 扩大至 48px，并通过伪元素扩展横向触摸识别区域，减少误触与操作无效。
 
 ### 修复
+- 修复任务块在「颜色填充」模式下完成时背景被替换为灰色的问题；现在完成态仅降低透明度并保留原项目色，删除线效果单独叠加，视觉一致性恢复。
 - 修复同步功能始终使用缓存数据、无法拉取服务器最新版本的问题；启动与刷新现在会强制拉取最新 profile，跨设备改动不再被本地缓存覆盖。
 - 修复短任务（15 分钟）调整手柄判定问题：短任务现在仅在块中心一条窄带可拖拽缩放，顶部与底部边缘回归拖动移动，避免误触改时长。
 - 修复已登录用户在云端 profile 查询失败时被强制进入本地预览模式、无法退出登录的问题；profile 查询失败现在降级为内存空数据，保持登录状态可用。
@@ -198,6 +201,8 @@
 ## 2026-06-25 · Short-block display and deletion stability
 
 ### Improved
+- Settings → Plugins page rebuilt on a unified plugin registry: the Enable/Disable buttons now persist to settings and fire plugin lifecycle hooks, and Configure opens a form dialog to edit that plugin's fields (focus minutes, city, markdown toggle, etc.) with instant effect.
+- The Sync button now shows a spinner during the operation and surfaces clear results: "Sync complete", "Already up to date", or a failure toast, instead of silently doing nothing.
 - Added a "Launch at startup" toggle in Settings so NavoPath can open automatically when you sign in to Windows.
 - Added a single-instance lock to the desktop app; launching a second copy now focuses the running window instead of opening a duplicate.
 - Raised the minimum font size for 15-minute short task titles to 12px with antialiasing enabled, fixing blurry text; added a "Timeline font size" slider (85% – 130%) under Settings → Appearance so the size can be tuned for any screen.
@@ -205,6 +210,7 @@
 - Widened the timeline left/right navigation buttons from 36px to 48px and extended the horizontal touch hit area via a pseudo-element, reducing missed taps and misfires.
 
 ### Fixed
+- Fixed task blocks in "color fill" mode losing their project color when completed; the completed state now only lowers opacity while keeping the original color, and the strikethrough is layered on top so visual consistency is restored.
 - Fixed signed-in users being forced into local preview mode (and unable to sign out) when the cloud profile query failed; profile failures now degrade to in-memory empty data so the signed-in session stays usable.
 - Fixed the runtime fallback flag being persisted to localStorage, which permanently trapped the app in preview mode; the fallback now lasts only for the current session, the next launch retries the cloud backend, and stale persisted flags from earlier builds are cleaned up.
 - Fixed deleted candidate task cards on the Execute page reappearing after deletion; all deletion paths now read from `dataRef.current` to eliminate stale-closure races.

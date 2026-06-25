@@ -1,6 +1,6 @@
 {
   "name": "navopath",
-  "version": "1.2.26",
+  "version": "1.2.27",
   "description": "NavoPath — Navigate your next step.",
   "author": "NavoPath",
   "main": "electron/main.cjs",
@@ -9,7 +9,7 @@
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && set VITE_DEV_SERVER_URL=http://127.0.0.1:5173&& electron .\"",
     "build": "npm run build:navopath",
     "build:navopath": "tsc && vite build",
-    "test": "node --test supabase/functions/ai-assistant/conversation.test.ts && vitest run src/syncBootstrap.test.ts src/utils/todayCandidates.test.ts",
+    "test": "node --test supabase/functions/ai-assistant/conversation.test.ts && vitest run src/syncBootstrap.test.ts src/utils/todayCandidates.test.ts src/plugins/registry.test.ts",
     "build:portfolio": "tsc && vite build --config vite.portfolio.config.ts",
     "preview:portfolio": "vite preview --config vite.portfolio.config.ts --host 127.0.0.1",
     "dist": "npm run build && electron-builder --win nsis portable",
