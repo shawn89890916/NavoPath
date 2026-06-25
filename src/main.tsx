@@ -7278,7 +7278,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
   return (
-    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 38 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
@@ -8548,6 +8548,119 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
       ],
     });
   };
+  
+  const importDataFromJson = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          const parsed = JSON.parse(content);
+          if (parsed.data && parsed.settings) {
+            onSaveData(parsed.data);
+            onSave(parsed.settings);
+            alert(lang === "zh" ? "数据导入成功！" : "Data imported successfully!");
+          } else {
+            alert(lang === "zh" ? "数据导入失败，文件格式不正确。" : "Import failed: invalid file format.");
+          }
+        } catch {
+          alert(lang === "zh" ? "数据导入失败，无法解析文件。" : "Import failed: unable to parse file.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+  
+  const importTasksFromCsv = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".csv,text/csv";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          const lines = content.split("\n").filter((line) => line.trim());
+          if (lines.length < 2) {
+            alert(lang === "zh" ? "数据导入失败，文件为空或格式不正确。" : "Import failed: file is empty or invalid.");
+            return;
+          }
+          // Skip header
+          const taskLines = lines.slice(1);
+          const tasks: Task[] = taskLines.map((line) => {
+            // Simple CSV parsing - handles quoted fields
+            const values: string[] = [];
+            let current = "";
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                  current += '"';
+                  i++;
+                } else {
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === "," && !inQuotes) {
+                values.push(current);
+                current = "";
+              } else {
+                current += char;
+              }
+            }
+            values.push(current);
+            
+            const id = values[0] || `task_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
+            const title = values[1] || "Untitled Task";
+            const projectTitle = values[2] || "";
+            const status = values[3] || "";
+            const dueDate = values[4] || "";
+            const estimatedHours = values[5] ? Number(values[5]) : undefined;
+            const priority = (values[6] as Task["priority"]) || "medium";
+            const createdAt = values[7] || new Date().toISOString();
+            const completed = values[8]?.toLowerCase() === "yes";
+            
+            return {
+              id,
+              title,
+              projectId: "", // Will be matched later
+              category: "personal",
+              priority,
+              notes: "",
+              goalId: "",
+              completed,
+              estimatedHours,
+              dueDate,
+              subtasks: [],
+              createdAt,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+          
+          // Merge imported tasks with existing tasks
+          const existingIds = new Set(data.tasks.map((t) => t.id));
+          const newTasks = tasks.filter((t) => !existingIds.has(t.id));
+          onSaveData({
+            ...data,
+            tasks: [...data.tasks, ...newTasks],
+          });
+          alert(lang === "zh" ? `成功导入 ${newTasks.length} 个任务！` : `Successfully imported ${newTasks.length} tasks!`);
+        } catch {
+          alert(lang === "zh" ? "数据导入失败，无法解析文件。" : "Import failed: unable to parse file.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
   const uploadAvatar = (file?: File) => {
     if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
@@ -8671,6 +8784,20 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
               </button>
               <button className="df-settings-export" onClick={() => exportTasksAsCsv(data)}>
                 {lang === "zh" ? "导出任务为 CSV" : "Export Tasks as CSV"}
+              </button>
+              <div className="df-settings-divider" />
+              <div className="df-settings-subhead">{lang === "zh" ? "数据导入" : "Data Import"}</div>
+              <button className="df-settings-export" onClick={() => {
+                if (confirm(lang === "zh" ? "导入 JSON 将覆盖当前所有数据，确定要继续吗？" : "Importing JSON will overwrite all current data. Are you sure you want to continue?")) {
+                  importDataFromJson();
+                }
+              }}>
+                {lang === "zh" ? "导入 JSON（完整数据）" : "Import JSON (Full Data)"}
+              </button>
+              <button className="df-settings-export" onClick={() => {
+                importTasksFromCsv();
+              }}>
+                {lang === "zh" ? "导入任务 CSV" : "Import Tasks CSV"}
               </button>
               <button className="df-settings-about" onClick={onShowAbout}><span className="df-settings-about-icon">i</span><span>{t(lang, "settings.about")}</span></button>
               {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
