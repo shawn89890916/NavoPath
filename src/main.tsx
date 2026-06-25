@@ -741,15 +741,20 @@ function getDropTargetFromPointer({
 }
 
 function waitForPlannerApi() {
-  return new Promise<PlannerApi>((resolve) => {
+  return new Promise<PlannerApi>((resolve, reject) => {
     if (window.plannerApi) {
       resolve(window.plannerApi);
       return;
     }
+    const startTime = Date.now();
+    const timeoutMs = 10000; // 10 second timeout
     const timer = window.setInterval(() => {
       if (window.plannerApi) {
         window.clearInterval(timer);
         resolve(window.plannerApi);
+      } else if (Date.now() - startTime > timeoutMs) {
+        window.clearInterval(timer);
+        reject(new Error("Timed out waiting for planner API. Please refresh the page."));
       }
     }, 20);
   });
@@ -1734,6 +1739,7 @@ function App() {
   }
 
   async function loadInitial() {
+    try {
     const api = await waitForPlannerApi();
     const auth = (await api.getAuthState?.()) || { mode: "local" as const, user: null, configured: false };
     const workspaceKey = auth.mode === "cloud" ? `cloud:${auth.user?.id || "signed-out"}` : "local";
@@ -1802,6 +1808,9 @@ function App() {
     if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
     if (shouldPushCachedData && nextData) void saveData(nextData);
     if (shouldPushCachedSettings && cached?.settings) void saveSettings(cached.settings);
+    } catch (err) {
+      console.error("Failed to load initial data:", err);
+    }
   }
 
   useEffect(() => {

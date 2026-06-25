@@ -413,12 +413,23 @@ export function installBrowserFallback() {
   const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
   if (!forceLocalPreview && supabaseUrl && supabaseAnonKey) {
-    void import("./supabasePlannerApi").then(({ createSupabasePlannerApi }) => {
-      window.plannerApi = createSupabasePlannerApi(supabaseUrl, supabaseAnonKey);
-    });
+    void import("./supabasePlannerApi")
+      .then(({ createSupabasePlannerApi }) => {
+        try {
+          window.plannerApi = createSupabasePlannerApi(supabaseUrl, supabaseAnonKey);
+        } catch (err) {
+          console.error("Failed to create Supabase planner API, falling back to local preview:", err);
+          installLocalPreview();
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load Supabase planner API, falling back to local preview:", err);
+        installLocalPreview();
+      });
     return;
   }
 
+  function installLocalPreview() {
   const defaultSettings: Settings = {
     activeMode: "execute",
     defaultTimelineView: "daily",
@@ -620,4 +631,7 @@ export function installBrowserFallback() {
   };
 
   window.plannerApi = api;
+  }
+
+  installLocalPreview();
 }
