@@ -8529,7 +8529,7 @@ function exportTasksAsCsv(data: PlannerData) {
 }
 
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: () => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
-  const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "account">("page");
+  const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "plugins" | "account">("page");
   const defaultAccent = settings.theme === "dark" ? "#EEE9DF" : "#27231E";
   const visibleMemories = (data.aiMemories || [])
     .filter((memory) => !memory.archived)
@@ -8697,7 +8697,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
         {kind === "settings" ? (
           <div className="df-utility-body df-settings-shell">
             <nav className="df-settings-nav" aria-label={lang === "zh" ? "设置分区" : "Settings sections"}>
-              {([['page', lang === 'zh' ? '页面' : 'Page'], ['ai', 'Navo AI'], ['mcp', 'MCP'], ['account', lang === 'zh' ? '账户' : 'Account']] as const).map(([id, label]) => (
+              {([['page', lang === 'zh' ? '页面' : 'Page'], ['ai', 'Navo AI'], ['mcp', 'MCP'], ['plugins', lang === 'zh' ? '插件' : 'Plugins'], ['account', lang === 'zh' ? '账户' : 'Account']] as const).map(([id, label]) => (
                 <button type="button" key={id} className={settingsSection === id ? "active" : ""} aria-current={settingsSection === id ? "page" : undefined} onClick={() => setSettingsSection(id)}>{label}</button>
               ))}
             </nav>
@@ -8765,6 +8765,131 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             </section>
             </section>}
             {settingsSection === "mcp" && <section className="df-settings-group"><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
+            {settingsSection === "plugins" && <section className="df-settings-group">
+              <h3>{lang === "zh" ? "插件市场" : "Plugin Marketplace"}</h3>
+              <p className="df-settings-desc">{lang === "zh" ? "扩展 NavoPath 的功能，发现和安装社区插件。" : "Extend NavoPath's functionality with community plugins."}</p>
+              
+              <div className="df-settings-divider" />
+              <div className="df-settings-subhead">{lang === "zh" ? "可用插件" : "Available Plugins"}</div>
+              
+              <div className="df-plugin-list">
+                {[
+                  {
+                    id: "pomodoro",
+                    name: lang === "zh" ? "番茄钟" : "Pomodoro Timer",
+                    description: lang === "zh" ? "集成番茄工作法，帮助你专注工作。" : "Integrate the Pomodoro technique to help you stay focused.",
+                    version: "1.0.0",
+                    author: "NavoPath Team",
+                    icon: "🍅",
+                    installed: false,
+                  },
+                  {
+                    id: "habit-tracker",
+                    name: lang === "zh" ? "习惯追踪" : "Habit Tracker",
+                    description: lang === "zh" ? "追踪你的日常习惯，建立更好的生活节奏。" : "Track your daily habits and build better routines.",
+                    version: "1.2.0",
+                    author: "Community",
+                    icon: "✅",
+                    installed: true,
+                  },
+                  {
+                    id: "weather",
+                    name: lang === "zh" ? "天气信息" : "Weather Info",
+                    description: lang === "zh" ? "在日历中显示天气信息，帮助你规划日程。" : "Display weather information in your calendar to help plan your day.",
+                    version: "0.9.0",
+                    author: "NavoPath Team",
+                    icon: "🌤️",
+                    installed: false,
+                  },
+                  {
+                    id: "notes",
+                    name: lang === "zh" ? "笔记增强" : "Notes Enhanced",
+                    description: lang === "zh" ? "为任务添加富文本笔记和 Markdown 支持。" : "Add rich text notes and Markdown support to tasks.",
+                    version: "2.1.0",
+                    author: "Community",
+                    icon: "📝",
+                    installed: true,
+                  },
+                ].map((plugin) => (
+                  <div key={plugin.id} className={`df-plugin-card ${plugin.installed ? "installed" : ""}`}>
+                    <div className="df-plugin-icon">{plugin.icon}</div>
+                    <div className="df-plugin-info">
+                      <div className="df-plugin-header">
+                        <strong className="df-plugin-name">{plugin.name}</strong>
+                        <span className="df-plugin-version">v{plugin.version}</span>
+                      </div>
+                      <p className="df-plugin-desc">{plugin.description}</p>
+                      <div className="df-plugin-meta">
+                        <span className="df-plugin-author">{plugin.author}</span>
+                        {plugin.installed && <span className="df-plugin-status">{lang === "zh" ? "已安装" : "Installed"}</span>}
+                      </div>
+                    </div>
+                    <div className="df-plugin-actions">
+                      {plugin.installed ? (
+                        <>
+                          <button className="df-plugin-config">{lang === "zh" ? "配置" : "Configure"}</button>
+                          <button className="df-plugin-uninstall">{lang === "zh" ? "卸载" : "Uninstall"}</button>
+                        </>
+                      ) : (
+                        <button className="df-plugin-install">{lang === "zh" ? "安装" : "Install"}</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="df-settings-divider" />
+              <div className="df-settings-subhead">{lang === "zh" ? "插件配置指南" : "Plugin Configuration Guide"}</div>
+              
+              <div className="df-plugin-guide">
+                <h4>{lang === "zh" ? "如何开发插件" : "How to Develop Plugins"}</h4>
+                <p>{lang === "zh" ? "NavoPath 插件基于 Web 标准构建，使用 HTML、CSS 和 JavaScript。" : "NavoPath plugins are built on web standards using HTML, CSS, and JavaScript."}</p>
+                
+                <ol className="df-plugin-steps">
+                  <li>
+                    <strong>{lang === "zh" ? "创建插件目录" : "Create Plugin Directory"}</strong>
+                    <p>{lang === "zh" ? "在插件目录中创建一个新文件夹，以你的插件 ID 命名。" : "Create a new folder in the plugins directory, named after your plugin ID."}</p>
+                  </li>
+                  <li>
+                    <strong>{lang === "zh" ? "创建 manifest.json" : "Create manifest.json"}</strong>
+                    <p>{lang === "zh" ? "插件清单文件，包含插件的基本信息和配置。" : "Plugin manifest file containing basic info and configuration."}</p>
+                    <pre className="df-plugin-code">{`{
+  "id": "your-plugin-id",
+  "name": "Your Plugin Name",
+  "version": "1.0.0",
+  "description": "Plugin description",
+  "author": "Your Name",
+  "main": "index.js",
+  "permissions": ["tasks", "settings"]
+}`}</pre>
+                  </li>
+                  <li>
+                    <strong>{lang === "zh" ? "编写插件代码" : "Write Plugin Code"}</strong>
+                    <p>{lang === "zh" ? "创建 index.js 文件，实现插件的主要功能。" : "Create an index.js file to implement the main functionality."}</p>
+                  </li>
+                  <li>
+                    <strong>{lang === "zh" ? "加载插件" : "Load Plugin"}</strong>
+                    <p>{lang === "zh" ? "在设置中启用插件，重启应用后生效。" : "Enable the plugin in settings, and restart the app to take effect."}</p>
+                  </li>
+                </ol>
+                
+                <div className="df-plugin-api">
+                  <h4>{lang === "zh" ? "插件 API 参考" : "Plugin API Reference"}</h4>
+                  <ul>
+                    <li><code>navopath.tasks</code> - {lang === "zh" ? "任务管理 API" : "Task management API"}</li>
+                    <li><code>navopath.settings</code> - {lang === "zh" ? "设置管理 API" : "Settings management API"}</li>
+                    <li><code>navopath.ui</code> - {lang === "zh" ? "用户界面 API" : "User interface API"}</li>
+                    <li><code>navopath.events</code> - {lang === "zh" ? "事件系统 API" : "Event system API"}</li>
+                  </ul>
+                </div>
+                
+                <div className="df-plugin-location">
+                  <h4>{lang === "zh" ? "插件目录位置" : "Plugin Directory Location"}</h4>
+                  <p>{lang === "zh" ? "桌面版插件存储在用户数据目录下的 plugins 文件夹中。" : "Desktop plugins are stored in the plugins folder under the user data directory."}</p>
+                  <code className="df-plugin-path">{lang === "zh" ? "%APPDATA%/NavoPath/plugins" : "~/Library/Application Support/NavoPath/plugins"}</code>
+                </div>
+              </div>
+            </section>}
             {settingsSection === "account" && <section className="df-settings-group"><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
                 <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
