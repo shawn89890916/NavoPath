@@ -8493,6 +8493,34 @@ function DesktopUpdateControl({ lang }: { lang: Language }) {
   </section>;
 }
 
+function AutoLaunchToggle({ lang }: { lang: Language }) {
+  const api = window.desktopApi;
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!api) { setLoading(false); return; }
+    void api.getAutoLaunch().then((v) => { setEnabled(v); setLoading(false); });
+  }, [api]);
+
+  if (!api) return null;
+
+  return <section className="df-update-card">
+    <div>
+      <strong>{lang === "zh" ? "开机自启动" : "Launch at startup"}</strong>
+      <small>{lang === "zh" ? "登录系统时自动打开 NavoPath" : "Automatically open NavoPath when you sign in"}</small>
+    </div>
+    <button
+      type="button"
+      disabled={loading}
+      onClick={() => { const next = !enabled; setEnabled(next); void api.setAutoLaunch(next); }}
+      aria-pressed={enabled}
+    >
+      {loading ? "…" : enabled ? (lang === "zh" ? "已开启" : "On") : (lang === "zh" ? "已关闭" : "Off")}
+    </button>
+  </section>;
+}
+
 function exportDataAsJson(data: PlannerData, settings: Settings) {
   const exportData = {
     exportedAt: new Date().toISOString(),
@@ -8920,6 +8948,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                 onSyncNow={onSyncNow}
               />
               <DesktopUpdateControl lang={lang} />
+              <AutoLaunchToggle lang={lang} />
               <div className="df-settings-divider" />
               <div className="df-settings-subhead">{lang === "zh" ? "数据导出" : "Data Export"}</div>
               <button className="df-settings-export" onClick={() => exportDataAsJson(data, settings)}>

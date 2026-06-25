@@ -20585,3 +20585,49 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font-size: calc(13px * var(--timeline-font-scale, 1)) !important;
 }
 
+/* Fix short-block title clipping: resize dots must not consume flex space.
+   Stack them absolutely so the title row can use the full block height. */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 7px !important;
+  min-width: 0 !important;
+  transform: none !important;
+  z-index: 3 !important;
+}
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.top {
+  top: 0 !important;
+}
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.bottom {
+  bottom: 0 !important;
+  top: auto !important;
+}
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::before {
+  top: -4px !important;
+  bottom: -4px !important;
+}
+/* Make checkbox absolute too so it overlays the left padding area, freeing vertical room. */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-check {
+  position: absolute !important;
+  left: 7px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin-top: 0 !important;
+  z-index: 2 !important;
+}
+/* Title row now owns the full block height, vertically centered, no clipping. */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row {
+  position: absolute !important;
+  left: 28px !important;
+  right: 12px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  width: auto !important;
+  max-width: none !important;
+  z-index: 1 !important;
+}
+

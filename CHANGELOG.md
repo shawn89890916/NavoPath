@@ -3,6 +3,8 @@
 ## 2026-06-25 · 短任务显示与删除稳定性优化
 
 ### 改进
+- 桌面应用新增「开机自启动」开关（设置页），登录系统时可自动打开 NavoPath。
+- 桌面应用新增单实例锁，重复启动时会聚焦到已打开的窗口而非多开。
 - 时间轴短任务（15 分钟）标题字体最小提升至 12px 并启用抗锯齿渲染，解决文字模糊不清的问题；设置 → 外观新增"时间轴字体大小"滑块（85% – 130%），可在不同屏幕尺寸下自由调整。
 - 时间轴快速添加面板重构为单行紧凑布局：移除顶部时间显示区域，仅保留任务名输入框与确认勾选按钮，添加效率更高。
 - 时间轴左右翻页按钮宽度从 36px 扩大至 48px，并通过伪元素扩展横向触摸识别区域，减少误触与操作无效。
@@ -12,6 +14,8 @@
 - 修复任务详情抽屉中删除任务后任务重新出现的问题。
 - 修复将任务转换为事件时删除原任务可能被恢复的问题。
 - 修复云端数据库查询失败时应用卡在加载页无法进入的问题；现在会自动降级到本地预览模式，保证工作区始终可用。
+- 修复应用被永久困在本地预览模式的问题；运行时降级现在仅在当前会话生效，下次启动会重新尝试云端后端。
+- 修复 15 分钟单行任务在时间轴中标题被调整手柄和勾选框遮挡的问题；标题现在占据完整高度并垂直居中，不再被裁切。
 - 修复 `package.json` 描述字段的编码乱码问题。
 
 ---
@@ -188,6 +192,8 @@
 ## 2026-06-25 · Short-block display and deletion stability
 
 ### Improved
+- Added a "Launch at startup" toggle in Settings so NavoPath can open automatically when you sign in to Windows.
+- Added a single-instance lock to the desktop app; launching a second copy now focuses the running window instead of opening a duplicate.
 - Raised the minimum font size for 15-minute short task titles to 12px with antialiasing enabled, fixing blurry text; added a "Timeline font size" slider (85% – 130%) under Settings → Appearance so the size can be tuned for any screen.
 - Redesigned the timeline quick-add popup as a single-line compact layout: removed the top time-display area, keeping only the task-name input and a confirm check button for faster entry.
 - Widened the timeline left/right navigation buttons from 36px to 48px and extended the horizontal touch hit area via a pseudo-element, reducing missed taps and misfires.
@@ -197,6 +203,8 @@
 - Fixed tasks reappearing after being deleted from the task detail drawer.
 - Fixed the original task reappearing after being converted to an event.
 - Fixed the app getting stuck on the loading screen when the cloud database query fails; it now automatically falls back to local preview mode so the workspace remains usable.
+- Fixed the app being permanently trapped in local preview mode; runtime fallback now lasts only for the current session, and the next launch retries the cloud backend.
+- Fixed 15-minute single-line task titles being clipped by resize handles and the checkbox in the timeline; the title now owns the full block height and is vertically centered without clipping.
 - Fixed garbled encoding in the `package.json` description field.
 
 ---

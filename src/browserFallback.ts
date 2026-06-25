@@ -76,6 +76,12 @@ function configurePreviewMode() {
   const preview = params.get("preview");
   if (preview === "local") localStorage.setItem(PREVIEW_MODE_KEY, "1");
   if (preview === "cloud" || preview === "off") localStorage.removeItem(PREVIEW_MODE_KEY);
+  // Migration: earlier builds persisted the runtime fallback to localStorage, which
+  // trapped users in preview mode forever. If the URL does not explicitly request
+  // local preview this cold start, drop the stale flag so the cloud backend is retried.
+  if (preview !== "local" && localStorage.getItem(PREVIEW_MODE_KEY) === "1") {
+    localStorage.removeItem(PREVIEW_MODE_KEY);
+  }
   return preview === "local" || localStorage.getItem(PREVIEW_MODE_KEY) === "1";
 }
 
@@ -405,10 +411,16 @@ function write(data: PlannerData): PlannerData {
   return saved;
 }
 
+// Session-level fallback flag (NOT persisted to localStorage).
+// Set when the cloud API fails at runtime so the current session can keep working,
+// but a fresh app start will retry the cloud backend instead of staying in preview.
+let sessionLocalFallback = false;
+
 export function forceLocalPreviewMode() {
-  try {
-    localStorage.setItem(PREVIEW_MODE_KEY, "1");
-  } catch { /* ignore */ }
+  sessionLocalFallback = true;
+  // Clear any stale persisted preview flag that earlier builds may have written,
+  // so the next cold start retries the cloud backend instead of being stuck in preview.
+  try { localStorage.removeItem(PREVIEW_MODE_KEY); } catch { /* ignore */ }
   window.plannerApi = undefined as any;
   installBrowserFallback();
 }
@@ -416,7 +428,7 @@ export function forceLocalPreviewMode() {
 export function installBrowserFallback() {
   if (window.plannerApi) return;
 
-  const forceLocalPreview = configurePreviewMode();
+  const forceLocalPreview = sessionLocalFallback || configurePreviewMode();
   const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
   const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 

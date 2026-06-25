@@ -3,5 +3,6 @@ dist/
 dist-landing/
 dist-portfolio/
 release/
+release-*/
 .playwright-cli/
 *.log

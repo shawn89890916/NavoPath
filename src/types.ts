@@ -381,6 +381,8 @@ declare global {
       installUpdate: () => Promise<boolean>;
       onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
       aiChat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
+      getAutoLaunch: () => Promise<boolean>;
+      setAutoLaunch: (enabled: boolean) => Promise<boolean>;
       isDesktop: () => boolean;
     };
   }

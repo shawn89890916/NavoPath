@@ -816,6 +816,21 @@ function createWindow() {
   }
 }
 
+// Single-instance lock: focus existing window instead of launching a duplicate
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  });
+}
+
 app.whenReady().then(() => {
   // Create window first for fastest perceived startup
   createWindow();
@@ -910,4 +925,21 @@ ipcMain.handle("updater:install", () => {
     autoUpdater.quitAndInstall(false, true);
   });
   return true;
+});
+
+// Auto-launch at system startup (toggled from Settings)
+ipcMain.handle("autolaunch:get", () => {
+  try {
+    return app.getLoginItemSettings().openAtLogin;
+  } catch {
+    return false;
+  }
+});
+ipcMain.handle("autolaunch:set", (_event, enabled) => {
+  try {
+    app.setLoginItemSettings({ openAtLogin: !!enabled });
+    return app.getLoginItemSettings().openAtLogin;
+  } catch {
+    return false;
+  }
 });
