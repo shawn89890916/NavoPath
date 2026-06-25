@@ -8,7 +8,7 @@ import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssista
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks } from "./autoSchedule";
-import { installBrowserFallback } from "./browserFallback";
+import { installBrowserFallback, forceLocalPreviewMode } from "./browserFallback";
 import {
   getVisibleDays,
   getTimelineMetrics,
@@ -1573,6 +1573,7 @@ function App() {
   const dataRef = useRef<PlannerData | null>(null);
   const settingsRef = useRef<Settings | null>(null);
   const loadedWorkspaceKeyRef = useRef("");
+  const localFallbackAppliedRef = useRef(false);
   const pendingDataSaveRef = useRef<QueuedDataSave | null>(null);
   const dataSaveTimerRef = useRef<number | null>(null);
   const dataSaveRetryTimerRef = useRef<number | null>(null);
@@ -1810,6 +1811,11 @@ function App() {
     if (shouldPushCachedSettings && cached?.settings) void saveSettings(cached.settings);
     } catch (err) {
       console.error("Failed to load initial data:", err);
+      if (!localFallbackAppliedRef.current) {
+        localFallbackAppliedRef.current = true;
+        forceLocalPreviewMode();
+        void loadInitial();
+      }
     }
   }
 

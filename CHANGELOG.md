@@ -11,6 +11,8 @@
 - 修复执行页候选任务卡片删除后任务重新出现的问题；所有删除路径现在统一使用 `dataRef.current` 读取最新数据，彻底消除 stale-closure 竞态。
 - 修复任务详情抽屉中删除任务后任务重新出现的问题。
 - 修复将任务转换为事件时删除原任务可能被恢复的问题。
+- 修复云端数据库查询失败时应用卡在加载页无法进入的问题；现在会自动降级到本地预览模式，保证工作区始终可用。
+- 修复 `package.json` 描述字段的编码乱码问题。
 
 ---
 
@@ -194,6 +196,8 @@
 - Fixed deleted candidate task cards on the Execute page reappearing after deletion; all deletion paths now read from `dataRef.current` to eliminate stale-closure races.
 - Fixed tasks reappearing after being deleted from the task detail drawer.
 - Fixed the original task reappearing after being converted to an event.
+- Fixed the app getting stuck on the loading screen when the cloud database query fails; it now automatically falls back to local preview mode so the workspace remains usable.
+- Fixed garbled encoding in the `package.json` description field.
 
 ---
 

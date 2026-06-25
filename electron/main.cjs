@@ -737,16 +737,20 @@ function createWindow() {
     ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
     : path.join(__dirname, "..", "public", "navopath-icon.png");
 
-  // Determine app URL: use local file in production, dev server or remote in development
+  // Determine app URL: prefer local built file, fall back to dev server or remote
   let appUrl;
   let allowedOrigin;
-  if (app.isPackaged) {
-    // Production: load local file
-    const indexPath = path.join(app.getAppPath(), "dist", "index.html");
+  const localIndex = path.join(__dirname, "..", "dist", "index.html");
+  const useLocalFile = app.isPackaged || (fs.existsSync(localIndex) && !process.env.VITE_DEV_SERVER_URL);
+  if (useLocalFile) {
+    // Production or local build: load local file
+    const indexPath = app.isPackaged
+      ? path.join(app.getAppPath(), "dist", "index.html")
+      : localIndex;
     appUrl = new URL(`file://${indexPath}`);
     allowedOrigin = "file://";
   } else {
-    // Development
+    // Development with dev server
     const configuredUrl = process.env.VITE_DEV_SERVER_URL || process.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
     appUrl = new URL("/app", configuredUrl);
     allowedOrigin = appUrl.origin;
@@ -786,6 +790,10 @@ function createWindow() {
     win.show();
   });
 
+  win.webContents.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL) => {
+    console.error(`[did-fail-load] code=${errorCode} desc=${errorDescription} url=${validatedURL}`);
+  });
+
   win.webContents.on("will-navigate", (e, url) => {
     if (!isWorkspaceUrl(url)) {
       e.preventDefault();
@@ -801,8 +809,8 @@ function createWindow() {
     return { action: "deny" };
   });
 
-  if (app.isPackaged) {
-    win.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
+  if (useLocalFile) {
+    win.loadFile(app.isPackaged ? path.join(app.getAppPath(), "dist", "index.html") : localIndex);
   } else {
     win.loadURL(appUrl.toString());
   }

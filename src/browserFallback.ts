@@ -405,6 +405,14 @@ function write(data: PlannerData): PlannerData {
   return saved;
 }
 
+export function forceLocalPreviewMode() {
+  try {
+    localStorage.setItem(PREVIEW_MODE_KEY, "1");
+  } catch { /* ignore */ }
+  window.plannerApi = undefined as any;
+  installBrowserFallback();
+}
+
 export function installBrowserFallback() {
   if (window.plannerApi) return;
 
