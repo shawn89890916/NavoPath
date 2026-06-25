@@ -20725,3 +20725,71 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--cat, var(--accent-active)) 16%, var(--surface-card)) !important;
 }
 
+/* === Short-block (15/30-min) resize handles — FINAL OVERRIDE ===============
+   Placed last so it wins every cascade duel. The top/bottom handles sit at
+   the block edges, are horizontally centered, show a visible indicator bar,
+   and expose a generous hit area so 15-min (20px) and 30-min (40px) blocks
+   can be resized from either edge. Center-handle legacy rules are voided. */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot,
+.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  width: 60% !important;
+  min-width: 36px !important;
+  max-width: none !important;
+  height: 12px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  z-index: 10 !important;
+  cursor: ns-resize !important;
+  opacity: 1 !important;
+  display: block !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.top {
+  top: -2px !important;
+  bottom: auto !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.bottom {
+  bottom: -2px !important;
+  top: auto !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(32px, 80%) !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+  background: var(--accent-active, #2A6E8E) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface-main, #fff) 50%, transparent) !important;
+  opacity: 0.85 !important;
+  pointer-events: none !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot:hover::after,
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot:active::after {
+  opacity: 1 !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: -6px !important;
+  bottom: -6px !important;
+  pointer-events: auto !important;
+}
+

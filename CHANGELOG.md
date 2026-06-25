@@ -1,13 +1,13 @@
 # NavoPath 更新日志
 
-## 2026-06-26 · 短任务时长调整与同步方向选择
+## 2026-06-26 · 短任务时长调整、同步方向与更新检测
 
 ### 改进
 - 设置 → 云端同步新增「推送到云端」「从云端拉取」两个方向按钮：可单独把本机数据上传到云端，或单独用云端数据覆盖本机，无需每次都执行双向合并，跨设备同步更可控。
 
 ### 修复
-- 修复短任务（15 分钟）时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，分别调整开始与结束时间，调整手柄在悬停时清晰可见。
-- 修复任务块调整手柄在悬停时不可见的问题；所有任务块的开始/结束手柄现于悬停时显示明确指示条。
+- 修复 15 分钟与 30 分钟短任务时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，调整手柄横向居中于任务块、悬停时清晰可见，且不再与拖动移动冲突。
+- 修复桌面应用检查更新始终提示「已是最新版本」的问题；此前的更新清单（latest.yml）版本号停留在旧版本，现已随每次发布正确生成，新版本发布后即可被准确检测到。
 
 ---
 
@@ -209,14 +209,14 @@
 
 # NavoPath Changelog
 
-## 2026-06-26 · Short-block resize and sync direction picker
+## 2026-06-26 · Short-block resize, sync direction, and update detection
 
 ### Improvements
 - Settings → Cloud sync now exposes dedicated "Push to cloud" and "Pull from cloud" direction buttons: upload this device's data alone, or overwrite this device with cloud data alone, without forcing a bidirectional merge every time — cross-device sync is now fully under your control.
 
 ### Fixes
-- Fixed short tasks (15-minute blocks) being unable to adjust duration: short blocks can now be resized from both the top and bottom edges to change start and end times independently, with resize handles clearly visible on hover.
-- Fixed task-block resize handles being invisible on hover; start/end handles on every block now show a clear indicator bar when hovered.
+- Fixed 15-minute and 30-minute short tasks being unable to adjust duration: short blocks can now be resized from both the top and bottom edges, with handles horizontally centered on the block, clearly visible on hover, and no longer conflicting with drag-to-move.
+- Fixed the desktop app always reporting "up to date" when checking for updates; the update manifest (latest.yml) was stuck on an old version and is now regenerated correctly with each release, so new versions are detected reliably.
 
 ---
 
