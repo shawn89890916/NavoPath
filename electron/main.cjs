@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nativeImage } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 let _crypto; // lazy: only when uid() is first called
@@ -144,22 +144,22 @@ let _smartNoteTemplates = null;
 function getSmartNoteTemplates() {
   if (!_smartNoteTemplates) {
     _smartNoteTemplates = Object.freeze({
-  "纭鑻卞浗 UCAS 宸ョ▼涓撲笟缁勫悎": "鐩爣锛氬湪 2026-06-15 鍓嶉攣瀹?5 涓?UCAS 蹇楁効鐨勪笓涓氬悕绉般€佽绋嬩唬鐮佸拰鏇夸唬椤哄簭锛岄伩鍏嶅悗缁?PS 涓庤€冭瘯鍑嗗鏂瑰悜鍙嶅鎽囨憜銆俓n琛￠噺锛氫骇鍑?1 寮犲姣旇〃锛岃嚦灏戝寘鍚墤妗ャ€両mperial銆乁CL銆並CL 涓?1 涓浛浠ｅ伐绋嬮」鐩紱姣忎釜椤圭洰鍐欐竻鍏ュ瑕佹眰銆丒SAT/TARA 瑕佹眰銆佹牳蹇冭绋嬪尮閰嶅害鍜岄闄╃瓑绾с€俓n琛屽姩锛氶€愭牎鎵撳紑瀹樼綉璇剧▼椤碉紝鏍稿 2027 Entry 瑕佹眰锛涙妸涓嶇‘瀹氶」鏍囩孩锛涙渶鍚庢寜鈥滃啿鍒恒€佸尮閰嶃€佷繚搴曗€濈粰鍑烘帓搴忋€俓n璧勬枡锛歎CAS Search銆佸悇澶у Engineering/Robotics/AI/Mechanical/Aerospace 瀹樼綉椤甸潰銆佸崌瀛︽寚瀵兼姤鍛娿€俓n瀹屾垚鏍囧噯锛氬姣旇〃娌℃湁绌洪」锛屽苟鑳界敤 3 鍙ヨ瘽瑙ｉ噴涓轰粈涔堣繖 5 涓笓涓氱粍鍚堥€傚悎宸ョ▼/鏈哄櫒浜?鑸┖鑸ぉ鏂瑰悜銆?,
-  "鍚姩 ESAT/TARA 璁粌璁″垝": "鐩爣锛氬湪 2026-06-20 鍓嶅缓绔?ESAT Maths 1銆丮aths 2銆丳hysics 鍜?TARA 鐨勫浐瀹氳缁冪郴缁熴€俓n琛￠噺锛氬缓濂?1 涓敊棰樿〃銆? 涓垎鏁拌褰曡〃鍜?1 涓瘡鍛ㄨ缁冭〃锛涙瘡涓鐩嚦灏戝畬鎴?1 娆″熀绾挎祴璇曟垨鏍烽璁粌銆俓n琛屽姩锛氫笅杞藉畼鏂规牱棰樺拰 guide锛涙寜 40 鍒嗛挓闄愭椂鍋?ESAT module锛汿ARA 鍗曠嫭鏁寸悊棰樺瀷銆佹椂闂撮檺鍒跺拰寮辩偣锛涙瘡娆¤缁冨悗璁板綍閿欒鍘熷洜銆俓n璧勬枡锛歎AT ESAT 椤甸潰 https://esat-tmua.ac.uk/about-the-tests/esat-test/锛沀AT 澶囪€冩潗鏂?https://esat-tmua.ac.uk/esat-preparation-materials/锛汸earson UAT 椤甸潰 https://www.pearsonvue.com/us/en/uatuk.html銆俓n瀹屾垚鏍囧噯锛氭墦寮€浠诲姟鏂囦欢澶规椂鑳界湅鍒拌祫鏂欏簱銆侀敊棰樿〃銆佸垎鏁拌〃鍜屼笅涓€鍛ㄨ缁冨畨鎺掞紝涓嶉渶瑕佷复鏃舵壘鏉愭枡銆?,
-  "鏁寸悊椤圭洰璇佹嵁鏂囦欢澶?: "鐩爣锛氬湪 2026-06-25 鍓嶆妸 ISSDC銆?D 鎵撳嵃銆佽鏂囥€佺伀绠€乀I-BASIC 绛夐」鐩暣鐞嗘垚鍙敤浜庢枃涔︺€佹椿鍔ㄨ〃鍜屾帹鑽愪俊鐨勮瘉鎹簱銆俓n琛￠噺锛氭瘡涓」鐩嚦灏戞湁 1 涓」鐩畝浠嬨€?-5 寮犲浘鐗?鎴浘銆佸叧閿垚鏋滄暟鎹€佹湰浜鸿础鐚鏄庡拰鍙紩鐢ㄩ摼鎺ユ垨鏂囦欢銆俓n琛屽姩锛氭寜椤圭洰寤烘枃浠跺す锛涙妸鍘熷鏂囦欢銆佺収鐗囥€佷唬鐮併€佽鏂囥€佽瘉涔︽斁鍏ュ搴旂洰褰曪紱鍐?100-150 瀛楄嫳鏂囬」鐩憳瑕侊紱鏍囨敞鏈€鑳戒綋鐜板伐绋嬭兘鍔涚殑璇佹嵁銆俓n璧勬枡锛氱數鑴戞湰鍦伴」鐩枃浠躲€佺収鐗囥€佽瘉涔︺€佽鏂囩銆丟itHub/缃戠洏閾炬帴銆佸崌瀛︽寚瀵兼姤鍛娿€俓n瀹屾垚鏍囧噯锛氫换鎰忔墦寮€涓€涓」鐩枃浠跺す锛岄兘鑳界洿鎺ユ壘鍒扳€滄垜鍋氫簡浠€涔堛€佺粨鏋滄槸浠€涔堛€佽兘璇佹槑浠€涔堚€濈殑鏉愭枡銆?,
-  "瀹屾垚 Common App 娲诲姩琛ㄥ垵绋?: "鐩爣锛氬湪 2026-07-20 鍓嶅畬鎴?Common App 10 椤规椿鍔ㄧ殑鑻辨枃鍒濈锛屽舰鎴愭棭鐢冲彲缁х画鎵撶（鐨勭増鏈€俓n琛￠噺锛?0 椤规椿鍔ㄦ寜褰卞搷鍔涙帓搴忥紱姣忛」鍖呭惈鑱屼綅/缁勭粐銆佹椂闂存姇鍏ャ€佽嫳鏂?150 瀛楃鎻忚堪鍜屽搴旇瘉鎹€俓n琛屽姩锛氬厛鍒楀叏閮ㄦ椿鍔紝鍐嶆寜宸ョ▼鐩稿叧鎬с€佸奖鍝嶅姏銆佹寔缁椂闂寸瓫閫夛紱鎶婂姩璇嶆敼鎴愬叿浣撹础鐚紝濡?designed銆乥uilt銆乼ested銆乴ed銆乸ublished锛涘垹闄ゆ硾娉涙弿杩般€俓n璧勬枡锛欳ommon App 娲诲姩鏍忔牸寮忋€侀」鐩瘉鎹枃浠跺す銆佺珵璧?绀惧洟/鐮旂┒璁板綍銆俓n瀹屾垚鏍囧噯锛氭椿鍔ㄨ〃璇昏捣鏉ヨ兘浣撶幇宸ョ▼涓荤嚎锛屽苟涓旀瘡椤归兘鑳借璇佹嵁鏂囦欢澶规敮鎸併€?,
-  "鑻卞浗 PS 绗竴鐗?: "鐩爣锛氬湪 2026-08-20 鍓嶅畬鎴愯嫳鍥?Personal Statement 绗竴鐗堬紝涓荤嚎鑱氱劍宸ョ▼鎬濈淮鍜岄」鐩凯浠ｈ兘鍔涖€俓n琛￠噺锛氫骇鍑?1 绡囧畬鏁磋嫳鏂?PS锛涜鐩栧鏈叴瓒ｃ€侀」鐩粡鍘嗐€佹暟瀛?鐗╃悊鑳藉姏銆佸伐绋嬪弽鎬濆拰鐩爣涓撲笟鍖归厤锛涘瓧鏁扮鍚?UCAS 褰撳墠闄愬埗銆俓n琛屽姩锛氬厛鍐欎腑鏂囩礌鏉愭彁绾诧紝鍐嶈浆鎴愯嫳鏂囨钀斤紱姣忔鍙繚鐣欎竴涓牳蹇冭鐐癸紱鐢ㄩ」鐩瘉鎹敮鎾戔€滃缓妯?鍘熷瀷-娴嬭瘯-杩唬鈥濈殑涓荤嚎銆俓n璧勬枡锛歎CAS PS 鎸囧崡銆佺洰鏍囦笓涓氳绋嬮〉銆侀」鐩瘉鎹枃浠跺す銆佸崌瀛︽寚瀵兼姤鍛娿€俓n瀹屾垚鏍囧噯锛氱涓€鐗堜笉鏄礌鏉愬爢鐮岋紝鑰屾槸鑳芥竻妤氬洖绛斺€滀负浠€涔堝伐绋嬨€佷负浠€涔堣繖浜涚粡鍘嗚瘉鏄庨€傚悎宸ョ▼鈥濄€?,
-  "鎺ㄨ崘淇℃潗鏂欏寘鍙戠粰鑰佸笀": "鐩爣锛氬湪 2026-08-25 鍓嶇粰鎺ㄨ崘鑰佸笀鍙戦€佸畬鏁存潗鏂欏寘锛岄檷浣庤€佸笀鍐欎俊鏃朵俊鎭笉鍏ㄧ殑椋庨櫓銆俓n琛￠噺锛氭潗鏂欏寘鍖呭惈鐩爣涓撲笟銆佺敵璇峰鏍°€佽绋嬭〃鐜般€侀」鐩础鐚€佸笇鏈涘己璋冪殑 3-5 涓兘鍔涚偣銆佹埅姝㈡棩鏈熷拰鑱旂郴鏂瑰紡銆俓n琛屽姩锛氭暣鐞?1 椤?brag sheet锛涢檮鎴愮哗/璇剧▼琛ㄧ幇浜偣锛涘垪鍑烘渶甯屾湜鑰佸笀鎻愬埌鐨勫叿浣撹鍫傛垨椤圭洰渚嬪瓙锛涘彂鍑哄悗纭鑰佸笀鏀跺埌銆俓n璧勬枡锛氭垚缁╄褰曘€佽绋嬩綔涓氥€侀」鐩瘉鎹枃浠跺す銆佺敵璇峰鏍℃竻鍗曘€俓n瀹屾垚鏍囧噯锛氳€佸笀涓嶇敤鍐嶈拷闂熀纭€淇℃伅锛屽氨鑳藉熀浜庢潗鏂欏啓鍑哄叿浣撴帹鑽愬唴瀹广€?,
-  "ESAT/TARA 鍐插埡澶嶇洏": "鐩爣锛氬湪 2026-09-20 鍓嶅畬鎴?ESAT/TARA 鍐插埡闃舵澶嶇洏锛屾槑纭渶鍚庝笁鍛ㄧ殑鎻愬垎浼樺厛绾с€俓n琛￠噺锛氳嚦灏戝畬鎴?2 濂楅檺鏃剁粍鍚堣缁冿紱缁熻 Maths 1銆丮aths 2銆丳hysics 鍜?TARA 鐨勬纭巼銆佽€楁椂銆侀敊鍥?Top 5銆俓n琛屽姩锛氭寜鑰冭瘯鏃堕棿闄愬埗鍋氶锛涘鐩樻椂鎶婇敊璇垎涓虹煡璇嗘紡娲炪€佽绠楀け璇€佽棰樿鍒ゃ€佹椂闂寸瓥鐣ワ紱涓烘瘡绫婚敊璇畨鎺掕ˉ鏁戝姩浣溿€俓n璧勬枡锛歎AT/Pearson 瀹樻柟鏍烽銆侀敊棰樿〃銆佸垎鏁拌褰曡〃銆乀ARA 缁冧範鏉愭枡銆俓n瀹屾垚鏍囧噯锛氳緭鍑?1 椤靛啿鍒烘竻鍗曪紝鍐欐竻姣忓ぉ缁冧粈涔堛€佷负浠€涔堢粌銆佸畬鎴愬悗濡備綍妫€鏌ャ€?,
-  "缇庡浗 ED/EA 鏂囦功瀹氱": "鐩爣锛氬湪 2026-10-25 鍓嶅畬鎴愮編鍥?ED/EA 涓绘枃涔︺€侀檮鏂囦功鍜屾椿鍔ㄨ〃鏈€缁堟鏌ャ€俓n琛￠噺锛氭墍鏈夋棭鐢冲鏍℃枃涔﹂兘鏈夋渶缁堢増锛涙瘡绡囧畬鎴愭嫾鍐欐鏌ャ€佸鏍″尮閰嶆鏌ャ€佷簨瀹炴牳瀵瑰拰绗笁鏂瑰弽棣堜慨鏀广€俓n琛屽姩锛氶€愭牎寤虹珛鎻愪氦娓呭崟锛涙鏌ユ枃涔︽槸鍚﹀洖绛旈鐩€佹槸鍚︽湁鍏蜂綋渚嬪瓙銆佹槸鍚﹂噸澶嶆椿鍔ㄨ〃锛涙渶鍚庣粺涓€鏍稿 Common App 淇℃伅銆俓n璧勬枡锛欳ommon App銆佸悇鏍＄敵璇?portal銆佹枃涔﹁崏绋裤€佹椿鍔ㄨ〃銆佹帹鑽愪俊鐘舵€併€俓n瀹屾垚鏍囧噯锛氭瘡鎵€鏃╃敵瀛︽牎閮借揪鍒扳€滀粖澶╂彁浜や篃涓嶄細閬楁紡鏉愭枡鈥濈殑鐘舵€併€?,
-  "缇庡浗 RD 娓呭崟鏍″噯": "鐩爣锛氬湪 2026-12-15 鍓嶆牴鎹?ED/EA 缁撴灉銆侀绠楀拰涓撲笟鍋忓ソ鏍″噯 RD 瀛︽牎娓呭崟銆俓n琛￠噺锛氬舰鎴?1 浠?RD 娓呭崟锛屾寜鍐插埡銆佸尮閰嶃€佷繚搴曞垎绫伙紱姣忔牎鍖呭惈鎴鏃ユ湡銆佽ˉ鍏呮枃涔︽暟閲忋€佷笓涓氬尮閰嶃€佽垂鐢?濂栧閲戜俊鎭€俓n琛屽姩锛氬厛鏇存柊鏃╃敵缁撴灉鍜屽搴绠楃害鏉燂紱鍒犻櫎鏄庢樉涓嶅尮閰嶅鏍★紱琛ュ叆宸ョ▼/鏈哄櫒浜?AI 鏂瑰悜鏇村己鎴栭闄╂洿鍚堢悊鐨勯€夋嫨銆俓n璧勬枡锛欳ommon App銆丆ollege Board/瀛︽牎瀹樼綉璐圭敤椤点€佷笓涓氳绋嬮〉銆佹棭鐢崇粨鏋溿€俓n瀹屾垚鏍囧噯锛歊D 娓呭崟鏁伴噺鍙墽琛岋紝涓旀瘡鎵€瀛︽牎閮芥湁鏄庣‘鐢宠鐞嗙敱銆?,
-  "ESAT W1D1锛氬缓绔嬭祫鏂欏簱 + Maths 1 璇婃柇": "鐩爣锛氬湪 2026-06-01 瀹屾垚 ESAT 璧勬枡搴撴惌寤猴紝骞舵嬁鍒?Maths 1 绗竴娆″熀绾垮垎鏁般€俓n琛￠噺锛氬畬鎴?Pearson ESAT Mathematics 1 鏍烽 40 鍒嗛挓闄愭椂璁粌锛涜褰曟€婚鏁般€佹纭暟銆佺┖棰樻暟銆佽秴鏃堕鏁板拰閿欏洜銆俓n琛屽姩锛氬厛淇濆瓨 UAT銆丳earson 璧勬枡閾炬帴锛涜缃?40 鍒嗛挓璁℃椂锛涘仛瀹岀珛鍗虫妸閿欓褰曞叆琛ㄦ牸锛屾爣娉ㄧ煡璇嗙偣鍜岄敊璇師鍥犮€俓n璧勬枡锛歎AT ESAT https://esat-tmua.ac.uk/about-the-tests/esat-test/锛沀AT 澶囪€冩潗鏂?https://esat-tmua.ac.uk/esat-preparation-materials/锛汸earson https://www.pearsonvue.com/us/en/uatuk.html銆俓n瀹屾垚鏍囧噯锛氶敊棰樿〃閲岃嚦灏戞湁棰樺彿銆佺煡璇嗙偣銆侀敊璇師鍥犮€佹纭€濊矾鍜屼笅娆″涔犳棩鏈熴€?,
-  "ESAT W1D2锛歁aths 1 閿欓澶嶇洏 + 鏃犺绠楀櫒閫熷害": "鐩爣锛氬湪 2026-06-02 澶嶇洏 W1D1 Maths 1 閿欓锛屽苟鎻愰珮鏃犺绠楀櫒鐭閫熷害銆俓n琛￠噺锛氬畬鎴?W1D1 鎵€鏈夐敊棰樺鐩橈紱棰濆瀹屾垚 20 閬撶煭棰橈紝姣忛鎺у埗鍦?90 绉掑唴锛涜褰曟纭巼鍜岃秴鏃舵暟閲忋€俓n琛屽姩锛氬厛閲嶅仛閿欓锛屼笉鐪嬬瓟妗堝啓鍑烘纭В娉曪紱鍐嶅仛 20 閬撶煭棰橈紱鎶婅秴杩?90 绉掓垨璁＄畻鍗￠】鐨勯鍒楀叆閫熷害涓撻」銆俓n璧勬枡锛歎AT Mathematics 1 guide https://esat-tmua.ac.uk/esat-preparation-materials/锛沋ouTube ESAT Maths 1 walkthrough锛汿LMaths https://www.youtube.com/@TLMaths銆俓n瀹屾垚鏍囧噯锛氳兘璇存竻 Maths 1 褰撳墠鏈€寮辩殑 3 涓鍨嬶紝浠ュ強涓嬩竴娆¤缁冭浼樺厛琛ュ摢涓€涓€?,
-  "ESAT W1D3锛歁aths 2 鍩虹嚎娴嬭瘯": "鐩爣锛氬湪 2026-06-03 瀹屾垚 Maths 2 绗竴娆?40 鍒嗛挓鍩虹嚎娴嬭瘯锛屾壘鍑洪珮闃舵暟瀛﹁杽寮辩偣銆俓n琛￠噺锛氳褰曟纭暟銆侀敊璇暟銆佺┖棰樻暟鍜?Top 3 寮辩偣锛涙瘡涓急鐐硅嚦灏戝搴?2 閬撳叿浣撻鐩€俓n琛屽姩锛氭寜鑰冭瘯鏃堕檺瀹屾垚 Pearson Maths 2 sample/specimen锛涘仛瀹屽悗鍏堝垎绫婚敊鍥狅紝鍐嶅洖鐪?guide 瀵瑰簲鐭ヨ瘑鐐广€俓n璧勬枡锛歅earson UAT https://www.pearsonvue.com/us/en/uatuk.html锛沀AT Mathematics 2 guide https://esat-tmua.ac.uk/esat-preparation-materials/锛沋ouTube Maths 2 walkthrough銆俓n瀹屾垚鏍囧噯锛氬垎鏁拌〃鍜岄敊棰樿〃宸叉洿鏂帮紝骞跺啓鍑?Maths 2 涓嬩竴鍛ㄤ紭鍏堣缁?topic銆?,
-  "ESAT W1D4锛歅hysics 鍩虹嚎娴嬭瘯": "鐩爣锛氬湪 2026-06-04 瀹屾垚 Physics 40 鍒嗛挓鍩虹嚎娴嬭瘯锛屽缓绔嬬墿鐞嗛骞插埌鍏紡/鎬濊矾鐨勬槧灏勮〃銆俓n琛￠噺锛氳褰曟纭巼鍜岄敊鍥狅紱鏁寸悊鑷冲皯 5 鏉♀€滈骞蹭俊鍙?-> 鍏紡/妯″瀷/瑙ｉ鍏ュ彛鈥濄€俓n琛屽姩锛氶檺鏃跺畬鎴?Physics sample/specimen锛涘鐩樻椂涓嶅彧鍐欑瓟妗堬紝鑰屾槸鍐欓鐩浣曟彁绀轰娇鐢ㄥ摢涓ā鍨嬨€俓n璧勬枡锛歅earson UAT https://www.pearsonvue.com/us/en/uatuk.html锛沀AT Physics guide https://esat-tmua.ac.uk/esat-preparation-materials/锛汸hysics Online https://www.youtube.com/@PhysicsOnline銆俓n瀹屾垚鏍囧噯锛氱墿鐞嗛敊棰樿〃鑷冲皯瑕嗙洊鍏紡閫夋嫨銆佸崟浣嶆鏌ャ€佸浘鍍?鎯呭鐞嗚В涓夌被闂銆?,
-  "ESAT W1D5锛欵NGAA/NSAA 椋庢牸鍏ラ棬 + 涓夌閿欓鏁寸悊": "鐩爣锛氬湪 2026-06-05 鐢?ENGAA/NSAA archive 琛ュ厖 ESAT 鐩歌繎棰樺瀷锛屽苟鏁寸悊鏈懆涓夌寮辩偣銆俓n琛￠噺锛氬畬鎴?2022 鎴?2023 Section 1 涓浉鍏?Maths/Physics 棰橈紱鏁寸悊 1-10 鐨勫急鐐规竻鍗曪紝鎸夊奖鍝嶅垎鎺掑簭銆俓n琛屽姩锛氶€変笌 ESAT Maths/Physics 鐩歌繎鐨勯鍋氶檺鏃剁粌涔狅紱鎶婃湰鍛?Maths 1銆丮aths 2銆丳hysics 閿欓鍚堝苟褰掔被銆俓n璧勬枡锛歎AT ENGAA/NSAA archive https://esat-tmua.ac.uk/esat-preparation-materials/锛汦NGAA/NSAA walkthrough 鎼滅储缁撴灉銆俓n瀹屾垚鏍囧噯锛氬急鐐规竻鍗曟瘡涓€椤归兘鏈夊搴旈鍙枫€侀敊璇師鍥犲拰涓嬩竴姝ョ粌涔犳柟寮忋€?,
-  "ESAT W1D6锛氫袱绉戣繛缁?+ 鏃堕棿绛栫暐": "鐩爣锛氬湪 2026-06-06 瀹屾垚涓や釜 ESAT module 杩炵画闄愭椂璁粌锛屾祴璇曚綋鍔涘拰鏃堕棿绛栫暐銆俓n琛￠噺锛氳繛缁畬鎴愪袱涓?40 鍒嗛挓 module锛涜褰曟瘡涓?module 鐨勬纭巼銆佽烦棰樻暟閲忋€乫lag 鏁伴噺鍜屾渶鍚?5 鍒嗛挓澶勭悊鎯呭喌銆俓n琛屽姩锛氭ā鎷熻€冭瘯鑺傚锛屼腑闂村彧鐭紤鎭紱璁粌 60-90 绉掑垽鏂槸鍚﹁烦棰橈紱鏈€鍚?5 鍒嗛挓妫€鏌ユ湭绛旈骞跺畬鎴愬叏濉€俓n璧勬枡锛歅earson sample/specimen https://www.pearsonvue.com/us/en/uatuk.html锛沀AT 澶囪€冩潗鏂?https://esat-tmua.ac.uk/esat-preparation-materials/銆俓n瀹屾垚鏍囧噯锛氬啓鍑?3 鏉′釜浜烘椂闂寸瓥鐣ワ紝渚嬪鍝簺棰樺厛璺炽€佷綍鏃跺洖鐪嬨€佹渶鍚?5 鍒嗛挓鎬庝箞鍒嗛厤銆?,
-  "ESAT W1D7锛氬懆澶嶇洏 + 涓嬪懆璁″垝": "鐩爣锛氬湪 2026-06-07 瀹屾垚 ESAT 绗竴鍛ㄥ鐩橈紝骞跺埗瀹氱浜屽懆璁粌閲嶇偣銆俓n琛￠噺锛氭眹鎬?Maths 1銆丮aths 2銆丳hysics 鍘熷鍒嗭紱姣忕閫夊嚭 2 涓笅鍛ㄤ紭鍏?topic锛涘啓 1 椤靛懆鎶ャ€俓n琛屽姩锛氱湅鍒嗘暟瓒嬪娍鍜岄敊鍥犲垎绫伙紱涓嶈鍙湅姝ｇ‘鐜囷紝瑕佸垽鏂槸鐭ヨ瘑闂銆侀€熷害闂杩樻槸绛栫暐闂锛涙妸涓嬪懆浠诲姟鎷嗗埌姣忓ぉ銆俓n璧勬枡锛歅raneel Physics ESAT Hub https://praneelphysics.com/esat/hub锛沀AT 澶囪€冩潗鏂欙紱YouTube ESAT Maths/Physics walkthrough銆俓n瀹屾垚鏍囧噯锛氬懆鎶ュ寘鍚湰鍛ㄦ暟鎹€佷富瑕侀棶棰樸€佷笅鍛ㄦ瘡鏃ュ畨鎺掑拰妫€鏌ユ爣鍑嗐€?
+  "确认英国 UCAS 工程专业组合": "目标：在 2026-06-15 前锁定 5 个 UCAS 志愿的专业名称、课程代码和替代顺序，避免后续 PS 与考试准备方向反复摇摆。\n衡量：产出 1 张对比表，至少包含剑桥、Imperial、UCL、KCL 与 1 个替代工程项目；每个项目写清入学要求、ESAT/TARA 要求、核心课程匹配度和风险等级。\n行动：逐校打开官网课程页，核对 2027 Entry 要求；把不确定项标红；最后按“冲刺、匹配、保底”给出排序。\n资料：UCAS Search、各大学 Engineering/Robotics/AI/Mechanical/Aerospace 官网页面、升学指导报告。\n完成标准：对比表没有空项，并能用 3 句话解释为什么这 5 个专业组合适合工程/机器人/航空航天方向。",
+  "启动 ESAT/TARA 训练计划": "目标：在 2026-06-20 前建立 ESAT Maths 1、Maths 2、Physics 和 TARA 的固定训练系统。\n衡量：建好 1 个错题表、1 个分数记录表和 1 个每周训练表；每个科目至少完成 1 次基线测试或样题训练。\n行动：下载官方样题和 guide；按 40 分钟限时做 ESAT module；TARA 单独整理题型、时间限制和弱点；每次训练后记录错误原因。\n资料：UAT ESAT 页面 https://esat-tmua.ac.uk/about-the-tests/esat-test/；UAT 备考材料 https://esat-tmua.ac.uk/esat-preparation-materials/；Pearson UAT 页面 https://www.pearsonvue.com/us/en/uatuk.html。\n完成标准：打开任务文件夹时能看到资料库、错题表、分数表和下一周训练安排，不需要临时找材料。",
+  "整理项目证据文件夹": "目标：在 2026-06-25 前把 ISSDC、3D 打印、论文、火箭、TI-BASIC 等项目整理成可用于文书、活动表和推荐信的证据库。\n衡量：每个项目至少有 1 个项目简介、2-5 张图片/截图、关键成果数据、本人贡献说明和可引用链接或文件。\n行动：按项目建文件夹；把原始文件、照片、代码、论文、证书放入对应目录；写 100-150 字英文项目摘要；标注最能体现工程能力的证据。\n资料：电脑本地项目文件、照片、证书、论文稿、GitHub/网盘链接、升学指导报告。\n完成标准：任意打开一个项目文件夹，都能直接找到“我做了什么、结果是什么、能证明什么”的材料。",
+  "完成 Common App 活动表初稿": "目标：在 2026-07-20 前完成 Common App 10 项活动的英文初稿，形成早申可继续打磨的版本。\n衡量：10 项活动按影响力排序；每项包含职位/组织、时间投入、英文 150 字符描述和对应证据。\n行动：先列全部活动，再按工程相关性、影响力、持续时间筛选；把动词改成具体贡献，如 designed、built、tested、led、published；删除泛泛描述。\n资料：Common App 活动栏格式、项目证据文件夹、竞赛/社团/研究记录。\n完成标准：活动表读起来能体现工程主线，并且每项都能被证据文件夹支持。",
+  "英国 PS 第一版": "目标：在 2026-08-20 前完成英国 Personal Statement 第一版，主线聚焦工程思维和项目迭代能力。\n衡量：产出 1 篇完整英文 PS；覆盖学术兴趣、项目经历、数学/物理能力、工程反思和目标专业匹配；字数符合 UCAS 当前限制。\n行动：先写中文素材提纲，再转成英文段落；每段只保留一个核心论点；用项目证据支撑“建模-原型-测试-迭代”的主线。\n资料：UCAS PS 指南、目标专业课程页、项目证据文件夹、升学指导报告。\n完成标准：第一版不是素材堆砌，而是能清楚回答“为什么工程、为什么这些经历证明适合工程”。",
+  "推荐信材料包发给老师": "目标：在 2026-08-25 前给推荐老师发送完整材料包，降低老师写信时信息不全的风险。\n衡量：材料包包含目标专业、申请学校、课程表现、项目贡献、希望强调的 3-5 个能力点、截止日期和联系方式。\n行动：整理 1 页 brag sheet；附成绩/课程表现亮点；列出最希望老师提到的具体课堂或项目例子；发出后确认老师收到。\n资料：成绩记录、课程作业、项目证据文件夹、申请学校清单。\n完成标准：老师不用再追问基础信息，就能基于材料写出具体推荐内容。",
+  "ESAT/TARA 冲刺复盘": "目标：在 2026-09-20 前完成 ESAT/TARA 冲刺阶段复盘，明确最后三周的提分优先级。\n衡量：至少完成 2 套限时组合训练；统计 Maths 1、Maths 2、Physics 和 TARA 的正确率、耗时、错因 Top 5。\n行动：按考试时间限制做题；复盘时把错误分为知识漏洞、计算失误、读题误判、时间策略；为每类错误安排补救动作。\n资料：UAT/Pearson 官方样题、错题表、分数记录表、TARA 练习材料。\n完成标准：输出 1 页冲刺清单，写清每天练什么、为什么练、完成后如何检查。",
+  "美国 ED/EA 文书定稿": "目标：在 2026-10-25 前完成美国 ED/EA 主文书、附文书和活动表最终检查。\n衡量：所有早申学校文书都有最终版；每篇完成拼写检查、学校匹配检查、事实核对和第三方反馈修改。\n行动：逐校建立提交清单；检查文书是否回答题目、是否有具体例子、是否重复活动表；最后统一核对 Common App 信息。\n资料：Common App、各校申请 portal、文书草稿、活动表、推荐信状态。\n完成标准：每所早申学校都达到“今天提交也不会遗漏材料”的状态。",
+  "美国 RD 清单校准": "目标：在 2026-12-15 前根据 ED/EA 结果、预算和专业偏好校准 RD 学校清单。\n衡量：形成 1 份 RD 清单，按冲刺、匹配、保底分类；每校包含截止日期、补充文书数量、专业匹配、费用/奖学金信息。\n行动：先更新早申结果和家庭预算约束；删除明显不匹配学校；补入工程/机器人/AI 方向更强或风险更合理的选择。\n资料：Common App、College Board/学校官网费用页、专业课程页、早申结果。\n完成标准：RD 清单数量可执行，且每所学校都有明确申请理由。",
+  "ESAT W1D1：建立资料库 + Maths 1 诊断": "目标：在 2026-06-01 完成 ESAT 资料库搭建，并拿到 Maths 1 第一次基线分数。\n衡量：完成 Pearson ESAT Mathematics 1 样题 40 分钟限时训练；记录总题数、正确数、空题数、超时题数和错因。\n行动：先保存 UAT、Pearson 资料链接；设置 40 分钟计时；做完立即把错题录入表格，标注知识点和错误原因。\n资料：UAT ESAT https://esat-tmua.ac.uk/about-the-tests/esat-test/；UAT 备考材料 https://esat-tmua.ac.uk/esat-preparation-materials/；Pearson https://www.pearsonvue.com/us/en/uatuk.html。\n完成标准：错题表里至少有题号、知识点、错误原因、正确思路和下次复习日期。",
+  "ESAT W1D2：Maths 1 错题复盘 + 无计算器速度": "目标：在 2026-06-02 复盘 W1D1 Maths 1 错题，并提高无计算器短题速度。\n衡量：完成 W1D1 所有错题复盘；额外完成 20 道短题，每题控制在 90 秒内；记录正确率和超时数量。\n行动：先重做错题，不看答案写出正确解法；再做 20 道短题；把超过 90 秒或计算卡顿的题列入速度专项。\n资料：UAT Mathematics 1 guide https://esat-tmua.ac.uk/esat-preparation-materials/；YouTube ESAT Maths 1 walkthrough；TLMaths https://www.youtube.com/@TLMaths。\n完成标准：能说清 Maths 1 当前最弱的 3 个题型，以及下一次训练要优先补哪一个。",
+  "ESAT W1D3：Maths 2 基线测试": "目标：在 2026-06-03 完成 Maths 2 第一次 40 分钟基线测试，找出高阶数学薄弱点。\n衡量：记录正确数、错误数、空题数和 Top 3 弱点；每个弱点至少对应 2 道具体题目。\n行动：按考试时限完成 Pearson Maths 2 sample/specimen；做完后先分类错因，再回看 guide 对应知识点。\n资料：Pearson UAT https://www.pearsonvue.com/us/en/uatuk.html；UAT Mathematics 2 guide https://esat-tmua.ac.uk/esat-preparation-materials/；YouTube Maths 2 walkthrough。\n完成标准：分数表和错题表已更新，并写出 Maths 2 下一周优先训练 topic。",
+  "ESAT W1D4：Physics 基线测试": "目标：在 2026-06-04 完成 Physics 40 分钟基线测试，建立物理题干到公式/思路的映射表。\n衡量：记录正确率和错因；整理至少 5 条“题干信号 -> 公式/模型/解题入口”。\n行动：限时完成 Physics sample/specimen；复盘时不只写答案，而是写题目如何提示使用哪个模型。\n资料：Pearson UAT https://www.pearsonvue.com/us/en/uatuk.html；UAT Physics guide https://esat-tmua.ac.uk/esat-preparation-materials/；Physics Online https://www.youtube.com/@PhysicsOnline。\n完成标准：物理错题表至少覆盖公式选择、单位检查、图像/情境理解三类问题。",
+  "ESAT W1D5：ENGAA/NSAA 风格入门 + 三科错题整理": "目标：在 2026-06-05 用 ENGAA/NSAA archive 补充 ESAT 相近题型，并整理本周三科弱点。\n衡量：完成 2022 或 2023 Section 1 中相关 Maths/Physics 题；整理 1-10 的弱点清单，按影响分排序。\n行动：选与 ESAT Maths/Physics 相近的题做限时练习；把本周 Maths 1、Maths 2、Physics 错题合并归类。\n资料：UAT ENGAA/NSAA archive https://esat-tmua.ac.uk/esat-preparation-materials/；ENGAA/NSAA walkthrough 搜索结果。\n完成标准：弱点清单每一项都有对应题号、错误原因和下一步练习方式。",
+  "ESAT W1D6：两科连练 + 时间策略": "目标：在 2026-06-06 完成两个 ESAT module 连续限时训练，测试体力和时间策略。\n衡量：连续完成两个 40 分钟 module；记录每个 module 的正确率、跳题数量、flag 数量和最后 5 分钟处理情况。\n行动：模拟考试节奏，中间只短休息；训练 60-90 秒判断是否跳题；最后 5 分钟检查未答题并完成全填。\n资料：Pearson sample/specimen https://www.pearsonvue.com/us/en/uatuk.html；UAT 备考材料 https://esat-tmua.ac.uk/esat-preparation-materials/。\n完成标准：写出 3 条个人时间策略，例如哪些题先跳、何时回看、最后 5 分钟怎么分配。",
+  "ESAT W1D7：周复盘 + 下周计划": "目标：在 2026-06-07 完成 ESAT 第一周复盘，并制定第二周训练重点。\n衡量：汇总 Maths 1、Maths 2、Physics 原始分；每科选出 2 个下周优先 topic；写 1 页周报。\n行动：看分数趋势和错因分类；不要只看正确率，要判断是知识问题、速度问题还是策略问题；把下周任务拆到每天。\n资料：Praneel Physics ESAT Hub https://praneelphysics.com/esat/hub；UAT 备考材料；YouTube ESAT Maths/Physics walkthrough。\n完成标准：周报包含本周数据、主要问题、下周每日安排和检查标准。"
     });
   }
   return _smartNoteTemplates;
@@ -186,7 +186,7 @@ function normalizePlannerData(data) {
     aiMemories: Array.isArray(data.aiMemories) ? data.aiMemories : [],
     drafts: Array.isArray(data.drafts)
       ? data.drafts
-          .filter((draft) => draft && draft.title && !(typeof draft.details === "string" && draft.details.startsWith("[棰勮]")))
+          .filter((draft) => draft && draft.title && !(typeof draft.details === "string" && draft.details.startsWith("[预设]")))
           .slice(-10)
       : [],
     events: Array.isArray(data.events)
@@ -217,7 +217,7 @@ function normalizePlannerData(data) {
 }
 
 function findGuidanceReport() {
-  const names = ["闄堟絿鏉?2027Entry鑻辩編宸ョ▼鏂瑰悜鍗囧鎸囧鎶ュ憡.docx"];
+  const names = ["陈潇杨-2027Entry英美工程方向升学指导报告.docx"];
   const roots = [
     process.cwd(),
     path.join(process.cwd(), "outputs"),
@@ -225,7 +225,7 @@ function findGuidanceReport() {
     path.join(process.cwd(), "..", "..", "outputs"),
     path.join(app.getAppPath(), "..", "outputs"),
     path.join(app.getAppPath(), "..", "..", "outputs"),
-    "D:\\233cxy\\OneDrive\\鏂囨。\\鍗囧鎸囧\\outputs"
+    "D:\\233cxy\\OneDrive\\文档\\升学指导\\outputs"
   ];
   for (const root of roots) {
     for (const name of names) {
@@ -239,56 +239,56 @@ function findGuidanceReport() {
 function seedData() {
   const reportPath = findGuidanceReport();
   const tasks = [
-    makeTask("纭鑻卞浗 UCAS 宸ョ▼涓撲笟缁勫悎", "2026-06-15", "uk", "high", "鍓戞ˉ銆両mperial銆乁CL銆並CL 涓庢浛浠ｅ伐绋嬮」鐩€?),
-    makeTask("鍚姩 ESAT/TARA 璁粌璁″垝", "2026-06-20", "exam", "high", "鏁板1銆佹暟瀛?銆佺墿鐞嗭紱鍗曠嫭鍑嗗 TARA銆?),
-    makeTask("鏁寸悊椤圭洰璇佹嵁鏂囦欢澶?, "2026-06-25", "materials", "high", "ISSDC銆?D 鎵撳嵃銆佽鏂囥€佺伀绠€乀I-BASIC銆?),
-    makeTask("瀹屾垚 Common App 娲诲姩琛ㄥ垵绋?, "2026-07-20", "us", "medium", "鎸夋椿鍔ㄥ奖鍝嶅姏鎺掑簭锛屽噯澶囪嫳鏂囨弿杩般€?),
-    makeTask("鑻卞浗 PS 绗竴鐗?, "2026-08-20", "essay", "high", "鍥寸粫寤烘ā-鍘熷瀷-娴嬭瘯-杩唬涓荤嚎銆?),
-    makeTask("鎺ㄨ崘淇℃潗鏂欏寘鍙戠粰鑰佸笀", "2026-08-25", "materials", "high", "璇剧▼琛ㄧ幇銆侀」鐩础鐚€佺洰鏍囦笓涓氥€佸笇鏈涘己璋冪殑鑳藉姏銆?),
-    makeTask("ESAT/TARA 鍐插埡澶嶇洏", "2026-09-20", "exam", "high", "闄愭椂濂楅銆侀敊棰樺綊鍥犮€佽杽寮辨ā鍧椼€?),
-    makeTask("缇庡浗 ED/EA 鏂囦功瀹氱", "2026-10-25", "us", "high", "鏃╃敵瀛︽牎闄勬枃涔﹀拰娲诲姩琛ㄦ鏌ャ€?),
-    makeTask("缇庡浗 RD 娓呭崟鏍″噯", "2026-12-15", "us", "medium", "缁撳悎 ED/EA 缁撴灉銆侀绠楀拰涓撲笟鍋忓ソ銆?),
-    makeTask("ESAT W1D1锛氬缓绔嬭祫鏂欏簱 + Maths 1 璇婃柇", "2026-06-01", "exam", "high", "UAT 瀹樻柟 ESAT 椤甸潰锛歨ttps://esat-tmua.ac.uk/about-the-tests/esat-test/锛沀AT 澶囪€冩潗鏂欙細https://esat-tmua.ac.uk/esat-preparation-materials/锛汸earson sample/specimen锛歨ttps://www.pearsonvue.com/us/en/uatuk.html銆備换鍔★細鍋?Pearson ESAT Mathematics 1锛岄檺鏃?40 鍒嗛挓锛屽缓绔嬮敊棰樿〃銆?),
-    makeTask("ESAT W1D2锛歁aths 1 閿欓澶嶇洏 + 鏃犺绠楀櫒閫熷害", "2026-06-02", "exam", "high", "璧勬枡锛歎AT Mathematics 1 guide锛歨ttps://esat-tmua.ac.uk/esat-preparation-materials/锛沋ouTube锛歨ttps://www.youtube.com/results?search_query=ESAT+Maths+1+walkthrough锛汿LMaths锛歨ttps://www.youtube.com/@TLMaths銆備换鍔★細澶嶇洏 W1D1 閿欓锛屽仛 20 閬?90 绉掑唴鐭銆?),
-    makeTask("ESAT W1D3锛歁aths 2 鍩虹嚎娴嬭瘯", "2026-06-03", "exam", "high", "璧勬枡锛歅earson ESAT Mathematics 2 sample/specimen锛歨ttps://www.pearsonvue.com/us/en/uatuk.html锛沀AT Mathematics 2 guide锛歨ttps://esat-tmua.ac.uk/esat-preparation-materials/锛沋ouTube锛歨ttps://www.youtube.com/results?search_query=ESAT+Maths+2+walkthrough銆備换鍔★細闄愭椂 40 鍒嗛挓鍋?Maths 2锛屾暣鐞?Top 3 寮辩偣銆?),
-    makeTask("ESAT W1D4锛歅hysics 鍩虹嚎娴嬭瘯", "2026-06-04", "exam", "high", "璧勬枡锛歅earson ESAT Physics sample/specimen锛歨ttps://www.pearsonvue.com/us/en/uatuk.html锛沀AT Physics guide锛歨ttps://esat-tmua.ac.uk/esat-preparation-materials/锛汸hysics Online锛歨ttps://www.youtube.com/@PhysicsOnline锛沋ouTube锛歨ttps://www.youtube.com/results?search_query=ESAT+Physics+walkthrough銆備换鍔★細闄愭椂 40 鍒嗛挓鍋?Physics锛屽啓 5 鏉￠骞蹭俊鍙峰埌鍏紡/鎬濊矾銆?),
-    makeTask("ESAT W1D5锛欵NGAA/NSAA 椋庢牸鍏ラ棬 + 涓夌閿欓鏁寸悊", "2026-06-05", "exam", "medium", "璧勬枡锛歎AT 瀹樻柟 ENGAA/NSAA archive锛歨ttps://esat-tmua.ac.uk/esat-preparation-materials/锛汦NGAA walkthrough锛歨ttps://www.youtube.com/results?search_query=ENGAA+Section+1+walkthrough锛汵SAA walkthrough锛歨ttps://www.youtube.com/results?search_query=NSAA+Section+1+walkthrough銆備换鍔★細閫?2022/2023 Section 1 鍋氱浉鍏?Maths/Physics 棰橈紝鏁寸悊鏈懆寮辩偣 1-10銆?),
-    makeTask("ESAT W1D6锛氫袱绉戣繛缁?+ 鏃堕棿绛栫暐", "2026-06-06", "exam", "high", "璧勬枡锛歅earson sample/specimen锛歨ttps://www.pearsonvue.com/us/en/uatuk.html锛沀AT 澶囪€冩潗鏂欙細https://esat-tmua.ac.uk/esat-preparation-materials/銆備换鍔★細杩炵画鍋氫袱涓?40 鍒嗛挓 module锛岃缁?60-90 绉掕烦棰樸€乫lag 鍜屾渶鍚?5 鍒嗛挓鍏ㄥ～銆?),
-    makeTask("ESAT W1D7锛氬懆澶嶇洏 + 涓嬪懆璁″垝", "2026-06-07", "exam", "high", "璧勬枡锛歅raneel Physics ESAT Hub锛歨ttps://praneelphysics.com/esat/hub锛沀AT锛歨ttps://esat-tmua.ac.uk/esat-preparation-materials/锛沋ouTube锛歨ttps://www.youtube.com/results?search_query=ESAT+Maths+Physics+walkthrough銆備换鍔★細姹囨€讳笁绉戝師濮嬪垎锛屾瘡绉戦€?2 涓笅鍛ㄤ紭鍏?topic锛屽啓涓€椤靛懆鎶ャ€?)
+    makeTask("确认英国 UCAS 工程专业组合", "2026-06-15", "uk", "high", "剑桥、Imperial、UCL、KCL 与替代工程项目。"),
+    makeTask("启动 ESAT/TARA 训练计划", "2026-06-20", "exam", "high", "数学1、数学2、物理；单独准备 TARA。"),
+    makeTask("整理项目证据文件夹", "2026-06-25", "materials", "high", "ISSDC、3D 打印、论文、火箭、TI-BASIC。"),
+    makeTask("完成 Common App 活动表初稿", "2026-07-20", "us", "medium", "按活动影响力排序，准备英文描述。"),
+    makeTask("英国 PS 第一版", "2026-08-20", "essay", "high", "围绕建模-原型-测试-迭代主线。"),
+    makeTask("推荐信材料包发给老师", "2026-08-25", "materials", "high", "课程表现、项目贡献、目标专业、希望强调的能力。"),
+    makeTask("ESAT/TARA 冲刺复盘", "2026-09-20", "exam", "high", "限时套题、错题归因、薄弱模块。"),
+    makeTask("美国 ED/EA 文书定稿", "2026-10-25", "us", "high", "早申学校附文书和活动表检查。"),
+    makeTask("美国 RD 清单校准", "2026-12-15", "us", "medium", "结合 ED/EA 结果、预算和专业偏好。"),
+    makeTask("ESAT W1D1：建立资料库 + Maths 1 诊断", "2026-06-01", "exam", "high", "UAT 官方 ESAT 页面：https://esat-tmua.ac.uk/about-the-tests/esat-test/；UAT 备考材料：https://esat-tmua.ac.uk/esat-preparation-materials/；Pearson sample/specimen：https://www.pearsonvue.com/us/en/uatuk.html。任务：做 Pearson ESAT Mathematics 1，限时 40 分钟，建立错题表。"),
+    makeTask("ESAT W1D2：Maths 1 错题复盘 + 无计算器速度", "2026-06-02", "exam", "high", "资料：UAT Mathematics 1 guide：https://esat-tmua.ac.uk/esat-preparation-materials/；YouTube：https://www.youtube.com/results?search_query=ESAT+Maths+1+walkthrough；TLMaths：https://www.youtube.com/@TLMaths。任务：复盘 W1D1 错题，做 20 道 90 秒内短题。"),
+    makeTask("ESAT W1D3：Maths 2 基线测试", "2026-06-03", "exam", "high", "资料：Pearson ESAT Mathematics 2 sample/specimen：https://www.pearsonvue.com/us/en/uatuk.html；UAT Mathematics 2 guide：https://esat-tmua.ac.uk/esat-preparation-materials/；YouTube：https://www.youtube.com/results?search_query=ESAT+Maths+2+walkthrough。任务：限时 40 分钟做 Maths 2，整理 Top 3 弱点。"),
+    makeTask("ESAT W1D4：Physics 基线测试", "2026-06-04", "exam", "high", "资料：Pearson ESAT Physics sample/specimen：https://www.pearsonvue.com/us/en/uatuk.html；UAT Physics guide：https://esat-tmua.ac.uk/esat-preparation-materials/；Physics Online：https://www.youtube.com/@PhysicsOnline；YouTube：https://www.youtube.com/results?search_query=ESAT+Physics+walkthrough。任务：限时 40 分钟做 Physics，写 5 条题干信号到公式/思路。"),
+    makeTask("ESAT W1D5：ENGAA/NSAA 风格入门 + 三科错题整理", "2026-06-05", "exam", "medium", "资料：UAT 官方 ENGAA/NSAA archive：https://esat-tmua.ac.uk/esat-preparation-materials/；ENGAA walkthrough：https://www.youtube.com/results?search_query=ENGAA+Section+1+walkthrough；NSAA walkthrough：https://www.youtube.com/results?search_query=NSAA+Section+1+walkthrough。任务：选 2022/2023 Section 1 做相关 Maths/Physics 题，整理本周弱点 1-10。"),
+    makeTask("ESAT W1D6：两科连练 + 时间策略", "2026-06-06", "exam", "high", "资料：Pearson sample/specimen：https://www.pearsonvue.com/us/en/uatuk.html；UAT 备考材料：https://esat-tmua.ac.uk/esat-preparation-materials/。任务：连续做两个 40 分钟 module，训练 60-90 秒跳题、flag 和最后 5 分钟全填。"),
+    makeTask("ESAT W1D7：周复盘 + 下周计划", "2026-06-07", "exam", "high", "资料：Praneel Physics ESAT Hub：https://praneelphysics.com/esat/hub；UAT：https://esat-tmua.ac.uk/esat-preparation-materials/；YouTube：https://www.youtube.com/results?search_query=ESAT+Maths+Physics+walkthrough。任务：汇总三科原始分，每科选 2 个下周优先 topic，写一页周报。")
   ];
 
   // Add sample subtasks to a few key tasks for demonstration
   const tasksWithSubs = tasks.map(t => {
     const sub = (titles) => titles.map(st => ({ id: uid("sub"), title: st, completed: false, createdAt: new Date().toISOString() }));
-    if (t.title === "鏁寸悊椤圭洰璇佹嵁鏂囦欢澶?) t.subtasks = sub(["鏁寸悊 ISSDC 椤圭洰鏂囦欢", "鏁寸悊 3D 鎵撳嵃浣滃搧鐓х墖", "鏁寸悊璁烘枃鍒濈鍜岀粓绋?, "鏁寸悊鐏椤圭洰璧勬枡", "姣忎釜椤圭洰鍐?100 瀛楄嫳鏂囨憳瑕?]);
-    if (t.title === "鑻卞浗 PS 绗竴鐗?) t.subtasks = sub(["鍒楀嚭鏍稿績宸ョ▼缁忓巻娓呭崟", "鍐欏嚭涓枃绱犳潗鎻愮翰", "杞垚鑻辨枃娈佃惤鍒濈", "淇敼涓荤嚎閫昏緫锛堝缓妯?鍘熷瀷-娴嬭瘯锛?, "璇疯€佸笀/鍚屽鍙嶉"]);
-    if (t.title === "鎺ㄨ崘淇℃潗鏂欏寘鍙戠粰鑰佸笀") t.subtasks = sub(["鏁寸悊 1 椤?brag sheet", "鍒楀嚭鏈€甯屾湜鑰佸笀鎻愬埌鐨?3 涓緥瀛?, "鎵撳寘鎴愮哗鍗曞拰椤圭洰璇佹嵁", "纭鎺ㄨ崘淇℃埅姝㈡棩鏈?, "鍙戦偖浠跺苟纭鑰佸笀鏀跺埌"]);
-    if (t.title === "Common App 娲诲姩琛ㄥ垵绋?) t.subtasks = sub(["鍒楀嚭鍏ㄩ儴娲诲姩鍜岃鑹?, "鎸夊奖鍝嶅姏鎺掑簭", "绛涢€?10 椤规渶閲嶈鐨?, "鍐欒嫳鏂?150 瀛楃鎻忚堪", "娑﹁壊璇硶鍜屽姩璇?]);
+    if (t.title === "整理项目证据文件夹") t.subtasks = sub(["整理 ISSDC 项目文件", "整理 3D 打印作品照片", "整理论文初稿和终稿", "整理火箭项目资料", "每个项目写 100 字英文摘要"]);
+    if (t.title === "英国 PS 第一版") t.subtasks = sub(["列出核心工程经历清单", "写出中文素材提纲", "转成英文段落初稿", "修改主线逻辑（建模-原型-测试）", "请老师/同学反馈"]);
+    if (t.title === "推荐信材料包发给老师") t.subtasks = sub(["整理 1 页 brag sheet", "列出最希望老师提到的 3 个例子", "打包成绩单和项目证据", "确认推荐信截止日期", "发邮件并确认老师收到"]);
+    if (t.title === "Common App 活动表初稿") t.subtasks = sub(["列出全部活动和角色", "按影响力排序", "筛选 10 项最重要的", "写英文 150 字符描述", "润色语法和动词"]);
     return t;
   });
 
   const events = [
-    makeEvent("纭 UCAS 涓撲笟缁勫悎", "2026-06-15", "uk", "閿佸畾鍓戞ˉ銆両mperial銆乁CL銆並CL 涓庢浛浠ｅ織鎰跨瓥鐣ャ€?),
-    makeEvent("鍚姩 ESAT/TARA 绯荤粺璁粌", "2026-06-20", "exam", "寤虹珛闄愭椂璁粌銆侀敊棰樻湰鍜屾ā鍧楀急鐐硅〃銆?),
-    makeEvent("UAT-UK 10 鏈堣€冭瘯棰勭害寮€鏀?, "2026-07-20", "exam", "棰勭害 ESAT/TARA锛岀‘璁よ€冪偣鍜岃瘉浠躲€?),
-    makeEvent("Common App 娲诲姩琛ㄥ垵绋?, "2026-07-25", "us", "瀹屾垚娲诲姩鎺掑簭銆佽嫳鏂囨弿杩板拰褰卞搷鍔涜瘉鎹€?),
-    makeEvent("鑻卞浗 PS 绗竴鐗?, "2026-08-20", "essay", "褰㈡垚宸ョ▼瀛︽湳涓荤嚎鍜岀礌鏉愬彇鑸嶃€?),
-    makeEvent("Common App 閫氬父寮€鏀?, "2026-08-01", "us", "寮€濮嬪～鍐欎俊鎭拰瀛︽牎闄勬枃涔︺€?),
-    makeEvent("鎺ㄨ崘淇℃潗鏂欏寘", "2026-08-25", "materials", "鎶?brag sheet 鍙戠粰鎺ㄨ崘鑰佸笀銆?),
-    makeEvent("UCAS 淇℃伅涓庢帹鑽愪俊瀹℃牳", "2026-09-10", "uk", "瀛︽牎鍐呴儴瀹℃牳銆侀娴嬪垎銆佺敵璇蜂俊鎭€?),
-    makeEvent("ESAT/TARA 鍐插埡", "2026-09-20", "exam", "闄愭椂妯℃嫙銆佽杽寮辨ā鍧楄ˉ寮恒€?),
-    makeEvent("ESAT", "2026-10-12", "exam", "涓浗/娓境 October sitting: 10 鏈?12-13 鏃ャ€?),
-    makeEvent("ESAT", "2026-10-13", "exam", "涓浗/娓境 October sitting: 10 鏈?12-13 鏃ャ€?),
-    makeEvent("TARA", "2026-10-14", "exam", "UCL Robotics and AI 2027 cycle 瑕佹眰銆?),
-    makeEvent("鍓戞ˉ UCAS 鎴", "2026-10-15", "uk", "2027 Entry 甯歌鏈鐢宠鎴銆?),
-    makeEvent("缇庡浗鏃╃敵鎻愪氦妫€鏌?, "2026-10-25", "us", "ED/EA 鏂囦功銆佹椿鍔ㄣ€佹帹鑽愪俊銆佹爣鍖栥€?),
-    makeEvent("鍓戞ˉ闈㈣瘯鍑嗗", "2026-11-20", "uk", "閫氬父闆嗕腑鍦?11 鏈堜笅鏃?12 鏈堜笂鏃€?),
-    makeEvent("缇庡浗 RD 鏂囦功涓庤ˉ鍏呮潗鏂?, "2026-12-15", "us", "缁撳悎鏃╃敵缁撴灉璋冩暣 RD銆?),
-    makeEvent("UCAS 甯歌鎴", "2027-01-13", "uk", "2027 Entry equal consideration deadline銆?),
-    makeEvent("缇庡浗 RD 鎻愪氦绐楀彛", "2027-01-05", "us", "澶氭暟 RD 鎴鍦?1 鏈堜笂鏃嚦涓棳銆?),
-    makeEvent("褰曞彇缁撴灉姣旇緝", "2027-03-25", "materials", "姣旇緝鑻辩編 offer銆佸瀛﹂噾銆佷笓涓氬尮閰嶃€?),
-    makeEvent("鑻卞浗 offer 鍥炲涓庡悗缁噯澶?, "2027-05-01", "uk", "鏉′欢 offer銆丄P/璇█銆佺璇併€佷綇瀹裤€?),
-    makeEvent("ESAT 鏈懆璇婃柇鍛ㄥ鐩?, "2026-06-07", "exam", "妫€鏌?2026-06-01 鍒?2026-06-07 鐨?Maths 1銆丮aths 2銆丳hysics 鍩虹嚎鍒嗘暟銆侀敊棰樺垎绫诲拰涓嬪懆寮辩偣浼樺厛绾с€傝祫鏂欐€诲叆鍙ｏ細UAT https://esat-tmua.ac.uk/esat-preparation-materials/锛汸earson https://www.pearsonvue.com/us/en/uatuk.html銆?)
+    makeEvent("确认 UCAS 专业组合", "2026-06-15", "uk", "锁定剑桥、Imperial、UCL、KCL 与替代志愿策略。"),
+    makeEvent("启动 ESAT/TARA 系统训练", "2026-06-20", "exam", "建立限时训练、错题本和模块弱点表。"),
+    makeEvent("UAT-UK 10 月考试预约开放", "2026-07-20", "exam", "预约 ESAT/TARA，确认考点和证件。"),
+    makeEvent("Common App 活动表初稿", "2026-07-25", "us", "完成活动排序、英文描述和影响力证据。"),
+    makeEvent("英国 PS 第一版", "2026-08-20", "essay", "形成工程学术主线和素材取舍。"),
+    makeEvent("Common App 通常开放", "2026-08-01", "us", "开始填写信息和学校附文书。"),
+    makeEvent("推荐信材料包", "2026-08-25", "materials", "把 brag sheet 发给推荐老师。"),
+    makeEvent("UCAS 信息与推荐信审核", "2026-09-10", "uk", "学校内部审核、预测分、申请信息。"),
+    makeEvent("ESAT/TARA 冲刺", "2026-09-20", "exam", "限时模拟、薄弱模块补强。"),
+    makeEvent("ESAT", "2026-10-12", "exam", "中国/港澳 October sitting: 10 月 12-13 日。"),
+    makeEvent("ESAT", "2026-10-13", "exam", "中国/港澳 October sitting: 10 月 12-13 日。"),
+    makeEvent("TARA", "2026-10-14", "exam", "UCL Robotics and AI 2027 cycle 要求。"),
+    makeEvent("剑桥 UCAS 截止", "2026-10-15", "uk", "2027 Entry 常规本科申请截止。"),
+    makeEvent("美国早申提交检查", "2026-10-25", "us", "ED/EA 文书、活动、推荐信、标化。"),
+    makeEvent("剑桥面试准备", "2026-11-20", "uk", "通常集中在 11 月下旬-12 月上旬。"),
+    makeEvent("美国 RD 文书与补充材料", "2026-12-15", "us", "结合早申结果调整 RD。"),
+    makeEvent("UCAS 常规截止", "2027-01-13", "uk", "2027 Entry equal consideration deadline。"),
+    makeEvent("美国 RD 提交窗口", "2027-01-05", "us", "多数 RD 截止在 1 月上旬至中旬。"),
+    makeEvent("录取结果比较", "2027-03-25", "materials", "比较英美 offer、奖学金、专业匹配。"),
+    makeEvent("英国 offer 回复与后续准备", "2027-05-01", "uk", "条件 offer、AP/语言、签证、住宿。"),
+    makeEvent("ESAT 本周诊断周复盘", "2026-06-07", "exam", "检查 2026-06-01 到 2026-06-07 的 Maths 1、Maths 2、Physics 基线分数、错题分类和下周弱点优先级。资料总入口：UAT https://esat-tmua.ac.uk/esat-preparation-materials/；Pearson https://www.pearsonvue.com/us/en/uatuk.html。")
   ];
 
   return {
@@ -299,8 +299,8 @@ function seedData() {
     goals: [
       {
         id: "goal_admission",
-        title: "2027 Entry 鑻辩編宸ョ▼鏂瑰悜鐢宠",
-        description: "鍥寸粫宸ョ▼銆佹満鍣ㄤ汉銆佽埅绌鸿埅澶┿€佽蒋纭欢缁撳悎瀹屾垚鐢宠鍑嗗銆?,
+        title: "2027 Entry 英美工程方向申请",
+        description: "围绕工程、机器人、航空航天、软硬件结合完成申请准备。",
         targetDate: "2027-05-01",
         status: "active"
       }
@@ -313,16 +313,16 @@ function seedData() {
       {
         id: uid("note"),
         content: reportPath
-          ? `搴旂敤宸叉娴嬪埌鍗囧鎸囧鎶ュ憡骞跺鍏ユ椂闂寸嚎锛?{reportPath}`
-          : "鏈娴嬪埌鍗囧鎸囧鎶ュ憡鏂囦欢锛屽凡浣跨敤鍐呯疆鍗囧鏃堕棿绾垮垵濮嬪寲銆傚彲浠ュ湪鍙充晶璁?AI 甯綘鎷嗗垎浠诲姟銆佽皟鏁存棩绋嬫垨璁板綍鎯虫硶銆?,
+          ? `应用已检测到升学指导报告并导入时间线：${reportPath}`
+          : "未检测到升学指导报告文件，已使用内置升学时间线初始化。可以在右侧让 AI 帮你拆分任务、调整日程或记录想法。",
         createdAt: new Date().toISOString(),
-        tags: ["绯荤粺", "鍗囧瑙勫垝"]
+        tags: ["系统", "升学规划"]
       },
       {
         id: uid("note"),
-        content: "ESAT 鏈懆璧勬枡绱㈠紩锛歎AT 瀹樻柟 ESAT 鏍煎紡/鏃ユ湡锛歨ttps://esat-tmua.ac.uk/about-the-tests/esat-test/锛沀AT 瀹樻柟 ESAT guide + ENGAA/NSAA archive锛歨ttps://esat-tmua.ac.uk/esat-preparation-materials/锛汸earson 瀹樻柟鏈鸿€?specimen/sample锛歨ttps://www.pearsonvue.com/us/en/uatuk.html锛汸raneel Physics ESAT Hub锛歨ttps://praneelphysics.com/esat/hub锛沋ouTube锛歁aths 1 https://www.youtube.com/results?search_query=ESAT+Maths+1+walkthrough锛汳aths 2 https://www.youtube.com/results?search_query=ESAT+Maths+2+walkthrough锛汸hysics https://www.youtube.com/results?search_query=ESAT+Physics+walkthrough銆?,
+        content: "ESAT 本周资料索引：UAT 官方 ESAT 格式/日期：https://esat-tmua.ac.uk/about-the-tests/esat-test/；UAT 官方 ESAT guide + ENGAA/NSAA archive：https://esat-tmua.ac.uk/esat-preparation-materials/；Pearson 官方机考 specimen/sample：https://www.pearsonvue.com/us/en/uatuk.html；Praneel Physics ESAT Hub：https://praneelphysics.com/esat/hub；YouTube：Maths 1 https://www.youtube.com/results?search_query=ESAT+Maths+1+walkthrough；Maths 2 https://www.youtube.com/results?search_query=ESAT+Maths+2+walkthrough；Physics https://www.youtube.com/results?search_query=ESAT+Physics+walkthrough。",
         createdAt: new Date().toISOString(),
-        tags: ["ESAT", "鏈懆璁″垝", "璧勬枡"]
+        tags: ["ESAT", "本周计划", "资料"]
       }
     ],
     drafts: [],
@@ -448,7 +448,7 @@ function getSettings() {
     baseUrl: raw.baseUrl || DEEPSEEK_URL,
     hasApiKey: Boolean(apiKey),
     apiKeyPreview: apiKey ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}` : "",
-    displayName: raw.displayName || "闄堟絿鏉?,
+    displayName: raw.displayName || "陈潇杨",
     dailyFocusTime: raw.dailyFocusTime || "20:00",
     weekStartsOn: raw.weekStartsOn === 1 ? 1 : 0,
     theme: raw.theme || "light",
@@ -488,7 +488,7 @@ function saveSettings(settings) {
     appTitle: "NavoPath",
     model: settings.model || existing.model || DEFAULT_MODEL,
     baseUrl: settings.baseUrl || existing.baseUrl || DEEPSEEK_URL,
-    displayName: settings.displayName || existing.displayName || "闄堟絿鏉?,
+    displayName: settings.displayName || existing.displayName || "陈潇杨",
     dailyFocusTime: settings.dailyFocusTime || existing.dailyFocusTime || "20:00",
     weekStartsOn: typeof settings.weekStartsOn === "number" ? (settings.weekStartsOn === 1 ? 1 : 0) : existing.weekStartsOn === 1 ? 1 : 0,
     theme: settings.theme || existing.theme || "light",
@@ -669,7 +669,7 @@ function applyActions(actions) {
 
 async function selectBackgroundImage() {
   const result = await dialog.showOpenDialog({
-    title: "閫夋嫨鑳屾櫙鍥剧墖",
+    title: "选择背景图片",
     properties: ["openFile"],
     filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "gif"] }]
   });
@@ -688,18 +688,18 @@ async function callDeepSeek({ messages = [], draftText = "" }) {
   const settings = getSettings();
   const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error("璇峰厛鍦ㄥ彸涓婅璁剧疆 DeepSeek API Key銆?);
+    throw new Error("请先在右上角设置 DeepSeek API Key。");
   }
   const data = readData();
   const system = [
-    "浣犳槸涓€涓暀瀛﹀崌瀛﹀璇濆姪鎵嬨€備綘闇€瑕佹牴鎹敤鎴疯緭鍏ュ喅瀹氳繑鍥炴牸寮忋€?,
-    "濡傛灉闇€瑕佸垱寤轰换鍔?/ 浜嬩欢 / 绗旇 / 璁板繂锛屽繀椤诲彧杩斿洖绾?JSON锛屼笉瑕佺敤 markdown 浠ｇ爜鍧楋紙涓嶈鐢?```锛夛紝涓嶈鍔犱换浣曞墠缂€鏂囧瓧锛?,
-    '{"reply":"浣犵殑涓枃鍥炲","actions":[{"type":"add_task","title":"...","dueDate":"YYYY-MM-DD","category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","notes":"鐩爣锛?..\\n琛￠噺锛?..\\n琛屽姩锛?..\\n璧勬枡锛?..\\n瀹屾垚鏍囧噯锛?..","subtasks":[{"title":"瀛愪换鍔?}]}]}',
-    "濡傛灉鍙槸鏅€氳亰澶┿€佷笉闇€瑕佸垱寤?淇敼浠讳綍鏁版嵁锛岀洿鎺ヨ繑鍥炵函鏂囨湰锛屼笉瑕佺敤 JSON銆?,
-    "浠诲姟澶囨敞蹇呴』涓ユ牸鎸?SMART 浜旀鍐欙紙鐩爣锛?琛￠噺锛?琛屽姩锛?璧勬枡锛?瀹屾垚鏍囧噯锛氾級銆傛瘡涓瓙浠诲姟鏍囬 15 瀛椾互鍐呫€?,
-    "鍙敤 action锛歛dd_task銆乺eschedule_task銆乤dd_event銆乤dd_note銆乤dd_memory銆?,
-    "闄や簡 add_memory锛屽叾浠?action 涓嶈璇?宸叉墽琛?鈥斺€斿簲鐢ㄤ細灞曠ず棰勮锛岀敱鐢ㄦ埛鐐瑰嚮纭銆?,
-    `鏈湴鏁版嵁鎽樿锛?{summarizeData(data)}`
+    "你是一个留学升学对话助手。你需要根据用户输入决定返回格式。",
+    "如果需要创建任务 / 事件 / 笔记 / 记忆，必须只返回纯 JSON，不要用 markdown 代码块（不要用 ```），不要加任何前缀文字：",
+    '{"reply":"你的中文回复","actions":[{"type":"add_task","title":"...","dueDate":"YYYY-MM-DD","category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","notes":"目标：...\\n衡量：...\\n行动：...\\n资料：...\\n完成标准：...","subtasks":[{"title":"子任务"}]}]}',
+    "如果只是普通聊天、不需要创建/修改任何数据，直接返回纯文本，不要用 JSON。",
+    "任务备注必须严格按 SMART 五段写（目标：/衡量：/行动：/资料：/完成标准：）。每个子任务标题 15 字以内。",
+    "可用 action：add_task、reschedule_task、add_event、add_note、add_memory。",
+    "除了 add_memory，其他 action 不要说'已执行'——应用会展示预览，由用户点击确认。",
+    `本地数据摘要：${summarizeData(data)}`
   ].join("\n");
 
   const hasSystemMessage = messages.length > 0 && messages[0].role === "system";
@@ -725,7 +725,7 @@ async function callDeepSeek({ messages = [], draftText = "" }) {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`DeepSeek 璇锋眰澶辫触锛?{response.status} ${text.slice(0, 200)}`);
+    throw new Error(`DeepSeek 请求失败：${response.status} ${text.slice(0, 200)}`);
   }
   const json = await response.json();
   const content = json.choices?.[0]?.message?.content || "";
@@ -743,7 +743,7 @@ function createWindow() {
   if (app.isPackaged) {
     // Production: load local file
     const indexPath = path.join(app.getAppPath(), "dist", "index.html");
-    appUrl = new URL("file://${indexPath}");
+    appUrl = new URL(`file://${indexPath}`);
     allowedOrigin = "file://";
   } else {
     // Development
@@ -786,19 +786,18 @@ function createWindow() {
     win.show();
   });
 
-  win.webContents.on("will-navigate", (event, url) => {
-    if (isWorkspaceUrl(url)) return;
-    event.preventDefault();
-    const target = new URL(url);
-    if (!app.isPackaged && target.origin === allowedOrigin && target.pathname === "/") {
-      void win.loadURL(appUrl.toString());
-      return;
+  win.webContents.on("will-navigate", (e, url) => {
+    if (!isWorkspaceUrl(url)) {
+      e.preventDefault();
+      shell.openExternal(url);
     }
-    void shell.openExternal(url);
   });
+
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isWorkspaceUrl(url)) return { action: "allow" };
-    void shell.openExternal(url);
+    if (isWorkspaceUrl(url)) {
+      return { action: "allow" };
+    }
+    shell.openExternal(url);
     return { action: "deny" };
   });
 
@@ -808,6 +807,7 @@ function createWindow() {
     win.loadURL(appUrl.toString());
   }
 }
+
 app.whenReady().then(() => {
   // Create window first for fastest perceived startup
   createWindow();
@@ -840,9 +840,9 @@ function createTray() {
   }
   tray = new Tray(trayIcon);
   const contextMenu = Menu.buildFromTemplate([
-    { label: "鏄剧ず NavoPath", click: () => { const win = BrowserWindow.getAllWindows()[0]; if (win) { win.show(); win.focus(); } else createWindow(); } },
+    { label: "显示 NavoPath", click: () => { const win = BrowserWindow.getAllWindows()[0]; if (win) { win.show(); win.focus(); } else createWindow(); } },
     { type: "separator" },
-    { label: "閫€鍑?, click: () => { isQuitting = true; app.quit(); } }
+    { label: "退出", click: () => { isQuitting = true; app.quit(); } }
   ]);
   tray.setToolTip("NavoPath");
   tray.setContextMenu(contextMenu);
