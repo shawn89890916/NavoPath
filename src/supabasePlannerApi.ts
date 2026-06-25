@@ -289,7 +289,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       configured: true
     }),
 
-    getBootstrap: async () => {
+    getBootstrap: async (options?: { force?: boolean }) => {
       const user = await getUser();
       const auth = {
         mode: "cloud" as const,
@@ -297,7 +297,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         configured: true
       };
       if (!user) return { auth, data: null, settings: null };
-      const profile = await ensureProfile(user);
+      const profile = await ensureProfile(user, Boolean(options?.force));
       return { auth, data: profile.data, settings: profile.settings, revision: profile.revision };
     },
 

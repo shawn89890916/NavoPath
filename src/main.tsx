@@ -1591,6 +1591,7 @@ function App() {
   const queuedRemoteRefreshRef = useRef(false);
   const remoteRevisionRef = useRef(0);
   const syncSchedulerRef = useRef<SyncScheduler | null>(null);
+  const snapshotTimerRef = useRef<number | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const colsContainerRef = useRef<HTMLDivElement | null>(null);
   const timeGridRef = useRef<HTMLDivElement | null>(null);
@@ -1739,6 +1740,23 @@ function App() {
     setToastAction(null);
   }
 
+  function scheduleSnapshotWrite() {
+    if (typeof window === "undefined" || !window.desktopApi?.writeSnapshot) return;
+    if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = window.setTimeout(() => {
+      snapshotTimerRef.current = null;
+      try {
+        void window.desktopApi?.writeSnapshot?.({
+          data: dataRef.current,
+          settings: settingsRef.current,
+          authUser: authState?.user ?? null,
+        });
+      } catch (err) {
+        console.warn("[snapshot] write failed:", err);
+      }
+    }, 1500);
+  }
+
   async function loadInitial() {
     try {
     const api = await waitForPlannerApi();
@@ -1764,7 +1782,7 @@ function App() {
       if (cached.settings.defaultTimelineView) setTimelineView(cached.settings.defaultTimelineView);
     }
     const bootstrap = api.getBootstrap
-      ? await api.getBootstrap()
+      ? await api.getBootstrap({ force: true })
       : {
         auth,
         data: await api.getData(),
@@ -1809,6 +1827,16 @@ function App() {
     if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
     if (shouldPushCachedData && nextData) void saveData(nextData);
     if (shouldPushCachedSettings && cached?.settings) void saveSettings(cached.settings);
+    // Persist a local JSON snapshot so users always have an offline backup.
+    try {
+      void window.desktopApi?.writeSnapshot?.({
+        data: nextData,
+        settings: nextSettings,
+        authUser: auth.user ?? null,
+      });
+    } catch (snapshotErr) {
+      console.warn("[loadInitial] snapshot write failed:", snapshotErr);
+    }
     } catch (err) {
       console.error("Failed to load initial data:", err);
       if (!localFallbackAppliedRef.current) {
@@ -2288,6 +2316,7 @@ function App() {
               dataDirty: false,
               remoteRevision: remoteRevisionRef.current,
             });
+            scheduleSnapshotWrite();
           }
         } catch {
           const latestPending = pendingDataSaveRef.current as QueuedDataSave | null;
@@ -2331,6 +2360,7 @@ function App() {
               remoteRevision: remoteRevisionRef.current,
             });
             if (saved.activeMode) setModeState(saved.activeMode as Mode);
+            scheduleSnapshotWrite();
           }
         } catch {
           const latestPending = pendingSettingsSaveRef.current as QueuedSettingsSave | null;
@@ -4829,7 +4859,7 @@ function App() {
       || dataSaveInFlightRef.current
       || settingsSaveInFlightRef.current) return;
     queuedRemoteRefreshRef.current = false;
-    const bootstrap = await window.plannerApi.getBootstrap?.();
+    const bootstrap = await window.plannerApi.getBootstrap?.({ force: true });
     if (!bootstrap?.data || !bootstrap.settings) return;
     remoteRevisionRef.current = bootstrap.revision || remoteRevisionRef.current;
     dataRef.current = bootstrap.data;
@@ -5366,7 +5396,7 @@ function App() {
     : undefined;
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}`} data-timeline-view={timelineView} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}${settings.taskBlockFill ? " task-block-fill" : ""}`} data-timeline-view={timelineView} data-task-block-fill={settings.taskBlockFill ? "true" : undefined} style={themeVars(settings, mode)}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand">
@@ -7295,12 +7325,15 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   );
   const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
+  const isShortBlock = height < 48 && !isWeekView;
+  const canResize = !isReturnedUnfinished && (isEvent || !recurringLocked);
   return (
-    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""} ${isShortBlock ? "short-block-center-resize" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && !isShortBlock && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && isShortBlock && <button className="df-resize-dot center" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {isEvent ? (
         <span className="df-event-indicator" title={t(lang, "timeBlock.eventTooltip")} aria-label={t(lang, "timeBlock.eventTooltip")} />
       ) : (
@@ -7328,7 +7361,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
         }}># {projectName}</button>
       </span>}
       {next && <span className="df-next">{t(lang, "timeBlock.nextStep")}：{next}</span>}
-      {!isReturnedUnfinished && (isEvent || !recurringLocked) && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && !isShortBlock && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{
@@ -8771,6 +8804,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             <label className="df-utility-select">{t(lang, "settings.defaultView")}<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="weekly">{viewLabel(lang, "weekly")}</option><option value="month">{viewLabel(lang, "month")}</option></select></label>
             <label className="df-utility-select">{lang === "zh" ? "一天开始时间" : "Day start time"}<input type="time" value={settings.dayStartTime || "00:00"} onChange={(event) => onSave({ dayStartTime: event.target.value })} /></label>
             <label className="df-utility-range">{lang === "zh" ? "时间轴字体大小" : "Timeline font size"}<input type="range" min="0.85" max="1.3" step="0.05" value={settings.timelineFontScale ?? 1} onChange={(event) => onSave({ timelineFontScale: Number(event.target.value) })} /><span className="df-utility-range-value">{Math.round((settings.timelineFontScale ?? 1) * 100)}%</span></label>
+            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.taskBlockFill)} onChange={(event) => onSave({ taskBlockFill: event.target.checked })} />{lang === "zh" ? "任务块颜色填充（以归属项目色整块填充）" : "Fill task block with project color"}</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />{t(lang, "settings.hideCompleted")}</label>
             <div className="df-settings-divider" />
             <div className="df-settings-subhead">{lang === "zh" ? "强调色" : "Accent Colors"}</div>

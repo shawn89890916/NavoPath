@@ -943,3 +943,47 @@ ipcMain.handle("autolaunch:set", (_event, enabled) => {
     return false;
   }
 });
+
+// Local JSON snapshot — written on every app launch (and on demand) so users
+// always have an offline backup next to their auth session in userData.
+ipcMain.handle("backup:writeSnapshot", (_event, payload) => {
+  try {
+    const { dir } = getPaths();
+    fs.mkdirSync(dir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const stampedPath = path.join(dir, `navopath-snapshot-${stamp}.json`);
+    const latestPath = path.join(dir, "navopath-snapshot-latest.json");
+    const body = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      appVersion: app.getVersion(),
+      data: payload?.data ?? null,
+      settings: payload?.settings ?? null,
+      authUser: payload?.authUser ?? null,
+    }, null, 2);
+    fs.writeFileSync(stampedPath, body, "utf8");
+    fs.writeFileSync(latestPath, body, "utf8");
+    // Keep only the 10 most recent stamped snapshots (latest is preserved separately).
+    const snapshots = fs.readdirSync(dir)
+      .filter((name) => /^navopath-snapshot-\d{4}-\d{2}-\d{2}T.+\.json$/.test(name))
+      .sort()
+      .reverse();
+    for (const stale of snapshots.slice(10)) {
+      try { fs.unlinkSync(path.join(dir, stale)); } catch { /* ignore */ }
+    }
+    return { ok: true, path: latestPath, stampedPath };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+
+ipcMain.handle("backup:readLatest", () => {
+  try {
+    const { dir } = getPaths();
+    const latestPath = path.join(dir, "navopath-snapshot-latest.json");
+    if (!fs.existsSync(latestPath)) return { ok: false, reason: "not-found" };
+    const raw = fs.readFileSync(latestPath, "utf8");
+    return { ok: true, payload: JSON.parse(raw) };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});

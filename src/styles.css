@@ -20631,3 +20631,84 @@ body:has(:active)::-webkit-scrollbar-thumb {
   z-index: 1 !important;
 }
 
+/* Short-block center resize handle: only the middle band is draggable to
+   resize the end edge, leaving the top/bottom edges for drag-move. */
+.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center {
+  position: absolute !important;
+  left: 28px !important;
+  right: 10px !important;
+  top: 25% !important;
+  bottom: 25% !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  transform: none !important;
+  z-index: 6 !important;
+  cursor: ns-resize !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center::before {
+  content: "" !important;
+  position: absolute !important;
+  right: 2px !important;
+  top: 50% !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  width: 10px !important;
+  height: 2px !important;
+  border-radius: 1px !important;
+  background: color-mix(in srgb, var(--cat, #2b6cb0) 60%, #ffffff 0%) !important;
+  opacity: 0.55 !important;
+  pointer-events: none !important;
+}
+.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center:hover::before,
+.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center:active::before {
+  opacity: 1 !important;
+}
+
+/* === Task Block Color Fill Mode ===========================================
+   When enabled (via .task-block-fill on .df-app), the entire task block is
+   filled with the belonging project color instead of using a subtle tint +
+   colored border. Task names and the project label shown on hover get a thin
+   white text-stroke so they stay legible over saturated fills.
+   ======================================================================== */
+.df-app.task-block-fill .df-time-block:not(.is-event):not(.df-time-block-preview) {
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 88%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 55%, transparent) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cat, var(--accent-active)) 22%, transparent) !important;
+}
+.df-app.task-block-fill .df-time-block:not(.is-event):not(.df-time-block-preview):hover {
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 96%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 70%, transparent) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--cat, var(--accent-active)) 30%, transparent) !important;
+}
+.df-app.task-block-fill .df-time-block:not(.is-event).completed:not(.df-time-block-preview) {
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 55%, #9aa6b2) !important;
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 40%, transparent) !important;
+}
+.df-app.task-block-fill .df-time-block:not(.is-event) .df-block-title,
+.df-app.task-block-fill .df-time-block:not(.is-event) .df-block-title-row,
+.df-app.task-block-fill .df-time-block:not(.is-event) .df-block-project,
+.df-app.task-block-fill .df-time-block:not(.is-event) .df-next {
+  color: #ffffff !important;
+  -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.85);
+  paint-order: stroke fill;
+}
+.df-app.task-block-fill .df-time-block:not(.is-event):hover .df-block-project {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 0 1px rgba(255, 255, 255, 0.7);
+}
+.df-app.task-block-fill .df-time-block:not(.is-event) .df-block-check {
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+.df-app.task-block-fill .df-time-block:not(.is-event) .df-block-check.completed {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+}
+.df-app.task-block-fill .df-time-block.is-event {
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 16%, var(--surface-card)) !important;
+}
+

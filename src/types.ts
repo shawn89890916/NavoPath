@@ -262,6 +262,8 @@ export interface Settings {
   dayStartTime: string;
   /** 时间轴任务标题字体缩放系数（0.85 ~ 1.3）。1 表示默认大小。 */
   timelineFontScale?: number;
+  /** 任务块以归属项目色整块填充（true）或仅描边（false）。 */
+  taskBlockFill?: boolean;
   /** 自动同步频率（分钟）。0 或未设置表示仅手动同步。 */
   syncIntervalMinutes?: number;
   /** 最近一次成功同步时间（ISO 字符串）。 */
@@ -321,7 +323,7 @@ export interface AiPlanItem {
 
 export interface PlannerApi {
   getAuthState?: () => Promise<{ mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean }>;
-  getBootstrap?: () => Promise<{
+  getBootstrap?: (options?: { force?: boolean }) => Promise<{
     auth: { mode: "local" | "cloud"; user: { id: string; email?: string } | null; configured: boolean };
     data: PlannerData | null;
     settings: Settings | null;
@@ -383,6 +385,8 @@ declare global {
       aiChat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
       getAutoLaunch: () => Promise<boolean>;
       setAutoLaunch: (enabled: boolean) => Promise<boolean>;
+      writeSnapshot?: (payload: { data?: PlannerData | null; settings?: Partial<Settings> | null; authUser?: { id?: string; email?: string } | null }) => Promise<{ ok: boolean; path?: string; stampedPath?: string; error?: string }>;
+      readLatestSnapshot?: () => Promise<{ ok: boolean; payload?: { exportedAt?: string; appVersion?: string; data?: PlannerData | null; settings?: Settings | null; authUser?: { id?: string; email?: string } | null }; reason?: string; error?: string }>;
       isDesktop: () => boolean;
     };
   }
