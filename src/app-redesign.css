@@ -2343,6 +2343,37 @@
   to { transform: rotate(360deg); }
 }
 
+/* Direction-aware sync buttons (push-only / pull-only) */
+.df-app .df-settings-sync-directions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.df-app .df-settings-sync-direction {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--paper-rule, rgba(255,255,255,.12));
+  background: transparent;
+  color: var(--text-primary, var(--ink, #27231E));
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.df-app .df-settings-sync-direction:hover:not(:disabled) {
+  border-color: var(--accent-active, currentColor);
+  color: var(--accent-active, currentColor);
+}
+
+.df-app .df-settings-sync-direction:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
 /* Plugin config dialog fields */
 .df-app .df-plugin-config-fields {
   display: flex;

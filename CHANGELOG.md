@@ -1,5 +1,16 @@
 # NavoPath 更新日志
 
+## 2026-06-26 · 短任务时长调整与同步方向选择
+
+### 改进
+- 设置 → 云端同步新增「推送到云端」「从云端拉取」两个方向按钮：可单独把本机数据上传到云端，或单独用云端数据覆盖本机，无需每次都执行双向合并，跨设备同步更可控。
+
+### 修复
+- 修复短任务（15 分钟）时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，分别调整开始与结束时间，调整手柄在悬停时清晰可见。
+- 修复任务块调整手柄在悬停时不可见的问题；所有任务块的开始/结束手柄现于悬停时显示明确指示条。
+
+---
+
 ## 2026-06-25 · 同步、本地备份与任务块填充
 
 ### 改进
@@ -197,6 +208,17 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-26 · Short-block resize and sync direction picker
+
+### Improvements
+- Settings → Cloud sync now exposes dedicated "Push to cloud" and "Pull from cloud" direction buttons: upload this device's data alone, or overwrite this device with cloud data alone, without forcing a bidirectional merge every time — cross-device sync is now fully under your control.
+
+### Fixes
+- Fixed short tasks (15-minute blocks) being unable to adjust duration: short blocks can now be resized from both the top and bottom edges to change start and end times independently, with resize handles clearly visible on hover.
+- Fixed task-block resize handles being invisible on hover; start/end handles on every block now show a clear indicator bar when hovered.
+
+---
 
 ## 2026-06-25 · Short-block display and deletion stability
 

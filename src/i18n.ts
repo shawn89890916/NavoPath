@@ -539,6 +539,10 @@ export const TR = {
       success: "同步完成",
       failure: "同步失败，请稍后重试",
       requiresAccount: "登录云端账户后可使用自动同步。",
+      push: "推送到云端",
+      pull: "从云端拉取",
+      pushHint: "将本机数据推送到云端（其他端可随后拉取）",
+      pullHint: "用云端数据覆盖本机（适用于从其他端同步过来）",
     },
     en: {
       heading: "Cloud sync",
@@ -555,6 +559,10 @@ export const TR = {
       success: "Sync complete",
       failure: "Sync failed, please try again",
       requiresAccount: "Sign in to a cloud account to use auto-sync.",
+      push: "Push to cloud",
+      pull: "Pull from cloud",
+      pushHint: "Upload this device's data to the cloud (other devices can pull it later)",
+      pullHint: "Overwrite this device with cloud data (use after syncing from another device)",
     },
   },
 

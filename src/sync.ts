@@ -101,7 +101,7 @@ export class SyncScheduler {
     this.stop();
     if (normalized <= 0) return;
     this.timer = setInterval(() => {
-      void this.runTick({ reason: "interval" });
+      void this.runTick({ reason: "interval", direction: "both" });
     }, normalized * 60 * 1000);
   }
 
@@ -126,21 +126,41 @@ export class SyncScheduler {
   /** Run a sync now. Concurrent calls share a single in-flight tick. */
   runNow(): Promise<SyncTickResult> {
     if (this.runningPromise) return this.runningPromise;
-    this.runningPromise = this.runTick({ reason: "manual" }).finally(() => {
+    this.runningPromise = this.runTick({ reason: "manual", direction: "both" }).finally(() => {
       this.runningPromise = null;
     });
     return this.runningPromise;
   }
 
-  private async runTick({ reason }: { reason: "manual" | "interval" }): Promise<SyncTickResult> {
+  /** Push local changes to the cloud only (no pull). Concurrent calls share the in-flight tick. */
+  runPushOnly(): Promise<SyncTickResult> {
+    if (this.runningPromise) return this.runningPromise;
+    this.runningPromise = this.runTick({ reason: "manual", direction: "push" }).finally(() => {
+      this.runningPromise = null;
+    });
+    return this.runningPromise;
+  }
+
+  /** Pull the latest cloud data to local only (no push). Concurrent calls share the in-flight tick. */
+  runPullOnly(): Promise<SyncTickResult> {
+    if (this.runningPromise) return this.runningPromise;
+    this.runningPromise = this.runTick({ reason: "manual", direction: "pull" }).finally(() => {
+      this.runningPromise = null;
+    });
+    return this.runningPromise;
+  }
+
+  private async runTick({ reason, direction }: { reason: "manual" | "interval"; direction: "push" | "pull" | "both" }): Promise<SyncTickResult> {
     const now = this.options.now?.() || new Date();
     const startedAt = now.toISOString();
     const busy = () => this.options.isBusy?.();
     const paused = () => this.options.isPaused?.();
     const push = this.options.pushLocal;
     const pull = this.options.pullRemote;
+    const wantPush = direction !== "pull" && Boolean(push);
+    const wantPull = direction !== "push" && Boolean(pull);
 
-    if (busy?.() || paused?.() || (!push && !pull)) {
+    if (busy?.() || paused?.() || (!wantPush && !wantPull)) {
       const result: SyncTickResult = { ok: true, syncedAt: startedAt, pushedLocal: false, pulledRemote: false };
       this.options.onTick?.(result);
       return result;
@@ -150,12 +170,12 @@ export class SyncScheduler {
     let pulledRemote = false;
     let error: string | undefined;
     try {
-      if (push) {
-        await push();
+      if (wantPush) {
+        await push!();
         pushedLocal = true;
       }
-      if (pull) {
-        await pull();
+      if (wantPull) {
+        await pull!();
         pulledRemote = true;
       }
     } catch (caught) {

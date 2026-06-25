@@ -150,4 +150,43 @@ describe("SyncScheduler", () => {
     expect(first).not.toBe(second);
     scheduler.stop();
   });
+
+  it("runPushOnly pushes local without pulling remote", async () => {
+    const calls = { push: 0, pull: 0 };
+    const scheduler = new SyncScheduler({
+      pushLocal: async () => { calls.push += 1; },
+      pullRemote: async () => { calls.pull += 1; },
+    });
+    const result = await scheduler.runPushOnly();
+    expect(result.pushedLocal).toBe(true);
+    expect(result.pulledRemote).toBe(false);
+    expect(calls.push).toBe(1);
+    expect(calls.pull).toBe(0);
+  });
+
+  it("runPullOnly pulls remote without pushing local", async () => {
+    const calls = { push: 0, pull: 0 };
+    const scheduler = new SyncScheduler({
+      pushLocal: async () => { calls.push += 1; },
+      pullRemote: async () => { calls.pull += 1; },
+    });
+    const result = await scheduler.runPullOnly();
+    expect(result.pushedLocal).toBe(false);
+    expect(result.pulledRemote).toBe(true);
+    expect(calls.push).toBe(0);
+    expect(calls.pull).toBe(1);
+  });
+
+  it("runNow does both push and pull", async () => {
+    const calls = { push: 0, pull: 0 };
+    const scheduler = new SyncScheduler({
+      pushLocal: async () => { calls.push += 1; },
+      pullRemote: async () => { calls.pull += 1; },
+    });
+    const result = await scheduler.runNow();
+    expect(result.pushedLocal).toBe(true);
+    expect(result.pulledRemote).toBe(true);
+    expect(calls.push).toBe(1);
+    expect(calls.pull).toBe(1);
+  });
 });

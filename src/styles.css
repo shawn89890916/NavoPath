@@ -12523,14 +12523,25 @@ body:has(:active)::-webkit-scrollbar-thumb {
   width: 100%;
   max-width: 100%;
 }
-/* Keep resize dots visible on short blocks — smaller and at edges */
+/* Keep resize dots visible on short blocks — usable hit area at edges */
 .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
   display: block !important;
-  width: 8px !important;
-  height: 4px !important;
-  border-radius: 2px !important;
-  min-width: 8px !important;
+  width: 60% !important;
+  height: 8px !important;
+  border-radius: 3px !important;
+  min-width: 28px !important;
+  opacity: 1 !important;
 }
+
+.df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::after {
+  width: min(28px, calc(100% - 4px));
+  height: 3px;
+  background: var(--accent-active, #2A6E8E);
+  opacity: 0.85;
+}
+
+.df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.top { top: -3px; }
+.df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.bottom { bottom: -3px; }
 /* Keep check button visible on short blocks — smaller */
 .df-time-block.short-block:not(.df-time-block-week) .df-block-check {
   display: inline-flex !important;
@@ -12648,12 +12659,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-time-block.resizing .df-resize-dot { opacity: 0; }
 
-.df-time-block:hover .df-resize-dot { opacity: 0; }
+.df-time-block:hover .df-resize-dot { opacity: 1; }
 
 .df-resize-dot:hover::after {
-  background: transparent;
-  box-shadow: none;
-  opacity: 0;
+  background: var(--accent-active, #2A6E8E);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface-main, #fff) 60%, transparent);
+  opacity: 1;
 }
 
 .df-next {

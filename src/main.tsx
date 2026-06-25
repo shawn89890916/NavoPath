@@ -2432,7 +2432,7 @@ function App() {
    * the auto-sync scheduler itself. Concurrent invocations share a single
    * in-flight run via the SyncScheduler.
    */
-  async function handleSyncNow({ silent = false }: { silent?: boolean } = {}): Promise<boolean> {
+  async function handleSyncNow({ silent = false, direction = "both" }: { silent?: boolean; direction?: "push" | "pull" | "both" } = {}): Promise<boolean> {
     if (authState?.mode !== "cloud" || !authState.user) {
       if (!silent) showToast(lang === "zh" ? "登录后即可同步。" : "Sign in to sync.");
       return false;
@@ -2444,10 +2444,22 @@ function App() {
     }
     if (!silent) setIsManualSyncing(true);
     try {
-      const result = await scheduler.runNow();
+      const result = direction === "push"
+        ? await scheduler.runPushOnly()
+        : direction === "pull"
+          ? await scheduler.runPullOnly()
+          : await scheduler.runNow();
       if (!silent) {
         if (!result.ok) {
           showToast(t(lang, "sync.failure"));
+        } else if (direction === "push") {
+          showToast(result.pushedLocal
+            ? (lang === "zh" ? "已推送本地数据到云端。" : "Pushed local data to cloud.")
+            : (lang === "zh" ? "没有待推送的本地改动。" : "No local changes to push."));
+        } else if (direction === "pull") {
+          showToast(result.pulledRemote
+            ? (lang === "zh" ? "已从云端拉取最新数据。" : "Pulled latest data from cloud.")
+            : (lang === "zh" ? "云端无新数据。" : "No new data from cloud."));
         } else if (result.pushedLocal || result.pulledRemote) {
           showToast(lang === "zh" ? "同步完成。" : "Sync complete.");
         } else {
@@ -6567,7 +6579,7 @@ function App() {
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={() => handleSyncNow()} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -7384,8 +7396,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {canResize && !isShortBlock && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
-      {canResize && isShortBlock && <button className="df-resize-dot center" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       {isEvent ? (
         <span className="df-event-indicator" title={t(lang, "timeBlock.eventTooltip")} aria-label={t(lang, "timeBlock.eventTooltip")} />
       ) : (
@@ -7413,7 +7424,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
         }}># {projectName}</button>
       </span>}
       {next && <span className="df-next">{t(lang, "timeBlock.nextStep")}：{next}</span>}
-      {canResize && !isShortBlock && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{
@@ -8467,7 +8478,7 @@ function SyncSettingsControl({
   cloudReady: boolean;
   isManualSyncing: boolean;
   onChange: (patch: Partial<Settings>) => void;
-  onSyncNow?: () => Promise<boolean> | void;
+  onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void;
 }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -8528,10 +8539,30 @@ function SyncSettingsControl({
           className={`df-settings-sync-now${isManualSyncing ? " is-syncing" : ""}`}
           disabled={!cloudReady || isManualSyncing}
           onClick={() => {
-            void onSyncNow?.();
+            void onSyncNow?.("both");
           }}
         >
           {isManualSyncing ? t(lang, "sync.syncing") : t(lang, "sync.syncNow")}
+        </button>
+      </div>
+      <div className="df-settings-sync-directions">
+        <button
+          type="button"
+          className="df-settings-sync-direction"
+          disabled={!cloudReady || isManualSyncing}
+          onClick={() => { void onSyncNow?.("push"); }}
+          title={t(lang, "sync.pushHint")}
+        >
+          ↑ {t(lang, "sync.push")}
+        </button>
+        <button
+          type="button"
+          className="df-settings-sync-direction"
+          disabled={!cloudReady || isManualSyncing}
+          onClick={() => { void onSyncNow?.("pull"); }}
+          title={t(lang, "sync.pullHint")}
+        >
+          ↓ {t(lang, "sync.pull")}
         </button>
       </div>
     </section>
@@ -8656,7 +8687,7 @@ function exportTasksAsCsv(data: PlannerData) {
   URL.revokeObjectURL(url);
 }
 
-function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: () => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
+function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
   const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "plugins" | "account">("page");
   const [pluginConfigDialogId, setPluginConfigDialogId] = useState<string | null>(null);
   const [pluginConfigDraft, setPluginConfigDraft] = useState<Record<string, unknown>>({});
