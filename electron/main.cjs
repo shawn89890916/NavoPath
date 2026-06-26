@@ -733,6 +733,14 @@ async function callDeepSeek({ messages = [], draftText = "" }) {
 }
 
 function createWindow() {
+  const existingWin = BrowserWindow.getAllWindows()[0];
+  if (existingWin) {
+    if (existingWin.isMinimized()) existingWin.restore();
+    existingWin.show();
+    existingWin.focus();
+    return;
+  }
+
   const iconPath = app.isPackaged
     ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
     : path.join(__dirname, "..", "public", "navopath-icon.png");

@@ -7,6 +7,7 @@
 - 优化任务块调整手柄的视觉与交互：判定区域收窄为任务块宽度的四分之一并居中，避免遮挡标题；提示条改为更细的常驻指示线，悬停时高亮，减少视觉干扰。
 
 ### 修复
+- 修复重复创建后台窗口的问题：防止从托盘菜单或 app.activate 事件重复调用 createWindow() 时创建多个不可见窗口，确保应用始终只保留一个窗口。
 - 修复 15 分钟与 30 分钟短任务时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，调整手柄横向居中于任务块、悬停时清晰可见，且不再与拖动移动冲突。
 - 修复桌面应用检查更新始终提示「已是最新版本」的问题；此前的更新清单（latest.yml）版本号停留在旧版本，现已随每次发布正确生成，新版本发布后即可被准确检测到。
 
@@ -219,6 +220,7 @@
 ### Fixes
 - Fixed 15-minute and 30-minute short tasks being unable to adjust duration: short blocks can now be resized from both the top and bottom edges, with handles horizontally centered on the block, clearly visible on hover, and no longer conflicting with drag-to-move.
 - Fixed the desktop app always reporting "up to date" when checking for updates; the update manifest (latest.yml) was stuck on an old version and is now regenerated correctly with each release, so new versions are detected reliably.
+- Fixed duplicate background windows being created: createWindow() now reuses an existing window instead of creating a new one when called from the tray menu or app.activate events, ensuring the app only ever maintains a single visible window.
 
 ---
 
