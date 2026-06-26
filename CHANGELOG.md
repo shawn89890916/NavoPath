@@ -4,6 +4,7 @@
 
 ### 改进
 - 设置 → 云端同步新增「推送到云端」「从云端拉取」两个方向按钮：可单独把本机数据上传到云端，或单独用云端数据覆盖本机，无需每次都执行双向合并，跨设备同步更可控。
+- 优化任务块调整手柄的视觉与交互：判定区域收窄为任务块宽度的四分之一并居中，避免遮挡标题；提示条改为更细的常驻指示线，悬停时高亮，减少视觉干扰。
 
 ### 修复
 - 修复 15 分钟与 30 分钟短任务时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，调整手柄横向居中于任务块、悬停时清晰可见，且不再与拖动移动冲突。
@@ -213,6 +214,7 @@
 
 ### Improvements
 - Settings → Cloud sync now exposes dedicated "Push to cloud" and "Pull from cloud" direction buttons: upload this device's data alone, or overwrite this device with cloud data alone, without forcing a bidirectional merge every time — cross-device sync is now fully under your control.
+- Refined task-block resize handles: the hit area is now a centered quarter of the block width so it never crowds the title, and the indicator is a thinner always-visible line that brightens on hover for less visual clutter.
 
 ### Fixes
 - Fixed 15-minute and 30-minute short tasks being unable to adjust duration: short blocks can now be resized from both the top and bottom edges, with handles horizontally centered on the block, clearly visible on hover, and no longer conflicting with drag-to-move.

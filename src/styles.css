@@ -18646,9 +18646,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-app .df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot {
   left: 50% !important;
   right: auto !important;
-  width: 44% !important;
-  min-width: 30px !important;
-  max-width: 74px !important;
+  width: 25% !important;
+  min-width: 24px !important;
+  max-width: 64px !important;
   height: 10px !important;
   transform: translateX(-50%) !important;
 }
@@ -18657,10 +18657,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 .df-app .df-event-blocks-layer .df-time-block .df-resize-dot::after,
 .df-app .df-week-view .df-time-block.df-time-block-week .df-resize-dot::after,
 .df-app .df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot::after {
-  width: min(28px, calc(100% - 8px)) !important;
-  opacity: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  width: min(20px, calc(100% - 6px)) !important;
+  height: 2px !important;
+  opacity: 0.75 !important;
+  background: var(--accent-active, #2A6E8E) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface-main, #fff) 50%, transparent) !important;
 }
 
 .df-app .df-event-detail-grid {
@@ -20727,18 +20728,18 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 /* === Short-block (15/30-min) resize handles — FINAL OVERRIDE ===============
    Placed last so it wins every cascade duel. The top/bottom handles sit at
-   the block edges, are horizontally centered, show a visible indicator bar,
-   and expose a generous hit area so 15-min (20px) and 30-min (40px) blocks
-   can be resized from either edge. Center-handle legacy rules are voided. */
+   the block edges. The hit area is a centered quarter of the block width so
+   it never crowds the title, while the slim indicator bar stays always
+   visible for affordance. Center-handle legacy rules are voided. */
 .df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot,
 .df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot {
   position: absolute !important;
   left: 50% !important;
   right: auto !important;
   transform: translateX(-50%) !important;
-  width: 60% !important;
-  min-width: 36px !important;
-  max-width: none !important;
+  width: 25% !important;
+  min-width: 22px !important;
+  max-width: 56px !important;
   height: 12px !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -20769,12 +20770,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
   right: auto !important;
   bottom: auto !important;
   transform: translate(-50%, -50%) !important;
-  width: min(32px, 80%) !important;
-  height: 3px !important;
-  border-radius: 2px !important;
+  width: min(18px, 70%) !important;
+  height: 2px !important;
+  border-radius: 1px !important;
   background: var(--accent-active, #2A6E8E) !important;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface-main, #fff) 50%, transparent) !important;
-  opacity: 0.85 !important;
+  opacity: 0.75 !important;
   pointer-events: none !important;
 }
 
