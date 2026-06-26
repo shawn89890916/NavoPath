@@ -1,6 +1,6 @@
 {
   "name": "navopath",
-  "version": "1.2.28",
+  "version": "1.2.29",
   "description": "NavoPath — Navigate your next step.",
   "author": "NavoPath",
   "main": "electron/main.cjs",
@@ -55,7 +55,7 @@
       "package.json"
     ],
     "directories": {
-      "output": "C:/navopath-build"
+      "output": "D:/navopath-build"
     },
     "win": {
       "icon": "build/icon.ico",
