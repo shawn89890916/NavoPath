@@ -3250,34 +3250,6 @@ body.df-timeline-pointer-drag * {
   border-color: var(--paper-rule);
 }
 
-@media (max-width: 1180px) and (orientation: landscape) {
-  .df-app[data-timeline-view="3day"] .df-ai-plan,
-  .df-app[data-timeline-view="weekly"] .df-ai-plan {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-    padding: 0;
-    display: grid;
-    place-items: center;
-    font-size: 0;
-  }
-
-  .df-app[data-timeline-view="3day"] .df-ai-plan::before,
-  .df-app[data-timeline-view="weekly"] .df-ai-plan::before {
-    content: "";
-    width: 15px;
-    height: 15px;
-    border: 1px solid currentColor;
-    border-top-width: 3px;
-    box-shadow: inset 0 4px 0 color-mix(in srgb, currentColor 18%, transparent);
-  }
-
-  .df-app[data-timeline-view="3day"] .df-ai-plan i,
-  .df-app[data-timeline-view="weekly"] .df-ai-plan i {
-    display: none;
-  }
-}
-
 .df-app .df-theme-setting .df-project-color-picker,
 .df-app .df-theme-setting .df-project-color-custom,
 .df-app .df-theme-setting .df-project-color-picker button {
@@ -3291,4 +3263,358 @@ body.df-timeline-pointer-drag * {
 
 .df-app .df-settings-content {
   scrollbar-gutter: stable;
+}
+
+.df-app .df-settings-sync-note {
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 11px/1.4 var(--paper-sans);
+}
+
+.df-app .df-subscription-panel,
+.df-app .df-account-more,
+.df-app .df-plugin-tool,
+.df-app .df-plugin-doc-link {
+  border-block: 1px solid var(--paper-rule);
+  background: transparent;
+  box-shadow: none;
+}
+
+.df-app .df-subscription-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px 0;
+}
+
+.df-app .df-subscription-head {
+  display: grid;
+  gap: 3px;
+}
+
+.df-app .df-subscription-head span,
+.df-app .df-subscription-head small,
+.df-app .df-plan-choice small,
+.df-app .df-plugin-tool small,
+.df-app .df-plugin-doc-link small {
+  color: var(--text-muted);
+  font: 600 11px/1.4 var(--paper-sans);
+}
+
+.df-app .df-subscription-head strong {
+  color: var(--text-main);
+  font-size: 18px;
+}
+
+.df-app .df-plan-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.df-app .df-plan-choice {
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid var(--paper-rule);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
+}
+
+.df-app .df-plan-choice.active {
+  border-color: var(--accent-active);
+  background: var(--paper-note);
+}
+
+.df-app .df-plan-choice strong {
+  color: var(--text-main);
+}
+
+.df-app .df-plan-benefits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.df-app .df-plan-benefits li {
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.df-app .df-plan-benefits li::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 1px;
+  margin: 0 8px 4px 0;
+  background: var(--accent-active);
+}
+
+.df-app .df-account-more {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.df-app .df-account-more-toggle,
+.df-app .df-plugin-doc-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--paper-rule);
+  border-radius: 0;
+  color: var(--text-main);
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  box-shadow: none;
+}
+
+.df-app .df-plugin-doc-link small {
+  grid-column: 1;
+}
+
+.df-app .df-account-more-toggle:hover,
+.df-app .df-plugin-doc-link:hover {
+  color: var(--accent-active);
+  border-bottom-color: var(--accent-active);
+}
+
+.df-app .df-account-more-body {
+  display: grid;
+  gap: 8px;
+}
+
+.df-app .df-settings-about {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.df-app .df-settings-about small {
+  color: var(--text-muted);
+  font: 600 11px/1.2 var(--paper-sans);
+}
+
+.df-app .df-plugin-legacy-guide-divider,
+.df-app .df-plugin-legacy-guide-heading,
+.df-app .df-plugin-guide {
+  display: none;
+}
+
+.df-app .df-plugin-runtime {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.df-app .df-plugin-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.df-app .df-plugin-tool {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.df-app .df-plugin-tool.wide {
+  grid-column: 1 / -1;
+}
+
+.df-app .df-plugin-tool header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.df-app .df-plugin-timer {
+  color: var(--text-main);
+  font: 700 34px/1 var(--paper-mono);
+  letter-spacing: 0;
+}
+
+.df-app .df-plugin-tool-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.df-app .df-plugin-tool button,
+.df-app .df-plugin-tool select,
+.df-app .df-plugin-tool textarea {
+  border: 0;
+  border-bottom: 1px solid var(--paper-rule);
+  border-radius: 0;
+  color: var(--text-main);
+  background: transparent;
+  box-shadow: none;
+}
+
+.df-app .df-plugin-tool button {
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.df-app .df-plugin-tool button:hover {
+  color: var(--accent-active);
+  border-bottom-color: var(--accent-active);
+}
+
+.df-app .df-plugin-habits {
+  display: grid;
+  gap: 8px;
+}
+
+.df-app .df-plugin-habits label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.df-app .df-plugin-weather {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.df-app .df-plugin-weather strong {
+  font: 700 28px/1 var(--paper-mono);
+}
+
+.df-doc-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  color: #27231E;
+  background: #FBF9FF;
+}
+
+.df-doc-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 34px 24px;
+  border-right: 1px solid rgba(39, 35, 30, .16);
+}
+
+.df-doc-sidebar a,
+.df-doc-content a {
+  color: #584D3D;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(88, 77, 61, .28);
+}
+
+.df-doc-content {
+  width: min(920px, 100%);
+  padding: 46px clamp(24px, 6vw, 78px) 80px;
+}
+
+.df-doc-hero {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid rgba(39, 35, 30, .16);
+}
+
+.df-doc-hero span,
+.df-doc-section dt,
+.df-doc-section th {
+  color: #584D3D;
+  font: 700 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.df-doc-hero h1 {
+  margin: 0;
+  font: 700 42px/1.05 Georgia, "Times New Roman", serif;
+}
+
+.df-doc-hero p,
+.df-doc-section p,
+.df-doc-section dd,
+.df-doc-section td {
+  color: rgba(39, 35, 30, .78);
+  line-height: 1.65;
+}
+
+.df-doc-section {
+  display: grid;
+  gap: 16px;
+  padding: 34px 0;
+  border-bottom: 1px solid rgba(39, 35, 30, .14);
+}
+
+.df-doc-section h2 {
+  margin: 0;
+  font: 700 26px/1.15 Georgia, "Times New Roman", serif;
+}
+
+.df-doc-section pre {
+  overflow: auto;
+  margin: 0;
+  padding: 16px;
+  color: #EEE9DF;
+  background: #0F0326;
+  border-radius: 0;
+}
+
+.df-doc-section dl,
+.df-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.df-doc-section dl div,
+.df-doc-grid article {
+  padding: 14px 0;
+  border-top: 1px solid rgba(39, 35, 30, .16);
+}
+
+.df-doc-section table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.df-doc-section th,
+.df-doc-section td {
+  padding: 12px 0;
+  border-top: 1px solid rgba(39, 35, 30, .16);
+  text-align: left;
+  vertical-align: top;
+}
+
+@media (max-width: 760px) {
+  .df-doc-page {
+    grid-template-columns: 1fr;
+  }
+  .df-doc-sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgba(39, 35, 30, .16);
+  }
+  .df-doc-section dl,
+  .df-doc-grid,
+  .df-app .df-plan-choice-grid,
+  .df-app .df-plan-benefits,
+  .df-app .df-plugin-runtime {
+    grid-template-columns: 1fr;
+  }
 }

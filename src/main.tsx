@@ -6605,7 +6605,7 @@ function App() {
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.location.assign(`/changelog?lang=${lang}`)} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -8460,6 +8460,11 @@ function McpTokenManager({ lang }: { lang: Language }) {
       <p>{supported
         ? (lang === "zh" ? "为远程 MCP 客户端创建个人 Bearer Token。原始令牌只显示一次。" : "Create a personal Bearer token for a remote MCP client. The raw token is shown once.")
         : (lang === "zh" ? "登录云端账户后可管理 MCP 令牌。" : "Sign in to a cloud account to manage MCP tokens.")}</p>
+      <a className="df-plugin-doc-link" href="/plugin-guide#mcp">
+        <span>{lang === "zh" ? "查看 MCP 配置教程" : "View MCP setup guide"}</span>
+        <small>{lang === "zh" ? "端点、Token、客户端配置和排错说明" : "Endpoint, token, client config, and troubleshooting notes"}</small>
+        <i aria-hidden="true">↗</i>
+      </a>
       <div className="df-mcp-docs">
         <div className="df-mcp-doc-head"><span>{lang === "zh" ? "服务地址" : "Server endpoint"}</span><button type="button" onClick={() => void copyText(MCP_ENDPOINT)}>{lang === "zh" ? "复制" : "Copy"}</button></div>
         <code>{MCP_ENDPOINT}</code>
@@ -8524,10 +8529,7 @@ function SyncSettingsControl({
     : null;
   return (
     <section className="df-settings-sync">
-      <div className="df-settings-sync-head">
-        <strong>{t(lang, "sync.heading")}</strong>
-        {!cloudReady && <small>{t(lang, "sync.requiresAccount")}</small>}
-      </div>
+      {!cloudReady && <p className="df-settings-sync-note">{t(lang, "sync.requiresAccount")}</p>}
       <label className="df-utility-select" data-disabled={!cloudReady}>
         {t(lang, "sync.frequency")}
         <select
@@ -8711,6 +8713,177 @@ function exportTasksAsCsv(data: PlannerData) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function patchPluginConfig(settings: Settings, onSave: (patch: Partial<Settings>) => void, pluginId: string, patch: Record<string, unknown>) {
+  const existing = settings.pluginConfigs?.[pluginId] ?? {};
+  onSave({ pluginConfigs: { ...(settings.pluginConfigs ?? {}), [pluginId]: { ...existing, ...patch } } });
+}
+
+function SubscriptionPanel({ lang }: { lang: Language }) {
+  const benefits = lang === "zh"
+    ? ["无限任务与项目", "Navo AI 对话与记忆", "多设备云端同步", "MCP 远程访问", "内置插件工具", "数据导入导出"]
+    : ["Unlimited tasks and projects", "Navo AI chat and memory", "Multi-device cloud sync", "Remote MCP access", "Built-in plugin tools", "Data import and export"];
+  return (
+    <section className="df-subscription-panel">
+      <div className="df-subscription-head">
+        <span>{lang === "zh" ? "当前方案" : "Current plan"}</span>
+        <strong>{lang === "zh" ? "Free Plan" : "Free Plan"}</strong>
+        <small>{lang === "zh" ? "开发测试期 Pro 权益已全部开放" : "All Pro benefits are open during the dev preview"}</small>
+      </div>
+      <div className="df-plan-choice-grid" role="list">
+        <article className="df-plan-choice active" role="listitem">
+          <span>{lang === "zh" ? "Free" : "Free"}</span>
+          <strong>$0</strong>
+          <small>{lang === "zh" ? "当前已启用" : "Active now"}</small>
+        </article>
+        <article className="df-plan-choice pro" role="listitem">
+          <span>{lang === "zh" ? "Pro" : "Pro"}</span>
+          <strong>{lang === "zh" ? "即将推出" : "Coming soon"}</strong>
+          <small>{lang === "zh" ? "上线后可订阅支持持续服务" : "Subscribe later to support ongoing service"}</small>
+        </article>
+      </div>
+      <ul className="df-plan-benefits">
+        {benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function AccountMoreSection({ lang, onShowAbout, onSignOut, onDeleteAccount }: { lang: Language; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="df-account-more">
+      <button type="button" className="df-account-more-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <span>{lang === "zh" ? "更多" : "More"}</span>
+        <i aria-hidden="true">{open ? "−" : "+"}</i>
+      </button>
+      {open && <div className="df-account-more-body">
+        <button className="df-settings-about" onClick={onShowAbout}>
+          <span className="df-settings-about-icon">i</span>
+          <span>{t(lang, "settings.about")}</span>
+          <small>{lang === "zh" ? "将打开外部链接" : "Opens external link"}</small>
+          <i aria-hidden="true">↗</i>
+        </button>
+        {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
+        {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账号和全部数据" : "Delete account and all data"}</button>}
+      </div>}
+    </section>
+  );
+}
+
+function PomodoroPluginTool({ settings, onSave, lang }: { settings: Settings; onSave: (patch: Partial<Settings>) => void; lang: Language }) {
+  const plugin = listRegisteredPlugins().find((p) => p.id === "pomodoro");
+  const config = plugin ? resolvePluginConfig(plugin, settings.pluginConfigs?.pomodoro) : {};
+  const focusMinutes = Number(config.focusMinutes) || 25;
+  const breakMinutes = Number(config.breakMinutes) || 5;
+  const [phase, setPhase] = useState<"focus" | "break">("focus");
+  const [seconds, setSeconds] = useState(focusMinutes * 60);
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setInterval(() => {
+      setSeconds((value) => {
+        if (value > 1) return value - 1;
+        const nextPhase = phase === "focus" ? "break" : "focus";
+        setPhase(nextPhase);
+        return (nextPhase === "focus" ? focusMinutes : breakMinutes) * 60;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [running, phase, focusMinutes, breakMinutes]);
+  useEffect(() => { if (!running) setSeconds((phase === "focus" ? focusMinutes : breakMinutes) * 60); }, [focusMinutes, breakMinutes, phase, running]);
+  const mm = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const ss = (seconds % 60).toString().padStart(2, "0");
+  return (
+    <article className="df-plugin-tool">
+      <header><strong>Pomodoro</strong><small>{phase === "focus" ? (lang === "zh" ? "专注" : "Focus") : (lang === "zh" ? "休息" : "Break")}</small></header>
+      <div className="df-plugin-timer">{mm}:{ss}</div>
+      <div className="df-plugin-tool-actions">
+        <button type="button" onClick={() => setRunning((value) => !value)}>{running ? (lang === "zh" ? "暂停" : "Pause") : (lang === "zh" ? "开始" : "Start")}</button>
+        <button type="button" onClick={() => { setRunning(false); setPhase("focus"); setSeconds(focusMinutes * 60); }}>{lang === "zh" ? "重置" : "Reset"}</button>
+      </div>
+      <small>{lang === "zh" ? "时长可在插件配置中调整。" : "Adjust durations in plugin configuration."}</small>
+    </article>
+  );
+}
+
+function HabitPluginTool({ settings, onSave, lang }: { settings: Settings; onSave: (patch: Partial<Settings>) => void; lang: Language }) {
+  const plugin = listRegisteredPlugins().find((p) => p.id === "habit-tracker");
+  const config = plugin ? resolvePluginConfig(plugin, settings.pluginConfigs?.["habit-tracker"]) : {};
+  const today = todayIso();
+  const habits = String(config.habits || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  const displayHabits = habits.length > 0 ? habits : (lang === "zh" ? ["复盘今天", "整理任务", "查看明日计划"] : ["Review today", "Tidy tasks", "Check tomorrow"]);
+  const doneByDate = (config.doneByDate && typeof config.doneByDate === "object" ? config.doneByDate : {}) as Record<string, string[]>;
+  const done = new Set(doneByDate[today] || []);
+  const toggle = (habit: string) => {
+    const next = new Set(done);
+    if (next.has(habit)) next.delete(habit);
+    else next.add(habit);
+    patchPluginConfig(settings, onSave, "habit-tracker", { doneByDate: { ...doneByDate, [today]: Array.from(next) } });
+  };
+  return (
+    <article className="df-plugin-tool">
+      <header><strong>{lang === "zh" ? "习惯" : "Habits"}</strong><small>{done.size}/{displayHabits.length}</small></header>
+      <div className="df-plugin-habits">
+        {displayHabits.map((habit) => <label key={habit}><input type="checkbox" checked={done.has(habit)} onChange={() => toggle(habit)} />{habit}</label>)}
+      </div>
+    </article>
+  );
+}
+
+function WeatherPluginTool({ settings, lang }: { settings: Settings; lang: Language }) {
+  const plugin = listRegisteredPlugins().find((p) => p.id === "weather");
+  const config = plugin ? resolvePluginConfig(plugin, settings.pluginConfigs?.weather) : {};
+  const city = String(config.city || "Shanghai");
+  const units = config.units === "f" ? "f" : "c";
+  const seed = Array.from(city).reduce((sum, char) => sum + char.charCodeAt(0), new Date().getDate());
+  const celsius = 16 + (seed % 15);
+  const value = units === "f" ? Math.round(celsius * 9 / 5 + 32) : celsius;
+  const condition = [lang === "zh" ? "晴朗" : "Clear", lang === "zh" ? "多云" : "Cloudy", lang === "zh" ? "有风" : "Breezy"][seed % 3];
+  return (
+    <article className="df-plugin-tool">
+      <header><strong>{lang === "zh" ? "天气" : "Weather"}</strong><small>{city}</small></header>
+      <div className="df-plugin-weather"><strong>{value}°{units.toUpperCase()}</strong><span>{condition}</span></div>
+      <small>{lang === "zh" ? "本地预览徽章，不请求外部天气 API。" : "Local preview badge. No external weather API call."}</small>
+    </article>
+  );
+}
+
+function NotesPluginTool({ data, onSaveData, lang }: { data: PlannerData; onSaveData: (next: PlannerData) => void; lang: Language }) {
+  const task = data.tasks[0];
+  const [taskId, setTaskId] = useState(task?.id || "");
+  const selected = data.tasks.find((item) => item.id === taskId) || task;
+  if (!selected) {
+    return <article className="df-plugin-tool"><header><strong>{lang === "zh" ? "笔记" : "Notes"}</strong></header><small>{lang === "zh" ? "先创建一个任务后即可写笔记。" : "Create a task first to attach notes."}</small></article>;
+  }
+  const saveNotes = (notes: string) => {
+    onSaveData({ ...data, tasks: data.tasks.map((item) => item.id === selected.id ? { ...item, notes, updatedAt: new Date().toISOString() } : item) });
+  };
+  return (
+    <article className="df-plugin-tool wide">
+      <header><strong>{lang === "zh" ? "任务笔记" : "Task notes"}</strong><small>{lang === "zh" ? "保存到任务 notes 字段" : "Saved to the task notes field"}</small></header>
+      <select value={selected.id} onChange={(event) => setTaskId(event.target.value)}>
+        {data.tasks.slice(0, 80).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+      </select>
+      <textarea rows={4} value={selected.notes || ""} onChange={(event) => saveNotes(event.target.value)} placeholder={lang === "zh" ? "写下任务背景、材料或下一步..." : "Add context, materials, or next steps..."} />
+    </article>
+  );
+}
+
+function PluginRuntimePanel({ settings, data, onSave, onSaveData, lang }: { settings: Settings; data: PlannerData; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; lang: Language }) {
+  const enabled = new Set(settings.enabledPlugins ?? []);
+  if (enabled.size === 0) {
+    return <p className="df-plugin-empty">{lang === "zh" ? "启用上方插件后，这里会出现可直接使用的工具。" : "Enable plugins above and their tools will appear here."}</p>;
+  }
+  return (
+    <section className="df-plugin-runtime" aria-label={lang === "zh" ? "已启用插件工具" : "Enabled plugin tools"}>
+      {enabled.has("pomodoro") && <PomodoroPluginTool settings={settings} onSave={onSave} lang={lang} />}
+      {enabled.has("habit-tracker") && <HabitPluginTool settings={settings} onSave={onSave} lang={lang} />}
+      {enabled.has("weather") && <WeatherPluginTool settings={settings} lang={lang} />}
+      {enabled.has("notes") && <NotesPluginTool data={data} onSaveData={onSaveData} lang={lang} />}
+    </section>
+  );
 }
 
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
@@ -9050,7 +9223,16 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
               </div>
 
               <div className="df-settings-divider" />
-              <div className="df-settings-subhead">{lang === "zh" ? "插件配置指南" : "Plugin Configuration Guide"}</div>
+              <a className="df-plugin-doc-link" href="/plugin-guide">
+                <span>{lang === "zh" ? "打开 Plugins / MCP 使用教程" : "Open Plugins / MCP documentation"}</span>
+                <small>{lang === "zh" ? "像 API 文档一样查看配置、权限和示例" : "Configuration, permissions, and examples in an API-doc layout"}</small>
+                <i aria-hidden="true">↗</i>
+              </a>
+              <div className="df-settings-divider" />
+              <div className="df-settings-subhead">{lang === "zh" ? "已启用工具" : "Enabled tools"}</div>
+              <PluginRuntimePanel settings={settings} data={data} onSave={onSave} onSaveData={onSaveData} lang={lang} />
+              <div className="df-settings-divider df-plugin-legacy-guide-divider" />
+              <div className="df-settings-subhead df-plugin-legacy-guide-heading">{lang === "zh" ? "插件配置指南" : "Plugin Configuration Guide"}</div>
 
               <div className="df-plugin-guide">
                 <h4>{lang === "zh" ? "如何开发插件" : "How to Develop Plugins"}</h4>
@@ -9104,8 +9286,9 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             {settingsSection === "account" && <section className="df-settings-group"><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
                 <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
-                <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /><small>{t(lang, "settings.freePlan")}</small></div>
+                <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /></div>
               </section>
+              <SubscriptionPanel lang={lang} />
               {authEmail && <p className="df-settings-account">{authEmail}</p>}
               <SyncSettingsControl
                 settings={settings}
@@ -9139,9 +9322,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
               }}>
                 {lang === "zh" ? "导入任务 CSV" : "Import Tasks CSV"}
               </button>
-              <button className="df-settings-about" onClick={onShowAbout}><span className="df-settings-about-icon">i</span><span>{t(lang, "settings.about")}</span></button>
-              {onSignOut && <button className="df-settings-logout" onClick={onSignOut}>{t(lang, "settings.logout")}</button>}
-              {onDeleteAccount && <button className="df-settings-delete-account" onClick={onDeleteAccount}>{lang === "zh" ? "删除账户与全部数据" : "Delete account and all data"}</button>}
+              <AccountMoreSection lang={lang} onShowAbout={onShowAbout} onSignOut={onSignOut} onDeleteAccount={onDeleteAccount} />
             </section>}
             </div>
           </div>
@@ -9256,6 +9437,72 @@ function ThemeColorSetting({ label, presets, value, onChange }: { label: string;
   );
 }
 
+function PluginGuidePage() {
+  return (
+    <main className="df-doc-page">
+      <nav className="df-doc-sidebar" aria-label="Documentation navigation">
+        <a href="/app">← Back to app</a>
+        <a href="#mcp">MCP quickstart</a>
+        <a href="#plugins">Built-in plugins</a>
+        <a href="#api">Plugin API</a>
+        <a href="#manifest">Manifest</a>
+      </nav>
+      <article className="df-doc-content">
+        <header className="df-doc-hero">
+          <span>NavoPath Docs</span>
+          <h1>Plugins and MCP configuration</h1>
+          <p>Use this page as the setup reference for remote MCP access and the built-in plugin system. The current app ships with safe built-in plugins; they run inside NavoPath and store configuration in your normal settings.</p>
+        </header>
+        <section id="mcp" className="df-doc-section">
+          <h2>MCP quickstart</h2>
+          <p>Open Settings → MCP, generate a personal token, then configure your MCP client with the Streamable HTTP endpoint below. The raw token is shown once, so copy it immediately.</p>
+          <pre>{`[mcp_servers.navopath]
+url = "${MCP_ENDPOINT}"
+http_headers = { Authorization = "Bearer nvp_YOUR_TOKEN" }`}</pre>
+          <dl>
+            <div><dt>Endpoint</dt><dd><code>{MCP_ENDPOINT}</code></dd></div>
+            <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
+            <div><dt>Authentication</dt><dd><code>Authorization: Bearer nvp_...</code></dd></div>
+          </dl>
+        </section>
+        <section id="plugins" className="df-doc-section">
+          <h2>Built-in plugins</h2>
+          <div className="df-doc-grid">
+            <article><h3>Pomodoro Timer</h3><p>Runs local focus/break cycles. Configure focus minutes, break minutes, and auto-start behavior.</p></article>
+            <article><h3>Habit Tracker</h3><p>Stores daily check-ins in plugin config. Add one habit per line in Configure.</p></article>
+            <article><h3>Weather Info</h3><p>Shows a local weather-style badge for the configured city without external API calls.</p></article>
+            <article><h3>Notes Enhanced</h3><p>Edits the selected task's existing notes field from the enabled plugin tools panel.</p></article>
+          </div>
+        </section>
+        <section id="api" className="df-doc-section">
+          <h2>Plugin API</h2>
+          <table>
+            <tbody>
+              <tr><th><code>getData()</code></th><td>Read the current planner snapshot.</td></tr>
+              <tr><th><code>savePluginConfig(id, patch)</code></th><td>Persist plugin-owned settings.</td></tr>
+              <tr><th><code>emit(event, payload)</code></th><td>Broadcast a NavoPath plugin event.</td></tr>
+              <tr><th><code>toast(message)</code></th><td>Show a transient in-app status message.</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <section id="manifest" className="df-doc-section">
+          <h2>Manifest reference</h2>
+          <pre>{`{
+  "id": "your-plugin-id",
+  "name": "Your Plugin",
+  "version": "1.0.0",
+  "permissions": ["tasks", "settings", "ui"],
+  "configFields": [
+    { "key": "enabled", "label": "Enabled", "type": "boolean", "default": true }
+  ]
+}`}</pre>
+          <p>External arbitrary code loading is intentionally disabled in the current NavoPath desktop/web build. New plugins should be added to the built-in registry, reviewed, and shipped with the app.</p>
+        </section>
+      </article>
+    </main>
+  );
+}
+
 
 const rootElement = document.getElementById("root")!;
 const rootKey = "__plannerRoot";
@@ -9265,5 +9512,7 @@ rootWindow[rootKey] = root;
 root.render(
   window.location.pathname === "/changelog"
     ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
+    : window.location.pathname === "/plugin-guide"
+      ? <PluginGuidePage />
     : <App />,
 );

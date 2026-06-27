@@ -18,7 +18,7 @@ export function reasoningModesForModel(id: string): AiReasoningMode[] {
   if (/DeepSeek-V4-Pro|Qwen3\.5-(?:122B|397B)|GLM-5\.2|Kimi-K2\.7|MiniMax-M3/i.test(label)) {
     return ["instant", "high", "xhigh"];
   }
-  if (/DeepSeek-(?:R1|V3\.2)|Qwen3|MiniMax-M2\.5/i.test(label)) return ["instant", "high"];
+  if (/DeepSeek-(?:R1|V3\.2)|Qwen3|GLM-4\.6|MiniMax-M2\.5/i.test(label)) return ["instant", "high"];
   return ["instant"];
 }
 
@@ -33,13 +33,15 @@ const MODEL_FAMILIES: Array<{ family: string; pattern: RegExp }> = [
   { family: "Gemma", pattern: /gemma/i },
 ];
 
-const PRO_MODEL = /(?:deepseek-v4-pro|qwen3\.5-397|glm-5\.2|kimi-k2\.7|minimax-m3)/i;
-const ECONOMY_MODEL = /(?:deepseek-v3\.2|qwen3\.5-35b|qwen3\.6-27b|step-3\.5-flash|ling-flash)/i;
+const PRO_MODEL = /(?:deepseek-v4-pro|qwen3\.5-(?:122|397)|glm-5\.2|kimi-k2\.7|minimax-m3|nex-n2-pro)/i;
+const ECONOMY_MODEL = /(?:deepseek-v3\.2|deepseek-r1|qwen3\.5-35b|qwen3\.6-27b|step-3\.5-flash|ling-flash)/i;
 const NON_ASSISTANT_MODEL = /(?:ocr|vision|[-_.]vl(?:[-_.]|$)|omni|caption|audio|image|embedding|rerank|translate|mt[-_.])/i;
 const ASSISTANT_MODEL_ALLOWLIST = [
   /DeepSeek-V3\.2$/i,
+  /DeepSeek-R1$/i,
   /Qwen3\.6-(?:27B|35B-A3B)$/i,
   /Qwen3\.5-(?:35B-A3B|122B-A10B|397B-A17B)$/i,
+  /GLM-4\.6$/i,
   /GLM-5\.2$/i,
   /Kimi-K2\.7(?:-Code)?$/i,
   /MiniMax-M(?:2\.5|3(?:\.\d+)?)$/i,

@@ -5,12 +5,19 @@
 - 新用户与本地预览默认进入浅色模式，保持 NavoPath 纸面风格的默认阅读体验。
 - 横屏窄窗口继续保持“今日候选在左、时间轴在右”的执行布局；竖屏才启用任务/日程单视图切换。
 - 设置页的云端同步、强调色、Navo AI 与账户区域改为更扁平的纸面分组，深色模式下按钮、弹窗和底部提示对比度更稳定。
+- Account 设置页新增独立订阅栏，当前 Free Plan 显示为开发测试期开放 Pro 权益，并把退出登录、关于与删除账号收进“更多”。
+- Plugins 现在有独立的使用教程/API 文档页面，MCP quickstart 也迁入同一文档页；设置页提供跳转入口。
+- 内置插件启用后会显示可使用工具：Pomodoro、习惯打卡、本地天气徽章和任务笔记。
+- AI 模型 fallback 列表扩展到 DeepSeek、Qwen、GLM、Kimi、MiniMax、Step、Nex 和 Ling 系列。
 
 ### 修复
 - 修复同一账号在新浏览器或重新安装桌面 app 后可能加载空数据的问题；云端 profile 读取失败时不再静默替换为空工作区，而是保留缓存并暴露错误。
 - 修复“Push to cloud / Pull from cloud”在桌面端被待保存队列静默跳过的问题；手动推送会先写完本地变更，手动拉取会明确以云端数据为准。
 - 修复 Navo AI 请求因模型或思考强度不兼容而持续失败的问题，并让 AI 记忆按当前中英文模式生成。
 - 修复 AI 对话框底部 Reasoning 控件、项目颜色调色盘自动关闭、Plan Suggestions 挡住三日/周视图日期、收起候选或全屏时未进入简洁显示等问题。
+- 修复部分模型不支持 JSON response_format 时导致 AI 请求直接失败的问题，Edge Function 会自动重试普通请求并保留稳定模型兜底。
+- 修复窄横屏三日/周视图下 Plan Suggestions 没有折叠成小日历按钮的问题。
+- 移除 Account 页 Cloud sync 重复标题，并给 About NavoPath 增加外部链接提示。
 
 ---
 
@@ -231,12 +238,19 @@
 - New users and local preview now default to light mode for the paper-like NavoPath reading experience.
 - Narrow landscape windows keep Today Candidates on the left and the timeline on the right; single-view switching is reserved for portrait layouts.
 - Settings cloud sync, accent color, Navo AI, and account areas now use flatter paper-style grouping with stronger dark-mode contrast.
+- Account settings now show plan status in a dedicated subscription section, with Pro benefits open during the dev preview, and moves logout/about/delete actions into More.
+- Plugins now link to a standalone usage and API documentation page; MCP quickstart lives on the same page.
+- Enabled built-in plugins now expose usable tools: Pomodoro, habit check-ins, a local weather badge, and task notes.
+- AI model fallback choices now cover DeepSeek, Qwen, GLM, Kimi, MiniMax, Step, Nex, and Ling families.
 
 ### Fixed
 - Fixed same-account sign-in on a fresh browser or reinstalled desktop app sometimes loading empty data; cloud profile load failures no longer silently replace the workspace with an empty profile.
 - Fixed Push to cloud and Pull from cloud being skipped by pending local save queues; manual push flushes local changes first, and manual pull explicitly applies cloud data.
 - Fixed Navo AI requests failing repeatedly when a model or reasoning level is incompatible, and made AI memory generation follow the current English/Chinese mode.
 - Fixed the AI dialog bottom Reasoning control, project color pickers closing while selecting custom colors, Plan Suggestions covering 3-day/week dates, and collapsed/fullscreen range views not entering simplified display.
+- Fixed AI requests failing when a model does not support JSON response_format by retrying without that option and keeping the stable model fallback.
+- Fixed Plan Suggestions not collapsing into a compact calendar button in narrow landscape 3-day/week views.
+- Removed the duplicate Cloud sync heading in Account settings and added an external-link hint to About NavoPath.
 
 ---
 

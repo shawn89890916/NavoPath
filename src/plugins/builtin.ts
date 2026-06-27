@@ -21,7 +21,7 @@ const pomodoroPlugin: NavoPlugin = {
     "Run 25/5 focus cycles with desktop notifications. The timer is local-only — no network calls.",
   version: "1.0.0",
   author: "NavoPath Team",
-  icon: "🍅",
+  icon: "P",
   permissions: ["tasks", "ui"],
   configFields: [
     { key: "focusMinutes", label: "Focus minutes", type: "number", min: 5, max: 90, default: 25 },
@@ -50,7 +50,7 @@ const habitTrackerPlugin: NavoPlugin = {
     "Mark daily habits done and keep a local streak counter. Habits are stored in plugin config.",
   version: "1.2.0",
   author: "Community",
-  icon: "✅",
+  icon: "H",
   permissions: ["tasks", "settings"],
   configFields: [
     { key: "habits", label: "Habit list (one per line)", type: "string", default: "" },
@@ -76,7 +76,7 @@ const weatherPlugin: NavoPlugin = {
     "Display a small weather badge. The default city can be customised; no API key is required for the placeholder badge.",
   version: "0.9.0",
   author: "NavoPath Team",
-  icon: "🌤️",
+  icon: "W",
   permissions: ["ui"],
   configFields: [
     { key: "city", label: "City", type: "string", default: "Shanghai" },
@@ -104,7 +104,7 @@ const notesPlugin: NavoPlugin = {
     "Attach a markdown-capable note panel to each task. Notes are stored with the task's own `notes` field.",
   version: "2.1.0",
   author: "Community",
-  icon: "📝",
+  icon: "N",
   permissions: ["tasks", "ui"],
   configFields: [
     {

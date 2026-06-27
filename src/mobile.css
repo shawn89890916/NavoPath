@@ -134,3 +134,42 @@
     z-index: 120 !important;
   }
 }
+
+@media (max-width: 1180px) and (orientation: landscape) {
+  .df-app[data-timeline-view="3day"] .df-ai-planner,
+  .df-app[data-timeline-view="weekly"] .df-ai-planner {
+    min-width: 34px !important;
+    width: 34px !important;
+    flex: 0 0 34px !important;
+  }
+
+  .df-app[data-timeline-view="3day"] .df-ai-plan,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan {
+    width: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    height: 34px !important;
+    padding: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+  }
+
+  .df-app[data-timeline-view="3day"] .df-ai-plan span,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan span,
+  .df-app[data-timeline-view="3day"] .df-ai-plan i,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan i {
+    display: none !important;
+  }
+
+  .df-app[data-timeline-view="3day"] .df-ai-plan::before,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan::before {
+    content: "" !important;
+    width: 15px !important;
+    height: 15px !important;
+    border: 1px solid currentColor !important;
+    border-top-width: 3px !important;
+    box-shadow: inset 0 4px 0 color-mix(in srgb, currentColor 18%, transparent) !important;
+  }
+}

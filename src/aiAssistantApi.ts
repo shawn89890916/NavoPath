@@ -292,12 +292,21 @@ function adaptDesktopAction(a: any): AiAction {
 
 export const FALLBACK_AI_MODELS = [
   "deepseek-ai/DeepSeek-V3.2",
+  "deepseek-ai/DeepSeek-R1",
   "Qwen/Qwen3.6-35B-A3B",
+  "Qwen/Qwen3.6-27B",
+  "Qwen/Qwen3.5-35B-A3B",
+  "Qwen/Qwen3.5-122B-A10B",
   "Qwen/Qwen3.5-397B-A17B",
   "zai-org/GLM-5.2",
+  "zai-org/GLM-4.6",
+  "moonshotai/Kimi-K2.7",
   "moonshotai/Kimi-K2.7-Code",
+  "MiniMaxAI/MiniMax-M3",
   "MiniMaxAI/MiniMax-M2.5",
   "stepfun-ai/Step-3.5-Flash",
+  "nexway/Nex-N2-Pro",
+  "inclusionAI/Ling-flash-2.0",
 ] as const;
 
 export async function listAiModels(): Promise<string[]> {

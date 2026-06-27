@@ -30,6 +30,24 @@ const corsHeaders = {
 
 const STABLE_MODEL = "deepseek-ai/DeepSeek-V3.2";
 const PROVIDER_ATTEMPT_TIMEOUT_MS = 18_000;
+const FALLBACK_MODELS = [
+  STABLE_MODEL,
+  "deepseek-ai/DeepSeek-R1",
+  "Qwen/Qwen3.6-35B-A3B",
+  "Qwen/Qwen3.6-27B",
+  "Qwen/Qwen3.5-35B-A3B",
+  "Qwen/Qwen3.5-122B-A10B",
+  "Qwen/Qwen3.5-397B-A17B",
+  "zai-org/GLM-4.6",
+  "zai-org/GLM-5.2",
+  "moonshotai/Kimi-K2.7",
+  "moonshotai/Kimi-K2.7-Code",
+  "MiniMaxAI/MiniMax-M3",
+  "MiniMaxAI/MiniMax-M2.5",
+  "stepfun-ai/Step-3.5-Flash",
+  "nexway/Nex-N2-Pro",
+  "inclusionAI/Ling-flash-2.0",
+];
 
 function resolveModel(model: string): string {
   // These models currently exceed the Edge Function request window on
@@ -153,48 +171,51 @@ async function callDeepSeek(
 ): Promise<string> {
   const candidates = Array.from(new Set([resolveModel(model), STABLE_MODEL]));
   const effortCandidates = Array.from(new Set([reasoningMode, "instant"] as const));
+  const jsonFormatCandidates = [true, false];
   let lastError: unknown;
 
   for (const candidate of candidates) {
     for (const effort of effortCandidates) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), PROVIDER_ATTEMPT_TIMEOUT_MS);
-      const abort = () => controller.abort();
-      if (signal) {
-        if (signal.aborted) controller.abort();
-        else signal.addEventListener("abort", abort, { once: true });
-      }
-      try {
-        const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: candidate,
-            messages,
-            response_format: { type: "json_object" },
-            max_tokens: maxTokens,
-            stream: false,
-            ...(effort === "instant" ? {} : { reasoning_effort: effort }),
-          }),
-          signal: controller.signal,
-        });
-        if (!dsResponse.ok) {
-          const errorText = await dsResponse.text();
-          throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
+      for (const useJsonFormat of jsonFormatCandidates) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), PROVIDER_ATTEMPT_TIMEOUT_MS);
+        const abort = () => controller.abort();
+        if (signal) {
+          if (signal.aborted) controller.abort();
+          else signal.addEventListener("abort", abort, { once: true });
         }
-        const dsData = await dsResponse.json();
-        const content = dsData.choices?.[0]?.message?.content;
-        if (!content) throw new Error("AI service returned no content");
-        return content;
-      } catch (error) {
-        lastError = error;
-        console.warn("AI provider attempt failed", { model: candidate, reasoningMode: effort, error: String(error) });
-      } finally {
-        clearTimeout(timeoutId);
-        signal?.removeEventListener("abort", abort);
+        try {
+          const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: candidate,
+              messages,
+              ...(useJsonFormat ? { response_format: { type: "json_object" } } : {}),
+              max_tokens: maxTokens,
+              stream: false,
+              ...(effort === "instant" ? {} : { reasoning_effort: effort }),
+            }),
+            signal: controller.signal,
+          });
+          if (!dsResponse.ok) {
+            const errorText = await dsResponse.text();
+            throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
+          }
+          const dsData = await dsResponse.json();
+          const content = dsData.choices?.[0]?.message?.content;
+          if (!content) throw new Error("AI service returned no content");
+          return content;
+        } catch (error) {
+          lastError = error;
+          console.warn("AI provider attempt failed", { model: candidate, reasoningMode: effort, responseFormat: useJsonFormat, error: String(error) });
+        } finally {
+          clearTimeout(timeoutId);
+          signal?.removeEventListener("abort", abort);
+        }
       }
     }
   }
@@ -279,13 +300,13 @@ serve(async (req: Request) => {
         headers: { "Authorization": `Bearer ${apiKey}` },
       });
       if (!response.ok) {
-        return new Response(JSON.stringify({ error: `AI model service ${response.status}` }), { status: 502, headers: corsHeaders });
+        return new Response(JSON.stringify({ models: FALLBACK_MODELS, warning: `AI model service ${response.status}` }), { headers: corsHeaders });
       }
       const payload = await response.json();
       const models = Array.isArray(payload?.data)
         ? payload.data.map((item: { id?: unknown }) => item?.id).filter((id: unknown): id is string => typeof id === "string").sort()
         : [];
-      return new Response(JSON.stringify({ models }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ models: Array.from(new Set([...models, ...FALLBACK_MODELS])).sort() }), { headers: corsHeaders });
     }
 
     if (!message) {
