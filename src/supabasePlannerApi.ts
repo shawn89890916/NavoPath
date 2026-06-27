@@ -38,7 +38,7 @@ const defaultSettings: Settings = {
   onboardingStep: "done",
   dailyFocusTime: "20:00",
   weekStartsOn: 0,
-  theme: "dark",
+  theme: "light",
   typographyStyle: "editorial",
   accentColor: "",
   executeAccentColor: "",
@@ -214,11 +214,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         .maybeSingle();
 
       if (error) {
-        // Network/RLS failure: degrade to an empty in-memory profile so the signed-in user
-        // keeps working instead of being bounced to local preview mode.
-        console.warn("[ensureProfile] select failed, using empty profile:", error.message);
-        profileCache = { data: emptyCloudData(), settings: { ...defaultSettings, onboardingVersion: 0, onboardingStep: "add" as const }, revision: 0 };
-        return profileCache;
+        throw new Error(`Cloud profile load failed: ${error.message}`);
       }
       if (data) {
         profileCache = {
@@ -246,8 +242,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         });
 
       if (insertError) {
-        // Insert failed (e.g. RLS): still return the in-memory profile so the session stays usable.
-        console.warn("[ensureProfile] insert failed, using in-memory profile:", insertError.message);
+        throw new Error(`Cloud profile create failed: ${insertError.message}`);
       }
       profileCache = { data: initialData, settings: initialSettings, revision: 0 };
       return profileCache;

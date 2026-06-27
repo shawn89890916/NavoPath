@@ -3,6 +3,7 @@
 // Router / Planner / Actor pipeline can compose them.
 
 export type PromptContext = {
+  language: "en" | "zh";
   currentDate: string;
   timezone: string;
   tomorrow: string;
@@ -36,17 +37,20 @@ CONVERSATION AND MEMORY RULES:
 * A short latest message containing only a time, date, duration, project, yes/no answer, or correction normally answers your previous clarification. Merge it with the most recent unresolved user request.
 * Never use a clarification value such as "今早8:00", "明天", "90分钟", or a project name as the task title when the earlier request already contains the task subject.
 * Treat long-term memory as preference context. The latest user message always wins.
-* You may include a top-level "memories" array: [{"content":"stable preference in Chinese","tags":["preference"]}].
+* Reply in ${ctx.language === "zh" ? "Chinese" : "English"} unless the user explicitly asks for another language.
+* You may include a top-level "memories" array: [{"content":"stable preference in the user's current language","tags":["preference"]}].
+* Write memory content in ${ctx.language === "zh" ? "Chinese" : "English"}.
 * Only return memories for explicit "remember this" requests, stable preferences, recurring constraints, or durable planning habits.
 * Do not put memory writes in "actions"; use the top-level "memories" field.`;
 
 export const summarizeMemoryPrompt = (ctx: PromptContext) => `You compress selected NavoPath conversation turns into one durable AI memory.
 Today's date is ${ctx.currentDate}. Timezone is ${ctx.timezone}.
-Return JSON only: {"reply":"one concise Chinese memory, max 120 Chinese characters","actions":[],"memories":[]}.
+Return JSON only: {"reply":"one concise ${ctx.language === "zh" ? "Chinese memory, max 120 Chinese characters" : "English memory, max 40 words"}","actions":[],"memories":[]}.
 Capture stable user preferences, constraints, facts, plans, or decisions. Do not summarize temporary chatter. If there is no durable memory, reply with the most useful factual context from the selected turns.`;
 
 export const importSchedulePrompt = (ctx: PromptContext) => `You import schedules from extracted document text into NavoPath.
 Today's date is ${ctx.currentDate}. Timezone is ${ctx.timezone}.
+Use ${ctx.language === "zh" ? "Chinese" : "English"} for reply, step labels, notes, warnings, and memories.
 Import every actionable or time-bound item as a task. Fixed commitments use scheduled task fields; NavoPath no longer has a separate event type.
 Return JSON only: {"reply":"中文摘要","steps":[{"label":"解析文件","status":"done"}],"actions":[...]}.
 Every action must have:
@@ -55,6 +59,7 @@ Use recurrence only when explicitly stated, or when a date range plus strong con
 Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${ctx.projectsInfo}${contextSuffix(ctx)}`;
 
 export const chatPrompt = (ctx: PromptContext) => `You are NavoPath, an AI time-blocking assistant. Reply ONLY in valid JSON. No markdown, no code fences, no text outside the JSON object.
+Use ${ctx.language === "zh" ? "Chinese" : "English"} for reply, step labels, reasons, notes, warnings, and memories unless the user explicitly asks for another language.
 
 TODAY IS ${ctx.currentDate}. Timezone: ${ctx.timezone}. The user is in China (UTC+8). Calculate ALL relative dates from ${ctx.currentDate}:
 - "今天" → ${ctx.currentDate}
@@ -91,7 +96,7 @@ OUTPUT ONLY THIS JSON (no other text):
 }
 
 CRITICAL RULES:
-* "reply" must be a natural Chinese sentence ONLY. NEVER put JSON, code, or markdown in reply.
+* "reply" must be a natural ${ctx.language === "zh" ? "Chinese" : "English"} sentence ONLY. NEVER put JSON, code, or markdown in reply.
 * NEVER set "title" to null/undefined/empty. Extract a real name from the user's message.
 * NEVER embed JSON objects in "reply". reply is a plain text sentence.
 * If nothing to schedule: {"reply":"需要更多信息才能安排。","steps":[{"label":"等待补充","status":"done"}],"actions":[],"memories":[]}

@@ -2971,7 +2971,7 @@
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 980px) and (orientation: portrait) {
   .df-execute, .df-planning { grid-template-columns: 1fr; height: auto; overflow: visible; }
   .df-candidate-panel, .df-timeline-panel, .df-mindmap, .df-quadrants { min-height: 420px; }
   .df-progress { width: 240px; }
@@ -16292,7 +16292,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 980px) and (orientation: portrait) {
   .df-app .df-mindmap.no-root,
   .df-app.theme-dark .df-mindmap.no-root,
   .df-app:not(.theme-dark) .df-mindmap.no-root {
@@ -17502,8 +17502,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--mode-primary) 10%, var(--border-soft));
   margin: 14px 0;
 }
-  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
-}
 .df-ai-conversation-list p {
   margin: 6px 0;
   color: var(--text-muted);
@@ -17646,6 +17644,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   right: -12px;
   z-index: -1;
 }
+.df-ai-reply {
   margin-left: 38px;
   color: var(--text-main);
   background: color-mix(in srgb, var(--mode-primary) 5%, var(--surface-card));
@@ -18954,7 +18953,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent-active) 5%, transparent);
 }
 
-@media (max-width: 899.98px) {
+@media (max-width: 899.98px) and (orientation: portrait) {
   html,
   body,
   #root {

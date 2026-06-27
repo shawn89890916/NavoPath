@@ -468,7 +468,7 @@ export function installBrowserFallback() {
     onboardingStep: "done",
     dailyFocusTime: "20:00",
     weekStartsOn: 0,
-    theme: "dark",
+    theme: "light",
     typographyStyle: "editorial",
     accentColor: "",
     executeAccentColor: "",

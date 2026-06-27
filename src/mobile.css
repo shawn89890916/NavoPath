@@ -1,4 +1,4 @@
-@media (max-width: 899.98px) {
+@media (max-width: 899.98px) and (orientation: portrait) {
   #root .df-app .df-header {
     height: 56px !important;
     min-height: 56px !important;

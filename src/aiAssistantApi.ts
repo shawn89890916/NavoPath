@@ -271,7 +271,9 @@ export async function callAiAssistant(params: {
 function buildDesktopSystemPrompt(mode: AiMode, context: Record<string, unknown>, memories?: AiMemoryPatch[]): string {
   const ctxStr = JSON.stringify(context).slice(0, 4000);
   const memStr = memories && memories.length > 0 ? JSON.stringify(memories).slice(0, 2000) : "";
+  const language = context.language === "zh" ? "Chinese" : "English";
   return [
+    `Reply, action reasons, and memory content in ${language} unless the user explicitly asks for another language.`,
     "你是一个留学升学对话助手。你需要根据用户输入决定返回格式。",
     "如果需要创建任务 / 事件 / 笔记 / 记忆，必须只返回纯 JSON，不要用 markdown 代码块（不要用 ```），不要加任何前缀文字：",
     '{"reply":"你的中文回复","actions":[{"type":"add_task","title":"...","dueDate":"YYYY-MM-DD","category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","notes":"...","subtasks":[{"title":"子任务"}]}]}',

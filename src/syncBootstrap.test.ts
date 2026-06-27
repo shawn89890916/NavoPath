@@ -45,4 +45,15 @@ describe("resolveBootstrap", () => {
     expect(result.replayData).toBe(false);
     expect(result.replaySettings).toBe(false);
   });
+
+  it("can prefer remote data for an explicit pull even when cache is dirty", () => {
+    const local = cache({ dataDirty: true, settingsDirty: true });
+    const remote = data("2026-06-21T00:00:00Z", "remote");
+    const remoteSettings = settings("en");
+    const result = resolveBootstrap(local, remote, remoteSettings, { preferRemote: true });
+    expect(result.data).toBe(remote);
+    expect(result.settings).toBe(remoteSettings);
+    expect(result.replayData).toBe(false);
+    expect(result.replaySettings).toBe(false);
+  });
 });

@@ -152,47 +152,50 @@ async function callDeepSeek(
   signal?: AbortSignal,
 ): Promise<string> {
   const candidates = Array.from(new Set([resolveModel(model), STABLE_MODEL]));
+  const effortCandidates = Array.from(new Set([reasoningMode, "instant"] as const));
   let lastError: unknown;
 
   for (const candidate of candidates) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PROVIDER_ATTEMPT_TIMEOUT_MS);
-    const abort = () => controller.abort();
-    if (signal) {
-      if (signal.aborted) controller.abort();
-      else signal.addEventListener("abort", abort, { once: true });
-    }
-    try {
-      const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: candidate,
-          messages,
-          response_format: { type: "json_object" },
-          max_tokens: maxTokens,
-          stream: false,
-          ...(reasoningMode === "instant" ? {} : { reasoning_effort: reasoningMode }),
-        }),
-        signal: controller.signal,
-      });
-      if (!dsResponse.ok) {
-        const errorText = await dsResponse.text();
-        throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
+    for (const effort of effortCandidates) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PROVIDER_ATTEMPT_TIMEOUT_MS);
+      const abort = () => controller.abort();
+      if (signal) {
+        if (signal.aborted) controller.abort();
+        else signal.addEventListener("abort", abort, { once: true });
       }
-      const dsData = await dsResponse.json();
-      const content = dsData.choices?.[0]?.message?.content;
-      if (!content) throw new Error("AI service returned no content");
-      return content;
-    } catch (error) {
-      lastError = error;
-      console.warn("AI provider attempt failed", { model: candidate, error: String(error) });
-    } finally {
-      clearTimeout(timeoutId);
-      signal?.removeEventListener("abort", abort);
+      try {
+        const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: candidate,
+            messages,
+            response_format: { type: "json_object" },
+            max_tokens: maxTokens,
+            stream: false,
+            ...(effort === "instant" ? {} : { reasoning_effort: effort }),
+          }),
+          signal: controller.signal,
+        });
+        if (!dsResponse.ok) {
+          const errorText = await dsResponse.text();
+          throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
+        }
+        const dsData = await dsResponse.json();
+        const content = dsData.choices?.[0]?.message?.content;
+        if (!content) throw new Error("AI service returned no content");
+        return content;
+      } catch (error) {
+        lastError = error;
+        console.warn("AI provider attempt failed", { model: candidate, reasoningMode: effort, error: String(error) });
+      } finally {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener("abort", abort);
+      }
     }
   }
 
@@ -304,6 +307,7 @@ serve(async (req: Request) => {
     const selectedReasoning = supportedReasoning && (reasoningMode === "high" || reasoningMode === "xhigh") ? reasoningMode : "instant";
 
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
+    const language = context?.language === "zh" ? "zh" : "en";
     const currentDate = validIsoDate(context?.currentDate) ? context.currentDate : localDateForTimeZone(timezone);
     const projectsInfo = context?.projects ? `Available projects: ${JSON.stringify(context.projects)}` : "";
     const scheduledTodayInfo = context?.scheduledToday
@@ -325,6 +329,7 @@ serve(async (req: Request) => {
       : [];
 
     const promptCtx: PromptContext = {
+      language,
       currentDate,
       timezone,
       tomorrow: getTomorrow(currentDate),

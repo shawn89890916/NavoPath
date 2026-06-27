@@ -14,7 +14,16 @@ export function resolveBootstrap(
   cached: BootstrapCache | null,
   remoteData: PlannerData | null,
   remoteSettings: Settings | null,
+  options: { preferRemote?: boolean } = {},
 ) {
+  if (options.preferRemote && remoteData && remoteSettings) {
+    return {
+      data: remoteData,
+      settings: remoteSettings,
+      replayData: false,
+      replaySettings: false,
+    };
+  }
   const replayData = Boolean(cached?.dataDirty && cached.data && remoteData);
   const replaySettings = Boolean(cached?.settingsDirty && cached.settings && remoteSettings);
   return {

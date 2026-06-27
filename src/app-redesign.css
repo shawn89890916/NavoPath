@@ -652,7 +652,7 @@
 .df-app .df-pick-actions button.primary:active:not(:disabled),
 .df-app .df-inline-action.primary:active:not(:disabled) { transform: translateY(1px) !important; box-shadow: none !important; }
 
-@media (max-width: 980px) {
+@media (max-width: 980px) and (orientation: portrait) {
   .df-execute { height: auto !important; min-height: calc(100vh - 58px); grid-template-columns: 1fr !important; overflow: visible !important; gap: 8px !important; }
   .df-candidate-panel { min-height: 280px; }
   .df-timeline-panel { min-height: 680px; }
@@ -1797,7 +1797,7 @@
     margin-inline: auto !important;
   }
 }
-@media (max-width: 980px) {
+@media (max-width: 980px) and (orientation: portrait) {
   body {
     min-width: 0 !important;
   }
@@ -3159,4 +3159,136 @@ body.df-timeline-pointer-drag * {
   border-radius: 50% !important;
   color: var(--surface-main) !important;
   background: var(--accent-active) !important;
+}
+
+/* Dev polish: cloud sync, AI composer, and narrow range-view controls. */
+.df-app .df-ai-panel-foot .df-ai-reasoning-picker {
+  display: none !important;
+}
+
+.df-app.theme-dark .df-toast {
+  color: var(--text-main);
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--accent-active) 6%);
+  border-color: var(--paper-rule-strong);
+}
+
+.df-app .df-settings-sync {
+  display: grid;
+  gap: 12px;
+  padding: 14px 0;
+  border-block: 1px solid var(--paper-rule);
+}
+
+.df-app .df-settings-sync-head,
+.df-app .df-settings-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.df-app .df-settings-sync-row > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.df-app .df-settings-sync-directions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.df-app .df-settings-sync-now,
+.df-app .df-settings-sync-direction {
+  min-height: 38px;
+  border: 0;
+  border-bottom: 1px solid var(--paper-rule-strong);
+  border-radius: 0;
+  color: var(--text-main);
+  background: transparent;
+  box-shadow: none;
+}
+
+.df-app .df-settings-sync-now:hover:not(:disabled),
+.df-app .df-settings-sync-direction:hover:not(:disabled) {
+  color: var(--accent-active);
+  border-bottom-color: var(--accent-active);
+  background: var(--paper-note);
+}
+
+.df-app .df-settings-sync-now:disabled,
+.df-app .df-settings-sync-direction:disabled {
+  opacity: .46;
+  cursor: not-allowed;
+}
+
+.df-app .df-settings-sync-now.is-syncing {
+  color: var(--accent-active);
+  animation: navoSyncBreath 1.2s ease-in-out infinite;
+}
+
+@keyframes navoSyncBreath {
+  0%, 100% { opacity: .62; }
+  50% { opacity: 1; }
+}
+
+.df-app.theme-dark .df-ai-model-menu,
+.df-app.theme-dark .df-ai-action-menu,
+.df-app.theme-dark .df-ai-plan-menu {
+  color: var(--text-main);
+  background: var(--surface-raised);
+  border-color: var(--paper-rule-strong);
+  box-shadow: var(--paper-float-shadow);
+}
+
+.df-app.theme-dark .df-ai-model-tier-list button,
+.df-app.theme-dark .df-ai-model-manage,
+.df-app.theme-dark .df-ai-plan-menu select {
+  color: var(--text-main);
+  background: var(--surface-card);
+  border-color: var(--paper-rule);
+}
+
+@media (max-width: 1180px) and (orientation: landscape) {
+  .df-app[data-timeline-view="3day"] .df-ai-plan,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    font-size: 0;
+  }
+
+  .df-app[data-timeline-view="3day"] .df-ai-plan::before,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan::before {
+    content: "";
+    width: 15px;
+    height: 15px;
+    border: 1px solid currentColor;
+    border-top-width: 3px;
+    box-shadow: inset 0 4px 0 color-mix(in srgb, currentColor 18%, transparent);
+  }
+
+  .df-app[data-timeline-view="3day"] .df-ai-plan i,
+  .df-app[data-timeline-view="weekly"] .df-ai-plan i {
+    display: none;
+  }
+}
+
+.df-app .df-theme-setting .df-project-color-picker,
+.df-app .df-theme-setting .df-project-color-custom,
+.df-app .df-theme-setting .df-project-color-picker button {
+  filter: none;
+  box-shadow: none;
+}
+
+.df-app .df-settings-shell {
+  grid-template-columns: 148px minmax(0, 1fr);
+}
+
+.df-app .df-settings-content {
+  scrollbar-gutter: stable;
 }

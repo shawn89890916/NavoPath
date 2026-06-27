@@ -1413,7 +1413,7 @@ function App() {
   const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [mode, setModeState] = useState<Mode>("execute");
-  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 899.98px)").matches);
+  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 899.98px) and (orientation: portrait)").matches);
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
   const [compactViewMenuOpen, setCompactViewMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -1515,7 +1515,7 @@ function App() {
   }, [fullscreen]);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 899.98px)");
+    const media = window.matchMedia("(max-width: 899.98px) and (orientation: portrait)");
     const sync = () => setCompactLayout(media.matches);
     sync();
     media.addEventListener("change", sync);
@@ -1678,8 +1678,8 @@ function App() {
   // consistent, including the week-view fullscreen control.
   useEffect(() => {
     const supportsCompactRange = timelineView === "3day" || timelineView === "weekly" || timelineView === "month";
-    setSimpleView(candidatePanelCollapsed && supportsCompactRange);
-  }, [candidatePanelCollapsed, timelineView]);
+    setSimpleView((candidatePanelCollapsed || fullscreen) && supportsCompactRange);
+  }, [candidatePanelCollapsed, fullscreen, timelineView]);
 
   useEffect(() => {
     if (mode !== "execute") {
@@ -1761,9 +1761,11 @@ function App() {
   }
 
   async function loadInitial() {
+    let attemptedCloudUser = false;
     try {
     const api = await waitForPlannerApi();
     const auth = (await api.getAuthState?.()) || { mode: "local" as const, user: null, configured: false };
+    attemptedCloudUser = auth.mode === "cloud" && Boolean(auth.user);
     const workspaceKey = auth.mode === "cloud" ? `cloud:${auth.user?.id || "signed-out"}` : "local";
     if (loadedWorkspaceKeyRef.current && loadedWorkspaceKeyRef.current !== workspaceKey) resetWorkspaceUi();
     loadedWorkspaceKeyRef.current = workspaceKey;
@@ -1842,6 +1844,15 @@ function App() {
     }
     } catch (err) {
       console.error("Failed to load initial data:", err);
+      if (attemptedCloudUser) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (dataRef.current && settingsRef.current) {
+          showToast(lang === "zh" ? "云端数据暂时无法加载，已保留本机缓存。" : "Cloud data could not load. Keeping this device's cache.");
+        } else {
+          setAuthError(message || (lang === "zh" ? "云端数据暂时无法加载，请稍后重试。" : "Cloud data could not load. Please try again later."));
+        }
+        return;
+      }
       if (!localFallbackAppliedRef.current) {
         localFallbackAppliedRef.current = true;
         forceLocalPreviewMode();
@@ -2444,6 +2455,18 @@ function App() {
     }
     if (!silent) setIsManualSyncing(true);
     try {
+      if (direction === "push" || direction === "both") {
+        if (pendingDataSaveRef.current) await flushPendingSave({ urgent: true });
+        if (pendingSettingsSaveRef.current) await flushPendingSettings({ urgent: true });
+      } else if (direction === "pull") {
+        if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
+        if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
+        dataSaveTimerRef.current = null;
+        settingsSaveTimerRef.current = null;
+        pendingDataSaveRef.current = null;
+        pendingSettingsSaveRef.current = null;
+        await refreshQueuedRemote({ force: true });
+      }
       const result = direction === "push"
         ? await scheduler.runPushOnly()
         : direction === "pull"
@@ -4558,8 +4581,8 @@ function App() {
     const activeConversationForHistory = (dataForHistory.aiConversations || [])
       .find((conversation) => conversation.id === (activeAiConversationId || dataForHistory.activeAiConversationId));
     const context = settings?.aiMemoryEnabled === false
-      ? { currentViewDate: selectedDate || today, page: mode }
-      : buildAiContext(data, { date: selectedDate || today, mode, focusTask: task });
+      ? { currentViewDate: selectedDate || today, page: mode, language: settings?.language || lang }
+      : { ...buildAiContext(data, { date: selectedDate || today, mode, focusTask: task }), language: settings?.language || lang };
     const history = toAiHistory(aiMessages, data.chat, activeConversationForHistory?.messages || []);
     const memories = settings?.aiMemoryEnabled === false
       ? []
@@ -4646,7 +4669,8 @@ function App() {
           ? currentData.aiMemories || []
           : mergeAiMemories(currentData, memoryPatches, "auto");
         if (memoryPatches.length > 0 && settingsRef.current?.aiMemoryEnabled !== false) {
-          setAiMemoryNotice(`已记住 ${Math.min(memoryPatches.length, 4)} 条偏好`);
+          const savedCount = Math.min(memoryPatches.length, 4);
+          setAiMemoryNotice(lang === "zh" ? `已记住 ${savedCount} 条偏好` : `Saved ${savedCount} memory item${savedCount === 1 ? "" : "s"}`);
         }
         await saveData({ ...currentData, chat: nextChat, aiConversations: nextConversations, activeAiConversationId: conversationId, aiMemories: nextMemories });
       }
@@ -4916,22 +4940,24 @@ function App() {
     window.addEventListener("keydown", keydown);
   }
 
-  async function refreshQueuedRemote() {
-    if (!queuedRemoteRefreshRef.current
+  async function refreshQueuedRemote(options: { force?: boolean } = {}) {
+    if (!options.force && (!queuedRemoteRefreshRef.current
       || pendingDataSaveRef.current
       || pendingSettingsSaveRef.current
       || dataSaveInFlightRef.current
-      || settingsSaveInFlightRef.current) return;
+      || settingsSaveInFlightRef.current)) return;
     queuedRemoteRefreshRef.current = false;
     const bootstrap = await window.plannerApi.getBootstrap?.({ force: true });
     if (!bootstrap?.data || !bootstrap.settings) return;
+    const resolved = resolveBootstrap(options.force ? null : readBootstrapCache(authState?.user?.id), bootstrap.data, bootstrap.settings, { preferRemote: options.force });
+    if (!resolved.data || !resolved.settings) return;
     remoteRevisionRef.current = bootstrap.revision || remoteRevisionRef.current;
-    dataRef.current = bootstrap.data;
-    settingsRef.current = bootstrap.settings;
-    setData(bootstrap.data);
-    setSettings(bootstrap.settings);
-    if (bootstrap.settings.language) setLang(bootstrap.settings.language);
-    writeBootstrapCache(bootstrap.data, bootstrap.settings, authState?.user?.id, {
+    dataRef.current = resolved.data;
+    settingsRef.current = resolved.settings;
+    setData(resolved.data);
+    setSettings(resolved.settings);
+    if (resolved.settings.language) setLang(resolved.settings.language);
+    writeBootstrapCache(resolved.data, resolved.settings, authState?.user?.id, {
       dataDirty: false,
       settingsDirty: false,
       remoteRevision: bootstrap.revision,
@@ -7485,7 +7511,7 @@ function ProjectChoice({ project, onChoose, onColorChange }: { project: Project;
       <button type="button" onClick={onChoose}># {project.title}</button>
       <span className="df-project-color-menu" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="df-project-color-dot-button" aria-label={`${project.title} color`} onClick={() => setColorOpen((open) => !open)}><span className="df-project-color-dot" style={{ "--project-color": color } as CSSProperties} /></button>
-        {colorOpen && <ProjectColorPicker value={color} onChange={(nextColor) => { onColorChange(nextColor); setColorOpen(false); }} compact />}
+        {colorOpen && <ProjectColorPicker value={color} onChange={(nextColor) => { onColorChange(nextColor); }} compact />}
       </span>
     </div>
   );
@@ -7537,7 +7563,7 @@ function QuickProjectPicker(props: {
             <button type="button" className="df-project-color-dot-button" aria-label="新项目颜色" onClick={() => setNewColorOpen((v) => !v)}>
               <span className="df-project-color-dot" style={{ "--project-color": props.newColor } as CSSProperties} />
             </button>
-            {newColorOpen && <ProjectColorPicker value={props.newColor} onChange={(c) => { props.onColorChange(c); setNewColorOpen(false); }} compact />}
+            {newColorOpen && <ProjectColorPicker value={props.newColor} onChange={(c) => { props.onColorChange(c); }} compact />}
           </span>
           <button type="button" onClick={props.onCreate}>✓</button>
         </div>

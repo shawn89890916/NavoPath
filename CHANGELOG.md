@@ -1,5 +1,19 @@
 # NavoPath 更新日志
 
+## 2026-06-27 · 云端同步、AI 与响应式布局修复
+### 改进
+- 新用户与本地预览默认进入浅色模式，保持 NavoPath 纸面风格的默认阅读体验。
+- 横屏窄窗口继续保持“今日候选在左、时间轴在右”的执行布局；竖屏才启用任务/日程单视图切换。
+- 设置页的云端同步、强调色、Navo AI 与账户区域改为更扁平的纸面分组，深色模式下按钮、弹窗和底部提示对比度更稳定。
+
+### 修复
+- 修复同一账号在新浏览器或重新安装桌面 app 后可能加载空数据的问题；云端 profile 读取失败时不再静默替换为空工作区，而是保留缓存并暴露错误。
+- 修复“Push to cloud / Pull from cloud”在桌面端被待保存队列静默跳过的问题；手动推送会先写完本地变更，手动拉取会明确以云端数据为准。
+- 修复 Navo AI 请求因模型或思考强度不兼容而持续失败的问题，并让 AI 记忆按当前中英文模式生成。
+- 修复 AI 对话框底部 Reasoning 控件、项目颜色调色盘自动关闭、Plan Suggestions 挡住三日/周视图日期、收起候选或全屏时未进入简洁显示等问题。
+
+---
+
 ## 2026-06-26 · 短任务时长调整、同步方向与更新检测
 
 ### 改进
@@ -210,6 +224,21 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-27 · Cloud sync, AI, and responsive layout fixes
+
+### Improved
+- New users and local preview now default to light mode for the paper-like NavoPath reading experience.
+- Narrow landscape windows keep Today Candidates on the left and the timeline on the right; single-view switching is reserved for portrait layouts.
+- Settings cloud sync, accent color, Navo AI, and account areas now use flatter paper-style grouping with stronger dark-mode contrast.
+
+### Fixed
+- Fixed same-account sign-in on a fresh browser or reinstalled desktop app sometimes loading empty data; cloud profile load failures no longer silently replace the workspace with an empty profile.
+- Fixed Push to cloud and Pull from cloud being skipped by pending local save queues; manual push flushes local changes first, and manual pull explicitly applies cloud data.
+- Fixed Navo AI requests failing repeatedly when a model or reasoning level is incompatible, and made AI memory generation follow the current English/Chinese mode.
+- Fixed the AI dialog bottom Reasoning control, project color pickers closing while selecting custom colors, Plan Suggestions covering 3-day/week dates, and collapsed/fullscreen range views not entering simplified display.
+
+---
 
 ## 2026-06-26 · Short-block resize, sync direction, and update detection
 
