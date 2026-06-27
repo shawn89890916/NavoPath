@@ -38,7 +38,7 @@ import { useInAppDialog } from "./InAppDialog";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
-import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, resolveConfig as resolvePluginConfig, type PluginHost } from "./plugins/registry";
+import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, resolveConfig as resolvePluginConfig, pluginText, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import "./styles.css";
 import "./app-redesign.css";
@@ -69,6 +69,7 @@ const SAVE_DEBOUNCE_MS = 250;
 const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
 const MCP_ENDPOINT = import.meta.env.VITE_MCP_ENDPOINT || "https://navopath-mcp.shawn89890916.workers.dev/mcp";
+const DONATION_URL = "https://afdian.com/a/233cxy/plan";
 const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
   return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
 });
@@ -3497,12 +3498,13 @@ function App() {
     return () => document.removeEventListener("scroll", onScroll, { capture: true });
   }, []);
 
-  function slotFromPointer(clientY: number, offsetMinutes = 0) {
+  function slotFromPointer(clientY: number, offsetMinutes = 0, clientX?: number) {
     const { gridEl, scrollEl, visDays } = getDropGridAndDays();
     if (!gridEl || !scrollEl) return "09:00";
-    // Pass a dummy clientX (0) — dayIndex doesn't matter for time‑only queries
+    const rect = gridEl.getBoundingClientRect();
     const target = pointerToDateTime({
-      clientX: 0, clientY,
+      clientX: clientX ?? rect.left + rect.width / 2,
+      clientY,
       gridElement: gridEl,
       scrollElement: scrollEl,
       visibleDays: visDays,
@@ -4113,7 +4115,7 @@ function App() {
             if (isEvent) moveEventOccurrence(task.id, nextStart, target.date);
             else moveTimelineRecord(task.id, nextStart, target.date);
           } else {
-            const nextStart = slotFromPointer(upEvent.clientY, offsetMinutes);
+            const nextStart = slotFromPointer(upEvent.clientY, offsetMinutes, upEvent.clientX);
             if (isEvent) moveEventOccurrence(task.id, nextStart);
             else moveTimelineRecord(task.id, nextStart);
           }
@@ -4164,7 +4166,7 @@ function App() {
     document.body.classList.add("df-resizing");
     setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)) });
     const move = (moveEvent: MouseEvent) => {
-      const slot = slotFromPointer(moveEvent.clientY);
+      const slot = slotFromPointer(moveEvent.clientY, 0, moveEvent.clientX);
       const slotMin = timeToMinutes(slot);
       const start = timeToMinutes(task.scheduledStart);
       const end = timeToMinutes(task.scheduledEnd);
@@ -4178,7 +4180,7 @@ function App() {
     };
     const up = (upEvent: MouseEvent) => {
       if (!data) return;
-      const slot = slotFromPointer(upEvent.clientY);
+      const slot = slotFromPointer(upEvent.clientY, 0, upEvent.clientX);
       const slotMin = timeToMinutes(slot);
       const start = timeToMinutes(task.scheduledStart);
       const end = timeToMinutes(task.scheduledEnd);
@@ -6394,7 +6396,7 @@ function App() {
                           dragTargetDateRef.current = target.date;
                           scheduleTask(taskId, target.startTime);
                         } else {
-                          scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY));
+                          scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY, 0, event.clientX));
                         }
                       }
                     }} onDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}>
@@ -6469,7 +6471,7 @@ function App() {
                           if (drag || resizePreview) return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
                           if (floatingTimeAdd) { setFloatingTimeAdd(null); return; }
-                          const startTime = slotFromPointer(event.clientY);
+                          const startTime = slotFromPointer(event.clientY, 0, event.clientX);
                           const endTime = addMinutes(startTime, 30);
                           const maxEnd = minutesToTime(TIMELINE_END * 60);
                           const clampedEnd = timeToMinutes(endTime) > TIMELINE_END * 60 ? maxEnd : endTime;
@@ -7415,10 +7417,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   );
   const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
-  const isShortBlock = height < 48 && !isWeekView;
   const canResize = !isReturnedUnfinished && (isEvent || !recurringLocked);
   return (
-    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""} ${isShortBlock ? "short-block-center-resize" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <div className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} data-kind={isEvent ? "event" : "task"} data-preview={isPreview ? "true" : undefined} data-view-mode={viewMode} style={{ top, height, "--cat": stripeColor, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
@@ -8720,32 +8721,57 @@ function patchPluginConfig(settings: Settings, onSave: (patch: Partial<Settings>
   onSave({ pluginConfigs: { ...(settings.pluginConfigs ?? {}), [pluginId]: { ...existing, ...patch } } });
 }
 
+function localizedPluginName(plugin: ReturnType<typeof listRegisteredPlugins>[number], lang: Language) {
+  return pluginText(plugin.name, plugin.nameI18n, lang);
+}
+
+function localizedPluginDescription(plugin: ReturnType<typeof listRegisteredPlugins>[number], lang: Language) {
+  return pluginText(plugin.description, plugin.descriptionI18n, lang);
+}
+
+function localizedPluginEnabledSummary(plugin: ReturnType<typeof listRegisteredPlugins>[number], lang: Language) {
+  return pluginText(
+    lang === "zh" ? "启用后会在下方工具区显示可直接使用的官方工具。" : "After enabling, its official tool appears below.",
+    plugin.enabledSummaryI18n,
+    lang,
+  );
+}
+
 function SubscriptionPanel({ lang }: { lang: Language }) {
-  const benefits = lang === "zh"
-    ? ["无限任务与项目", "Navo AI 对话与记忆", "多设备云端同步", "MCP 远程访问", "内置插件工具", "数据导入导出"]
-    : ["Unlimited tasks and projects", "Navo AI chat and memory", "Multi-device cloud sync", "Remote MCP access", "Built-in plugin tools", "Data import and export"];
+  const tiers = lang === "zh"
+    ? [
+      { name: "Free", price: "¥0", note: "当前启用", items: ["本地任务与项目规划", "核心时间轴与日/周/月视图", "基础导入导出", "官方内置插件预览"] },
+      { name: "Supporter", price: "爱发电支持", note: "适合支持持续开发", items: ["支持者身份入口", "优先体验实验性插件", "更多 AI / 同步额度预留", "公开路线图优先反馈"] },
+      { name: "Pro", price: "即将推出", note: "开发测试期暂时开放核心权益", items: ["多设备云端同步", "Navo AI 对话与记忆", "MCP 远程访问", "高级导入导出与备份"] },
+    ]
+    : [
+      { name: "Free", price: "$0", note: "Active now", items: ["Local tasks and projects", "Core timeline and calendar views", "Basic import and export", "Official built-in plugin preview"] },
+      { name: "Supporter", price: "Donation", note: "For supporting ongoing work", items: ["Supporter entry point", "Early experimental plugin access", "Reserved AI / sync quota framing", "Priority feedback on the roadmap"] },
+      { name: "Pro", price: "Coming soon", note: "Core benefits are open during dev preview", items: ["Multi-device cloud sync", "Navo AI chat and memory", "Remote MCP access", "Advanced import/export and backups"] },
+    ];
   return (
     <section className="df-subscription-panel">
       <div className="df-subscription-head">
-        <span>{lang === "zh" ? "当前方案" : "Current plan"}</span>
-        <strong>{lang === "zh" ? "Free Plan" : "Free Plan"}</strong>
-        <small>{lang === "zh" ? "开发测试期 Pro 权益已全部开放" : "All Pro benefits are open during the dev preview"}</small>
+        <span>{lang === "zh" ? "方案权限" : "Plan access"}</span>
+        <strong>{lang === "zh" ? "Dev Preview" : "Dev Preview"}</strong>
+        <small>{lang === "zh" ? "开发测试期会暂时开放部分 Pro 权益；正式权限以后端开通为准。" : "Some Pro-like benefits are open during the dev preview; final access will follow backend entitlement."}</small>
       </div>
-      <div className="df-plan-choice-grid" role="list">
-        <article className="df-plan-choice active" role="listitem">
-          <span>{lang === "zh" ? "Free" : "Free"}</span>
-          <strong>$0</strong>
-          <small>{lang === "zh" ? "当前已启用" : "Active now"}</small>
-        </article>
-        <article className="df-plan-choice pro" role="listitem">
-          <span>{lang === "zh" ? "Pro" : "Pro"}</span>
-          <strong>{lang === "zh" ? "即将推出" : "Coming soon"}</strong>
-          <small>{lang === "zh" ? "上线后可订阅支持持续服务" : "Subscribe later to support ongoing service"}</small>
-        </article>
+      <div className="df-plan-choice-grid detailed" role="list">
+        {tiers.map((tier, index) => (
+          <article className={`df-plan-choice ${index === 0 ? "active" : ""}`} role="listitem" key={tier.name}>
+            <span>{tier.name}</span>
+            <strong>{tier.price}</strong>
+            <small>{tier.note}</small>
+            <ul>
+              {tier.items.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </article>
+        ))}
       </div>
-      <ul className="df-plan-benefits">
-        {benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}
-      </ul>
+      <a className="df-donation-link" href={DONATION_URL} target="_blank" rel="noreferrer">
+        <span>{lang === "zh" ? "通过爱发电支持 NavoPath" : "Support NavoPath on Afdian"}</span>
+        <small>{lang === "zh" ? "捐赠不会立即改变当前账户权限，但会支持后续服务和插件维护。" : "Donation does not immediately change account access, but supports ongoing service and plugin maintenance."}</small>
+      </a>
     </section>
   );
 }
@@ -9161,11 +9187,11 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             </section>}
             {settingsSection === "mcp" && <section className="df-settings-group"><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
             {settingsSection === "plugins" && <section className="df-settings-group">
-              <h3>{lang === "zh" ? "插件市场" : "Plugin Marketplace"}</h3>
-              <p className="df-settings-desc">{lang === "zh" ? "扩展 NavoPath 的功能，发现和安装社区插件。" : "Extend NavoPath's functionality with community plugins."}</p>
+              <h3>{lang === "zh" ? "官方插件" : "Official plugins"}</h3>
+              <p className="df-settings-desc">{lang === "zh" ? "当前版本提供经过内置审核的官方插件。点击启用后，下方会立即出现对应工具。" : "This build ships reviewed official plugins. Enable one and its tool appears below immediately."}</p>
 
               <div className="df-settings-divider" />
-              <div className="df-settings-subhead">{lang === "zh" ? "可用插件" : "Available Plugins"}</div>
+              <div className="df-settings-subhead">{lang === "zh" ? "可用官方插件" : "Available official plugins"}</div>
 
               <div className="df-plugin-list">
                 {listRegisteredPlugins().map((plugin) => {
@@ -9176,15 +9202,17 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                       <div className="df-plugin-icon">{plugin.icon}</div>
                       <div className="df-plugin-info">
                         <div className="df-plugin-header">
-                          <strong className="df-plugin-name">{plugin.name}</strong>
+                          <strong className="df-plugin-name">{localizedPluginName(plugin, lang)}</strong>
                           <span className="df-plugin-version">v{plugin.version}</span>
                         </div>
-                        <p className="df-plugin-desc">{plugin.description}</p>
+                        <p className="df-plugin-desc">{localizedPluginDescription(plugin, lang)}</p>
+                        <p className="df-plugin-enabled-summary">{localizedPluginEnabledSummary(plugin, lang)}</p>
                         <div className="df-plugin-meta">
                           <span className="df-plugin-author">{plugin.author}</span>
+                          <span>{lang === "zh" ? "权限" : "Permissions"}: {plugin.permissions.join(", ")}</span>
                           {enabled && (
                             <span className="df-plugin-status">
-                              {active ? (lang === "zh" ? "已启用" : "Active") : (lang === "zh" ? "已安装" : "Installed")}
+                              {active ? (lang === "zh" ? "运行中" : "Running") : (lang === "zh" ? "已启用，等待刷新" : "Enabled, refreshing")}
                             </span>
                           )}
                         </div>
@@ -9224,64 +9252,13 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
 
               <div className="df-settings-divider" />
               <a className="df-plugin-doc-link" href="/plugin-guide">
-                <span>{lang === "zh" ? "打开 Plugins / MCP 使用教程" : "Open Plugins / MCP documentation"}</span>
-                <small>{lang === "zh" ? "像 API 文档一样查看配置、权限和示例" : "Configuration, permissions, and examples in an API-doc layout"}</small>
+                <span>{lang === "zh" ? "打开 Plugins / MCP 使用教程" : "Open Plugins / MCP guide"}</span>
+                <small>{lang === "zh" ? "查看官方插件作用、MCP 配置和安全边界" : "Read official plugin roles, MCP setup, and security boundaries"}</small>
                 <i aria-hidden="true">↗</i>
               </a>
               <div className="df-settings-divider" />
               <div className="df-settings-subhead">{lang === "zh" ? "已启用工具" : "Enabled tools"}</div>
               <PluginRuntimePanel settings={settings} data={data} onSave={onSave} onSaveData={onSaveData} lang={lang} />
-              <div className="df-settings-divider df-plugin-legacy-guide-divider" />
-              <div className="df-settings-subhead df-plugin-legacy-guide-heading">{lang === "zh" ? "插件配置指南" : "Plugin Configuration Guide"}</div>
-
-              <div className="df-plugin-guide">
-                <h4>{lang === "zh" ? "如何开发插件" : "How to Develop Plugins"}</h4>
-                <p>{lang === "zh" ? "NavoPath 插件基于 Web 标准构建，使用 HTML、CSS 和 JavaScript。" : "NavoPath plugins are built on web standards using HTML, CSS, and JavaScript."}</p>
-
-                <ol className="df-plugin-steps">
-                  <li>
-                    <strong>{lang === "zh" ? "创建插件目录" : "Create Plugin Directory"}</strong>
-                    <p>{lang === "zh" ? "在插件目录中创建一个新文件夹，以你的插件 ID 命名。" : "Create a new folder in the plugins directory, named after your plugin ID."}</p>
-                  </li>
-                  <li>
-                    <strong>{lang === "zh" ? "创建 manifest.json" : "Create manifest.json"}</strong>
-                    <p>{lang === "zh" ? "插件清单文件，包含插件的基本信息和配置。" : "Plugin manifest file containing basic info and configuration."}</p>
-                    <pre className="df-plugin-code">{`{
-  "id": "your-plugin-id",
-  "name": "Your Plugin Name",
-  "version": "1.0.0",
-  "description": "Plugin description",
-  "author": "Your Name",
-  "main": "index.js",
-  "permissions": ["tasks", "settings"]
-}`}</pre>
-                  </li>
-                  <li>
-                    <strong>{lang === "zh" ? "编写插件代码" : "Write Plugin Code"}</strong>
-                    <p>{lang === "zh" ? "创建 index.js 文件，实现插件的主要功能。" : "Create an index.js file to implement the main functionality."}</p>
-                  </li>
-                  <li>
-                    <strong>{lang === "zh" ? "加载插件" : "Load Plugin"}</strong>
-                    <p>{lang === "zh" ? "在设置中启用插件，重启应用后生效。" : "Enable the plugin in settings, and restart the app to take effect."}</p>
-                  </li>
-                </ol>
-
-                <div className="df-plugin-api">
-                  <h4>{lang === "zh" ? "插件 API 参考" : "Plugin API Reference"}</h4>
-                  <ul>
-                    <li><code>navopath.tasks</code> - {lang === "zh" ? "任务管理 API" : "Task management API"}</li>
-                    <li><code>navopath.settings</code> - {lang === "zh" ? "设置管理 API" : "Settings management API"}</li>
-                    <li><code>navopath.ui</code> - {lang === "zh" ? "用户界面 API" : "User interface API"}</li>
-                    <li><code>navopath.events</code> - {lang === "zh" ? "事件系统 API" : "Event system API"}</li>
-                  </ul>
-                </div>
-
-                <div className="df-plugin-location">
-                  <h4>{lang === "zh" ? "插件目录位置" : "Plugin Directory Location"}</h4>
-                  <p>{lang === "zh" ? "桌面版插件存储在用户数据目录下的 plugins 文件夹中。" : "Desktop plugins are stored in the plugins folder under the user data directory."}</p>
-                  <code className="df-plugin-path">{lang === "zh" ? "%APPDATA%/NavoPath/plugins" : "~/Library/Application Support/NavoPath/plugins"}</code>
-                </div>
-              </div>
             </section>}
             {settingsSection === "account" && <section className="df-settings-group"><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
@@ -9352,8 +9329,8 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
               onMouseDown={(event) => event.stopPropagation()}
             >
               <form onSubmit={(event) => { event.preventDefault(); commitPluginConfig(); }}>
-                <h2 id="df-plugin-config-title">{plugin.icon} {plugin.name}</h2>
-                <p className="df-settings-desc">{plugin.description}</p>
+                <h2 id="df-plugin-config-title">{plugin.icon} {localizedPluginName(plugin, lang)}</h2>
+                <p className="df-settings-desc">{localizedPluginDescription(plugin, lang)}</p>
                 <div className="df-plugin-config-fields">
                   {plugin.configFields.map((field) => {
                     const value = pluginConfigDraft[field.key];
@@ -9365,17 +9342,17 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                             checked={Boolean(value)}
                             onChange={(event) => savePluginConfigField(field.key, event.target.checked)}
                           />
-                          {field.label}
+                          {pluginText(field.label, field.labelI18n, lang)}
                         </label>
                       );
                     }
                     if (field.type === "select") {
                       return (
                         <label key={field.key} className="df-plugin-config-field">
-                          <span>{field.label}</span>
+                          <span>{pluginText(field.label, field.labelI18n, lang)}</span>
                           <select value={String(value ?? "")} onChange={(event) => savePluginConfigField(field.key, event.target.value)}>
                             {(field.options ?? []).map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              <option key={opt.value} value={opt.value}>{pluginText(opt.label, opt.labelI18n, lang)}</option>
                             ))}
                           </select>
                         </label>
@@ -9384,7 +9361,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                     if (field.type === "number") {
                       return (
                         <label key={field.key} className="df-plugin-config-field">
-                          <span>{field.label}</span>
+                          <span>{pluginText(field.label, field.labelI18n, lang)}</span>
                           <input
                             type="number"
                             value={Number(value ?? 0)}
@@ -9397,7 +9374,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
                     }
                     return (
                       <label key={field.key} className="df-plugin-config-field">
-                        <span>{field.label}</span>
+                        <span>{pluginText(field.label, field.labelI18n, lang)}</span>
                         <textarea
                           rows={3}
                           value={String(value ?? "")}
@@ -9438,65 +9415,73 @@ function ThemeColorSetting({ label, presets, value, onChange }: { label: string;
 }
 
 function PluginGuidePage() {
+  registerBuiltinPlugins();
+  const [language, setLanguage] = useState<Language>(detectSystemLanguage());
+  const zh = language === "zh";
+  const labels = {
+    back: zh ? "返回工作区" : "Back to app",
+    tag: zh ? "官方插件 / MCP" : "OFFICIAL PLUGINS / MCP",
+    title: zh ? "Plugins 和 MCP 使用说明" : "Plugins and MCP guide",
+    intro: zh
+      ? "NavoPath 当前只加载随应用发布的官方内置插件。启用后，插件会在设置页下方显示可直接使用的工具；不会从本地目录或远程脚本加载任意代码。"
+      : "NavoPath currently loads only official built-in plugins shipped with the app. Once enabled, each plugin exposes a usable tool in Settings; arbitrary local folders or remote scripts are not loaded.",
+    mcp: zh ? "MCP 快速配置" : "MCP quickstart",
+    plugins: zh ? "官方插件作用" : "Official plugin roles",
+    security: zh ? "安全边界" : "Security boundary",
+    host: zh ? "宿主能力" : "Host capabilities",
+  };
+  const config = `[mcp_servers.navopath]\nurl = "${MCP_ENDPOINT}"\nhttp_headers = { Authorization = "Bearer nvp_YOUR_TOKEN" }`;
   return (
-    <main className="df-doc-page">
-      <nav className="df-doc-sidebar" aria-label="Documentation navigation">
-        <a href="/app">← Back to app</a>
-        <a href="#mcp">MCP quickstart</a>
-        <a href="#plugins">Built-in plugins</a>
-        <a href="#api">Plugin API</a>
-        <a href="#manifest">Manifest</a>
+    <main className="df-doc-page changelog-like">
+      <nav className="df-doc-sidebar" aria-label={zh ? "文档导航" : "Documentation navigation"}>
+        <a href="/app">← {labels.back}</a>
+        <div className="df-doc-language" aria-label={zh ? "文档语言" : "Guide language"}>
+          <button type="button" className={zh ? "active" : ""} onClick={() => setLanguage("zh")}>中文</button>
+          <button type="button" className={!zh ? "active" : ""} onClick={() => setLanguage("en")}>EN</button>
+        </div>
       </nav>
       <article className="df-doc-content">
         <header className="df-doc-hero">
-          <span>NavoPath Docs</span>
-          <h1>Plugins and MCP configuration</h1>
-          <p>Use this page as the setup reference for remote MCP access and the built-in plugin system. The current app ships with safe built-in plugins; they run inside NavoPath and store configuration in your normal settings.</p>
+          <span>{labels.tag}</span>
+          <h1>{labels.title}</h1>
+          <p>{labels.intro}</p>
         </header>
         <section id="mcp" className="df-doc-section">
-          <h2>MCP quickstart</h2>
-          <p>Open Settings → MCP, generate a personal token, then configure your MCP client with the Streamable HTTP endpoint below. The raw token is shown once, so copy it immediately.</p>
-          <pre>{`[mcp_servers.navopath]
-url = "${MCP_ENDPOINT}"
-http_headers = { Authorization = "Bearer nvp_YOUR_TOKEN" }`}</pre>
+          <h2>{labels.mcp}</h2>
+          <p>{zh ? "打开 Settings → MCP，生成个人 Bearer Token，然后把下面的 Streamable HTTP 配置写入支持 MCP 的客户端。原始令牌只显示一次。" : "Open Settings → MCP, create a personal Bearer token, then paste the Streamable HTTP configuration below into an MCP-capable client. The raw token is shown once."}</p>
+          <pre>{config}</pre>
           <dl>
-            <div><dt>Endpoint</dt><dd><code>{MCP_ENDPOINT}</code></dd></div>
-            <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
-            <div><dt>Authentication</dt><dd><code>Authorization: Bearer nvp_...</code></dd></div>
+            <div><dt>{zh ? "服务地址" : "Endpoint"}</dt><dd><code>{MCP_ENDPOINT}</code></dd></div>
+            <div><dt>{zh ? "传输方式" : "Transport"}</dt><dd>Streamable HTTP</dd></div>
+            <div><dt>{zh ? "认证" : "Authentication"}</dt><dd><code>Authorization: Bearer nvp_...</code></dd></div>
           </dl>
         </section>
         <section id="plugins" className="df-doc-section">
-          <h2>Built-in plugins</h2>
+          <h2>{labels.plugins}</h2>
           <div className="df-doc-grid">
-            <article><h3>Pomodoro Timer</h3><p>Runs local focus/break cycles. Configure focus minutes, break minutes, and auto-start behavior.</p></article>
-            <article><h3>Habit Tracker</h3><p>Stores daily check-ins in plugin config. Add one habit per line in Configure.</p></article>
-            <article><h3>Weather Info</h3><p>Shows a local weather-style badge for the configured city without external API calls.</p></article>
-            <article><h3>Notes Enhanced</h3><p>Edits the selected task's existing notes field from the enabled plugin tools panel.</p></article>
+            {listRegisteredPlugins().map((plugin) => (
+              <article key={plugin.id}>
+                <h3>{localizedPluginName(plugin, language)}</h3>
+                <p>{localizedPluginDescription(plugin, language)}</p>
+                <small>{localizedPluginEnabledSummary(plugin, language)}</small>
+              </article>
+            ))}
           </div>
         </section>
-        <section id="api" className="df-doc-section">
-          <h2>Plugin API</h2>
+        <section id="security" className="df-doc-section">
+          <h2>{labels.security}</h2>
+          <p>{zh ? "当前版本的插件系统是同步的内置注册表：插件定义随 NavoPath 一起发布，配置保存在普通设置中。这样可以避免任意桌面脚本、远程脚本或未审核 manifest 在 Electron/Web 版本中运行。" : "The current plugin system is a synchronous built-in registry: plugin definitions ship with NavoPath and configuration is stored in normal settings. This avoids arbitrary desktop scripts, remote scripts, or unreviewed manifests running inside Electron/Web builds."}</p>
+        </section>
+        <section id="host" className="df-doc-section">
+          <h2>{labels.host}</h2>
           <table>
             <tbody>
-              <tr><th><code>getData()</code></th><td>Read the current planner snapshot.</td></tr>
-              <tr><th><code>savePluginConfig(id, patch)</code></th><td>Persist plugin-owned settings.</td></tr>
-              <tr><th><code>emit(event, payload)</code></th><td>Broadcast a NavoPath plugin event.</td></tr>
-              <tr><th><code>toast(message)</code></th><td>Show a transient in-app status message.</td></tr>
+              <tr><th><code>getData()</code></th><td>{zh ? "读取当前规划快照。" : "Read the current planner snapshot."}</td></tr>
+              <tr><th><code>savePluginConfig(id, patch)</code></th><td>{zh ? "保存插件自己的设置。" : "Persist plugin-owned settings."}</td></tr>
+              <tr><th><code>emit(event, payload)</code></th><td>{zh ? "广播 NavoPath 插件事件。" : "Broadcast a NavoPath plugin event."}</td></tr>
+              <tr><th><code>toast(message)</code></th><td>{zh ? "显示短暂的应用内状态提示。" : "Show a transient in-app status message."}</td></tr>
             </tbody>
           </table>
-        </section>
-        <section id="manifest" className="df-doc-section">
-          <h2>Manifest reference</h2>
-          <pre>{`{
-  "id": "your-plugin-id",
-  "name": "Your Plugin",
-  "version": "1.0.0",
-  "permissions": ["tasks", "settings", "ui"],
-  "configFields": [
-    { "key": "enabled", "label": "Enabled", "type": "boolean", "default": true }
-  ]
-}`}</pre>
-          <p>External arbitrary code loading is intentionally disabled in the current NavoPath desktop/web build. New plugins should be added to the built-in registry, reviewed, and shipped with the app.</p>
         </section>
       </article>
     </main>

@@ -6,8 +6,9 @@
 - 横屏窄窗口继续保持“今日候选在左、时间轴在右”的执行布局；竖屏才启用任务/日程单视图切换。
 - 设置页的云端同步、强调色、Navo AI 与账户区域改为更扁平的纸面分组，深色模式下按钮、弹窗和底部提示对比度更稳定。
 - Account 设置页新增独立订阅栏，当前 Free Plan 显示为开发测试期开放 Pro 权益，并把退出登录、关于与删除账号收进“更多”。
-- Plugins 现在有独立的使用教程/API 文档页面，MCP quickstart 也迁入同一文档页；设置页提供跳转入口。
-- 内置插件启用后会显示可使用工具：Pomodoro、习惯打卡、本地天气徽章和任务笔记。
+- Account 设置页的方案权限细化为 Free、Supporter 与 Pro，并新增爱发电捐赠入口；网站首页也提供轻量捐赠入口。
+- Plugins / MCP 使用教程改为更新日志式纸面文档，明确当前仅支持随应用发布的官方内置插件。
+- 官方插件新增中文名称、说明、配置项和启用后说明，启用后会直接显示 Pomodoro、习惯打卡、本地天气徽章和任务笔记工具。
 - AI 模型 fallback 列表扩展到 DeepSeek、Qwen、GLM、Kimi、MiniMax、Step、Nex 和 Ling 系列。
 
 ### 修复
@@ -18,6 +19,7 @@
 - 修复部分模型不支持 JSON response_format 时导致 AI 请求直接失败的问题，Edge Function 会自动重试普通请求并保留稳定模型兜底。
 - 修复窄横屏三日/周视图下 Plan Suggestions 没有折叠成小日历按钮的问题。
 - 移除 Account 页 Cloud sync 重复标题，并给 About NavoPath 增加外部链接提示。
+- 修复三日/周视图下拖动或调整任务块时预览提示条可能偏移的问题；短任务和长任务现在使用同一套悬停显示的调整手柄逻辑，短任务悬停后也会显示所属项目。
 
 ---
 
@@ -239,8 +241,9 @@
 - Narrow landscape windows keep Today Candidates on the left and the timeline on the right; single-view switching is reserved for portrait layouts.
 - Settings cloud sync, accent color, Navo AI, and account areas now use flatter paper-style grouping with stronger dark-mode contrast.
 - Account settings now show plan status in a dedicated subscription section, with Pro benefits open during the dev preview, and moves logout/about/delete actions into More.
-- Plugins now link to a standalone usage and API documentation page; MCP quickstart lives on the same page.
-- Enabled built-in plugins now expose usable tools: Pomodoro, habit check-ins, a local weather badge, and task notes.
+- Account settings now split plan access into Free, Supporter, and Pro tiers and add an Afdian donation entry; the website homepage also includes a restrained donation link.
+- Plugins / MCP documentation now uses a changelog-style paper page and makes clear that the current build only supports official built-in plugins shipped with the app.
+- Official plugins now have Chinese names, descriptions, config labels, and enabled-state guidance; enabled tools expose Pomodoro, habit check-ins, a local weather badge, and task notes.
 - AI model fallback choices now cover DeepSeek, Qwen, GLM, Kimi, MiniMax, Step, Nex, and Ling families.
 
 ### Fixed
@@ -251,6 +254,7 @@
 - Fixed AI requests failing when a model does not support JSON response_format by retrying without that option and keeping the stable model fallback.
 - Fixed Plan Suggestions not collapsing into a compact calendar button in narrow landscape 3-day/week views.
 - Removed the duplicate Cloud sync heading in Account settings and added an external-link hint to About NavoPath.
+- Fixed resize previews drifting while dragging or resizing timeline blocks in 3-day/week views; short and long tasks now share hover-only resize handles, and short tasks reveal their project on hover.
 
 ---
 

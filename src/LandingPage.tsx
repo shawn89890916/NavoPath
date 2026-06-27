@@ -4,11 +4,13 @@ import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 
 type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
+const DONATION_URL = "https://afdian.com/a/233cxy/plan";
 
 const copy = {
   en: {
     nav: ["Workflow", "Features", "Principles"],
     login: "Log in",
+    donate: "Support",
     eyebrow: "Planning for people who build",
     title: "Turn ambitious goals into",
     titleAccent: "today's next move.",
@@ -35,11 +37,13 @@ const copy = {
     principles: ["Planning and execution are different modes of thought.", "Your timeline should reflect reality, not aspiration.", "AI proposes. You decide."],
     ctaTitle: "Give the next important thing a place to happen.",
     ctaBody: "Start with the project. End with a day you can actually complete.",
+    ctaDonate: "Support ongoing development",
     footer: "NavoPath · Plan the path. Execute today.",
   },
   zh: {
     nav: ["工作流", "功能", "原则"],
     login: "登录",
+    donate: "支持",
     eyebrow: "为长期目标与今日行动而设计",
     title: "把宏大的目标变成",
     titleAccent: "今天清晰的下一步。",
@@ -66,6 +70,7 @@ const copy = {
     principles: ["规划与执行是两种不同的思考模式。", "时间轴应该反映现实，而不是愿望。", "AI 提议，你决定。"],
     ctaTitle: "为下一件重要的事，留出真正发生的时间。",
     ctaBody: "从项目开始，以一个能够完成的今天结束。",
+    ctaDonate: "支持后续开发",
     footer: "NavoPath · 规划路径，执行今天。",
   },
 };
@@ -208,6 +213,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
           {c.nav.map((item, index) => <a key={item} href={`#${["workflow", "features", "principles"][index]}`}>{item}</a>)}
         </div>
         <div className="landing-nav-actions">
+          <a className="landing-donation-link" href={DONATION_URL} target="_blank" rel="noreferrer">{c.donate}</a>
           <button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button>
           <button className="landing-button quiet small" onClick={() => openAuth("signin")}>{c.login}</button>
         </div>
@@ -268,11 +274,12 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
           <div className="landing-actions">
             <button className="landing-button primary" onClick={() => openAuth("signup")}>{c.start}<span>↗</span></button>
             <a className="landing-button quiet landing-download" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">{c.download}<span>↓</span></a>
+            <a className="landing-button quiet landing-donate" href={DONATION_URL} target="_blank" rel="noreferrer">{c.ctaDonate}</a>
           </div>
         </section>
       </main>
 
-      <footer className="landing-footer"><span>{c.footer}</span><span>© 2026 Xiaoyang Chen</span></footer>
+      <footer className="landing-footer"><span>{c.footer}</span><a href={DONATION_URL} target="_blank" rel="noreferrer">{c.ctaDonate}</a><span>© 2026 Xiaoyang Chen</span></footer>
 
       {showAuth && <div className="landing-auth-overlay" onMouseDown={() => { setShowAuth(false); setAuthView("login"); }}>
         <section className="landing-auth-card" onMouseDown={(event) => event.stopPropagation()}>

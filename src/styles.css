@@ -20224,248 +20224,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
 }
 
 
-/* ===== Plugin Marketplace Styles ===== */
-.df-app .df-settings-desc {
-  font-size: 14px;
-  color: var(--df-text-secondary);
-  margin: 8px 0 16px 0;
-  line-height: 1.5;
-}
-
-.df-app .df-plugin-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.df-app .df-plugin-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: var(--df-bg-secondary);
-  border: 1px solid var(--df-border);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.df-app .df-plugin-card:hover {
-  border-color: var(--df-accent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.df-app .df-plugin-card.installed {
-  border-color: var(--df-success, #10b981);
-}
-
-.df-app .df-plugin-icon {
-  font-size: 32px;
-  line-height: 1;
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--df-bg-tertiary);
-  border-radius: 10px;
-}
-
-.df-app .df-plugin-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.df-app .df-plugin-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.df-app .df-plugin-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--df-text-primary);
-}
-
-.df-app .df-plugin-version {
-  font-size: 12px;
-  color: var(--df-text-tertiary);
-  background: var(--df-bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.df-app .df-plugin-desc {
-  font-size: 13px;
-  color: var(--df-text-secondary);
-  line-height: 1.5;
-  margin: 0 0 8px 0;
-}
-
-.df-app .df-plugin-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--df-text-tertiary);
-}
-
-.df-app .df-plugin-status {
-  color: var(--df-success, #10b981);
-  font-weight: 500;
-}
-
-.df-app .df-plugin-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.df-app .df-plugin-install,
-.df-app .df-plugin-uninstall,
-.df-app .df-plugin-config {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.df-app .df-plugin-install {
-  background: var(--df-accent);
-  color: var(--df-accent-contrast);
-}
-
-.df-app .df-plugin-install:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.df-app .df-plugin-config {
-  background: var(--df-bg-tertiary);
-  color: var(--df-text-primary);
-}
-
-.df-app .df-plugin-config:hover {
-  background: var(--df-border);
-}
-
-.df-app .df-plugin-uninstall {
-  background: transparent;
-  color: var(--df-danger, #ef4444);
-  border: 1px solid var(--df-danger, #ef4444);
-}
-
-.df-app .df-plugin-uninstall:hover {
-  background: var(--df-danger, #ef4444);
-  color: white;
-}
-
-.df-app .df-plugin-guide {
-  margin-top: 12px;
-}
-
-.df-app .df-plugin-guide h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--df-text-primary);
-  margin: 16px 0 8px 0;
-}
-
-.df-app .df-plugin-guide p {
-  font-size: 13px;
-  color: var(--df-text-secondary);
-  line-height: 1.6;
-  margin: 0 0 12px 0;
-}
-
-.df-app .df-plugin-steps {
-  margin: 0 0 16px 0;
-  padding-left: 20px;
-}
-
-.df-app .df-plugin-steps li {
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: var(--df-text-secondary);
-  line-height: 1.6;
-}
-
-.df-app .df-plugin-steps li strong {
-  color: var(--df-text-primary);
-  display: block;
-  margin-bottom: 4px;
-}
-
-.df-app .df-plugin-steps li p {
-  margin: 4px 0 8px 0;
-}
-
-.df-app .df-plugin-code {
-  display: block;
-  background: var(--df-bg-tertiary);
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: var(--df-text-primary);
-  overflow-x: auto;
-  margin: 8px 0;
-  line-height: 1.5;
-}
-
-.df-app .df-plugin-api {
-  margin-top: 16px;
-}
-
-.df-app .df-plugin-api ul {
-  margin: 8px 0 0 0;
-  padding-left: 20px;
-}
-
-.df-app .df-plugin-api li {
-  font-size: 13px;
-  color: var(--df-text-secondary);
-  line-height: 1.8;
-}
-
-.df-app .df-plugin-api code {
-  background: var(--df-bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: var(--df-accent);
-}
-
-.df-app .df-plugin-location {
-  margin-top: 16px;
-  padding: 12px;
-  background: var(--df-bg-tertiary);
-  border-radius: 8px;
-}
-
-.df-app .df-plugin-path {
-  display: block;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: var(--df-text-primary);
-  background: var(--df-bg-secondary);
-  padding: 8px 12px;
-  border-radius: 6px;
-  margin-top: 8px;
-  word-break: break-all;
-}
-
-
-
 /* ===== v1.2.20: Refactor time block display logic ===== */
 /* Clean up conflicting styles and ensure reliable display for all task durations */
 
@@ -20642,44 +20400,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   z-index: 1 !important;
 }
 
-/* Short-block center resize handle: only the middle band is draggable to
-   resize the end edge, leaving the top/bottom edges for drag-move. */
-.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center {
-  position: absolute !important;
-  left: 28px !important;
-  right: 10px !important;
-  top: 25% !important;
-  bottom: 25% !important;
-  width: auto !important;
-  height: auto !important;
-  min-width: 0 !important;
-  transform: none !important;
-  z-index: 6 !important;
-  cursor: ns-resize !important;
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
-}
-.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center::before {
-  content: "" !important;
-  position: absolute !important;
-  right: 2px !important;
-  top: 50% !important;
-  left: auto !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important;
-  width: 10px !important;
-  height: 2px !important;
-  border-radius: 1px !important;
-  background: color-mix(in srgb, var(--cat, #2b6cb0) 60%, #ffffff 0%) !important;
-  opacity: 0.55 !important;
-  pointer-events: none !important;
-}
-.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center:hover::before,
-.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot.center:active::before {
-  opacity: 1 !important;
-}
-
 /* === Task Block Color Fill Mode ===========================================
    When enabled (via .task-block-fill on .df-app), the entire task block is
    filled with the belonging project color instead of using a subtle tint +
@@ -20725,13 +20445,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--cat, var(--accent-active)) 16%, var(--surface-card)) !important;
 }
 
-/* === Short-block (15/30-min) resize handles — FINAL OVERRIDE ===============
-   Placed last so it wins every cascade duel. The top/bottom handles sit at
-   the block edges. The hit area is a centered quarter of the block width so
-   it never crowds the title, while the slim indicator bar stays always
-   visible for affordance. Center-handle legacy rules are voided. */
-.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot,
-.df-app .df-time-block.short-block.short-block-center-resize:not(.df-time-block-week) .df-resize-dot {
+/* === Unified timeline resize + short-block hover affordances =============== */
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
   position: absolute !important;
   left: 50% !important;
   right: auto !important;
@@ -20747,8 +20462,27 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: none !important;
   z-index: 10 !important;
   cursor: ns-resize !important;
-  opacity: 1 !important;
+  opacity: 0 !important;
   display: block !important;
+}
+
+.df-app .df-time-block .df-resize-dot,
+.df-app .df-event-blocks-layer .df-time-block .df-resize-dot,
+.df-app .df-week-view .df-time-block.df-time-block-week .df-resize-dot,
+.df-app .df-week-view .df-event-blocks-layer .df-time-block .df-resize-dot {
+  opacity: 0 !important;
+}
+
+.df-app .df-time-block:hover .df-resize-dot,
+.df-app .df-time-block:focus-within .df-resize-dot,
+.df-app .df-time-block.resizing .df-resize-dot,
+.df-app .df-event-blocks-layer .df-time-block:hover .df-resize-dot,
+.df-app .df-event-blocks-layer .df-time-block:focus-within .df-resize-dot,
+.df-app .df-event-blocks-layer .df-time-block.resizing .df-resize-dot,
+.df-app .df-week-view .df-time-block.df-time-block-week:hover .df-resize-dot,
+.df-app .df-week-view .df-time-block.df-time-block-week:focus-within .df-resize-dot,
+.df-app .df-week-view .df-time-block.df-time-block-week.resizing .df-resize-dot {
+  opacity: 1 !important;
 }
 
 .df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.top {
@@ -20761,7 +20495,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
   top: auto !important;
 }
 
-.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::after {
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot::after,
+.df-app .df-time-block:not(.short-block) .df-resize-dot::after,
+.df-app .df-event-blocks-layer .df-time-block .df-resize-dot::after {
   content: "" !important;
   position: absolute !important;
   top: 50% !important;
@@ -20774,12 +20510,18 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border-radius: 1px !important;
   background: var(--accent-active, #2A6E8E) !important;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface-main, #fff) 50%, transparent) !important;
-  opacity: 0.75 !important;
+  opacity: 0 !important;
   pointer-events: none !important;
 }
 
 .df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot:hover::after,
-.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot:active::after {
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot:active::after,
+.df-app .df-time-block:hover .df-resize-dot::after,
+.df-app .df-time-block:focus-within .df-resize-dot::after,
+.df-app .df-time-block.resizing .df-resize-dot::after,
+.df-app .df-event-blocks-layer .df-time-block:hover .df-resize-dot::after,
+.df-app .df-event-blocks-layer .df-time-block:focus-within .df-resize-dot::after,
+.df-app .df-event-blocks-layer .df-time-block.resizing .df-resize-dot::after {
   opacity: 1 !important;
 }
 
@@ -20791,5 +20533,28 @@ body:has(:active)::-webkit-scrollbar-thumb {
   top: -6px !important;
   bottom: -6px !important;
   pointer-events: auto !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-project {
+  display: -webkit-box !important;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-project-wrap {
+  top: calc(100% + 4px) !important;
+  left: 28px !important;
+  max-width: min(220px, calc(100% - 36px)) !important;
+  padding: 3px 7px;
+  border: 1px solid var(--paper-rule);
+  background: var(--surface-card);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.df-app .df-time-block.short-block:not(.df-time-block-week):hover .df-block-project-wrap,
+.df-app .df-time-block.short-block:not(.df-time-block-week):focus-within .df-block-project-wrap,
+.df-app .df-time-block.short-block:not(.df-time-block-week).project-open .df-block-project-wrap {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 30;
 }
 

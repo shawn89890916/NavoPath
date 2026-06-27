@@ -32,11 +32,14 @@ export interface PluginHost {
   toast: (message: string) => void;
 }
 
+export type LocalizedText = Partial<Record<"zh" | "en", string>>;
+
 export interface PluginConfigField {
   key: string;
   label: string;
+  labelI18n?: LocalizedText;
   type: "boolean" | "number" | "string" | "select";
-  options?: { value: string; label: string }[];
+  options?: { value: string; label: string; labelI18n?: LocalizedText }[];
   min?: number;
   max?: number;
   default: unknown;
@@ -46,7 +49,10 @@ export interface NavoPlugin {
   /** Stable unique id, lowercase kebab-case. */
   id: string;
   name: string;
+  nameI18n?: LocalizedText;
   description: string;
+  descriptionI18n?: LocalizedText;
+  enabledSummaryI18n?: LocalizedText;
   version: string;
   author: string;
   icon: string;
@@ -93,6 +99,14 @@ export function resolveConfig(
     result[field.key] = has ? (stored as Record<string, unknown>)[field.key] : field.default;
   }
   return result;
+}
+
+export function pluginText(
+  text: string,
+  localized: LocalizedText | undefined,
+  lang: "zh" | "en",
+): string {
+  return localized?.[lang] || localized?.en || text;
 }
 
 /** Activate a plugin by id. Returns false if plugin unknown or already active. */
