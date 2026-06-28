@@ -1,5 +1,13 @@
 # NavoPath 更新日志
 
+## 2026-06-29 · 模板模式
+
+### 新功能
+- Execute 页新增模板模式：可按学校日或自习日的固定时间节点批量创建当天时间块，勾选需要的 Period 后填写任务目标即可应用。
+
+### 改进
+- 模板弹窗统一使用 NavoPath 纸面风格，Period 默认不勾选，填写目标或修改时间会自动启用该节点，并支持新增或删除 Period。
+
 ## 2026-06-27 · 云端同步、AI 与响应式布局修复
 ### 改进
 - 新用户与本地预览默认进入浅色模式，保持 NavoPath 纸面风格的默认阅读体验。
@@ -233,6 +241,14 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-06-29 · Template mode
+
+### New
+- Added template mode to the Execute page: users can create same-day time blocks from school-day or study-day fixed periods, then fill goals only for the selected periods.
+
+### Improved
+- The template dialog now follows NavoPath's paper-like visual style, leaves periods unchecked by default, auto-enables a period when its goal or time is edited, and supports adding or removing periods.
 
 ## 2026-06-27 · Cloud sync, AI, and responsive layout fixes
 
