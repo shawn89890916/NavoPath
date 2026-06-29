@@ -150,6 +150,18 @@ export function normalizeData(data: PlannerData): PlannerData {
       pinned: Boolean(memory.pinned),
       archived: Boolean(memory.archived),
     })),
+    scheduleTemplates: (data.scheduleTemplates || []).map((template) => ({
+      ...template,
+      id: template.id || uid("template"),
+      title: template.title || "Template",
+      slots: (template.slots || []).map((slot) => ({
+        ...slot,
+        id: slot.id || uid("slot"),
+        label: slot.label || "Period",
+      })),
+      createdAt: template.createdAt || now(),
+      updatedAt: template.updatedAt || template.createdAt || now(),
+    })),
     drafts: (data.drafts || []).filter((draft) => draft.title).slice(-10),
     version: Math.max(data.version || 1, 2),
     events: [],

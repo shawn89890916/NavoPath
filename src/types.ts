@@ -194,6 +194,21 @@ export interface AiConversation {
   updatedAt: string;
 }
 
+export interface ScheduleTemplateSlot {
+  id: string;
+  label: string;
+  start: string;
+  end: string;
+}
+
+export interface ScheduleTemplate {
+  id: string;
+  title: string;
+  slots: ScheduleTemplateSlot[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PlannerData {
   version: number;
   importedSeedVersion: string;
@@ -210,6 +225,7 @@ export interface PlannerData {
   aiConversations?: AiConversation[];
   activeAiConversationId?: string;
   aiMemories: AiMemory[];
+  scheduleTemplates?: ScheduleTemplate[];
   taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
   sync?: { deleted: Record<string, string> };
 }

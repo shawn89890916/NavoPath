@@ -82,7 +82,7 @@ function mergeSettings(settings: unknown): Settings {
   return { ...defaultSettings, ...stored };
 }
 
-const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "longTasks", "notes", "drafts", "aiConversations", "aiMemories"] as const;
+const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
 
 function itemTime(item: any) {
   return Date.parse(item?.updatedAt || item?.createdAt || item?.savedAt || "") || 0;
@@ -126,6 +126,7 @@ function emptyCloudData(): PlannerData {
     aiConversations: [],
     activeAiConversationId: undefined,
     aiMemories: [],
+    scheduleTemplates: [],
     taskLayouts: {},
   };
 }
