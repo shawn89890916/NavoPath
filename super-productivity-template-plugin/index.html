@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Template Mode</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #faf8f3;
+      --paper: #fffdfa;
+      --ink: #26231f;
+      --muted: #73695e;
+      --rule: #ded6ca;
+      --accent: #806947;
+      --danger: #a84736;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1d1c1a;
+        --paper: #262420;
+        --ink: #eee8de;
+        --muted: #b8ad9f;
+        --rule: #403a32;
+        --accent: #d8c29b;
+        --danger: #ef9a86;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 13px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { padding: 14px; }
+    h1 {
+      margin: 0 0 12px;
+      font: 650 18px/1.2 Georgia, "Times New Roman", serif;
+      letter-spacing: 0;
+    }
+    button, input {
+      font: inherit;
+    }
+    button {
+      min-height: 32px;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+    button.danger { color: var(--danger); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    input {
+      min-height: 32px;
+      width: 100%;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 0 8px;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .tabs button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .toolbar {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      margin: 12px 0;
+    }
+    .notice {
+      margin: 8px 0;
+      padding: 8px;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      color: var(--muted);
+      border-radius: 4px;
+    }
+    .periods {
+      display: grid;
+      gap: 8px;
+    }
+    .period {
+      display: grid;
+      grid-template-columns: 88px 1fr 34px;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .check input {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      min-height: 16px;
+      padding: 0;
+      border: 1.5px solid var(--ink);
+      background: transparent;
+      border-radius: 2px;
+      position: relative;
+    }
+    .check input:checked::after {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 8px;
+      height: 4px;
+      border-left: 2px solid var(--ink);
+      border-bottom: 2px solid var(--ink);
+      transform: rotate(-45deg);
+    }
+    .meta {
+      display: grid;
+      gap: 7px;
+    }
+    .time {
+      display: grid;
+      grid-template-columns: 1fr 14px 1fr;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .summary { color: var(--muted); }
+    .small { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Template Mode</h1>
+    <div class="tabs" id="tabs"></div>
+    <div class="toolbar">
+      <input id="templateName" placeholder="Template name" />
+      <button id="newTemplate">New</button>
+      <button id="saveTemplate" class="primary">Save</button>
+    </div>
+    <div class="notice">
+      Checked periods become Super Productivity tasks for today. Exact start/end times are stored in notes because the public plugin API exposes task creation, not planner time-block placement.
+    </div>
+    <div class="periods" id="periods"></div>
+    <div class="actions">
+      <span class="summary" id="summary">0 tasks ready</span>
+      <button id="addPeriod">Add period</button>
+      <button id="apply" class="primary">Apply</button>
+    </div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "navopath-template-mode.templates";
+    const fallbackTemplates = [
+      {
+        id: "default-1",
+        title: "Default 1",
+        slots: [
+          ["Period 1", "08:00", "08:45"],
+          ["Period 2", "08:55", "09:40"],
+          ["Period 3", "10:00", "10:45"],
+          ["Period 4", "10:55", "11:40"],
+          ["Afternoon 1", "13:30", "14:15"],
+          ["Afternoon 2", "14:25", "15:10"],
+          ["Afternoon 3", "15:30", "16:15"],
+          ["Evening review", "19:30", "20:15"],
+        ].map(([label, start, end]) => ({ id: uid("slot"), label, start, end })),
+      },
+      {
+        id: "default-2",
+        title: "Default 2",
+        slots: [
+          ["Morning focus", "09:00", "10:30"],
+          ["Morning review", "10:45", "12:00"],
+          ["Afternoon progress", "14:00", "15:30"],
+          ["Output block", "15:45", "17:00"],
+          ["Evening close", "19:30", "20:30"],
+        ].map(([label, start, end]) => ({ id: uid("slot"), label, start, end })),
+      },
+    ];
+
+    let templates = [];
+    let activeId = "default-1";
+    let draft = [];
+
+    const $ = (id) => document.getElementById(id);
+
+    function uid(prefix) {
+      return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
+    }
+
+    function todayIso() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function minutes(time) {
+      const match = /^(\d{1,2}):(\d{2})$/.exec(time || "");
+      if (!match) return NaN;
+      return Number(match[1]) * 60 + Number(match[2]);
+    }
+
+    function addMinutes(time, amount) {
+      const next = Math.max(0, Math.min(24 * 60 - 1, minutes(time) + amount));
+      return `${String(Math.floor(next / 60)).padStart(2, "0")}:${String(next % 60).padStart(2, "0")}`;
+    }
+
+    async function api(method, ...args) {
+      if (!window.PluginAPI || !window.PluginAPI[method]) {
+        throw new Error(`Super Productivity PluginAPI.${method} is unavailable.`);
+      }
+      return window.PluginAPI[method](...args);
+    }
+
+    async function load() {
+      try {
+        const saved = await api("loadSyncedData", STORAGE_KEY);
+        templates = Array.isArray(saved) && saved.length ? saved : fallbackTemplates;
+      } catch {
+        templates = fallbackTemplates;
+      }
+      activeId = templates[0]?.id || "default-1";
+      setDraftFromActive();
+      render();
+    }
+
+    async function persist() {
+      await api("persistDataSynced", STORAGE_KEY, templates);
+    }
+
+    function activeTemplate() {
+      return templates.find((template) => template.id === activeId) || templates[0];
+    }
+
+    function setDraftFromActive() {
+      const template = activeTemplate();
+      $("templateName").value = template?.title || "";
+      draft = (template?.slots || []).map((slot) => ({
+        ...slot,
+        selected: false,
+        goal: "",
+      }));
+    }
+
+    function render() {
+      $("tabs").innerHTML = "";
+      for (const template of templates) {
+        const btn = document.createElement("button");
+        btn.textContent = template.title;
+        btn.className = template.id === activeId ? "active" : "";
+        btn.onclick = () => {
+          activeId = template.id;
+          setDraftFromActive();
+          render();
+        };
+        $("tabs").appendChild(btn);
+      }
+
+      $("periods").innerHTML = "";
+      for (const slot of draft) {
+        const row = document.createElement("div");
+        row.className = "period";
+        row.innerHTML = `
+          <label class="check">
+            <input type="checkbox" ${slot.selected ? "checked" : ""} data-field="selected" />
+            <span>Add</span>
+          </label>
+          <div class="meta">
+            <input value="${escapeHtml(slot.label)}" data-field="label" placeholder="Period label" />
+            <div class="time">
+              <input value="${escapeHtml(slot.start)}" data-field="start" placeholder="HH:MM" maxlength="5" />
+              <span>-</span>
+              <input value="${escapeHtml(slot.end)}" data-field="end" placeholder="HH:MM" maxlength="5" />
+            </div>
+            <input value="${escapeHtml(slot.goal || "")}" data-field="goal" placeholder="Task title, optional" />
+          </div>
+          <button class="danger" data-field="remove">×</button>
+        `;
+        row.querySelectorAll("[data-field]").forEach((el) => {
+          const field = el.dataset.field;
+          if (field === "remove") {
+            el.onclick = () => {
+              draft = draft.filter((item) => item.id !== slot.id);
+              render();
+            };
+            return;
+          }
+          el.oninput = () => {
+            if (field === "selected") slot.selected = el.checked;
+            else slot[field] = el.value;
+            renderSummary();
+          };
+        });
+        $("periods").appendChild(row);
+      }
+      renderSummary();
+    }
+
+    function renderSummary() {
+      const ready = readySlots();
+      $("summary").textContent = `${ready.length} task${ready.length === 1 ? "" : "s"} ready`;
+      $("apply").disabled = ready.length === 0;
+    }
+
+    function readySlots() {
+      return draft.filter((slot) => {
+        const start = minutes(slot.start);
+        const end = minutes(slot.end);
+        return slot.selected && Number.isFinite(start) && Number.isFinite(end) && end > start;
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    $("newTemplate").onclick = () => {
+      const id = uid("template");
+      templates.push({
+        id,
+        title: "New template",
+        slots: [
+          { id: uid("slot"), label: "Period 1", start: "09:00", end: "10:00" },
+          { id: uid("slot"), label: "Period 2", start: "10:15", end: "11:15" },
+        ],
+      });
+      activeId = id;
+      setDraftFromActive();
+      render();
+    };
+
+    $("addPeriod").onclick = () => {
+      const last = draft[draft.length - 1];
+      const start = last && Number.isFinite(minutes(last.end)) ? last.end : "09:00";
+      draft.push({
+        id: uid("slot"),
+        label: `Period ${draft.length + 1}`,
+        start,
+        end: addMinutes(start, 45),
+        selected: true,
+        goal: "",
+      });
+      render();
+    };
+
+    $("saveTemplate").onclick = async () => {
+      const template = activeTemplate();
+      if (!template) return;
+      template.title = $("templateName").value.trim() || "Untitled template";
+      template.slots = draft
+        .filter((slot) => Number.isFinite(minutes(slot.start)) && Number.isFinite(minutes(slot.end)) && minutes(slot.end) > minutes(slot.start))
+        .map((slot) => ({ id: slot.id, label: slot.label || "Period", start: slot.start, end: slot.end }));
+      await persist();
+      await api("showSnack", { msg: "Template saved", type: "SUCCESS" }).catch(() => {});
+      render();
+    };
+
+    $("apply").onclick = async () => {
+      const slots = readySlots();
+      if (!slots.length) return;
+      let context = null;
+      try {
+        context = await api("getActiveWorkContext");
+      } catch {}
+
+      const dueDay = todayIso();
+      let created = 0;
+      for (const slot of slots) {
+        const start = minutes(slot.start);
+        const end = minutes(slot.end);
+        const task = {
+          title: (slot.goal || slot.label || "Template period").trim(),
+          notes: `Template period: ${slot.label || "Period"} (${slot.start}-${slot.end})`,
+          timeEstimate: (end - start) * 60 * 1000,
+          dueDay,
+        };
+        if (context?.type === "PROJECT") task.projectId = context.id;
+        if (context?.type === "TAG") task.tagIds = [context.id];
+        await api("addTask", task);
+        created += 1;
+      }
+      draft = draft.map((slot) => ({ ...slot, selected: false, goal: "" }));
+      render();
+      await api("showSnack", { msg: `Added ${created} template tasks`, type: "SUCCESS" }).catch(() => {});
+    };
+
+    load();
+  </script>
+</body>
+</html>

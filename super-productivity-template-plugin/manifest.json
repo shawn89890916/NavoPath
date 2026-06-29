@@ -1,0 +1,20 @@
+{
+  "id": "navopath-template-mode",
+  "name": "Template Mode",
+  "version": "0.1.0",
+  "description": "Create reusable period templates and add the selected periods as Super Productivity tasks.",
+  "manifestVersion": 1,
+  "minSupVersion": "11.0.0",
+  "author": "NavoPath",
+  "iFrame": true,
+  "sidePanel": true,
+  "isSkipMenuEntry": false,
+  "permissions": [
+    "addTask",
+    "getActiveWorkContext",
+    "getAllProjects",
+    "loadSyncedData",
+    "persistDataSynced",
+    "showSnack"
+  ]
+}
