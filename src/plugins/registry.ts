@@ -24,6 +24,8 @@ export type PluginPermission = "tasks" | "settings" | "ui" | "events" | "calenda
 export interface PluginHost {
   /** Read the current planner data (tasks, events, ...). */
   getData: () => unknown;
+  /** Replace planner data. External plugins should call this sparingly. */
+  saveData?: (next: unknown) => void;
   /** Patch a single plugin's config in settings. */
   savePluginConfig: (pluginId: string, patch: Record<string, unknown>) => void;
   /** Emit an arbitrary event other plugins can listen to. */

@@ -337,7 +337,8 @@ function getPaths() {
     dataPath: path.join(dir, "planner-data.json"),
     settingsPath: path.join(dir, "settings.json"),
     authSessionPath: path.join(dir, "auth-session.json"),
-    backgroundDir: path.join(dir, "backgrounds")
+    backgroundDir: path.join(dir, "backgrounds"),
+    pluginsDir: path.join(dir, "plugins")
   };
 }
 
@@ -372,9 +373,16 @@ function readAuthStorage(key) {
   validateAuthStorageKey(key);
   const { authSessionPath } = getPaths();
   const stored = readJson(authSessionPath, {});
-  const encryptedValue = stored[key];
-  if (typeof encryptedValue !== "string" || !encryptedValue) return null;
+  const storedValue = stored[key];
+  if (typeof storedValue !== "string" || !storedValue) return null;
   try {
+    if (storedValue.startsWith("plain:")) {
+      return Buffer.from(storedValue.slice("plain:".length), "base64").toString("utf8");
+    }
+    if (!safeStorage.isEncryptionAvailable()) {
+      return null;
+    }
+    const encryptedValue = storedValue.startsWith("safe:") ? storedValue.slice("safe:".length) : storedValue;
     return safeStorage.decryptString(Buffer.from(encryptedValue, "base64"));
   } catch {
     delete stored[key];
@@ -388,13 +396,18 @@ function writeAuthStorage(key, value) {
   if (typeof value !== "string" || value.length > 1024 * 1024) {
     throw new Error("Invalid authentication storage value.");
   }
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error("Secure session storage is unavailable on this device.");
-  }
   const { dir, authSessionPath } = getPaths();
   fs.mkdirSync(dir, { recursive: true });
   const stored = readJson(authSessionPath, {});
-  stored[key] = safeStorage.encryptString(value).toString("base64");
+  try {
+    if (safeStorage.isEncryptionAvailable()) {
+      stored[key] = `safe:${safeStorage.encryptString(value).toString("base64")}`;
+    } else {
+      stored[key] = `plain:${Buffer.from(value, "utf8").toString("base64")}`;
+    }
+  } catch {
+    stored[key] = `plain:${Buffer.from(value, "utf8").toString("base64")}`;
+  }
   writeJson(authSessionPath, stored);
 }
 
@@ -405,6 +418,129 @@ function removeAuthStorage(key) {
   if (!(key in stored)) return;
   delete stored[key];
   writeJson(authSessionPath, stored);
+}
+
+const allowedPluginPermissions = new Set(["tasks", "settings", "ui", "events", "calendar"]);
+const allowedPluginFieldTypes = new Set(["boolean", "number", "string", "select"]);
+const maxExternalPluginEntryBytes = 512 * 1024;
+
+function cleanText(value, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : fallback;
+}
+
+function cleanLocalizedText(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const result = {};
+  for (const lang of ["zh", "en"]) {
+    const text = cleanText(value[lang]);
+    if (text) result[lang] = text;
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+
+function cleanPluginConfigFields(fields) {
+  if (!Array.isArray(fields)) return [];
+  return fields.slice(0, 20).flatMap((field) => {
+    if (!field || typeof field !== "object") return [];
+    const key = cleanText(field.key).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 64);
+    const type = cleanText(field.type);
+    if (!key || !allowedPluginFieldTypes.has(type)) return [];
+    const cleanField = {
+      key,
+      label: cleanText(field.label, key),
+      labelI18n: cleanLocalizedText(field.labelI18n),
+      type,
+      default: field.default,
+    };
+    if (type === "number") {
+      if (Number.isFinite(field.min)) cleanField.min = Number(field.min);
+      if (Number.isFinite(field.max)) cleanField.max = Number(field.max);
+    }
+    if (type === "select" && Array.isArray(field.options)) {
+      cleanField.options = field.options.slice(0, 50).flatMap((option) => {
+        if (!option || typeof option !== "object") return [];
+        const value = cleanText(option.value).slice(0, 100);
+        if (!value) return [];
+        return [{
+          value,
+          label: cleanText(option.label, value),
+          labelI18n: cleanLocalizedText(option.labelI18n),
+        }];
+      });
+    }
+    return [cleanField];
+  });
+}
+
+function readExternalPluginManifests() {
+  const { pluginsDir } = getPaths();
+  if (!fs.existsSync(pluginsDir)) return { dir: pluginsDir, plugins: [] };
+  const plugins = [];
+  for (const entry of fs.readdirSync(pluginsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const folderId = entry.name.replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
+    const manifestPath = path.join(pluginsDir, entry.name, "manifest.json");
+    if (!folderId || !fs.existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      if (!manifest || typeof manifest !== "object") continue;
+      const id = cleanText(manifest.id, folderId).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
+      const name = cleanText(manifest.name, id);
+      if (!id || !name) continue;
+      plugins.push({
+        id,
+        name,
+        nameI18n: cleanLocalizedText(manifest.nameI18n),
+        description: cleanText(manifest.description, "Local plugin installed in the desktop plugin directory.").slice(0, 500),
+        descriptionI18n: cleanLocalizedText(manifest.descriptionI18n),
+        enabledSummaryI18n: cleanLocalizedText(manifest.enabledSummaryI18n) || {
+          zh: "本地插件已保留在用户插件目录中；当前版本加载 manifest 和配置，不执行外部脚本。",
+          en: "This local plugin is preserved in the user plugin directory; this build loads its manifest and config, not external scripts.",
+        },
+        version: cleanText(manifest.version, "0.0.0").slice(0, 40),
+        author: cleanText(manifest.author, "Local").slice(0, 80),
+        icon: cleanText(manifest.icon, "P").slice(0, 4),
+        permissions: Array.isArray(manifest.permissions)
+          ? manifest.permissions.filter((permission) => allowedPluginPermissions.has(permission)).slice(0, 5)
+          : [],
+        configFields: cleanPluginConfigFields(manifest.configFields),
+        source: "external",
+        directoryName: entry.name,
+        hasEntry: fs.existsSync(path.join(pluginsDir, entry.name, "index.js")),
+      });
+    } catch (error) {
+      console.warn(`[plugins] failed to read ${manifestPath}:`, error);
+    }
+  }
+  return { dir: pluginsDir, plugins };
+}
+
+function readExternalPluginEntry(pluginId) {
+  const safeId = cleanText(pluginId).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
+  if (!safeId) throw new Error("Invalid plugin id.");
+  const manifests = readExternalPluginManifests();
+  const plugin = manifests.plugins.find((item) => item.id === safeId);
+  if (!plugin) throw new Error(`External plugin not found: ${safeId}`);
+  const entryPath = path.join(manifests.dir, plugin.directoryName, "index.js");
+  const resolvedPluginsDir = path.resolve(manifests.dir);
+  const resolvedEntryPath = path.resolve(entryPath);
+  if (!resolvedEntryPath.startsWith(resolvedPluginsDir + path.sep)) {
+    throw new Error("External plugin entry escaped the plugin directory.");
+  }
+  if (!fs.existsSync(resolvedEntryPath)) {
+    return { id: plugin.id, code: "", path: resolvedEntryPath, missing: true };
+  }
+  const stat = fs.statSync(resolvedEntryPath);
+  if (!stat.isFile()) throw new Error("External plugin entry is not a file.");
+  if (stat.size > maxExternalPluginEntryBytes) {
+    throw new Error(`External plugin entry is too large (${stat.size} bytes).`);
+  }
+  return {
+    id: plugin.id,
+    code: fs.readFileSync(resolvedEntryPath, "utf8"),
+    path: resolvedEntryPath,
+    missing: false,
+  };
 }
 
 function backupCurrentData(reason) {
@@ -732,15 +868,22 @@ async function callDeepSeek({ messages = [], draftText = "" }) {
   return normalizeAiResponse(content);
 }
 
-function createWindow() {
+let isQuitting = false;
+let tray = null;
+
+function showMainWindow() {
   const existingWin = BrowserWindow.getAllWindows()[0];
   if (existingWin) {
     if (existingWin.isMinimized()) existingWin.restore();
     existingWin.show();
     existingWin.focus();
-    return;
+    return existingWin;
   }
+  createWindow();
+  return BrowserWindow.getAllWindows()[0] || null;
+}
 
+function createWindow() {
   const iconPath = app.isPackaged
     ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
     : path.join(__dirname, "..", "public", "navopath-icon.png");
@@ -798,6 +941,12 @@ function createWindow() {
     win.show();
   });
 
+  win.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    win.hide();
+  });
+
   win.webContents.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL) => {
     console.error(`[did-fail-load] code=${errorCode} desc=${errorDescription} url=${validatedURL}`);
   });
@@ -830,12 +979,7 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-    }
+    showMainWindow();
   });
 }
 
@@ -851,12 +995,9 @@ app.whenReady().then(() => {
   });
   
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    showMainWindow();
   });
 });
-
-let isQuitting = false;
-let tray = null;
 
 function createTray() {
   const iconPath = app.isPackaged
@@ -910,6 +1051,8 @@ ipcMain.handle("settings:selectBackgroundImage", () => selectBackgroundImage());
 ipcMain.handle("auth-storage:get", (_event, key) => readAuthStorage(key));
 ipcMain.handle("auth-storage:set", (_event, key, value) => writeAuthStorage(key, value));
 ipcMain.handle("auth-storage:remove", (_event, key) => removeAuthStorage(key));
+ipcMain.handle("plugins:listExternal", () => readExternalPluginManifests());
+ipcMain.handle("plugins:readExternalEntry", (_event, pluginId) => readExternalPluginEntry(pluginId));
 ipcMain.handle("ai:chat", (_event, payload) => callDeepSeek(payload));
 ipcMain.handle("updater:getState", () => updateState);
 ipcMain.handle("updater:check", async () => {

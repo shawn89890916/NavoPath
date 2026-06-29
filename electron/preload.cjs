@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
   aiChat: (payload) => ipcRenderer.invoke("ai:chat", payload),
   getAutoLaunch: () => ipcRenderer.invoke("autolaunch:get"),
   setAutoLaunch: (enabled) => ipcRenderer.invoke("autolaunch:set", enabled),
+  listExternalPlugins: () => ipcRenderer.invoke("plugins:listExternal"),
+  readExternalPluginEntry: (pluginId) => ipcRenderer.invoke("plugins:readExternalEntry", pluginId),
   writeSnapshot: (payload) => ipcRenderer.invoke("backup:writeSnapshot", payload),
   readLatestSnapshot: () => ipcRenderer.invoke("backup:readLatest"),
   isDesktop: () => true

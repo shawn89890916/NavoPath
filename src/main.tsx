@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopUpdateState, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Language, McpTokenMetadata, NavoPathPluginRuntime, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -38,7 +38,7 @@ import { useInAppDialog } from "./InAppDialog";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
-import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, resolveConfig as resolvePluginConfig, pluginText, type PluginHost } from "./plugins/registry";
+import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import "./styles.css";
 import "./app-redesign.css";
@@ -68,6 +68,32 @@ const PLANNING_THEME_PRESETS_DARK  = ["#7EA172", "#FBF9FF", "#D7816A", "#584D3D"
 const SAVE_DEBOUNCE_MS = 250;
 const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
+
+function externalManifestToPlugin(
+  plugin: DesktopExternalPlugin,
+  loadExternalPlugin: (plugin: DesktopExternalPlugin, host: PluginHost, config: Record<string, unknown>) => void,
+  unloadExternalPlugin: (pluginId: string) => void,
+): NavoPlugin {
+  return {
+    id: plugin.id,
+    name: plugin.name,
+    nameI18n: plugin.nameI18n,
+    description: plugin.description,
+    descriptionI18n: plugin.descriptionI18n,
+    enabledSummaryI18n: plugin.enabledSummaryI18n,
+    version: plugin.version,
+    author: plugin.author,
+    icon: plugin.icon,
+    permissions: plugin.permissions,
+    configFields: plugin.configFields,
+    onActivate: (host, config) => {
+      loadExternalPlugin(plugin, host, config);
+    },
+    onDeactivate: () => {
+      unloadExternalPlugin(plugin.id);
+    },
+  };
+}
 const MCP_ENDPOINT = import.meta.env.VITE_MCP_ENDPOINT || "https://navopath-mcp.shawn89890916.workers.dev/mcp";
 const DONATION_URL = "https://afdian.com/a/233cxy/plan";
 const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
@@ -1597,6 +1623,9 @@ function App() {
   const snapshotTimerRef = useRef<number | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const pluginHostRef = useRef<PluginHost | null>(null);
+  const externalPluginsLoadedRef = useRef(false);
+  const externalPluginDisposersRef = useRef(new Map<string, () => void>());
+  const [externalPluginsRevision, setExternalPluginsRevision] = useState(0);
   const colsContainerRef = useRef<HTMLDivElement | null>(null);
   const timeGridRef = useRef<HTMLDivElement | null>(null);
   const [multiColWidth, setMultiColWidth] = useState(0);
@@ -2545,13 +2574,131 @@ function App() {
     scheduler.setIntervalMinutes(readSyncInterval(settings));
   }, [settings?.syncIntervalMinutes, authState?.user?.id]);
 
+  function unloadExternalPlugin(pluginId: string) {
+    const dispose = externalPluginDisposersRef.current.get(pluginId);
+    if (dispose) {
+      try {
+        dispose();
+      } catch (error) {
+        console.warn(`[plugins] external plugin cleanup failed for ${pluginId}:`, error);
+      }
+      externalPluginDisposersRef.current.delete(pluginId);
+    }
+    if (window.navopath?.pluginId === pluginId) {
+      delete window.navopath;
+    }
+  }
+
+  function createExternalPluginApi(plugin: DesktopExternalPlugin, host: PluginHost, config: Record<string, unknown>, cleanup: Array<() => void>): NavoPathPluginRuntime {
+    const api: NavoPathPluginRuntime = {
+      version: "1",
+      pluginId: plugin.id,
+      tasks: {
+        getData: () => dataRef.current,
+        list: () => dataRef.current?.tasks ?? [],
+        update: (taskId, patch) => {
+          const current = dataRef.current;
+          if (!current) return;
+          const nextTasks = current.tasks.map((task) => (
+            task.id === taskId ? { ...task, ...patch, id: task.id, updatedAt: new Date().toISOString() } : task
+          ));
+          void saveData({ ...current, tasks: nextTasks });
+        },
+      },
+      settings: {
+        getConfig: () => ({ ...config }),
+        saveConfig: (patch) => host.savePluginConfig(plugin.id, patch),
+      },
+      ui: {
+        toast: (message) => host.toast(String(message)),
+        registerTool: (tool) => {
+          const payload = { pluginId: plugin.id, tool };
+          host.emit("ui:register-tool", payload);
+          return () => host.emit("ui:unregister-tool", payload);
+        },
+      },
+      events: {
+        emit: (event, payload) => host.emit(event, payload),
+        on: (event, listener) => {
+          const handler = (rawEvent: Event) => {
+            const detail = (rawEvent as CustomEvent<{ event: string; payload?: unknown }>).detail;
+            if (detail?.event === event) listener(detail.payload);
+          };
+          window.addEventListener("navopath:plugin", handler);
+          const unsubscribe = () => window.removeEventListener("navopath:plugin", handler);
+          cleanup.push(unsubscribe);
+          return unsubscribe;
+        },
+      },
+      plugins: {
+        register: (runtime) => {
+          const maybeDispose = runtime.activate?.(api);
+          if (typeof maybeDispose === "function") cleanup.push(maybeDispose);
+          if (typeof runtime.deactivate === "function") cleanup.push(runtime.deactivate);
+        },
+      },
+    };
+    return api;
+  }
+
+  function loadExternalPlugin(plugin: DesktopExternalPlugin, host: PluginHost, config: Record<string, unknown>) {
+    if (!plugin.hasEntry) {
+      host.toast(`${plugin.name} has no index.js entry.`);
+      return;
+    }
+    if (externalPluginDisposersRef.current.has(plugin.id)) return;
+    void window.desktopApi?.readExternalPluginEntry?.(plugin.id)
+      .then((entry) => {
+        if (!entry || entry.missing || !entry.code.trim()) {
+          host.toast(`${plugin.name} has no index.js entry.`);
+          return;
+        }
+        const cleanup: Array<() => void> = [];
+        const api = createExternalPluginApi(plugin, host, config, cleanup);
+        window.navopath = api;
+        const execute = new Function("window", "navopath", `"use strict";\n${entry.code}\n//# sourceURL=navopath-plugin-${plugin.id}.js`);
+        execute(window, api);
+        externalPluginDisposersRef.current.set(plugin.id, () => {
+          for (const dispose of cleanup.splice(0).reverse()) dispose();
+          if (window.navopath?.pluginId === plugin.id) delete window.navopath;
+        });
+        host.toast(`${plugin.name} loaded.`);
+      })
+      .catch((error) => {
+        console.warn(`[plugins] external plugin load failed for ${plugin.id}:`, error);
+        host.toast(`${plugin.name} failed to load.`);
+      });
+  }
+
   // Plugin system bootstrap. The host exposes saveSettings + data + toast so
   // plugin lifecycle hooks can do useful work without reaching into internals.
   useEffect(() => {
     registerBuiltinPlugins();
+    if (!externalPluginsLoadedRef.current) {
+      externalPluginsLoadedRef.current = true;
+      void window.desktopApi?.listExternalPlugins?.()
+        .then((result) => {
+          const existingIds = new Set(listRegisteredPlugins().map((plugin) => plugin.id));
+          let added = 0;
+          for (const plugin of result?.plugins ?? []) {
+            if (existingIds.has(plugin.id)) continue;
+            registerPlugin(externalManifestToPlugin(plugin, loadExternalPlugin, unloadExternalPlugin));
+            existingIds.add(plugin.id);
+            added += 1;
+          }
+          if (added > 0) setExternalPluginsRevision((revision) => revision + 1);
+        })
+        .catch((error) => {
+          console.warn("[plugins] failed to load external plugins:", error);
+        });
+    }
     if (!pluginHostRef.current) {
       pluginHostRef.current = {
         getData: () => dataRef.current,
+        saveData: (next) => {
+          if (!next || typeof next !== "object") return;
+          void saveData(next as PlannerData);
+        },
         savePluginConfig: (pluginId, patch) => {
           const current = settingsRef.current;
           if (!current) return;
@@ -2583,7 +2730,7 @@ function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.enabledPlugins, settings?.pluginConfigs]);
+  }, [settings?.enabledPlugins, settings?.pluginConfigs, externalPluginsRevision]);
 
   const today = todayIso();
   const timelineDate = selectedDate;
@@ -9187,11 +9334,11 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             </section>}
             {settingsSection === "mcp" && <section className="df-settings-group"><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
             {settingsSection === "plugins" && <section className="df-settings-group">
-              <h3>{lang === "zh" ? "官方插件" : "Official plugins"}</h3>
-              <p className="df-settings-desc">{lang === "zh" ? "当前版本提供经过内置审核的官方插件。点击启用后，下方会立即出现对应工具。" : "This build ships reviewed official plugins. Enable one and its tool appears below immediately."}</p>
+              <h3>{lang === "zh" ? "插件" : "Plugins"}</h3>
+              <p className="df-settings-desc">{lang === "zh" ? "这里会显示内置插件，以及桌面端用户插件目录中的本地插件。启用本地插件后会加载它的 manifest.json 和 index.js。" : "This list includes built-in plugins and desktop local plugins from the user plugin directory. Enabling a local plugin loads its manifest.json and index.js."}</p>
 
               <div className="df-settings-divider" />
-              <div className="df-settings-subhead">{lang === "zh" ? "可用官方插件" : "Available official plugins"}</div>
+              <div className="df-settings-subhead">{lang === "zh" ? "可用插件" : "Available plugins"}</div>
 
               <div className="df-plugin-list">
                 {listRegisteredPlugins().map((plugin) => {
@@ -9253,7 +9400,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
               <div className="df-settings-divider" />
               <a className="df-plugin-doc-link" href="/plugin-guide">
                 <span>{lang === "zh" ? "打开 Plugins / MCP 使用教程" : "Open Plugins / MCP guide"}</span>
-                <small>{lang === "zh" ? "查看官方插件作用、MCP 配置和安全边界" : "Read official plugin roles, MCP setup, and security boundaries"}</small>
+                <small>{lang === "zh" ? "查看内置插件、本地插件、MCP 配置和安全边界" : "Read built-in plugins, local plugins, MCP setup, and security boundaries"}</small>
                 <i aria-hidden="true">↗</i>
               </a>
               <div className="df-settings-divider" />

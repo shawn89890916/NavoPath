@@ -89,7 +89,8 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "three": "^0.185.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260617.1",
@@ -97,6 +98,7 @@
     "@supabase/supabase-js": "^2.107.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.185.0",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.1.2",
     "electron": "^37.0.0",
