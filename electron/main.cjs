@@ -184,6 +184,7 @@ function normalizePlannerData(data) {
       : [],
     longTasks: Array.isArray(data.longTasks) ? data.longTasks : [],
     aiMemories: Array.isArray(data.aiMemories) ? data.aiMemories : [],
+    scheduleTemplates: Array.isArray(data.scheduleTemplates) ? data.scheduleTemplates : [],
     drafts: Array.isArray(data.drafts)
       ? data.drafts
           .filter((draft) => draft && draft.title && !(typeof draft.details === "string" && draft.details.startsWith("[预设]")))
