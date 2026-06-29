@@ -211,6 +211,12 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
     setStep("placed");
   };
 
+  const skipIntro = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    placeOnTimeline(tasks[0], 0, targetStart);
+  };
+
   const isInsideCardMagnet = (clientX: number, clientY: number) => {
     const rect = floatingTaskRef.current?.getBoundingClientRect();
     if (!rect) return false;
@@ -495,6 +501,11 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
           <span>{dragGhost.task}</span>
           <small>45m</small>
         </div>
+      )}
+      {step !== "placed" && (
+        <button className="landing-skip-intro" type="button" onClick={skipIntro} aria-label="Skip intro">
+          &gt;&gt;skip
+        </button>
       )}
     </div>
   );

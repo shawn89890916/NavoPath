@@ -125,6 +125,26 @@
   content: none;
   display: none;
 }
+.landing-skip-intro {
+  position: absolute;
+  right: clamp(14px, 2.4vw, 34px);
+  bottom: clamp(14px, 2.4vw, 34px);
+  z-index: 18;
+  padding: 3px 0;
+  border: 0;
+  border-radius: 0;
+  color: color-mix(in srgb, var(--l-muted) 58%, transparent);
+  background: transparent;
+  font: 700 8px var(--l-mono);
+  letter-spacing: .02em;
+  cursor: pointer;
+  opacity: .58;
+  transition: opacity 140ms ease, color 140ms ease;
+}
+.landing-skip-intro:hover {
+  color: var(--l-muted);
+  opacity: .82;
+}
 .landing-floating-task {
   --tilt-x: 0deg;
   --tilt-y: 0deg;

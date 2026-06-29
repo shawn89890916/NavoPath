@@ -143,6 +143,14 @@ function authErrorMessage(message: string) {
   return message || "账号请求失败，请稍后再试。";
 }
 
+function isRetryableProfileError(message = "") {
+  return /schema cache|Could not query the database|timeout|temporarily|PGRST/i.test(message);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function emailConfirmationRedirectUrl() {
   return new URL("/app?auth_callback=1", window.location.origin).toString();
 }
@@ -208,11 +216,29 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     if (!force && profileCache) return profileCache;
     if (!force && profilePromise) return profilePromise;
     const pending = (async () => {
-      const { data, error } = await supabase
-        .from(PROFILE_TABLE)
-        .select("data, settings, revision")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      let data: any = null;
+      let error: any = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const result = await supabase
+          .from(PROFILE_TABLE)
+          .select("data, settings, revision")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        data = result.data;
+        error = result.error;
+        if (!error || !isRetryableProfileError(error.message)) break;
+        await wait(260 * (attempt + 1));
+      }
+
+      if (error && isRetryableProfileError(error.message)) {
+        const fallback = await supabase
+          .from(PROFILE_TABLE)
+          .select("data, settings")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         throw new Error(`Cloud profile load failed: ${error.message}`);
@@ -232,15 +258,21 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         onboardingVersion: 0,
         onboardingStep: "add" as const,
       };
-      const { error: insertError } = await supabase
-        .from(PROFILE_TABLE)
-        .insert({
-          user_id: user.id,
-          data: initialData,
-          settings: initialSettings,
-          created_at: now(),
-          updated_at: now()
-        });
+      let insertError: any = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const result = await supabase
+          .from(PROFILE_TABLE)
+          .insert({
+            user_id: user.id,
+            data: initialData,
+            settings: initialSettings,
+            created_at: now(),
+            updated_at: now()
+          });
+        insertError = result.error;
+        if (!insertError || !isRetryableProfileError(insertError.message)) break;
+        await wait(260 * (attempt + 1));
+      }
 
       if (insertError) {
         throw new Error(`Cloud profile create failed: ${insertError.message}`);
