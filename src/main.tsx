@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopUpdateState, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopUpdateState, ExecutionLane, Language, McpTokenMetadata, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -251,8 +251,8 @@ function themeVars(settings: Settings, mode: Mode) {
 type ResizePreview = { taskId: string; start: string; end: string } | null;
 type ScheduleSuggestion = SchedulePreview; // legacy alias kept for compatibility; replaced by SchedulePreview
 type QuickSchedule = { startTime: string; title: string; projectId: string; isAllDay?: boolean } | null;
-type ScheduleTemplateId = "school" | "study";
-type ScheduleTemplateSlot = {
+type BuiltInScheduleTemplateId = "school" | "study";
+type BuiltInScheduleTemplateSlot = {
   id: string;
   labelZh: string;
   labelEn: string;
@@ -261,7 +261,7 @@ type ScheduleTemplateSlot = {
   titleZh: string;
   titleEn: string;
 };
-type ScheduleTemplateDraftSlot = ScheduleTemplateSlot & {
+type ScheduleTemplateDraftSlot = BuiltInScheduleTemplateSlot & {
   selected: boolean;
   title: string;
 };
@@ -287,16 +287,16 @@ type DragCreateState = {
   committed: boolean;
 } | null;
 
-const SCHEDULE_TEMPLATES: Record<ScheduleTemplateId, {
+const SCHEDULE_TEMPLATES: Record<BuiltInScheduleTemplateId, {
   labelZh: string;
   labelEn: string;
   descriptionZh: string;
   descriptionEn: string;
-  slots: ScheduleTemplateSlot[];
+  slots: BuiltInScheduleTemplateSlot[];
 }> = {
   school: {
-    labelZh: "学校日",
-    labelEn: "School day",
+    labelZh: "\u9ed8\u8ba4 1",
+    labelEn: "Default 1",
     descriptionZh: "按上课节奏预留固定时间段，当天再填写每节要推进的目标。",
     descriptionEn: "Reserve fixed class-style blocks, then fill in the goal for each block.",
     slots: [
@@ -311,8 +311,8 @@ const SCHEDULE_TEMPLATES: Record<ScheduleTemplateId, {
     ],
   },
   study: {
-    labelZh: "自习日",
-    labelEn: "Study day",
+    labelZh: "\u9ed8\u8ba4 2",
+    labelEn: "Default 2",
     descriptionZh: "用较长专注块划分一天，适合假期、周末或备考日。",
     descriptionEn: "Use longer focus blocks for weekends, holidays, or exam-prep days.",
     slots: [
@@ -5830,9 +5830,6 @@ function App() {
                   <label>{t(lang, "timeline.strategy")}<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="alternativeProject">{t(lang, "timeline.alternateByProject")}</option><option value="byProject">{t(lang, "timeline.scheduleByProject")}</option><option value="longShort">{t(lang, "timeline.alternateLongShort")}</option><option value="random">{t(lang, "timeline.random")}</option></select></label>
                 </span>}
               </div>}
-              <button className="df-template-plan" type="button" onClick={() => setScheduleTemplateOpen(true)}>
-                {lang === "zh" ? "模板" : "Template"}
-              </button>
               <div className="df-timeline-actions">
                 {autoScheduleState === "preview" && schedulePreviews.length > 0 && (
                   <span className="df-ai-plan-summary">{`${t(lang, "timeline.previewPlan").replace("X", String(schedulePreviews.length))}`}</span>
@@ -6671,6 +6668,9 @@ function App() {
                 )}
               </div>
               <div className="df-view-switch-vertical" aria-label={t(lang, "timeline.switchView")}>
+                <button className="df-template-plan" type="button" onClick={() => setScheduleTemplateOpen(true)}>
+                  {lang === "zh" ? "\u6a21\u677f" : "Template"}
+                </button>
                 {([
                   ["daily", viewLabel(lang, "daily")],
                   ["3day", viewLabel(lang, "3day")],
@@ -6707,7 +6707,17 @@ function App() {
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
-      {scheduleTemplateOpen && <ScheduleTemplateModal lang={lang} date={timelineDate} tasks={tasks} onApply={applyTemplateToDate} onClose={() => setScheduleTemplateOpen(false)} />}
+      {scheduleTemplateOpen && data && (
+        <ScheduleTemplateModal
+          lang={lang}
+          date={timelineDate}
+          tasks={tasks}
+          customTemplates={data.scheduleTemplates || []}
+          onSaveCustomTemplates={(templates) => void saveData({ ...dataRef.current!, scheduleTemplates: templates })}
+          onApply={applyTemplateToDate}
+          onClose={() => setScheduleTemplateOpen(false)}
+        />
+      )}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
@@ -6740,17 +6750,24 @@ function ScheduleTemplateModal({
   lang,
   date,
   tasks,
+  customTemplates,
+  onSaveCustomTemplates,
   onApply,
   onClose,
 }: {
   lang: Language;
   date: string;
   tasks: Task[];
+  customTemplates: ScheduleTemplate[];
+  onSaveCustomTemplates: (templates: ScheduleTemplate[]) => void;
   onApply: (slots: ScheduleTemplateApplySlot[], conflictCount: number) => void;
   onClose: () => void;
 }) {
-  const [templateId, setTemplateId] = useState<ScheduleTemplateId>("school");
-  const [slots, setSlots] = useState<ScheduleTemplateDraftSlot[]>(() => makeTemplateDraft("school"));
+  type TemplateKey = `builtin:${BuiltInScheduleTemplateId}` | `custom:${string}` | "draft:new";
+  const [templateKey, setTemplateKey] = useState<TemplateKey>("builtin:school");
+  const [templateName, setTemplateName] = useState("");
+  const [slots, setSlots] = useState<ScheduleTemplateDraftSlot[]>(() => makeBuiltInDraft("school"));
+  const [templateNotice, setTemplateNotice] = useState("");
   const titleRef = useRef<HTMLHeadingElement>(null);
   const zh = lang === "zh";
 
@@ -6764,7 +6781,7 @@ function ScheduleTemplateModal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  function makeTemplateDraft(id: ScheduleTemplateId) {
+  function makeBuiltInDraft(id: BuiltInScheduleTemplateId) {
     return SCHEDULE_TEMPLATES[id].slots.map((slot) => ({
       ...slot,
       selected: false,
@@ -6772,13 +6789,66 @@ function ScheduleTemplateModal({
     }));
   }
 
-  function changeTemplate(id: ScheduleTemplateId) {
-    setTemplateId(id);
-    setSlots(makeTemplateDraft(id));
+  function makeCustomDraft(template: ScheduleTemplate) {
+    return template.slots.map((slot, index) => ({
+      id: slot.id || uid("slot"),
+      labelZh: slot.label || `第 ${index + 1} 段`,
+      labelEn: slot.label || `Period ${index + 1}`,
+      start: slot.start || "09:00",
+      end: slot.end || "10:00",
+      titleZh: "填写任务目标",
+      titleEn: "Goal for this block",
+      selected: false,
+      title: "",
+    }));
+  }
+
+  function makeBlankCustomDraft() {
+    return [
+      {
+        id: uid("slot"),
+        labelZh: zh ? "第一段" : "Period 1",
+        labelEn: zh ? "第一段" : "Period 1",
+        start: "09:00",
+        end: "10:00",
+        titleZh: "填写任务目标",
+        titleEn: "Goal for this block",
+        selected: false,
+        title: "",
+      },
+      {
+        id: uid("slot"),
+        labelZh: zh ? "第二段" : "Period 2",
+        labelEn: zh ? "第二段" : "Period 2",
+        start: "10:15",
+        end: "11:15",
+        titleZh: "填写任务目标",
+        titleEn: "Goal for this block",
+        selected: false,
+        title: "",
+      },
+    ];
+  }
+
+  function changeTemplate(key: TemplateKey) {
+    setTemplateKey(key);
+    setTemplateNotice("");
+    if (key.startsWith("builtin:")) {
+      const id = key.replace("builtin:", "") as BuiltInScheduleTemplateId;
+      setTemplateName("");
+      setSlots(makeBuiltInDraft(id));
+      return;
+    }
+    const id = key.replace("custom:", "");
+    const template = customTemplates.find((item) => item.id === id);
+    if (!template) return;
+    setTemplateName(template.title);
+    setSlots(makeCustomDraft(template));
   }
 
   function updateSlot(slotId: string, patch: Partial<ScheduleTemplateDraftSlot>) {
     setSlots((current) => current.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+    setTemplateNotice("");
   }
 
   function addSlot() {
@@ -6803,6 +6873,86 @@ function ScheduleTemplateModal({
 
   function removeSlot(slotId: string) {
     setSlots((current) => current.filter((slot) => slot.id !== slotId));
+    setTemplateNotice("");
+  }
+
+  function currentTemplateTitle() {
+    return templateName.trim();
+  }
+
+  function slotLabel(slot: ScheduleTemplateDraftSlot) {
+    return (zh ? slot.labelZh : slot.labelEn).trim() || (zh ? "时间段" : "Period");
+  }
+
+  function templateSlotsForSave() {
+    return slots
+      .filter((slot) => validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
+      .map((slot, index) => ({
+        id: slot.id || uid("slot"),
+        label: slotLabel(slot) || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
+        start: slot.start,
+        end: slot.end,
+      }));
+  }
+
+  function saveCurrentTemplate() {
+    const savedSlots = templateSlotsForSave();
+    const nextTitle = currentTemplateTitle();
+    if (!nextTitle) {
+      setTemplateNotice(zh ? "请先填写模板名称。" : "Name the template before saving.");
+      return;
+    }
+    if (savedSlots.length === 0) {
+      setTemplateNotice(zh ? "至少需要一个有效时间段。" : "Add at least one valid time block.");
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    if (templateKey.startsWith("custom:")) {
+      const id = templateKey.replace("custom:", "");
+      const next = customTemplates.map((template) => template.id === id
+        ? { ...template, title: nextTitle, slots: savedSlots, updatedAt: nowIso }
+        : template);
+      onSaveCustomTemplates(next);
+      setTemplateNotice(zh ? "模板已保存。" : "Template saved.");
+      return;
+    }
+    const created: ScheduleTemplate = {
+      id: uid("template"),
+      title: nextTitle,
+      slots: savedSlots,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    onSaveCustomTemplates([...customTemplates, created]);
+    setTemplateKey(`custom:${created.id}`);
+    setTemplateName(created.title);
+    setTemplateNotice(zh ? "已保存为模板，可在自定义模板中复用。" : "Saved as a reusable template.");
+  }
+
+  function createCustomTemplate() {
+    setTemplateKey("draft:new");
+    setTemplateName("");
+    setSlots(makeBlankCustomDraft());
+    setTemplateNotice(zh ? "正在编辑新模板：先填写模板名称，再保存到自定义模板列表。" : "Editing a new template: name it before saving to Custom templates.");
+  }
+
+  function deleteCustomTemplate() {
+    if (!templateKey.startsWith("custom:")) return;
+    deleteCustomTemplateById(templateKey.replace("custom:", ""));
+  }
+
+  function deleteCustomTemplateById(id: string) {
+    const template = customTemplates.find((item) => item.id === id);
+    if (!template) return;
+    const ok = window.confirm(zh ? `删除“${template.title}”？已生成的任务不会受影响。` : `Delete "${template.title}"? Existing tasks will not be changed.`);
+    if (!ok) return;
+    onSaveCustomTemplates(customTemplates.filter((template) => template.id !== id));
+    if (templateKey === `custom:${id}`) {
+      setTemplateKey("builtin:school");
+      setTemplateName("");
+      setSlots(makeBuiltInDraft("school"));
+    }
+    setTemplateNotice(zh ? "模板已删除。" : "Template deleted.");
   }
 
   const existingIntervals = useMemo(() => {
@@ -6820,15 +6970,19 @@ function ScheduleTemplateModal({
   }, [date, tasks]);
 
   const applySlots = slots
-    .filter((slot) => slot.selected && slot.title.trim() && validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
-    .map((slot) => ({ title: slot.title.trim(), start: slot.start, end: slot.end }));
-  const invalidCount = slots.filter((slot) => slot.selected && slot.title.trim() && (!validTime(slot.start) || !validTime(slot.end) || timeToMinutes(slot.end) <= timeToMinutes(slot.start))).length;
+    .filter((slot) => slot.selected && validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
+    .map((slot) => ({ title: slot.title.trim() || slotLabel(slot), start: slot.start, end: slot.end }));
+  const invalidCount = slots.filter((slot) => slot.selected && (!validTime(slot.start) || !validTime(slot.end) || timeToMinutes(slot.end) <= timeToMinutes(slot.start))).length;
   const conflictCount = applySlots.filter((slot) => {
     const start = timeToMinutes(slot.start);
     const end = timeToMinutes(slot.end);
     return existingIntervals.some((item) => start < item.end && end > item.start);
   }).length;
-  const template = SCHEDULE_TEMPLATES[templateId];
+  const activeBuiltInId = templateKey.startsWith("builtin:") ? templateKey.replace("builtin:", "") as BuiltInScheduleTemplateId : null;
+  const activeCustom = templateKey.startsWith("custom:") ? customTemplates.find((item) => item.id === templateKey.replace("custom:", "")) : null;
+  const templateDescription = activeBuiltInId
+    ? (zh ? SCHEDULE_TEMPLATES[activeBuiltInId].descriptionZh : SCHEDULE_TEMPLATES[activeBuiltInId].descriptionEn)
+    : (zh ? "先编辑模板名称和 Period 时间，保存为模板；每天使用时再勾选要添加的 Period 并填写当天目标。" : "Edit the template name and periods, save it, then choose which periods to add and fill daily goals when using it.");
   const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString(zh ? "zh-CN" : "en-US", {
     month: "short",
     day: "numeric",
@@ -6856,26 +7010,75 @@ function ScheduleTemplateModal({
         </header>
 
         <div className="df-template-tabs" role="tablist" aria-label={zh ? "日程模板" : "Schedule templates"}>
-          {(Object.keys(SCHEDULE_TEMPLATES) as ScheduleTemplateId[]).map((id) => (
+          {(Object.keys(SCHEDULE_TEMPLATES) as BuiltInScheduleTemplateId[]).map((id) => (
             <button
               key={id}
               type="button"
               role="tab"
-              aria-selected={templateId === id}
-              className={templateId === id ? "active" : ""}
-              onClick={() => changeTemplate(id)}
+              aria-selected={templateKey === `builtin:${id}`}
+              className={templateKey === `builtin:${id}` ? "active" : ""}
+              onClick={() => changeTemplate(`builtin:${id}`)}
             >
               {zh ? SCHEDULE_TEMPLATES[id].labelZh : SCHEDULE_TEMPLATES[id].labelEn}
             </button>
           ))}
+          {customTemplates.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              role="tab"
+              aria-selected={templateKey === `custom:${template.id}`}
+              className={templateKey === `custom:${template.id}` ? "active" : ""}
+              onClick={() => changeTemplate(`custom:${template.id}`)}
+            >
+              {template.title}
+            </button>
+          ))}
+          {templateKey === "draft:new" && <button type="button" role="tab" aria-selected className="active">{zh ? "新模板草稿" : "New draft"}</button>}
+          <button type="button" className="df-template-new-tab" onClick={createCustomTemplate}>{zh ? "新建模板" : "New template"}</button>
         </div>
 
         <div className="df-template-note">
-          <span>{zh ? template.descriptionZh : template.descriptionEn}</span>
+          <span>{templateDescription}</span>
           <div className="df-template-note-actions">
-            <button type="button" onClick={() => setSlots(makeTemplateDraft(templateId))}>{zh ? "恢复默认" : "Reset"}</button>
+            <input className="df-template-name-input" value={templateName} onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }} aria-label={zh ? "模板名称" : "Template name"} placeholder={zh ? "模板名称" : "Template name"} />
+            <button type="button" onClick={() => {
+              if (activeBuiltInId) setSlots(makeBuiltInDraft(activeBuiltInId));
+              else if (activeCustom) setSlots(makeCustomDraft(activeCustom));
+              else setSlots(makeBlankCustomDraft());
+              setTemplateNotice("");
+            }}>{zh ? "恢复当前模板" : "Reset current"}</button>
             <button type="button" onClick={addSlot}>{zh ? "新增 Period" : "Add period"}</button>
+            <button type="button" onClick={saveCurrentTemplate}>{activeBuiltInId ? (zh ? "保存为模板" : "Save as template") : (zh ? "保存为模板" : "Save as template")}</button>
+            {activeCustom && <button type="button" className="danger" onClick={deleteCustomTemplate}>{zh ? "删除模板" : "Delete"}</button>}
           </div>
+        </div>
+        {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
+
+        {customTemplates.length > 0 && (
+          <section className="df-template-manager" aria-label={zh ? "自定义模板管理" : "Custom template management"}>
+            <div className="df-template-manager-head">
+              <strong>{zh ? "自定义模板" : "Custom templates"}</strong>
+              <span>{zh ? `${customTemplates.length} 个` : `${customTemplates.length} saved`}</span>
+            </div>
+            <div className="df-template-manager-list">
+              {customTemplates.map((template) => (
+                <div key={template.id} className={`df-template-manager-row${templateKey === `custom:${template.id}` ? " active" : ""}`}>
+                  <button type="button" className="df-template-manager-select" onClick={() => changeTemplate(`custom:${template.id}`)}>
+                    <span>{template.title}</span>
+                    <small>{template.slots.length} {zh ? "个时间段" : "blocks"}</small>
+                  </button>
+                  <button type="button" className="df-template-manager-delete" onClick={() => deleteCustomTemplateById(template.id)}>
+                    {zh ? "删除" : "Delete"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="df-template-use-hint">
+          {zh ? "使用模板时，勾选左侧“加入当天”就会把这个 Period 加入当天时间轴；当天目标可选，不填时会使用 Period 名称。" : "When using a template, check Add today to include that period in today's timeline. The daily goal is optional; the period name is used when it is blank."}
         </div>
 
         <div className="df-template-slots">
@@ -6885,13 +7088,13 @@ function ScheduleTemplateModal({
               <div key={slot.id} className={`df-template-slot${slot.selected ? " selected" : ""}${!validRange ? " invalid" : ""}`}>
                 <label className="df-template-check">
                   <input type="checkbox" checked={slot.selected} onChange={(event) => updateSlot(slot.id, { selected: event.target.checked })} />
-                  <span />
+                  <span>{zh ? "加入当天" : "Add today"}</span>
                 </label>
                 <div className="df-template-slot-meta">
-                  <strong>{zh ? slot.labelZh : slot.labelEn}</strong>
+                  <input className="df-template-label-input" type="text" value={zh ? slot.labelZh : slot.labelEn} onChange={(event) => updateSlot(slot.id, zh ? { labelZh: event.target.value, labelEn: event.target.value } : { labelEn: event.target.value, labelZh: event.target.value })} aria-label={zh ? "节点名称" : "Block label"} />
                   <div>
                     <input type="text" inputMode="numeric" maxLength={5} value={slot.start} onFocus={() => updateSlot(slot.id, { selected: true })} onChange={(event) => updateSlot(slot.id, { start: event.target.value, selected: true })} placeholder="HH:MM" aria-label={zh ? `${slot.labelZh}开始时间` : `${slot.labelEn} start time`} />
-                    <span>-</span>
+                    <span>–</span>
                     <input type="text" inputMode="numeric" maxLength={5} value={slot.end} onFocus={() => updateSlot(slot.id, { selected: true })} onChange={(event) => updateSlot(slot.id, { end: event.target.value, selected: true })} placeholder="HH:MM" aria-label={zh ? `${slot.labelZh}结束时间` : `${slot.labelEn} end time`} />
                   </div>
                 </div>
@@ -6900,7 +7103,7 @@ function ScheduleTemplateModal({
                   value={slot.title}
                   onFocus={() => updateSlot(slot.id, { selected: true })}
                   onChange={(event) => updateSlot(slot.id, { title: event.target.value, selected: true })}
-                  placeholder={zh ? slot.titleZh : slot.titleEn}
+                  placeholder={zh ? "当天目标（可选）" : "Daily goal (optional)"}
                   aria-label={zh ? `${slot.labelZh}任务目标` : `${slot.labelEn} goal`}
                 />
                 <button type="button" className="df-template-slot-remove" onClick={() => removeSlot(slot.id)} aria-label={zh ? `删除 ${slot.labelZh}` : `Remove ${slot.labelEn}`}>×</button>
@@ -6915,7 +7118,7 @@ function ScheduleTemplateModal({
             <span>
               {conflictCount > 0
                 ? (zh ? `${conflictCount} 个时间段与现有安排重叠，仍会添加。` : `${conflictCount} blocks overlap existing schedule and will still be added.`)
-                : (zh ? "没有检测到时间重叠。" : "No overlaps detected.")}
+                : (zh ? "勾选有效 Period 后即可应用到当天。" : "Checked valid periods can be applied to the day.")}
               {invalidCount > 0 ? (zh ? ` ${invalidCount} 个时间段无效，将跳过。` : ` ${invalidCount} invalid blocks will be skipped.`) : ""}
             </span>
           </div>

@@ -3882,241 +3882,644 @@ body.df-timeline-pointer-drag * {
 }
 /* Schedule template mode */
 .df-app .df-template-plan {
-  height: 34px;
-  padding: 0 14px;
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 10px;
   border: 1px solid var(--paper-rule);
-  border-radius: 0;
-  background: var(--paper-surface);
-  color: var(--paper-ink);
-  font-size: 13px;
-  font-weight: 700;
+  border-radius: var(--paper-radius);
+  background: transparent;
+  color: var(--text-main);
+  font: 700 12px/1 var(--paper-sans);
+  letter-spacing: 0;
+  white-space: nowrap;
   cursor: pointer;
+  box-shadow: none;
+  transition: color var(--paper-motion), background-color var(--paper-motion), border-color var(--paper-motion), opacity var(--paper-motion), transform 90ms ease-out;
 }
 
 .df-app .df-template-plan:hover {
-  border-color: var(--paper-accent-rule);
-  background: var(--paper-note);
   color: var(--accent-active);
+  background: var(--paper-note);
+  border-color: var(--paper-accent-rule);
+  box-shadow: none;
+  transform: none;
+}
+
+.df-app .df-template-plan:active { transform: translateY(1px); }
+.df-app .df-template-plan:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+
+.df-app .df-view-switch-vertical .df-template-plan {
+  min-width: 64px !important;
+  min-height: 30px !important;
+  margin-bottom: 4px !important;
+  padding: 3px 8px !important;
+  border: 1px solid var(--paper-rule) !important;
+  border-radius: var(--paper-radius) !important;
+  color: var(--text-main) !important;
+  background: color-mix(in srgb, var(--surface-main) 88%, transparent) !important;
+  font-family: var(--paper-sans) !important;
+  font-size: 11px !important;
+  justify-self: end;
+}
+
+.df-app .df-view-switch-vertical .df-template-plan:hover {
+  color: var(--accent-active) !important;
+  border-color: var(--paper-accent-rule) !important;
+  background: var(--paper-note) !important;
 }
 
 .df-app .df-template-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2400;
-  display: grid;
+  z-index: 1000001 !important;
+  display: grid !important;
   place-items: center;
   padding: 24px;
-  background: rgba(32, 30, 27, .28);
+  background: rgba(22,19,15,.48) !important;
+  backdrop-filter: none !important;
+  animation: dfFadeIn 140ms ease-out both !important;
 }
 
 .df-app .df-template-modal {
-  width: min(820px, calc(100vw - 32px));
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  border: 1px solid var(--paper-rule);
-  border-radius: 0;
-  background: var(--paper-surface);
-  color: var(--paper-ink);
-  box-shadow: var(--shadow-soft);
+  width: min(1040px, calc(100vw - 36px));
+  min-height: min(720px, calc(100dvh - 36px));
+  max-height: calc(100dvh - 36px);
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--paper-radius-soft);
+  background: var(--surface-main);
+  color: var(--text-main);
+  box-shadow: var(--paper-float-shadow);
+  overflow: hidden;
+  animation: paper-sheet-in 170ms cubic-bezier(.2,.75,.25,1) both !important;
+  transform-origin: center top !important;
 }
 
-.df-app .df-template-modal-head,
-.df-app .df-template-note,
-.df-app .df-template-modal-actions {
+.df-app .df-template-modal-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
-  padding: 16px 18px;
+  gap: 18px;
+  padding: 20px 22px 17px;
   border-bottom: 1px solid var(--paper-rule);
+  background: var(--surface-main);
 }
 
 .df-app .df-template-kicker {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   color: var(--paper-ink-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font: 700 11px/1 var(--paper-mono);
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
 .df-app .df-template-modal h2 {
   margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
+  color: var(--text-main);
+  font: 700 24px/1.12 var(--paper-display);
+  letter-spacing: 0;
 }
+
+.df-app .df-template-modal h2:focus { outline: none; }
 
 .df-app .df-template-modal p {
-  margin: 6px 0 0;
-  color: var(--paper-ink-muted);
-  font-size: 13px;
+  max-width: 560px;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font: 500 13px/1.55 var(--paper-sans);
 }
 
-.df-app .df-template-close,
-.df-app .df-template-slot-remove {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--paper-rule);
-  border-radius: 0;
-  background: var(--paper-surface);
-  color: var(--paper-ink);
+.df-app .df-template-close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 24px;
+  line-height: 1;
   cursor: pointer;
+  box-shadow: none;
 }
+
+.df-app .df-template-close:hover {
+  color: var(--accent-active);
+  border-bottom-color: var(--accent-active);
+  background: var(--paper-note);
+  box-shadow: none;
+  transform: none;
+}
+
+.df-app .df-template-close:active { transform: translateY(1px); }
+.df-app .df-template-close:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
 
 .df-app .df-template-tabs {
   display: flex;
-  gap: 8px;
-  padding: 14px 18px 0;
+  gap: 16px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--paper-rule);
+  background: var(--surface-main);
 }
 
-.df-app .df-template-tabs button,
-.df-app .df-template-note button,
-.df-app .df-template-modal-actions button {
-  min-height: 34px;
-  border: 1px solid var(--paper-rule);
-  border-radius: 0;
-  background: var(--paper-surface);
-  color: var(--paper-ink);
-  padding: 0 12px;
-  font: inherit;
+.df-app .df-template-tabs button {
+  min-height: 44px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 13px/1 var(--paper-sans);
   cursor: pointer;
+  box-shadow: none;
 }
 
-.df-app .df-template-tabs button.active,
 .df-app .df-template-tabs button:hover,
-.df-app .df-template-note button:hover,
-.df-app .df-template-modal-actions button:hover:not(:disabled),
-.df-app .df-template-close:hover,
-.df-app .df-template-slot-remove:hover {
-  border-color: var(--paper-accent-rule);
-  background: var(--paper-note);
+.df-app .df-template-tabs button.active {
   color: var(--accent-active);
+  border-bottom-color: var(--accent-active);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
 }
+
+.df-app .df-template-tabs .df-template-new-tab {
+  margin-left: auto;
+}
+
+.df-app .df-template-tabs button:active { transform: translateY(1px); }
+.df-app .df-template-tabs button:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
 
 .df-app .df-template-note {
-  align-items: flex-start;
-  color: var(--paper-ink-muted);
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--paper-rule);
+  background: var(--paper-note);
+  color: var(--text-muted);
+  font: 500 12px/1.5 var(--paper-sans);
 }
 
 .df-app .df-template-note-actions {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.df-app .df-template-name-input {
+  width: 150px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--paper-radius);
+  background: var(--surface-main);
+  color: var(--text-main);
+  font: 700 12px/1 var(--paper-sans);
+}
+
+.df-app .df-template-note button,
+.df-app .df-template-modal-actions button.secondary {
+  min-height: 34px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 12px/1 var(--paper-sans);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.df-app .df-template-note button:hover,
+.df-app .df-template-modal-actions button.secondary:hover {
+  color: var(--accent-active);
+  border-bottom-color: var(--paper-accent-rule);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.df-app .df-template-note button.danger {
+  color: color-mix(in srgb, var(--navo-coral) 80%, var(--text-main));
+}
+
+.df-app .df-template-note button.danger:hover {
+  border-bottom-color: color-mix(in srgb, var(--navo-coral) 60%, var(--paper-rule));
+}
+
+.df-app .df-template-status {
+  padding: 8px 22px;
+  border-bottom: 1px solid var(--paper-rule);
+  background: color-mix(in srgb, var(--accent-active) 6%, var(--surface-main));
+  color: var(--text-muted);
+  font: 600 12px/1.4 var(--paper-sans);
+}
+
+.df-app .df-template-manager {
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--paper-rule);
+  background: var(--surface-main);
+}
+
+.df-app .df-template-manager-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+  color: var(--text-muted);
+  font: 600 11px/1.2 var(--paper-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.df-app .df-template-manager-head strong {
+  color: var(--text-main);
+  font: inherit;
+}
+
+.df-app .df-template-manager-list {
+  display: grid;
+  gap: 0;
+}
+
+.df-app .df-template-manager-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  border-top: 1px solid var(--paper-rule);
+}
+
+.df-app .df-template-manager-row.active {
+  background: color-mix(in srgb, var(--accent-active) 5%, transparent);
+}
+
+.df-app .df-template-manager-select {
+  min-width: 0;
+  min-height: 37px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.df-app .df-template-manager-select span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 12px/1.2 var(--paper-sans);
+}
+
+.df-app .df-template-manager-select small {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font: 600 10px/1 var(--paper-mono);
+}
+
+.df-app .df-template-manager-delete {
+  min-height: 32px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--navo-coral) 80%, var(--text-main));
+  font: 700 12px/1 var(--paper-sans);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.df-app .df-template-manager-select:hover,
+.df-app .df-template-manager-delete:hover {
+  color: var(--accent-active);
+  border-bottom-color: var(--paper-accent-rule);
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+.df-app .df-template-use-hint {
+  padding: 9px 22px;
+  border-bottom: 1px solid var(--paper-rule);
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%);
+  color: var(--text-muted);
+  font: 600 12px/1.45 var(--paper-sans);
 }
 
 .df-app .df-template-slots {
-  display: grid;
-  gap: 0;
-  padding: 8px 18px 4px;
+  overflow: auto;
+  padding: 0 22px;
+  background: var(--surface-main);
 }
 
 .df-app .df-template-slot {
   display: grid;
-  grid-template-columns: 28px minmax(160px, 220px) minmax(180px, 1fr) 34px;
-  gap: 10px;
+  grid-template-columns: 92px minmax(220px, .7fr) minmax(320px, 1.2fr) 34px;
   align-items: center;
-  padding: 10px 0;
+  gap: 12px;
+  min-height: 70px;
   border-bottom: 1px solid var(--paper-rule);
+  transition: background-color var(--paper-motion), border-color var(--paper-motion), opacity var(--paper-motion);
+}
+
+.df-app .df-template-slot:hover {
+  background: color-mix(in srgb, var(--accent-active) 4%, transparent);
 }
 
 .df-app .df-template-slot.invalid {
-  color: var(--danger, #b91c1c);
+  background: color-mix(in srgb, var(--navo-coral) 10%, transparent);
 }
 
 .df-app .df-template-check {
-  display: grid;
-  place-items: center;
+  width: auto;
+  min-width: 82px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  color: var(--text-muted);
+  font: 700 10px/1.1 var(--paper-sans);
+  letter-spacing: .02em;
+  cursor: pointer;
 }
 
 .df-app .df-template-check input {
+  appearance: none;
   width: 16px;
   height: 16px;
-  margin: 0;
-  accent-color: var(--accent-active);
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.df-app .df-template-check::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  border: 1.5px solid color-mix(in srgb, var(--text-main) 72%, var(--paper-rule));
+  border-radius: 2px;
+  background: transparent;
+}
+
+.df-app .df-template-check::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  border-left: 2px solid var(--text-main);
+  border-bottom: 2px solid var(--text-main);
+  transform: rotate(-45deg) scale(0);
+  background: transparent;
+  transition: transform var(--paper-motion);
+}
+
+.df-app .df-template-check:has(input:checked)::before {
+  border-color: var(--text-main);
+}
+
+.df-app .df-template-check:has(input:checked)::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+.df-app .df-template-slot .df-template-check input[type="checkbox"],
+.df-app .df-template-slot .df-template-check input[type="checkbox"]:checked {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+.df-app .df-template-check:has(input:focus-visible)::before {
+  outline: 1px solid var(--accent-active);
+  outline-offset: 2px;
+}
+
+.df-app .df-template-check span {
+  display: inline;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.df-app .df-template-check input:checked + span {
+  color: var(--text-main);
+}
+
+.df-app .df-template-slot-meta {
+  display: grid;
+  gap: 6px;
 }
 
 .df-app .df-template-slot-meta strong {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
+  color: var(--text-main);
+  font: 700 13px/1.1 var(--paper-sans);
 }
 
 .df-app .df-template-slot-meta div {
-  display: grid;
-  grid-template-columns: 72px 10px 72px;
-  gap: 6px;
+  display: flex;
   align-items: center;
+  gap: 6px;
+  color: var(--paper-ink-muted);
+  font-family: var(--paper-mono);
 }
 
 .df-app .df-template-slot-meta input,
 .df-app .df-template-goal {
-  min-height: 34px;
-  border: 1px solid var(--paper-rule);
-  border-radius: 0;
-  background: var(--input-bg, var(--paper-surface));
-  color: var(--paper-ink);
-  padding: 0 10px;
-  font: inherit;
+  min-height: 36px;
+  border: 1px solid color-mix(in srgb, var(--text-main) 13%, transparent) !important;
+  border-radius: var(--paper-radius) !important;
+  background: color-mix(in srgb, var(--surface-main) 88%, var(--bg-app) 12%) !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+  font: 600 13px/1 var(--paper-sans);
+  transition: color var(--paper-motion), background-color var(--paper-motion), border-color var(--paper-motion), box-shadow var(--paper-motion), opacity var(--paper-motion);
 }
 
-.df-app .df-template-slot-meta span {
-  color: var(--paper-ink-muted);
-  text-align: center;
+.df-app .df-template-slot-meta input {
+  width: 86px;
+  padding-inline: 6px;
+  font-family: var(--paper-mono);
+  appearance: textfield;
+}
+
+.df-app .df-template-slot-meta .df-template-label-input {
+  width: min(100%, 220px);
+  font-family: var(--paper-sans);
+  font-weight: 700;
 }
 
 .df-app .df-template-goal {
   width: 100%;
+  padding: 0 10px;
+}
+
+.df-app .df-template-goal::placeholder { color: var(--paper-ink-muted); }
+.df-app .df-template-goal:disabled { opacity: .42; cursor: not-allowed; }
+
+.df-app .df-template-slot-meta input:hover,
+.df-app .df-template-goal:hover:not(:disabled) {
+  border-color: var(--paper-rule-strong) !important;
+  background: color-mix(in srgb, var(--surface-main) 80%, var(--accent-active) 5%) !important;
+}
+
+.df-app .df-template-slot input:focus-visible {
+  outline: 0;
+  border-color: var(--paper-accent-rule) !important;
+  background: color-mix(in srgb, var(--surface-main) 82%, var(--accent-active) 7%) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-active) 18%, transparent) !important;
+}
+
+.df-app .df-template-slot-remove {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 20px/1 var(--paper-sans);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.df-app .df-template-slot-remove:hover {
+  color: var(--accent-active);
+  border-bottom-color: var(--paper-accent-rule);
+  background: var(--paper-note);
+  transform: none;
+  box-shadow: none;
+}
+
+.df-app .df-template-slot-remove:active { transform: translateY(1px); }
+.df-app .df-template-slot-remove:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+
+.df-app .df-template-modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 22px 18px;
+  border-top: 1px solid var(--paper-rule);
+  background: var(--surface-main);
 }
 
 .df-app .df-template-summary {
   display: grid;
   gap: 4px;
-  color: var(--paper-ink-muted);
-  font-size: 13px;
+  color: var(--text-muted);
+  font: 500 12px/1.45 var(--paper-sans);
 }
 
 .df-app .df-template-summary strong {
-  color: var(--paper-ink);
+  color: var(--text-main);
+  font-size: 13px;
 }
 
-.df-app .df-template-modal-actions {
-  border-top: 1px solid var(--paper-rule);
-  border-bottom: 0;
+.df-app .df-template-modal-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: var(--paper-radius);
 }
 
-.df-app .df-template-modal-actions .primary {
+.df-app .df-template-modal-actions button.primary {
+  border: 1px solid var(--paper-accent-rule);
+  background: var(--paper-note);
+  color: var(--accent-active);
+  font: 700 12px/1 var(--paper-sans);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.df-app .df-template-modal-actions button.primary:hover:not(:disabled) {
   border-color: var(--accent-active);
-  background: var(--accent-active);
-  color: var(--accent-contrast, #fff);
+  background: color-mix(in srgb, var(--accent-active) 10%, var(--surface-main));
+  box-shadow: none;
+  transform: none;
 }
 
-.df-app .df-template-modal-actions button:disabled {
-  opacity: .45;
-  cursor: not-allowed;
-}
+.df-app .df-template-modal-actions button:active:not(:disabled) { transform: translateY(1px); }
+.df-app .df-template-modal-actions button:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+.df-app .df-template-modal-actions button:disabled { opacity: .45; cursor: not-allowed; }
 
-@media (max-width: 760px) {
+@media (max-width: 720px) {
   .df-app .df-template-modal-backdrop {
-    padding: 12px;
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .df-app .df-template-modal {
+    width: 100%;
+    min-height: calc(100dvh - 18px);
+    max-height: calc(100dvh - 18px);
+    border-inline: 0;
+    border-radius: var(--paper-radius-soft) var(--paper-radius-soft) 0 0;
   }
 
   .df-app .df-template-modal-head,
   .df-app .df-template-note,
   .df-app .df-template-modal-actions {
-    align-items: stretch;
-    flex-direction: column;
+    padding-inline: 16px;
   }
 
   .df-app .df-template-tabs {
-    flex-wrap: wrap;
+    padding-inline: 16px;
+    overflow-x: auto;
+  }
+
+  .df-app .df-template-slots {
+    padding-inline: 16px;
+  }
+
+  .df-app .df-template-manager {
+    padding-inline: 16px;
+  }
+
+  .df-app .df-template-use-hint {
+    padding-inline: 16px;
+  }
+
+  .df-app .df-template-manager-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 6px 0;
+  }
+
+  .df-app .df-template-manager-delete {
+    justify-self: start;
   }
 
   .df-app .df-template-slot {
-    grid-template-columns: 28px 1fr 34px;
+    grid-template-columns: 92px minmax(0, 1fr) 34px;
+    gap: 8px 10px;
+    padding: 10px 0;
   }
 
   .df-app .df-template-goal {
-    grid-column: 2 / -1;
+    grid-column: 2 / 4;
+  }
+
+  .df-app .df-template-modal-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .df-app .df-template-summary {
+    grid-column: 1 / -1;
   }
 }
