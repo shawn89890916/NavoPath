@@ -141,3 +141,15 @@ export function countDoneSubtasks(subtasks: Subtask[] | undefined): number {
   }
   return count;
 }
+
+export function toggleSubtaskInTree(subtasks: Subtask[], id: string): Subtask[] {
+  return subtasks.map((item) => {
+    if (item.id === id) {
+      const nextDone = !(item.completed || item.done);
+      return { ...item, completed: nextDone, done: nextDone };
+    }
+    return item.subtasks
+      ? { ...item, subtasks: toggleSubtaskInTree(item.subtasks, id) }
+      : item;
+  });
+}

@@ -34,7 +34,8 @@ import { scheduleHabitRecord, toggleHabitCompletion } from "./utils/habits";
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
 import { validateProjectCompletion } from "./utils/productivityModel";
-import { addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree } from "./utils/treeOrder";
+import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
+import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
@@ -5986,13 +5987,13 @@ function App() {
                 </button>
                 <div className="df-header-timer-actions">
                   {!timerRunning ? (
-                    <button onClick={resumeTimer} className="df-timer-action">{lang === "zh" ? "继续" : "Resume"}</button>
+                    <button onClick={resumeTimer} className="df-timer-action" title={lang === "zh" ? "继续" : "Resume"}><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
                   ) : (
-                    <button onClick={pauseTimer} className="df-timer-action">{lang === "zh" ? "暂停" : "Pause"}</button>
+                    <button onClick={pauseTimer} className="df-timer-action" title={lang === "zh" ? "暂停" : "Pause"}><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
                   )}
-                  <button onClick={stopAndSaveTimer} className="df-timer-action">{lang === "zh" ? "保存" : "Save"}</button>
-                  <button onClick={discardTimer} className="df-timer-action">{lang === "zh" ? "丢弃" : "Discard"}</button>
-                  <button onClick={() => setFocusOverlayMode(settings.focusModeDefault || "flowtime")} className="df-timer-action">{lang === "zh" ? "专注" : "Focus"}</button>
+                  <button onClick={stopAndSaveTimer} className="df-timer-action" title={lang === "zh" ? "保存" : "Save"}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+                  <button onClick={discardTimer} className="df-timer-action" title={lang === "zh" ? "丢弃" : "Discard"}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+                  <button onClick={() => setFocusOverlayMode(settings.focusModeDefault || "flowtime")} className="df-timer-action" title={lang === "zh" ? "专注" : "Focus"}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
                 </div>
               </div>
             ) : (
@@ -6127,6 +6128,7 @@ function App() {
                 )}
                 <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
+                <button className="df-icon-action df-icon-template" data-tip={lang === "zh" ? "日程模版" : "Schedule Template"} aria-label={lang === "zh" ? "日程模版" : "Schedule Template"} onClick={() => setScheduleTemplateOpen(true)}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2M16 4V2M8 13h3M8 17h6"/></svg></button>
               </div>
             </div>
             <div className="df-candidate-list">
@@ -6154,14 +6156,14 @@ function App() {
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
                         {tasks.map((task) => (
-                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
+                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
                         ))}
                       </div>
                     );
                   })
               ) : visibleCandidates.map((task) => (
                 <div key={task.id} className="df-candidate-task-row">
-                  <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
+                  <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
                   <button className={`df-candidate-timer-btn${timerTaskId === task.id ? " active" : ""}`} onClick={() => timerTaskId === task.id ? (timerRunning ? pauseTimer() : resumeTimer()) : startTimer(task.id)} aria-label={lang === "zh" ? "计时" : "Timer"}>
                     {timerTaskId === task.id ? (timerRunning ? "⏸" : "▶") : "⏱"}
                   </button>
@@ -7085,9 +7087,6 @@ function App() {
                 )}
               </div>
               <div className="df-view-switch-vertical" aria-label={t(lang, "timeline.switchView")}>
-                <button className="df-template-plan" type="button" onClick={() => setScheduleTemplateOpen(true)}>
-                  {lang === "zh" ? "\u6a21\u677f" : "Template"}
-                </button>
                 {([
                   ["daily", viewLabel(lang, "daily")],
                   ["3day", viewLabel(lang, "3day")],
@@ -7125,18 +7124,27 @@ function App() {
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
       {focusOverlayMode && (
-        <div className="df-focus-overlay">
-          <button className="df-focus-close" onClick={() => setFocusOverlayMode(null)} aria-label={lang === "zh" ? "关闭" : "Close"}>×</button>
-          <div className="df-focus-mode-switch">
-            {(["stopwatch", "pomodoro", "flowtime"] as const).map((m) => (
-              <button key={m} className={`df-focus-mode-btn${focusOverlayMode === m ? " active" : ""}`} onClick={() => setFocusOverlayMode(m)}>
-                {m === "stopwatch" ? (lang === "zh" ? "秒表" : "Stopwatch") : m === "pomodoro" ? "Pomodoro" : "Flowtime"}
-              </button>
-            ))}
+        <div className="df-focus-overlay" style={timerProject?.color ? { ["--focus-accent" as string]: timerProject.color } as React.CSSProperties : undefined}>
+          <div className="df-focus-topbar">
+            <div className="df-focus-mode-switch">
+              {(["stopwatch", "pomodoro", "flowtime"] as const).map((m) => (
+                <button key={m} className={`df-focus-mode-btn${focusOverlayMode === m ? " active" : ""}`} onClick={() => setFocusOverlayMode(m)}>
+                  {m === "stopwatch" ? (lang === "zh" ? "秒表" : "Stopwatch") : m === "pomodoro" ? "Pomodoro" : "Flowtime"}
+                </button>
+              ))}
+            </div>
+            <button className="df-focus-close" onClick={() => setFocusOverlayMode(null)} aria-label={lang === "zh" ? "关闭" : "Close"}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
           </div>
-          <div className="df-focus-timer-display">{formatTimerDisplay(timerElapsed)}</div>
-          <div className="df-focus-task-name">{timerTask?.title || (lang === "zh" ? "未选择任务" : "No task selected")}</div>
-          {timerProject && <div className="df-focus-project-name">{timerProject.title}</div>}
+          <div className="df-focus-main">
+            <div className="df-focus-timer-display">{formatTimerDisplay(timerElapsed)}</div>
+            <div className="df-focus-task-wrap">
+              <span className="df-focus-task-prefix">{lang === "zh" ? "正在做" : "Working"}</span>
+              <span className="df-focus-task-name">{timerTask?.title || (lang === "zh" ? "未选择任务" : "No task selected")}</span>
+            </div>
+            {timerProject && <div className="df-focus-project-name">{timerProject.title}</div>}
+          </div>
           <div className="df-focus-controls">
             {!timerRunning ? (
               <button className="df-focus-play" onClick={() => timerTaskId ? resumeTimer() : null}>{lang === "zh" ? "开始" : "Start"}</button>
@@ -7889,6 +7897,7 @@ function TaskCard({
   onSaveDueDate,
   onSaveRecurrence,
   onMoveToPlanning,
+  onToggleSubtask,
   lang,
 }: {
   task: Task;
@@ -7909,6 +7918,7 @@ function TaskCard({
   onSaveDueDate: (date: string) => void;
   onSaveRecurrence: (recurrence?: TaskRecurrence) => void;
   onMoveToPlanning?: () => void;
+  onToggleSubtask?: (subtaskId: string) => void;
   lang: Language;
 }) {
   const [openPanel, setOpenPanel] = useState<"more" | null>(null);
@@ -7981,6 +7991,12 @@ function TaskCard({
             {isEvent ? <span className="df-candidate-kind">EVENT</span> : null}
             <strong className="df-candidate-title" title={task.title}>{task.title}</strong>
             {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
+            {!isEvent && <span className="df-task-meta-badges" aria-label={lang === "zh" ? "任务状态" : "Task status"}>
+              {buildTaskMetaBadges(task, lang).map((badge) => (
+                <span key={badge.key} className={badge.className}>{badge.label}</span>
+              ))}
+            </span>}
+            {!isEvent && (task.subtasks || []).length > 0 && <span className="df-candidate-subtask-count" title={lang === "zh" ? "子任务进度" : "Subtask progress"}>{countDoneSubtasks(task.subtasks)}/{countSubtasks(task.subtasks)}</span>}
           </div>
           {!isEvent && <button
             className="df-duration-pill"
@@ -8020,6 +8036,29 @@ function TaskCard({
             </svg>
           </button>}
         </div>}
+
+        {!isMoreOpen && !isEvent && onToggleSubtask && (task.subtasks || []).length > 0 && (
+          <div className="df-candidate-subtasks">
+            {(task.subtasks || []).map((subtask) => {
+              const subDone = Boolean(subtask.completed || subtask.done);
+              return (
+                <button
+                  key={subtask.id}
+                  type="button"
+                  className={subDone ? "done" : ""}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleSubtask(subtask.id);
+                  }}
+                  title={subtask.title}
+                >
+                  <span aria-hidden="true">{subDone ? <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}</span>
+                  <small>{subtask.title}</small>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {isPlacementArmed && placementPreview && (
           <div className="df-candidate-placement-bar" onClick={stop}>
