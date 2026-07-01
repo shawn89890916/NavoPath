@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Language, McpTokenMetadata, NavoPathPluginRuntime, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -30,8 +30,10 @@ import {
   type TimelineViewMode,
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
+import { scheduleHabitRecord, toggleHabitCompletion } from "./utils/habits";
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
+import { validateProjectCompletion } from "./utils/productivityModel";
 import { addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
@@ -387,8 +389,8 @@ type AiSessionMessage = {
 type AiContextSummary = {
   currentViewDate: string;
   page: "execute" | "planning";
-  projects: Array<{ id: string; title: string; category: Category; color?: string; importance?: Priority; urgency?: Priority; notes?: string }>;
-  activeTasks: Array<{ id: string; title: string; projectId?: string; dueDate: string; priority: Priority; scheduled?: string[]; subtasks?: string[]; notes?: string }>;
+  projects: Array<{ id: string; title: string; category: Category; color?: string; importance?: NullablePriority; urgency?: NullablePriority; notes?: string }>;
+  activeTasks: Array<{ id: string; title: string; projectId?: string; dueDate: string; priority: NullablePriority; scheduled?: string[]; subtasks?: string[]; notes?: string }>;
   upcomingEvents: Array<{ id: string; title: string; date: string; startTime?: string; endTime?: string; details?: string }>;
   scheduledToday: Array<{ id: string; title: string; start: string; end: string; projectId?: string }>;
   recentNotes: Array<{ content: string; tags: string[]; createdAt: string }>;
@@ -1586,6 +1588,77 @@ function App() {
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const [yearOverviewOpen, setYearOverviewOpen] = useState(false);
   const [overviewYear, setOverviewYear] = useState(() => new Date(`${todayIso()}T00:00:00`).getFullYear());
+
+  const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerElapsed, setTimerElapsed] = useState(0);
+  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
+  const [focusOverlayMode, setFocusOverlayMode] = useState<null | "stopwatch" | "pomodoro" | "flowtime">(null);
+  const timerIntervalRef = useRef<number | null>(null);
+  const timerTaskRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("navopath-active-timer");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.taskId) {
+          setTimerTaskId(parsed.taskId);
+          setTimerElapsed(parsed.elapsed || 0);
+          setTimerRunning(false);
+          timerTaskRef.current = parsed.taskId;
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (!timerRunning || timerStartedAt === null) {
+      if (timerIntervalRef.current) { window.clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
+      return;
+    }
+    timerIntervalRef.current = window.setInterval(() => {
+      setTimerElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => { if (timerIntervalRef.current) { window.clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; } };
+  }, [timerRunning, timerStartedAt]);
+
+  useEffect(() => {
+    if (timerTaskId) {
+      timerTaskRef.current = timerTaskId;
+      try { localStorage.setItem("navopath-active-timer", JSON.stringify({ taskId: timerTaskId, elapsed: timerElapsed, running: timerRunning })); } catch { /* ignore */ }
+    } else {
+      timerTaskRef.current = null;
+      try { localStorage.removeItem("navopath-active-timer"); } catch { /* ignore */ }
+    }
+  }, [timerTaskId, timerElapsed, timerRunning]);
+
+  const startTimer = useCallback((taskId: string) => {
+    setTimerTaskId(taskId);
+    setTimerRunning(true);
+    setTimerStartedAt(Date.now());
+  }, []);
+
+  const pauseTimer = useCallback(() => {
+    setTimerRunning(false);
+    setTimerStartedAt(null);
+  }, []);
+
+  const resumeTimer = useCallback(() => {
+    setTimerRunning(true);
+    setTimerStartedAt(Date.now());
+  }, []);
+
+  const discardTimer = useCallback(() => {
+    setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null);
+  }, []);
+
+  const formatTimerDisplay = useCallback((seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+  }, []);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -2797,6 +2870,31 @@ function App() {
   const tasks = data?.tasks || [];
   const events = data?.events || [];
 
+  const timerTask = useMemo(() => tasks.find((task) => task.id === timerTaskId) || null, [tasks, timerTaskId]);
+  const timerProject = useMemo(() => timerTask?.projectId ? projects.find((p) => p.id === timerTask.projectId) || null : null, [timerTask, projects]);
+
+  const stopAndSaveTimer = useCallback(() => {
+    if (!timerTaskId || timerElapsed < 1) { setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null); return; }
+    const now = new Date().toISOString();
+    const start = new Date(Date.now() - timerElapsed * 1000).toISOString();
+    const entry = {
+      id: `te-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      taskId: timerTaskId,
+      projectId: timerTask?.projectId,
+      startAt: start,
+      endAt: now,
+      durationMinutes: Math.max(1, Math.round(timerElapsed / 60)),
+      source: "timer" as const,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (data) {
+      const nextData = { ...data, timeEntries: [...(data.timeEntries || []), entry] };
+      void saveData(nextData);
+    }
+    setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null);
+  }, [timerTaskId, timerElapsed, timerTask, data, saveData]);
+
   /**
    * Build "virtual" Task objects for each active preview block. These are
    * rendered alongside real `scheduledTasks` so the timeline shows previews
@@ -3384,6 +3482,17 @@ function App() {
       ...data,
       projects: data.projects.map((project) => project.id === projectId ? { ...project, ...patch, updatedAt: new Date().toISOString() } : project)
     });
+  }
+
+  function completeProject(projectId: string) {
+    if (!data) return;
+    const result = validateProjectCompletion(projectId, data.tasks);
+    if (!result.ok) {
+      showToast(lang === "zh" ? "请先完成项目下所有任务" : "Complete every task in this project first");
+      return;
+    }
+    updateProject(projectId, { completed: true });
+    showToast(lang === "zh" ? "项目已完成" : "Project completed");
   }
 
   function showToast(message: string) {
@@ -4043,6 +4152,13 @@ function App() {
 
   function scheduleTask(taskId: string, startTime: string) {
     const targetDate = dragTargetDateRef.current || timelineDate;
+    if (taskId.startsWith("habit:")) {
+      scheduleHabitAt(taskId.slice("habit:".length), targetDate, startTime);
+      setHoverSlot("");
+      setDrag(null);
+      dragTargetDateRef.current = "";
+      return;
+    }
     if (isEventDisplayTask(taskId)) {
       moveEventOccurrence(taskId, startTime, targetDate);
       setHoverSlot("");
@@ -4064,6 +4180,102 @@ function App() {
     setHoverSlot("");
     setDrag(null);
     dragTargetDateRef.current = "";
+  }
+
+  function toggleHabitDaily(habitId: string, completed: boolean) {
+    const current = dataRef.current;
+    if (!current) return;
+    void saveData(toggleHabitCompletion(current, habitId, today, completed));
+  }
+
+  function scheduleHabitAt(habitId: string, date: string, startTime: string) {
+    const current = dataRef.current;
+    if (!current) return;
+    const result = scheduleHabitRecord(current, habitId, date, startTime);
+    void saveData(result.data);
+    requestTimelineFocus({ date, startTime, taskId: result.recordId, source: "schedule" });
+    showToast(lang === "zh" ? "习惯已安排" : "Habit scheduled");
+  }
+
+  function focusHabitSchedule(recordId: string) {
+    const current = dataRef.current;
+    if (!current) return;
+    const owner = current.tasks.find((item) => (item.timelineRecords || []).some((record) => record.id === recordId));
+    const record = owner?.timelineRecords?.find((item) => item.id === recordId);
+    if (!owner || !record) return;
+    setSelectedDate(record.scheduledDate);
+    setTimelineView("daily");
+    requestTimelineFocus({ date: record.scheduledDate, startTime: record.scheduledStart, taskId: record.id, source: "schedule" });
+  }
+
+  function beginHabitDrag(event: React.PointerEvent, habit: Habit) {
+    const target = event.target as HTMLElement;
+    if (event.button !== 0 || target.closest("button,input,textarea,select,a")) return;
+    const pointerId = event.pointerId;
+    const dragElement = event.currentTarget as HTMLElement;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const duration = Math.max(habit.defaultDurationMinutes || 20, 5);
+    const taskId = habitDragTaskId(habit.id);
+    let active = false;
+    let dropTime = "";
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", keydown);
+      document.body.classList.remove("df-timeline-pointer-drag");
+      setDrag(null);
+      setHoverSlot("");
+      dragTargetDateRef.current = "";
+      if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
+      if (active) window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
+    };
+    const updateTarget = (pointerEvent: PointerEvent) => {
+      const { gridEl, scrollEl, visDays } = getDropGridAndDays();
+      if (!gridEl || !scrollEl) return;
+      const rect = scrollEl.getBoundingClientRect();
+      const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
+      if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
+      if (pointerEvent.clientY < rect.top + 48) scrollEl.scrollTop -= 18;
+      else if (pointerEvent.clientY > rect.bottom - 48) scrollEl.scrollTop += 18;
+      const targetSlot = getDropTargetFromPointer({ clientX: pointerEvent.clientX, clientY: pointerEvent.clientY, gridElement: gridEl, scrollElement: scrollEl, visibleDays: visDays, startHour: dayStartHour });
+      dragTargetDateRef.current = targetSlot.date;
+      dropTime = targetSlot.startTime;
+      setHoverSlot(targetSlot.startTime);
+    };
+    const move = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < 8) return;
+      if (!active) {
+        active = true;
+        dragElement.setPointerCapture(pointerId);
+        document.body.classList.add("df-timeline-pointer-drag");
+        suppressBlockClickRef.current = true;
+        setDragCreate(null);
+        if (compactLayout) {
+          setCompactExecuteView("schedule");
+          if (timelineView === "month") setTimelineView("daily");
+          window.requestAnimationFrame(() => updateTarget(pointerEvent));
+        }
+      }
+      pointerEvent.preventDefault();
+      setDrag({ taskId, kind: "candidate", source: "candidate", duration, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
+      updateTarget(pointerEvent);
+    };
+    const up = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      if (active && dropTime && dragTargetDateRef.current) {
+        scheduleHabitAt(habit.id, dragTargetDateRef.current, dropTime);
+      }
+      cleanup();
+    };
+    const cancel = (pointerEvent: PointerEvent) => { if (pointerEvent.pointerId === pointerId) cleanup(); };
+    const keydown = (keyboardEvent: KeyboardEvent) => { if (keyboardEvent.key === "Escape") cleanup(); };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", keydown);
   }
 
   function unscheduleTask(taskId: string) {
@@ -4542,8 +4754,8 @@ function App() {
       endDate: task.scheduledDate || realTask.dueDate || today,
       endTime: task.scheduledEnd || "",
       category: realTask.category,
-      priority: realTask.priority,
-      importance: realTask.importance || realTask.priority,
+      priority: realTask.priority ?? "medium",
+      importance: realTask.importance ?? realTask.priority ?? "high",
       urgency: realTask.urgency || "low",
       estimatedHours: realTask.estimatedHours || 0.5,
       details: realTask.notes || ""
@@ -4774,8 +4986,8 @@ function App() {
       endDate: task.dueDate,
       endTime: task.scheduledEnd || "",
       category: task.category,
-      priority: task.priority,
-      importance: task.importance || task.priority,
+      priority: task.priority ?? "medium",
+      importance: task.importance ?? task.priority ?? "high",
       urgency: task.urgency || "low",
       estimatedHours: task.estimatedHours || 0.5,
       details: task.notes || "",
@@ -5724,10 +5936,32 @@ function App() {
 
   const onboardingActive = (settings.onboardingVersion ?? 0) < 2 && settings.onboardingStep !== "done";
   const onboardingStep = (settings.onboardingStep || "add") as OnboardingStep;
+  const habits = data.habits || [];
+  const habitDailyStates = data.habitDailyStates || [];
   const draggedTask = drag
     ? tasks.find((task) => task.id === drag.taskId)
       || recordToTaskMap.get(drag.taskId)
       || eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId)
+      || (drag.taskId.startsWith("habit:")
+        ? (() => {
+            const habit = habits.find((item) => habitDragTaskId(item.id) === drag.taskId);
+            if (!habit) return undefined;
+            const duration = Math.max(habit.defaultDurationMinutes || 20, 5);
+            return {
+              id: habitDragTaskId(habit.id),
+              title: habit.title,
+              dueDate: timelineDate,
+              category: "personal",
+              priority: null,
+              notes: "",
+              goalId: "",
+              completed: false,
+              estimatedHours: duration / 60,
+              createdAt: "",
+              updatedAt: "",
+            } as Task;
+          })()
+        : undefined)
     : undefined;
 
   return (
@@ -5741,20 +5975,42 @@ function App() {
             <div><strong>NavoPath</strong></div>
           </div>
           <div className="df-month-year-selector">
-            <button className="df-month-year-btn" aria-expanded={yearOverviewOpen} onClick={() => {
-              const nextOpen = !yearOverviewOpen;
-              setYearOverviewOpen(nextOpen);
-              if (nextOpen) {
-                setOverviewYear(new Date(`${timelineDate}T00:00:00`).getFullYear());
-                setCompactExecuteView("schedule");
-                if (mode !== "execute") void saveSettings({ activeMode: "execute" });
-              }
-            }}>
-              {yearOverviewOpen
-                ? overviewYear
-                : (() => { const d = new Date(`${timelineDate}T00:00:00`); return `${d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" })} ${d.getFullYear()}`; })()}
-              <span className="df-month-year-chevron" />
-            </button>
+            {timerTask ? (
+              <div className={`df-header-timer-task${timerRunning ? " is-running" : ""}`} style={timerProject?.color ? { ["--timer-project-color" as string]: timerProject.color } as React.CSSProperties : undefined}>
+                <button className="df-header-timer-label" onClick={() => timerTask && openTaskEdit(timerTask)}>
+                  <span className="df-header-timer-status">{timerRunning ? (lang === "zh" ? "正在计时" : "Tracking") : (lang === "zh" ? "正在做" : "Working")}</span>
+                  <span className="df-header-timer-name">{timerTask.title}</span>
+                </button>
+                <button className="df-header-timer-display" onClick={() => timerRunning ? pauseTimer() : resumeTimer()}>
+                  {formatTimerDisplay(timerElapsed)}
+                </button>
+                <div className="df-header-timer-actions">
+                  {!timerRunning ? (
+                    <button onClick={resumeTimer} className="df-timer-action">{lang === "zh" ? "继续" : "Resume"}</button>
+                  ) : (
+                    <button onClick={pauseTimer} className="df-timer-action">{lang === "zh" ? "暂停" : "Pause"}</button>
+                  )}
+                  <button onClick={stopAndSaveTimer} className="df-timer-action">{lang === "zh" ? "保存" : "Save"}</button>
+                  <button onClick={discardTimer} className="df-timer-action">{lang === "zh" ? "丢弃" : "Discard"}</button>
+                  <button onClick={() => setFocusOverlayMode(settings.focusModeDefault || "flowtime")} className="df-timer-action">{lang === "zh" ? "专注" : "Focus"}</button>
+                </div>
+              </div>
+            ) : (
+              <button className="df-month-year-btn" aria-expanded={yearOverviewOpen} onClick={() => {
+                const nextOpen = !yearOverviewOpen;
+                setYearOverviewOpen(nextOpen);
+                if (nextOpen) {
+                  setOverviewYear(new Date(`${timelineDate}T00:00:00`).getFullYear());
+                  setCompactExecuteView("schedule");
+                  if (mode !== "execute") void saveSettings({ activeMode: "execute" });
+                }
+              }}>
+                {yearOverviewOpen
+                  ? overviewYear
+                  : (() => { const d = new Date(`${timelineDate}T00:00:00`); return `${d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "long" })} ${d.getFullYear()}`; })()}
+                <span className="df-month-year-chevron" />
+              </button>
+            )}
           </div>
           <div className="df-header-right">
           <nav className="df-tabs df-tabs-right">
@@ -5904,9 +6160,23 @@ function App() {
                     );
                   })
               ) : visibleCandidates.map((task) => (
-                <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
+                <div key={task.id} className="df-candidate-task-row">
+                  <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} lang={lang} />
+                  <button className={`df-candidate-timer-btn${timerTaskId === task.id ? " active" : ""}`} onClick={() => timerTaskId === task.id ? (timerRunning ? pauseTimer() : resumeTimer()) : startTimer(task.id)} aria-label={lang === "zh" ? "计时" : "Timer"}>
+                    {timerTaskId === task.id ? (timerRunning ? "⏸" : "▶") : "⏱"}
+                  </button>
+                </div>
               ))}
             </div>
+            <HabitCandidateCard
+              habits={habits}
+              habitDailyStates={habitDailyStates}
+              today={today}
+              lang={lang}
+              onToggle={toggleHabitDaily}
+              onPointerDragStart={beginHabitDrag}
+              onFocusScheduled={focusHabitSchedule}
+            />
             <form className="df-quick-add" onSubmit={(event) => {
               event.preventDefault();
               quickAddTask();
@@ -6340,7 +6610,7 @@ function App() {
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
-                                    <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
+                                    <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
                                       dayStartHour={dayStartHour}
                                     />
@@ -6738,7 +7008,7 @@ function App() {
                           return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
                         })}
                         {isViewingToday && <NowLine lang={lang} dayStartHour={dayStartHour} />}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); if (r) return r; return eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId); })()} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} />}
                         {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -6831,7 +7101,7 @@ function App() {
         </main>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} />
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} />
         </Suspense>
       )}
 
@@ -6854,6 +7124,30 @@ function App() {
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
+      {focusOverlayMode && (
+        <div className="df-focus-overlay">
+          <button className="df-focus-close" onClick={() => setFocusOverlayMode(null)} aria-label={lang === "zh" ? "关闭" : "Close"}>×</button>
+          <div className="df-focus-mode-switch">
+            {(["stopwatch", "pomodoro", "flowtime"] as const).map((m) => (
+              <button key={m} className={`df-focus-mode-btn${focusOverlayMode === m ? " active" : ""}`} onClick={() => setFocusOverlayMode(m)}>
+                {m === "stopwatch" ? (lang === "zh" ? "秒表" : "Stopwatch") : m === "pomodoro" ? "Pomodoro" : "Flowtime"}
+              </button>
+            ))}
+          </div>
+          <div className="df-focus-timer-display">{formatTimerDisplay(timerElapsed)}</div>
+          <div className="df-focus-task-name">{timerTask?.title || (lang === "zh" ? "未选择任务" : "No task selected")}</div>
+          {timerProject && <div className="df-focus-project-name">{timerProject.title}</div>}
+          <div className="df-focus-controls">
+            {!timerRunning ? (
+              <button className="df-focus-play" onClick={() => timerTaskId ? resumeTimer() : null}>{lang === "zh" ? "开始" : "Start"}</button>
+            ) : (
+              <button className="df-focus-pause" onClick={pauseTimer}>{lang === "zh" ? "暂停" : "Pause"}</button>
+            )}
+            <button className="df-focus-save" onClick={stopAndSaveTimer}>{lang === "zh" ? "保存" : "Save"}</button>
+            <button className="df-focus-discard" onClick={discardTimer}>{lang === "zh" ? "丢弃" : "Discard"}</button>
+          </div>
+        </div>
+      )}
       {scheduleTemplateOpen && data && (
         <ScheduleTemplateModal
           lang={lang}
@@ -7507,6 +7801,69 @@ type CandidateTimeSettings = {
   allDay: boolean;
   clearSchedule?: boolean;
 };
+
+function habitDragTaskId(habitId: string) {
+  return `habit:${habitId}`;
+}
+
+function HabitCandidateCard(props: {
+  habits: Habit[];
+  habitDailyStates: HabitDailyState[];
+  today: string;
+  lang: Language;
+  onToggle: (habitId: string, completed: boolean) => void;
+  onPointerDragStart: (event: React.PointerEvent, habit: Habit) => void;
+  onFocusScheduled: (recordId: string) => void;
+}) {
+  const active = props.habits
+    .filter((habit) => !habit.archived)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const completed = active.filter((habit) => props.habitDailyStates.some((state) => state.habitId === habit.id && state.date === props.today && state.completed)).length;
+  if (active.length === 0) return null;
+
+  return (
+    <section className="df-habit-candidate-card" aria-label={props.lang === "zh" ? "习惯" : "Habits"}>
+      <header>
+        <strong>{props.lang === "zh" ? "习惯" : "Habits"}</strong>
+        <span>{completed}/{active.length}</span>
+      </header>
+      <div className="df-habit-candidate-list">
+        {active.map((habit) => {
+          const state = props.habitDailyStates.find((item) => item.habitId === habit.id && item.date === props.today);
+          const isDone = Boolean(state?.completed);
+          return (
+            <article
+              key={habit.id}
+              className={`df-habit-candidate-row${isDone ? " completed" : ""}${state?.timelineRecordId ? " scheduled" : ""}`}
+              onPointerDown={(event) => props.onPointerDragStart(event, habit)}
+            >
+              <button
+                type="button"
+                className="df-habit-check"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => props.onToggle(habit.id, !isDone)}
+                aria-pressed={isDone}
+                aria-label={isDone ? (props.lang === "zh" ? "取消完成" : "Mark incomplete") : (props.lang === "zh" ? "完成习惯" : "Complete habit")}
+              />
+              <span className="df-habit-title">{habit.title}</span>
+              <small>{habit.defaultDurationMinutes || 20}m</small>
+              {state?.timelineRecordId && (
+                <button
+                  type="button"
+                  className="df-habit-scheduled"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={() => props.onFocusScheduled(state.timelineRecordId!)}
+                >
+                  {props.lang === "zh" ? "已安排" : "Scheduled"}
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function recurrenceLabel(recurrence?: TaskRecurrence) {
   if (!recurrence || recurrence.frequency === "none") return "";
@@ -9555,7 +9912,7 @@ function PluginRuntimePanel({ settings, data, onSave, onSaveData, lang }: { sett
 }
 
 function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
-  const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "plugins" | "account">("page");
+  const [settingsSection, setSettingsSection] = useState<"page" | "ai" | "mcp" | "plugins" | "account" | "features">("page");
   const [pluginConfigDialogId, setPluginConfigDialogId] = useState<string | null>(null);
   const [pluginConfigDraft, setPluginConfigDraft] = useState<Record<string, unknown>>({});
   // Force a re-render of the plugin list when activation state changes (the
@@ -9759,7 +10116,7 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
         {kind === "settings" ? (
           <div className="df-utility-body df-settings-shell">
             <nav className="df-settings-nav" aria-label={lang === "zh" ? "设置分区" : "Settings sections"}>
-              {([['page', lang === 'zh' ? '页面' : 'Page'], ['ai', 'Navo AI'], ['mcp', 'MCP'], ['plugins', lang === 'zh' ? '插件' : 'Plugins'], ['account', lang === 'zh' ? '账户' : 'Account']] as const).map(([id, label]) => (
+              {([['page', lang === 'zh' ? '页面' : 'Page'], ['features', lang === 'zh' ? '功能' : 'Features'], ['ai', 'Navo AI'], ['mcp', 'MCP'], ['plugins', lang === 'zh' ? '插件' : 'Plugins'], ['account', lang === 'zh' ? '账户' : 'Account']] as const).map(([id, label]) => (
                 <button type="button" key={id} className={settingsSection === id ? "active" : ""} aria-current={settingsSection === id ? "page" : undefined} onClick={() => setSettingsSection(id)}>{label}</button>
               ))}
             </nav>
@@ -9798,6 +10155,39 @@ function UtilityPanel({ kind, settings, data, authEmail, onClose, onSave, onSave
             <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
             <button className="df-settings-reset-accent" onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复主题默认点缀色" : "Restore theme accent defaults"}</button>
             <button className="df-settings-about" onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}</button>
+            </section>}
+            {settingsSection === "features" && <section className="df-settings-group"><h3>{lang === "zh" ? "功能" : "Features"}</h3>
+            <label className="df-utility-check">
+              <input type="checkbox" checked={settings.featureKanbanViewEnabled !== false} onChange={(e) => onSave({ featureKanbanViewEnabled: e.target.checked })} />
+              <span>{lang === "zh" ? "启用看板视图 (Kanban)" : "Enable Kanban view"}</span>
+            </label>
+            <label className="df-utility-check">
+              <input type="checkbox" checked={settings.featureQuadrantViewEnabled !== false} onChange={(e) => onSave({ featureQuadrantViewEnabled: e.target.checked })} />
+              <span>{lang === "zh" ? "启用四象限视图" : "Enable Eisenhower matrix view"}</span>
+            </label>
+            <label className="df-utility-check">
+              <input type="checkbox" checked={settings.featureListViewEnabled !== false} onChange={(e) => onSave({ featureListViewEnabled: e.target.checked })} />
+              <span>{lang === "zh" ? "启用列表视图" : "Enable list view"}</span>
+            </label>
+            <hr />
+            <label className="df-utility-select">
+              {lang === "zh" ? "默认专注模式" : "Default focus mode"}
+              <select value={settings.focusModeDefault || "flowtime"} onChange={(e) => onSave({ focusModeDefault: e.target.value as "stopwatch" | "pomodoro" | "flowtime" })}>
+                <option value="stopwatch">{lang === "zh" ? "秒表" : "Stopwatch"}</option>
+                <option value="pomodoro">Pomodoro</option>
+                <option value="flowtime">Flowtime</option>
+              </select>
+            </label>
+            <label className="df-utility-select">
+              {lang === "zh" ? "空闲阈值" : "Idle threshold"}
+              <select value={String(settings.idleThresholdMinutes ?? 5)} onChange={(e) => onSave({ idleThresholdMinutes: Number(e.target.value) })}>
+                <option value="3">3 {lang === "zh" ? "分钟" : "min"}</option>
+                <option value="5">5 {lang === "zh" ? "分钟" : "min"}</option>
+                <option value="10">10 {lang === "zh" ? "分钟" : "min"}</option>
+                <option value="15">15 {lang === "zh" ? "分钟" : "min"}</option>
+                <option value="0">{lang === "zh" ? "关闭" : "Off"}</option>
+              </select>
+            </label>
             </section>}
             {settingsSection === "ai" && <section className="df-settings-group"><h3>Navo AI</h3>
             <label className="df-utility-select">{lang === "zh" ? "默认模型" : "Default model"}<input value={settings.model} readOnly /></label>

@@ -62,7 +62,12 @@ const defaultSettings: Settings = {
   uiStyle: "gradient",
   dayStartTime: "00:00",
   syncIntervalMinutes: 60,
-  lastSyncedAt: undefined
+  lastSyncedAt: undefined,
+  idleThresholdMinutes: 5,
+  focusModeDefault: "stopwatch",
+  featureKanbanViewEnabled: false,
+  featureQuadrantViewEnabled: false,
+  featureListViewEnabled: false
 };
 
 function publicUser(user: User | null) {
@@ -82,7 +87,7 @@ function mergeSettings(settings: unknown): Settings {
   return { ...defaultSettings, ...stored };
 }
 
-const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
+const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "timeEntries", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
 
 function itemTime(item: any) {
   return Date.parse(item?.updatedAt || item?.createdAt || item?.savedAt || "") || 0;
@@ -118,6 +123,7 @@ function emptyCloudData(): PlannerData {
     goals: [],
     projects: [],
     tasks: [],
+    timeEntries: [],
     longTasks: [],
     events: [],
     notes: [],

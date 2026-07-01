@@ -1,5 +1,7 @@
 export type Category = "exam" | "uk" | "us" | "essay" | "materials" | "project" | "personal";
 export type Priority = "high" | "medium" | "low";
+export type NullablePriority = Priority | null;
+export type WorkflowStatus = "backlog" | "next" | "doing" | "waiting" | "done";
 
 export interface Goal {
   id: string;
@@ -16,8 +18,8 @@ export interface Project {
   notes: string;
   completed: boolean;
   color?: string;
-  importance?: Priority;
-  urgency?: Priority;
+  importance?: NullablePriority;
+  urgency?: NullablePriority;
   order?: number;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +50,7 @@ export interface TimelineRecord {
   taskId: string;
   scheduledDate: string;
   scheduledStart: string;
+  scheduledEndDate?: string;
   scheduledEnd: string;
   executionStatus: "scheduled" | "completed" | "returned_unfinished" | "cancelled";
   createdAt: string;
@@ -81,14 +84,16 @@ export interface Task {
   title: string;
   dueDate: string;
   category: Category;
-  priority: Priority;
+  priority: NullablePriority;
   notes: string;
   goalId: string;
   completed: boolean;
+  completedAt?: string;
+  workflowStatus?: WorkflowStatus;
   parentTaskId?: string;
   projectId?: string;
-  importance?: Priority;
-  urgency?: Priority;
+  importance?: NullablePriority;
+  urgency?: NullablePriority;
   estimatedHours?: number;
   order?: number;
   subtasks?: Subtask[];
@@ -194,6 +199,41 @@ export interface AiConversation {
   updatedAt: string;
 }
 
+export interface Habit {
+  id: string;
+  title: string;
+  defaultDurationMinutes: number;
+  archived?: boolean;
+  order?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HabitDailyState {
+  id: string;
+  habitId: string;
+  date: string;
+  completed: boolean;
+  completedAt?: string;
+  timelineRecordId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  taskId: string;
+  projectId?: string;
+  timelineRecordId?: string;
+  startAt: string;
+  endAt: string;
+  durationMinutes: number;
+  source: "timer" | "manual" | "idle_adjusted";
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ScheduleTemplateSlot {
   id: string;
   label: string;
@@ -217,6 +257,9 @@ export interface PlannerData {
   goals: Goal[];
   projects: Project[];
   tasks: Task[];
+  habits?: Habit[];
+  habitDailyStates?: HabitDailyState[];
+  timeEntries?: TimeEntry[];
   longTasks: LongTermTask[];
   events: CalendarEvent[];
   notes: Note[];
@@ -228,6 +271,7 @@ export interface PlannerData {
   scheduleTemplates?: ScheduleTemplate[];
   taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
   sync?: { deleted: Record<string, string> };
+  pluginConfigs?: Record<string, Record<string, unknown>>;
 }
 
 export type Language = "en" | "zh";
@@ -282,6 +326,11 @@ export interface Settings {
   taskBlockFill?: boolean;
   /** 自动同步频率（分钟）。0 或未设置表示仅手动同步。 */
   syncIntervalMinutes?: number;
+  idleThresholdMinutes?: number;
+  focusModeDefault?: "stopwatch" | "pomodoro" | "flowtime";
+  featureKanbanViewEnabled?: boolean;
+  featureQuadrantViewEnabled?: boolean;
+  featureListViewEnabled?: boolean;
   /** 最近一次成功同步时间（ISO 字符串）。 */
   lastSyncedAt?: string;
   /** 已启用（已安装并激活）的插件 ID 列表。 */

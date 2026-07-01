@@ -1,5 +1,16 @@
 # NavoPath 更新日志
 
+## 2026-07-01 · 规划视图与任务计时恢复
+
+### 新增
+- 规划视图新增看板（代办 / 进行中 / 完成三列拖拽）、四象限（重要 × 紧急拖拽）、列表三种视图，配合视图切换按钮与筛选面板（项目、状态、重要度、紧急度）。
+- 任务级计时器：在候选任务上启动计时，header 中部显示当前计时任务与时长，支持暂停、保存、丢弃；保存后写入时间记录（timeEntries）。
+- 专注覆盖层：全屏计时显示，支持秒表 / 番茄 / 心流模式切换，便于专注执行。
+- 设置 → 功能区域：可单独开关看板、四象限、列表视图，并设置默认专注模式与空闲阈值。
+
+### 改进
+- 规划视图筛选栏新增「显示已完成」切换与「筛选」面板入口，视图切换按钮组改为纸面风格。
+
 ## 2026-06-29 ? ????? 1.2.32 ????
 
 ### ???
@@ -243,6 +254,17 @@
 - 修复拖动时间轴任务时意外选中文字的问题。
 
 # NavoPath Changelog
+
+## 2026-07-01 · Planning views and task timer restored
+
+### Added
+- Planning view now offers Kanban (To do / Doing / Done drag-and-drop), Eisenhower four-quadrant (important × urgent drag-and-drop), and List views, with a view switcher and filter panel (project, status, importance, urgency).
+- Task-level timer: start timing from a candidate task; the header center shows the active timer task and elapsed time with pause, save, and discard controls; saving writes a time entry.
+- Focus overlay: full-screen timer display with Stopwatch / Pomodoro / Flowtime mode switching for focused execution.
+- Settings → Features section: toggle Kanban, Quadrant, and List views independently, and set the default focus mode plus idle threshold.
+
+### Improved
+- Planning filter bar adds a "Show completed" toggle and a "Filter" panel entry; the view switcher button group adopts the paper style.
 
 ## 2026-06-29 ? Template mode and 1.2.32 release prep
 
