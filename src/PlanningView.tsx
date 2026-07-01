@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PlannerData, Project, Subtask, Task } from "./types";
+import type { PlannerData, Project, Subtask, Task, WorkflowStatus } from "./types";
 import { t, type Language } from "./i18n";
 import { useInAppDialog } from "./InAppDialog";
 import { localIsoDate } from "./utils/localDate";
+import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
+import { kanbanGroups, WORKFLOW_LABELS } from "./utils/productivity";
+import { normalizeWorkflowStatus, workflowStatusForPatch, type UiWorkflowStatus, type StateFilterValue } from "./utils/productivityModel";
 import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 
 type TreeNodeKind = "project" | "task" | "subtask";
@@ -304,6 +307,7 @@ function PlanningTaskNode(props: {
   const hasSubtasks = (props.task.subtasks || []).length > 0;
   const doneCount = countDoneSubtasks(props.task.subtasks);
   const totalCount = countSubtasks(props.task.subtasks);
+  const metaBadges = buildTaskMetaBadges(props.task, props.lang);
 
   return (
     <>
@@ -321,6 +325,11 @@ function PlanningTaskNode(props: {
             onMouseLeave={hideTip}
           >
             {props.task.title}
+          </span>
+          <span className="df-task-meta-badges" aria-label={props.lang === "zh" ? "任务状态" : "Task status"}>
+            {metaBadges.map((badge) => (
+              <span key={badge.key} className={badge.className}>{badge.label}</span>
+            ))}
           </span>
           {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
           {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "今日候选" : "Today"}</span>}
@@ -386,6 +395,7 @@ function PlanningProjectNode(props: {
   onToggleCollapse: () => void;
   onOpen: () => void;
   onAddTask: () => void;
+  onComplete?: () => void;
 }) {
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
@@ -421,6 +431,18 @@ function PlanningProjectNode(props: {
         </span>
         <span className="df-project-badge">{props.taskCount}</span>
         <div className="df-project-node-actions">
+          {props.onComplete && !props.project.completed && (
+            <button
+              className="df-tree-icon-button df-project-complete-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onComplete?.();
+              }}
+              aria-label={props.lang === "zh" ? "完成项目" : "Complete project"}
+            >
+              <CheckIcon />
+            </button>
+          )}
           <button className="df-tree-icon-button df-project-add-btn" onClick={props.onAddTask} aria-label={t(props.lang, "planning.addTask")}>
             <PlusIcon />
           </button>
@@ -619,6 +641,8 @@ function useTreeLines(
   return lines;
 }
 
+type PlanningViewMode = "tree" | "kanban" | "eisenhower" | "list";
+
 export default function PlanningView(props: {
   lang: Language;
   data: PlannerData;
@@ -630,12 +654,16 @@ export default function PlanningView(props: {
   onToggleTodayCandidate: (taskId: string) => void;
   onPromoteSubtaskToToday: (parentTaskId: string, subtaskId: string) => void;
   onProjectEdit: (project: Project) => void;
+  onProjectComplete?: (projectId: string) => void;
   onTaskEdit: (task: Task) => void;
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onTaskCreate: (projectId: string) => void;
   onTaskDelete: (taskId: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
   onDataChange: (data: PlannerData) => void;
+  featureKanban?: boolean;
+  featureQuadrant?: boolean;
+  featureList?: boolean;
 }) {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
@@ -645,6 +673,26 @@ export default function PlanningView(props: {
   const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const dialog = useInAppDialog(props.lang);
+
+  const enableKanban = props.featureKanban !== false;
+  const enableQuadrant = props.featureQuadrant !== false;
+  const enableList = props.featureList !== false;
+  const availableModes = useMemo<PlanningViewMode[]>(() => {
+    const modes: PlanningViewMode[] = ["tree"];
+    if (enableKanban) modes.push("kanban");
+    if (enableQuadrant) modes.push("eisenhower");
+    if (enableList) modes.push("list");
+    return modes;
+  }, [enableKanban, enableQuadrant, enableList]);
+  const [viewMode, setViewMode] = useState<PlanningViewMode>("tree");
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [filterProject, setFilterProject] = useState<string>("all");
+  const [filterWorkflow, setFilterWorkflow] = useState<UiWorkflowStatus | "all">("all");
+  const [filterImportance, setFilterImportance] = useState<StateFilterValue>("all");
+  const [filterUrgency, setFilterUrgency] = useState<StateFilterValue>("all");
+  const [kanbanDragTaskId, setKanbanDragTaskId] = useState<string | null>(null);
+  const [kanbanDropStatus, setKanbanDropStatus] = useState<UiWorkflowStatus | null>(null);
 
   const today = todayIso();
 
@@ -931,6 +979,60 @@ export default function PlanningView(props: {
 
   const svgLines = useTreeLines(treeRef, safeProjects, safeTasks, props.collapsed, collapsedSubtasks);
 
+  const viewFilteredTasks = useMemo(() => {
+    let result = safeTasks.filter((task) => {
+      if (!showCompleted && task.completed) return false;
+      if (!showAddedTasks && task.plannedForDate === today) return false;
+      if (filterProject !== "all" && String(task.projectId || "") !== filterProject) return false;
+      const uiStatus = normalizeWorkflowStatus(task);
+      if (filterWorkflow !== "all" && uiStatus !== filterWorkflow) return false;
+      if (filterImportance !== "all") {
+        const imp = task.importance || null;
+        if (filterImportance === "empty") { if (imp) return false; }
+        else if (imp !== filterImportance) return false;
+      }
+      if (filterUrgency !== "all") {
+        const urg = task.urgency || null;
+        if (filterUrgency === "empty") { if (urg) return false; }
+        else if (urg !== filterUrgency) return false;
+      }
+      return true;
+    });
+    return result;
+  }, [safeTasks, showCompleted, showAddedTasks, today, filterProject, filterWorkflow, filterImportance, filterUrgency]);
+
+  const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
+
+  const projectColor = useCallback((projectId?: string) => {
+    if (!projectId) return UNASSIGNED_COLOR;
+    const project = safeProjects.find((p) => String(p.id) === String(projectId));
+    return project?.color || DEFAULT_PROJECT_COLOR;
+  }, [safeProjects]);
+
+  const projectName = useCallback((projectId?: string) => {
+    if (!projectId) return (props.lang === "zh" ? "未分配" : "Unassigned");
+    const project = safeProjects.find((p) => String(p.id) === String(projectId));
+    return project?.title || (props.lang === "zh" ? "未分配" : "Unassigned");
+  }, [safeProjects, props.lang]);
+
+  const handleKanbanDrop = useCallback((status: UiWorkflowStatus, taskId?: string) => {
+    const id = taskId || kanbanDragTaskId;
+    if (!id) return;
+    props.onTaskUpdate(id, workflowStatusForPatch(status));
+    setKanbanDragTaskId(null);
+    setKanbanDropStatus(null);
+  }, [kanbanDragTaskId, props]);
+
+  const handleQuadrantDrop = useCallback((importance: "high" | "medium" | "low" | null, urgency: "high" | "medium" | "low" | null, taskId?: string) => {
+    const id = taskId || kanbanDragTaskId;
+    if (!id) return;
+    props.onTaskUpdate(id, { importance, urgency, completed: false });
+    setKanbanDragTaskId(null);
+    setKanbanDropStatus(null);
+  }, [kanbanDragTaskId, props]);
+
+  const hasActiveFilters = filterProject !== "all" || filterWorkflow !== "all" || filterImportance !== "all" || filterUrgency !== "all";
+
   return (
     <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
       {dialog.host}
@@ -941,8 +1043,206 @@ export default function PlanningView(props: {
             <button className={`df-filter-toggle${showAddedTasks ? " active" : ""}`} onClick={() => setShowAddedTasks((v) => !v)}>
               {showAddedTasks ? t(props.lang, "sourceModal.hideAdded") : t(props.lang, "planning.showAdded")}
             </button>
+            <button className={`df-filter-toggle${showCompleted ? " active" : ""}`} onClick={() => setShowCompleted((v) => !v)}>
+              {props.lang === "zh" ? "显示已完成" : "Show done"}
+            </button>
+            <button className={`df-filter-toggle${filterPanelOpen ? " active" : ""}`} onClick={() => setFilterPanelOpen((v) => !v)}>
+              {props.lang === "zh" ? "筛选" : "Filter"}
+              {hasActiveFilters ? <span className="df-filter-dot" /> : null}
+            </button>
+            {filterPanelOpen && (
+              <div className="df-planning-filter-panel" onClick={(e) => e.stopPropagation()}>
+                {hasActiveFilters && (
+                  <button className="df-filter-reset" onClick={() => { setFilterProject("all"); setFilterWorkflow("all"); setFilterImportance("all"); setFilterUrgency("all"); }}>
+                    {props.lang === "zh" ? "重置" : "Reset"}
+                  </button>
+                )}
+                <label className="df-filter-row">
+                  <span>{props.lang === "zh" ? "项目" : "Project"}</span>
+                  <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
+                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
+                    {safeProjects.map((p) => <option key={p.id} value={String(p.id)}>{p.title}</option>)}
+                  </select>
+                </label>
+                <label className="df-filter-row">
+                  <span>{props.lang === "zh" ? "状态" : "Status"}</span>
+                  <select value={filterWorkflow} onChange={(e) => setFilterWorkflow(e.target.value as UiWorkflowStatus | "all")}>
+                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
+                    <option value="backlog">{props.lang === "zh" ? "代办" : "To do"}</option>
+                    <option value="doing">{props.lang === "zh" ? "进行中" : "Doing"}</option>
+                    <option value="done">{props.lang === "zh" ? "完成" : "Done"}</option>
+                  </select>
+                </label>
+                <label className="df-filter-row">
+                  <span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>
+                  <select value={filterImportance} onChange={(e) => setFilterImportance(e.target.value as StateFilterValue)}>
+                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
+                    <option value="high">{props.lang === "zh" ? "高" : "High"}</option>
+                    <option value="medium">{props.lang === "zh" ? "中" : "Medium"}</option>
+                    <option value="low">{props.lang === "zh" ? "低" : "Low"}</option>
+                    <option value="empty">{props.lang === "zh" ? "未设" : "Unset"}</option>
+                  </select>
+                </label>
+                <label className="df-filter-row">
+                  <span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>
+                  <select value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value as StateFilterValue)}>
+                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
+                    <option value="high">{props.lang === "zh" ? "高" : "High"}</option>
+                    <option value="medium">{props.lang === "zh" ? "中" : "Medium"}</option>
+                    <option value="low">{props.lang === "zh" ? "低" : "Low"}</option>
+                    <option value="empty">{props.lang === "zh" ? "未设" : "Unset"}</option>
+                  </select>
+                </label>
+              </div>
+            )}
+            {availableModes.length > 1 && (
+              <div className="df-planning-view-switch">
+                {availableModes.map((m) => (
+                  <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)}>
+                    {m === "tree" ? (props.lang === "zh" ? "树" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "四象限" : "Matrix") : (props.lang === "zh" ? "列表" : "List")}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
+          {viewMode === "kanban" && (
+            <div className="df-kanban-board">
+              {(["backlog", "doing", "done"] as UiWorkflowStatus[]).map((status) => {
+                const columnTasks = kanbanTasks.filter((task) => normalizeWorkflowStatus(task) === status);
+                return (
+                  <div
+                    key={status}
+                    className={`df-kanban-column${kanbanDropStatus === status ? " is-drop-target" : ""}`}
+                    onDragOver={(e) => { e.preventDefault(); setKanbanDropStatus(status); }}
+                    onDragLeave={() => setKanbanDropStatus(null)}
+                    onDrop={(e) => { e.preventDefault(); handleKanbanDrop(status); }}
+                  >
+                    <div className="df-kanban-column-header">
+                      <span>{status === "backlog" ? (props.lang === "zh" ? "代办" : "To do") : status === "doing" ? (props.lang === "zh" ? "进行中" : "Doing") : (props.lang === "zh" ? "完成" : "Done")}</span>
+                      <small>{columnTasks.length}</small>
+                    </div>
+                    <div className="df-kanban-card-list">
+                      {columnTasks.map((task) => (
+                        <article
+                          key={task.id}
+                          className="df-kanban-card"
+                          draggable
+                          onDragStart={() => setKanbanDragTaskId(task.id)}
+                          onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
+                          onClick={() => props.onTaskEdit(task)}
+                          style={{ ["--task-project-color" as string]: projectColor(task.projectId) }}
+                        >
+                          <div className="df-kanban-card-title">{task.title}</div>
+                          <div className="df-kanban-card-meta">
+                            <span className="df-kanban-project-name">{projectName(task.projectId)}</span>
+                            {task.importance === "high" && <span className="df-kanban-tag df-tag-important">{props.lang === "zh" ? "重要" : "Important"}</span>}
+                            {task.urgency === "high" && <span className="df-kanban-tag df-tag-urgent">{props.lang === "zh" ? "紧急" : "Urgent"}</span>}
+                          </div>
+                          <div className="df-kanban-card-actions">
+                            {(["backlog", "doing", "done"] as UiWorkflowStatus[]).map((s) => (
+                              <button key={s} className={`df-kanban-status-btn${normalizeWorkflowStatus(task) === s ? " active" : ""}`} onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(s)); }}>
+                                {s === "backlog" ? (props.lang === "zh" ? "代办" : "To do") : s === "doing" ? (props.lang === "zh" ? "进行" : "Doing") : (props.lang === "zh" ? "完成" : "Done")}
+                              </button>
+                            ))}
+                          </div>
+                        </article>
+                      ))}
+                      {columnTasks.length === 0 && <div className="df-kanban-empty">{props.lang === "zh" ? "拖拽任务到这里" : "Drop tasks here"}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {viewMode === "eisenhower" && (
+            <div className="df-eisenhower-grid">
+              {([
+                { key: "q1", label: props.lang === "zh" ? "重要 · 紧急" : "Important · Urgent", importance: "high" as const, urgency: "high" as const },
+                { key: "q2", label: props.lang === "zh" ? "重要 · 不紧急" : "Important · Not urgent", importance: "high" as const, urgency: "low" as const },
+                { key: "q3", label: props.lang === "zh" ? "不重要 · 紧急" : "Not important · Urgent", importance: "low" as const, urgency: "high" as const },
+                { key: "q4", label: props.lang === "zh" ? "不重要 · 不紧急" : "Not important · Not urgent", importance: "low" as const, urgency: "low" as const },
+              ]).map((quad) => {
+                const quadTasks = viewFilteredTasks.filter((task) => {
+                  const imp = task.importance || "medium";
+                  const urg = task.urgency || "medium";
+                  const matchImp = quad.importance === "high" ? imp === "high" : imp !== "high";
+                  const matchUrg = quad.urgency === "high" ? urg === "high" : urg !== "high";
+                  return matchImp && matchUrg;
+                });
+                return (
+                  <div
+                    key={quad.key}
+                    className={`df-eisenhower-quadrant${kanbanDropStatus === ("q-" + quad.key) as unknown as UiWorkflowStatus ? " is-drop-target" : ""}`}
+                    onDragOver={(e) => { e.preventDefault(); setKanbanDropStatus(("q-" + quad.key) as unknown as UiWorkflowStatus); }}
+                    onDragLeave={() => setKanbanDropStatus(null)}
+                    onDrop={(e) => { e.preventDefault(); handleQuadrantDrop(quad.importance, quad.urgency); }}
+                  >
+                    <div className="df-eisenhower-quadrant-header"><span>{quad.label}</span><small>{quadTasks.length}</small></div>
+                    <div className="df-eisenhower-task-list">
+                      {quadTasks.map((task) => (
+                        <article
+                          key={task.id}
+                          className="df-eisenhower-task"
+                          draggable
+                          onDragStart={() => setKanbanDragTaskId(task.id)}
+                          onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
+                          onClick={() => props.onTaskEdit(task)}
+                          style={{ ["--task-project-color" as string]: projectColor(task.projectId) }}
+                        >
+                          <div className="df-eisenhower-task-title">{task.title}</div>
+                          <div className="df-eisenhower-task-meta">
+                            <span>{projectName(task.projectId)}</span>
+                          </div>
+                          <div className="df-eisenhower-task-actions">
+                            {([
+                              { label: props.lang === "zh" ? "重要·紧急" : "I·U", imp: "high" as const, urg: "high" as const },
+                              { label: props.lang === "zh" ? "重要·不急" : "I·N", imp: "high" as const, urg: "low" as const },
+                              { label: props.lang === "zh" ? "不重要·紧急" : "N·U", imp: "low" as const, urg: "high" as const },
+                              { label: props.lang === "zh" ? "不重要·不急" : "N·N", imp: "low" as const, urg: "low" as const },
+                            ]).map((q) => (
+                              <button key={q.label} className="df-eisenhower-move-btn" onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, { importance: q.imp, urgency: q.urg, completed: false }); }}>
+                                {q.label}
+                              </button>
+                            ))}
+                          </div>
+                        </article>
+                      ))}
+                      {quadTasks.length === 0 && <div className="df-eisenhower-empty">{props.lang === "zh" ? "拖拽任务到这里" : "Drop tasks here"}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {viewMode === "list" && (
+            <div className="df-planning-list">
+              {viewFilteredTasks.length === 0 && <div className="df-planning-list-empty">{props.lang === "zh" ? "暂无任务" : "No tasks"}</div>}
+              {viewFilteredTasks.map((task) => {
+                const uiStatus = normalizeWorkflowStatus(task);
+                return (
+                  <div key={task.id} className="df-planning-list-row" style={{ ["--task-project-color" as string]: projectColor(task.projectId) }}>
+                    <button className="df-list-status-toggle" onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}>
+                      {uiStatus === "done" ? "✓" : ""}
+                    </button>
+                    <span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>
+                    <span className="df-list-project">{projectName(task.projectId)}</span>
+                    <div className="df-list-status-actions">
+                      {(["backlog", "doing", "done"] as UiWorkflowStatus[]).map((s) => (
+                        <button key={s} className={`df-list-status-btn${uiStatus === s ? " active" : ""}`} onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(s))}>
+                          {s === "backlog" ? (props.lang === "zh" ? "代办" : "To do") : s === "doing" ? (props.lang === "zh" ? "进行" : "Doing") : (props.lang === "zh" ? "完成" : "Done")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {viewMode === "tree" && (
           <div
             className={`df-tree${dragNode ? " is-tree-dragging" : ""}`}
             ref={treeRef}
@@ -996,6 +1296,7 @@ export default function PlanningView(props: {
                   onToggleCollapse={() => props.setCollapsed((current) => ({ ...current, [project.id]: !current[project.id] }))}
                   onOpen={() => props.onProjectEdit(project)}
                   onAddTask={() => props.onTaskCreate(project.id)}
+                  onComplete={() => props.onProjectComplete?.(project.id)}
                 />
                 {!props.collapsed[project.id] && (
                   <div className="df-project-tasks">
@@ -1100,6 +1401,7 @@ export default function PlanningView(props: {
               </div>
             )}
           </div>
+          )}
         </div>
       </section>
 

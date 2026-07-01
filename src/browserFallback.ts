@@ -1,10 +1,12 @@
 import type { AiAction, PlannerApi, PlannerData, Settings, Task, TaskRecurrence } from "./types";
 import { normalizeTreeOrder } from "./utils/treeOrder";
+import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
+import { normalizePlannerDataForClient } from "./utils/dataNormalization";
 
 const PREVIEW_STORAGE_KEY = "planner-preview-data";
 const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
 const PREVIEW_MODE_KEY = "navopath-force-local-preview";
-const PREVIEW_SEED_VERSION = "browser-preview-v2";
+const PREVIEW_SEED_VERSION = "browser-preview-v3";
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -45,6 +47,7 @@ function migrateEventsToTasks(data: PlannerData): Task[] {
       notes: event.details || "",
       goalId: "",
       completed: false,
+      workflowStatus: "next",
       estimatedHours: duration / 60,
       plannedForDate: date,
       recurrence: event.recurrence,
@@ -125,7 +128,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       createdAt: chat[0]?.createdAt || now(),
       updatedAt: chat[chat.length - 1]?.createdAt || now(),
     }] : []);
-  return normalizeTreeOrder({
+  return normalizePlannerDataForClient(normalizeTreeOrder({
     ...data,
     projects: (data.projects || []).map((project) => ({
       ...project,
@@ -162,12 +165,17 @@ export function normalizeData(data: PlannerData): PlannerData {
       createdAt: template.createdAt || now(),
       updatedAt: template.updatedAt || template.createdAt || now(),
     })),
+    timeEntries: (data.timeEntries || [])
+      .map((entry) => normalizeTimeEntry(entry, data.tasks || []))
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
     drafts: (data.drafts || []).filter((draft) => draft.title).slice(-10),
     version: Math.max(data.version || 1, 2),
     events: [],
     taskLayouts: data.taskLayouts || {},
     tasks: [...(data.tasks || []), ...migratedTasks].map((task) => ({
       ...task,
+      completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
+      workflowStatus: inferWorkflowStatus(task),
       subtasks: (task.subtasks || []).map((subtask, index) => ({
         ...subtask,
         id: subtask.id || uid("sub"),
@@ -179,7 +187,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       })),
       notes: task.notes || "",
     })),
-  });
+  }));
 }
 
 export function fallbackData(): PlannerData {
@@ -374,6 +382,36 @@ export function fallbackData(): PlannerData {
         updatedAt: now(),
       },
     ],
+    habits: [
+      {
+        id: "habit-morning-reading",
+        title: "晨读",
+        defaultDurationMinutes: 20,
+        archived: false,
+        order: 0,
+        createdAt: now(),
+        updatedAt: now(),
+      },
+      {
+        id: "habit-exercise",
+        title: "运动",
+        defaultDurationMinutes: 30,
+        archived: false,
+        order: 1,
+        createdAt: now(),
+        updatedAt: now(),
+      },
+      {
+        id: "habit-review",
+        title: "复盘",
+        defaultDurationMinutes: 15,
+        archived: false,
+        order: 2,
+        createdAt: now(),
+        updatedAt: now(),
+      },
+    ],
+    habitDailyStates: [],
     longTasks: [],
     events: [
       {
@@ -503,6 +541,11 @@ export function installBrowserFallback() {
     addAdvancedOpen: false,
     uiStyle: "gradient",
     dayStartTime: "00:00",
+    idleThresholdMinutes: 5,
+    focusModeDefault: "stopwatch",
+    featureKanbanViewEnabled: false,
+    featureQuadrantViewEnabled: false,
+    featureListViewEnabled: false,
   };
 
   const readSettings = () => {

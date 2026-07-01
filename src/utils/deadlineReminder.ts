@@ -59,8 +59,8 @@ export function evaluateDeadlines(tasks: Task[], now: Date = new Date()): Deadli
   // Stable order: highest priority first, then earliest due date.
   const sorter = (a: Task, b: Task) => {
     const order = { high: 0, medium: 1, low: 2 } as const;
-    const pa = order[a.priority] ?? 2;
-    const pb = order[b.priority] ?? 2;
+    const pa = order[a.priority ?? "low"] ?? 2;
+    const pb = order[b.priority ?? "low"] ?? 2;
     if (pa !== pb) return pa - pb;
     return (a.dueDate || "").localeCompare(b.dueDate || "");
   };

@@ -151,8 +151,8 @@ function sortByPriority(
   a: { task: Task; minutes: number },
   b: { task: Task; minutes: number },
 ) {
-  const pa = PRIORITY_WEIGHT[a.task.priority] ?? 2;
-  const pb = PRIORITY_WEIGHT[b.task.priority] ?? 2;
+  const pa = PRIORITY_WEIGHT[a.task.priority ?? "low"] ?? 2;
+  const pb = PRIORITY_WEIGHT[b.task.priority ?? "low"] ?? 2;
   if (pa !== pb) return pa - pb;
   // Earlier due date first
   const da = a.task.dueDate || "9999-12-31";

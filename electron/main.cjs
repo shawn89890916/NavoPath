@@ -123,8 +123,42 @@ function makeTask(title, dueDate, category, priority = "medium", notes = "", goa
     notes,
     goalId,
     completed: false,
+    workflowStatus: "backlog",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
+  };
+}
+
+function inferWorkflowStatus(task) {
+  if (task.completed) return "done";
+  if (["backlog", "next", "doing", "waiting", "done"].includes(task.workflowStatus)) return task.workflowStatus;
+  if ((task.timelineRecords || []).some((record) => record.executionStatus === "scheduled")) return "doing";
+  if (task.plannedForDate) return "next";
+  return "backlog";
+}
+
+function minutesBetween(startAt, endAt) {
+  const start = Date.parse(startAt);
+  const end = Date.parse(endAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.max(1, Math.round((end - start) / 60000));
+}
+
+function normalizeTimeEntry(entry, tasks) {
+  if (!entry || !entry.id || !entry.taskId) return null;
+  const task = tasks.find((item) => item.id === entry.taskId);
+  const durationMinutes = Number.isFinite(entry.durationMinutes) && entry.durationMinutes > 0
+    ? Math.round(entry.durationMinutes)
+    : minutesBetween(entry.startAt, entry.endAt);
+  if (durationMinutes <= 0) return null;
+  const now = new Date().toISOString();
+  return {
+    ...entry,
+    projectId: entry.projectId || task?.projectId,
+    durationMinutes,
+    source: entry.source || "timer",
+    createdAt: entry.createdAt || now,
+    updatedAt: entry.updatedAt || entry.createdAt || now
   };
 }
 
@@ -169,8 +203,49 @@ function smartNoteForTask(task) {
   return task.notes || "";
 }
 
+const LEVELS = ["high", "medium", "low"];
+
+function normalizeLevel(value, fallback = null) {
+  if (value === null || value === undefined || value === "") return fallback;
+  return LEVELS.includes(value) ? value : fallback;
+}
+
+function normalizeUrgencyLevel(value) {
+  return normalizeLevel(value, "low") || "low";
+}
+
+function normalizeTimelineRecord(record) {
+  return { ...record, scheduledEndDate: record.scheduledEndDate || record.scheduledDate };
+}
+
+function habitId(title) {
+  return `habit-${String(title).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
+function normalizeHabitsForClient(data) {
+  if (Array.isArray(data.habits) && data.habits.length > 0) {
+    return { habits: data.habits, habitDailyStates: Array.isArray(data.habitDailyStates) ? data.habitDailyStates : [] };
+  }
+  const raw = String(data.pluginConfigs?.["habit-tracker"]?.habits || "");
+  const now = new Date().toISOString();
+  const habits = raw.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((title, index) => ({
+      id: habitId(title),
+      title,
+      defaultDurationMinutes: 20,
+      archived: false,
+      order: index,
+      createdAt: now,
+      updatedAt: now
+    }));
+  return { habits, habitDailyStates: Array.isArray(data.habitDailyStates) ? data.habitDailyStates : [] };
+}
+
 function normalizePlannerData(data) {
   if (!data || !Array.isArray(data.tasks)) return data;
+  const habitPatch = normalizeHabitsForClient(data);
   return {
     ...data,
     importedSeedVersion: data.importedSeedVersion === "admission-2027-v1" ? "admission-2027-v2-smart-notes" : data.importedSeedVersion,
@@ -178,8 +253,8 @@ function normalizePlannerData(data) {
       ? data.projects.map((project) => ({
           ...project,
           color: project.color || "#C69CF9",
-          importance: project.importance || "high",
-          urgency: project.urgency || "low"
+          importance: normalizeLevel(project.importance),
+          urgency: normalizeLevel(project.urgency)
         }))
       : [],
     longTasks: Array.isArray(data.longTasks) ? data.longTasks : [],
@@ -201,8 +276,19 @@ function normalizePlannerData(data) {
         }))
       : [],
     taskLayouts: data.taskLayouts && typeof data.taskLayouts === "object" ? data.taskLayouts : {},
+    timeEntries: Array.isArray(data.timeEntries)
+      ? data.timeEntries.map((entry) => normalizeTimeEntry(entry, data.tasks || [])).filter(Boolean)
+      : [],
+    habits: habitPatch.habits,
+    habitDailyStates: habitPatch.habitDailyStates,
     tasks: data.tasks.map((task) => ({
       ...task,
+      priority: normalizeLevel(task.priority),
+      importance: normalizeLevel(task.importance),
+      urgency: normalizeUrgencyLevel(task.urgency),
+      completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
+      workflowStatus: inferWorkflowStatus(task),
+      timelineRecords: Array.isArray(task.timelineRecords) ? task.timelineRecords.map(normalizeTimelineRecord) : [],
       subtasks: (task.subtasks || []).map((subtask, index) => ({
         ...subtask,
         id: subtask.id || uid("sub"),
@@ -611,7 +697,9 @@ function getSettings() {
     chatMessageMaxHeight: Number.isFinite(raw.chatMessageMaxHeight) ? raw.chatMessageMaxHeight : 220,
     aiMemoryEnabled: raw.aiMemoryEnabled !== false,
     addAdvancedOpen: Boolean(raw.addAdvancedOpen),
-    dayStartTime: raw.dayStartTime || "00:00"
+    dayStartTime: raw.dayStartTime || "00:00",
+    idleThresholdMinutes: Number.isFinite(raw.idleThresholdMinutes) ? raw.idleThresholdMinutes : 5,
+    focusModeDefault: ["stopwatch", "pomodoro", "flowtime"].includes(raw.focusModeDefault) ? raw.focusModeDefault : "stopwatch"
   };
 }
 
@@ -665,6 +753,16 @@ function saveSettings(settings) {
         : 220,
     aiMemoryEnabled: typeof settings.aiMemoryEnabled === "boolean" ? settings.aiMemoryEnabled : existing.aiMemoryEnabled !== false,
     dayStartTime: settings.dayStartTime || existing.dayStartTime || "00:00",
+    idleThresholdMinutes: Number.isFinite(settings.idleThresholdMinutes)
+      ? settings.idleThresholdMinutes
+      : Number.isFinite(existing.idleThresholdMinutes)
+        ? existing.idleThresholdMinutes
+        : 5,
+    focusModeDefault: ["stopwatch", "pomodoro", "flowtime"].includes(settings.focusModeDefault)
+      ? settings.focusModeDefault
+      : ["stopwatch", "pomodoro", "flowtime"].includes(existing.focusModeDefault)
+        ? existing.focusModeDefault
+        : "stopwatch",
     updatedAt: new Date().toISOString()
   };
   if (settings.apiKey && settings.apiKey.trim()) {
