@@ -686,11 +686,10 @@ export default function PlanningView(props: {
   }, [enableKanban, enableQuadrant, enableList]);
   const [viewMode, setViewMode] = useState<PlanningViewMode>("tree");
   const [showCompleted, setShowCompleted] = useState(false);
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [filterProject, setFilterProject] = useState<string>("all");
-  const [filterWorkflow, setFilterWorkflow] = useState<UiWorkflowStatus | "all">("all");
-  const [filterImportance, setFilterImportance] = useState<StateFilterValue>("all");
-  const [filterUrgency, setFilterUrgency] = useState<StateFilterValue>("all");
+  const [filterProjects, setFilterProjects] = useState<string[]>([]);
+  const [filterWorkflows, setFilterWorkflows] = useState<UiWorkflowStatus[]>([]);
+  const [filterImportances, setFilterImportances] = useState<StateFilterValue[]>([]);
+  const [filterUrgencies, setFilterUrgencies] = useState<StateFilterValue[]>([]);
   const [kanbanDragTaskId, setKanbanDragTaskId] = useState<string | null>(null);
   const [kanbanDropStatus, setKanbanDropStatus] = useState<UiWorkflowStatus | null>(null);
 
@@ -980,26 +979,25 @@ export default function PlanningView(props: {
   const svgLines = useTreeLines(treeRef, safeProjects, safeTasks, props.collapsed, collapsedSubtasks);
 
   const viewFilteredTasks = useMemo(() => {
-    let result = safeTasks.filter((task) => {
+    return safeTasks.filter((task) => {
       if (!showCompleted && task.completed) return false;
       if (!showAddedTasks && task.plannedForDate === today) return false;
-      if (filterProject !== "all" && String(task.projectId || "") !== filterProject) return false;
+      if (filterProjects.length > 0 && !filterProjects.includes(String(task.projectId || ""))) return false;
       const uiStatus = normalizeWorkflowStatus(task);
-      if (filterWorkflow !== "all" && uiStatus !== filterWorkflow) return false;
-      if (filterImportance !== "all") {
+      if (filterWorkflows.length > 0 && !filterWorkflows.includes(uiStatus)) return false;
+      if (filterImportances.length > 0) {
         const imp = task.importance || null;
-        if (filterImportance === "empty") { if (imp) return false; }
-        else if (imp !== filterImportance) return false;
+        const matches = filterImportances.some((f) => f === "empty" ? !imp : imp === f);
+        if (!matches) return false;
       }
-      if (filterUrgency !== "all") {
+      if (filterUrgencies.length > 0) {
         const urg = task.urgency || null;
-        if (filterUrgency === "empty") { if (urg) return false; }
-        else if (urg !== filterUrgency) return false;
+        const matches = filterUrgencies.some((f) => f === "empty" ? !urg : urg === f);
+        if (!matches) return false;
       }
       return true;
     });
-    return result;
-  }, [safeTasks, showCompleted, showAddedTasks, today, filterProject, filterWorkflow, filterImportance, filterUrgency]);
+  }, [safeTasks, showCompleted, showAddedTasks, today, filterProjects, filterWorkflows, filterImportances, filterUrgencies]);
 
   const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
 
@@ -1031,7 +1029,75 @@ export default function PlanningView(props: {
     setKanbanDropStatus(null);
   }, [kanbanDragTaskId, props]);
 
-  const hasActiveFilters = filterProject !== "all" || filterWorkflow !== "all" || filterImportance !== "all" || filterUrgency !== "all";
+  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0;
+
+  const toggleArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, value: T) => {
+    setter((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]);
+  };
+
+  const filterChips: Array<{
+    key: string;
+    label: string;
+    selected: string[];
+    options: Array<{ value: string; label: string; checked: boolean; onToggle: () => void }>;
+  }> = [
+    {
+      key: "project",
+      label: props.lang === "zh" ? "项目" : "Project",
+      selected: filterProjects.map((id) => safeProjects.find((p) => String(p.id) === id)?.title || id).filter(Boolean),
+      options: safeProjects.map((p) => ({
+        value: String(p.id),
+        label: p.title,
+        checked: filterProjects.includes(String(p.id)),
+        onToggle: () => toggleArray(setFilterProjects, String(p.id)),
+      })),
+    },
+    {
+      key: "display",
+      label: props.lang === "zh" ? "显示" : "Display",
+      selected: [
+        ...(showCompleted ? [props.lang === "zh" ? "已完成" : "Done"] : []),
+        ...(showAddedTasks ? [props.lang === "zh" ? "已添加" : "Added"] : []),
+      ],
+      options: [
+        { value: "completed", label: props.lang === "zh" ? "显示已完成" : "Show done", checked: showCompleted, onToggle: () => setShowCompleted((v) => !v) },
+        { value: "added", label: props.lang === "zh" ? "显示已添加" : "Show added", checked: showAddedTasks, onToggle: () => setShowAddedTasks((v) => !v) },
+      ],
+    },
+    {
+      key: "status",
+      label: props.lang === "zh" ? "状态" : "Status",
+      selected: filterWorkflows.map((s) => s === "backlog" ? (props.lang === "zh" ? "代办" : "To do") : s === "doing" ? (props.lang === "zh" ? "进行中" : "Doing") : (props.lang === "zh" ? "完成" : "Done")),
+      options: (["backlog", "doing", "done"] as UiWorkflowStatus[]).map((s) => ({
+        value: s,
+        label: s === "backlog" ? (props.lang === "zh" ? "代办" : "To do") : s === "doing" ? (props.lang === "zh" ? "进行中" : "Doing") : (props.lang === "zh" ? "完成" : "Done"),
+        checked: filterWorkflows.includes(s),
+        onToggle: () => toggleArray(setFilterWorkflows, s),
+      })),
+    },
+    {
+      key: "importance",
+      label: props.lang === "zh" ? "重要程度" : "Importance",
+      selected: filterImportances.map((i) => i === "high" ? (props.lang === "zh" ? "高" : "High") : i === "medium" ? (props.lang === "zh" ? "中" : "Medium") : i === "low" ? (props.lang === "zh" ? "低" : "Low") : (props.lang === "zh" ? "未设" : "Unset")),
+      options: (["high", "medium", "low", "empty"] as StateFilterValue[]).map((i) => ({
+        value: i,
+        label: i === "high" ? (props.lang === "zh" ? "高" : "High") : i === "medium" ? (props.lang === "zh" ? "中" : "Medium") : i === "low" ? (props.lang === "zh" ? "低" : "Low") : (props.lang === "zh" ? "未设" : "Unset"),
+        checked: filterImportances.includes(i),
+        onToggle: () => toggleArray(setFilterImportances, i),
+      })),
+    },
+    {
+      key: "urgency",
+      label: props.lang === "zh" ? "紧急程度" : "Urgency",
+      selected: filterUrgencies.map((u) => u === "high" ? (props.lang === "zh" ? "高" : "High") : u === "medium" ? (props.lang === "zh" ? "中" : "Medium") : u === "low" ? (props.lang === "zh" ? "低" : "Low") : (props.lang === "zh" ? "未设" : "Unset")),
+      options: (["high", "medium", "low", "empty"] as StateFilterValue[]).map((u) => ({
+        value: u,
+        label: u === "high" ? (props.lang === "zh" ? "高" : "High") : u === "medium" ? (props.lang === "zh" ? "中" : "Medium") : u === "low" ? (props.lang === "zh" ? "低" : "Low") : (props.lang === "zh" ? "未设" : "Unset"),
+        checked: filterUrgencies.includes(u),
+        onToggle: () => toggleArray(setFilterUrgencies, u),
+      })),
+    },
+  ];
 
   return (
     <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
@@ -1040,61 +1106,25 @@ export default function PlanningView(props: {
         <section className="df-mindmap no-root">
           <div className="df-tree-wrap">
           <div className="df-planning-filter-bar">
-            <button className={`df-filter-toggle${showAddedTasks ? " active" : ""}`} onClick={() => setShowAddedTasks((v) => !v)}>
-              {showAddedTasks ? t(props.lang, "sourceModal.hideAdded") : t(props.lang, "planning.showAdded")}
-            </button>
-            <button className={`df-filter-toggle${showCompleted ? " active" : ""}`} onClick={() => setShowCompleted((v) => !v)}>
-              {props.lang === "zh" ? "显示已完成" : "Show done"}
-            </button>
-            <button className={`df-filter-toggle${filterPanelOpen ? " active" : ""}`} onClick={() => setFilterPanelOpen((v) => !v)}>
-              {props.lang === "zh" ? "筛选" : "Filter"}
-              {hasActiveFilters ? <span className="df-filter-dot" /> : null}
-            </button>
-            {filterPanelOpen && (
-              <div className="df-planning-filter-panel" onClick={(e) => e.stopPropagation()}>
-                {hasActiveFilters && (
-                  <button className="df-filter-reset" onClick={() => { setFilterProject("all"); setFilterWorkflow("all"); setFilterImportance("all"); setFilterUrgency("all"); }}>
-                    {props.lang === "zh" ? "重置" : "Reset"}
-                  </button>
-                )}
-                <label className="df-filter-row">
-                  <span>{props.lang === "zh" ? "项目" : "Project"}</span>
-                  <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
-                    {safeProjects.map((p) => <option key={p.id} value={String(p.id)}>{p.title}</option>)}
-                  </select>
-                </label>
-                <label className="df-filter-row">
-                  <span>{props.lang === "zh" ? "状态" : "Status"}</span>
-                  <select value={filterWorkflow} onChange={(e) => setFilterWorkflow(e.target.value as UiWorkflowStatus | "all")}>
-                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
-                    <option value="backlog">{props.lang === "zh" ? "代办" : "To do"}</option>
-                    <option value="doing">{props.lang === "zh" ? "进行中" : "Doing"}</option>
-                    <option value="done">{props.lang === "zh" ? "完成" : "Done"}</option>
-                  </select>
-                </label>
-                <label className="df-filter-row">
-                  <span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>
-                  <select value={filterImportance} onChange={(e) => setFilterImportance(e.target.value as StateFilterValue)}>
-                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
-                    <option value="high">{props.lang === "zh" ? "高" : "High"}</option>
-                    <option value="medium">{props.lang === "zh" ? "中" : "Medium"}</option>
-                    <option value="low">{props.lang === "zh" ? "低" : "Low"}</option>
-                    <option value="empty">{props.lang === "zh" ? "未设" : "Unset"}</option>
-                  </select>
-                </label>
-                <label className="df-filter-row">
-                  <span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>
-                  <select value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value as StateFilterValue)}>
-                    <option value="all">{props.lang === "zh" ? "全部" : "All"}</option>
-                    <option value="high">{props.lang === "zh" ? "高" : "High"}</option>
-                    <option value="medium">{props.lang === "zh" ? "中" : "Medium"}</option>
-                    <option value="low">{props.lang === "zh" ? "低" : "Low"}</option>
-                    <option value="empty">{props.lang === "zh" ? "未设" : "Unset"}</option>
-                  </select>
-                </label>
-              </div>
+            {hasActiveFilters && (
+              <button className="df-filter-reset-btn" onClick={() => { setFilterProjects([]); setFilterWorkflows([]); setFilterImportances([]); setFilterUrgencies([]); }}>
+                {props.lang === "zh" ? "重置" : "Reset"}
+              </button>
             )}
+            {filterChips.map((chip) => (
+              <div key={chip.key} className="df-filter-chip">
+                <span className="df-filter-chip-label">{chip.label}</span>
+                {chip.selected.length > 0 && <span className="df-filter-chip-value">{chip.selected.join(", ")}</span>}
+                <div className="df-filter-flyout" onClick={(e) => e.stopPropagation()}>
+                  {chip.options.map((opt) => (
+                    <label key={opt.value} className={`df-filter-flyout-item${opt.checked ? " checked" : ""}`}>
+                      <input type="checkbox" checked={opt.checked} onChange={opt.onToggle} />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
             {availableModes.length > 1 && (
               <div className="df-planning-view-switch">
                 {availableModes.map((m) => (
@@ -1135,9 +1165,10 @@ export default function PlanningView(props: {
                         >
                           <div className="df-kanban-card-title">{task.title}</div>
                           <div className="df-kanban-card-meta">
-                            <span className="df-kanban-project-name">{projectName(task.projectId)}</span>
-                            {task.importance === "high" && <span className="df-kanban-tag df-tag-important">{props.lang === "zh" ? "重要" : "Important"}</span>}
-                            {task.urgency === "high" && <span className="df-kanban-tag df-tag-urgent">{props.lang === "zh" ? "紧急" : "Urgent"}</span>}
+                            <span className="df-kanban-project-name" style={{ color: projectColor(task.projectId) }}>{projectName(task.projectId)}</span>
+                            {task.importance && task.importance !== "medium" && <span className={`df-kanban-tag df-tag-imp-${task.importance}`} title={props.lang === "zh" ? "重要" : "Importance"}>{task.importance === "high" ? "▲" : "▽"}</span>}
+                            {task.urgency && task.urgency !== "medium" && <span className={`df-kanban-tag df-tag-urg-${task.urgency}`} title={props.lang === "zh" ? "紧急" : "Urgency"}>{task.urgency === "high" ? "●" : "○"}</span>}
+                            {task.dueDate && <span className="df-kanban-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
                           </div>
                           <div className="df-kanban-card-actions">
                             {(["backlog", "doing", "done"] as UiWorkflowStatus[]).map((s) => (
@@ -1193,7 +1224,9 @@ export default function PlanningView(props: {
                         >
                           <div className="df-eisenhower-task-title">{task.title}</div>
                           <div className="df-eisenhower-task-meta">
-                            <span>{projectName(task.projectId)}</span>
+                            <span className="df-eisenhower-project-name" style={{ color: projectColor(task.projectId) }}>{projectName(task.projectId)}</span>
+                            <span className={`df-eisenhower-status status-${normalizeWorkflowStatus(task)}`}>{normalizeWorkflowStatus(task) === "doing" ? (props.lang === "zh" ? "进行中" : "Doing") : normalizeWorkflowStatus(task) === "done" ? (props.lang === "zh" ? "完成" : "Done") : (props.lang === "zh" ? "代办" : "To do")}</span>
+                            {task.dueDate && <span className="df-eisenhower-due">{task.dueDate.slice(5)}</span>}
                           </div>
                           <div className="df-eisenhower-task-actions">
                             {([
@@ -1229,6 +1262,9 @@ export default function PlanningView(props: {
                     </button>
                     <span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>
                     <span className="df-list-project">{projectName(task.projectId)}</span>
+                    {task.importance && task.importance !== "medium" && <span className={`df-list-tag df-tag-imp-${task.importance}`} title={props.lang === "zh" ? "重要" : "Importance"}>{task.importance === "high" ? "▲" : "▽"}</span>}
+                    {task.urgency && task.urgency !== "medium" && <span className={`df-list-tag df-tag-urg-${task.urgency}`} title={props.lang === "zh" ? "紧急" : "Urgency"}>{task.urgency === "high" ? "●" : "○"}</span>}
+                    {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
                     <div className="df-list-status-actions">
                       {(["backlog", "doing", "done"] as UiWorkflowStatus[]).map((s) => (
                         <button key={s} className={`df-list-status-btn${uiStatus === s ? " active" : ""}`} onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(s))}>

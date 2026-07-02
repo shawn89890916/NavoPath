@@ -1,5 +1,33 @@
 # NavoPath 更新日志
 
+## 2026-07-02 · 执行与规划界面重设计
+
+### 改进
+- 顶栏常显当前计时任务，任务名外加分粗描边胶囊，计时数字常显，悬停显示暂停、保存、丢弃、进入专注等 SVG 图标操作。
+- 全屏专注模式重构：Stopwatch / Pomodoro / Flowtime 三种模式切换置于页面顶部，计时器居中超大显示，关闭按钮移至右上角；任务名下移并加粗，"正在做"小字置于左侧，整体用主题色描边，背景不透明。
+- 规划视图筛选面板改为 Linear 式悬停 flyout：项目、显示、状态、重要程度、紧急程度五个选项横向排列，悬停拉出多选列表，选项右侧显示已选值，重置按钮置于筛选顶栏。
+- 规划页整体上移，视图切换按钮改为竖排并定位到右侧。
+- 今日候选任务卡片新增状态、重要程度、紧急程度徽章与子任务进度计数；展开后可显示子任务色块列表并直接勾选完成。
+- 模版功能入口移至今日候选面板标题栏，使用日历 SVG 图标。
+- 规划列表视图补充重要程度、紧急程度、截止日期指示器。
+- 习惯系统完整化：习惯行改为紧凑子任务风格，复选框缩小统一；点击习惯名可编辑，点击外层卡片打开习惯总览右侧栏。
+- 习惯编辑面板支持标题、备注、预设时长、频率规则（每天/每周目标/指定星期）、目标次数与提醒配置；总览面板展示今日完成数、已规划数、7/30 天完成率与计划分钟数。
+- 拖回候选区可取消习惯当日计划，清除时间轴记录并保留完成状态。
+
+## 2026-07-02 · Execute & Planning Redesign
+
+### Improvements
+- Header now persistently shows the active timer task with a bold outlined capsule; timer digits stay visible, and hovering reveals pause, save, discard, and focus SVG icon actions.
+- Focus overlay rebuilt: Stopwatch / Pomodoro / Flowtime mode switch sits at the top, the timer is centered and oversized, and the close button moved to the top-right; the task name moved down with heavy weight, a tiny "Working" label on its left, all wrapped in a theme-colored outline with an opaque background.
+- Planning filter panel switched to a Linear-style hover flyout: five chips (Project, Display, Status, Importance, Urgency) line up horizontally, each revealing a multi-select list on hover with the current selection shown on the right; the reset button sits in the filter top bar.
+- Planning page shifted up, and the view-switch buttons are now vertical on the right side.
+- Today candidate task cards now show status, importance, and urgency badges plus a subtask progress count; expanding reveals a color-blocked subtask list with inline toggle.
+- Schedule template entry moved to the candidate panel title bar with a calendar SVG icon.
+- Planning list view now displays importance, urgency, and due-date indicators.
+- Habit system overhaul: habit rows restyled as compact subtask cards with smaller unified checkboxes; clicking a habit title opens the editor, and clicking the outer card opens the habit overview side panel.
+- Habit editor supports title, notes, default duration, frequency rule (daily / weekly target / custom weekdays), target count, and reminder config; the overview panel shows today's completed, planned, 7/30-day completion rates, and planned minutes.
+- Dragging a habit back to the candidate area unschedules it for the day, removing the timeline record while preserving completion state.
+
 ## 2026-07-01 · 规划视图与任务计时恢复
 
 ### 新增
