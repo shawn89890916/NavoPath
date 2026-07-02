@@ -30,6 +30,7 @@ export interface Subtask {
   title: string;
   completed: boolean;
   done?: boolean;
+  plannedTaskId?: string;
   order?: number;
   createdAt: string;
   subtasks?: Subtask[];
@@ -199,10 +200,18 @@ export interface AiConversation {
   updatedAt: string;
 }
 
+export type HabitFrequency = "daily" | "weekly" | "custom";
+
 export interface Habit {
   id: string;
   title: string;
   defaultDurationMinutes: number;
+  notes?: string;
+  frequencyRule?: HabitFrequency;
+  weeklyTarget?: number;
+  activeWeekdays?: number[];
+  targetCount?: number;
+  reminder?: { enabled: boolean; time?: string };
   archived?: boolean;
   order?: number;
   createdAt: string;
@@ -279,6 +288,7 @@ export type Language = "en" | "zh";
 export interface Settings {
   activeMode: "execute" | "planning";
   defaultTimelineView?: "daily" | "3day" | "weekly" | "month";
+  continuousCrossDayScroll?: boolean;
   language: Language;
   planningView: "tree" | "matrix" | "split";
   aiDockOpen: boolean;

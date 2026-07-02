@@ -10,6 +10,9 @@
 - 今日候选任务卡片新增状态、重要程度、紧急程度徽章与子任务进度计数；展开后可显示子任务色块列表并直接勾选完成。
 - 模版功能入口移至今日候选面板标题栏，使用日历 SVG 图标。
 - 规划列表视图补充重要程度、紧急程度、截止日期指示器。
+- 习惯系统完整化：习惯行改为紧凑子任务风格，复选框缩小统一；点击习惯名可编辑，点击外层卡片打开习惯总览右侧栏。
+- 习惯编辑面板支持标题、备注、预设时长、频率规则（每天/每周目标/指定星期）、目标次数与提醒配置；总览面板展示今日完成数、已规划数、7/30 天完成率与计划分钟数。
+- 拖回候选区可取消习惯当日计划，清除时间轴记录并保留完成状态。
 
 ## 2026-07-02 · Execute & Planning Redesign
 
@@ -21,6 +24,9 @@
 - Today candidate task cards now show status, importance, and urgency badges plus a subtask progress count; expanding reveals a color-blocked subtask list with inline toggle.
 - Schedule template entry moved to the candidate panel title bar with a calendar SVG icon.
 - Planning list view now displays importance, urgency, and due-date indicators.
+- Habit system overhaul: habit rows restyled as compact subtask cards with smaller unified checkboxes; clicking a habit title opens the editor, and clicking the outer card opens the habit overview side panel.
+- Habit editor supports title, notes, default duration, frequency rule (daily / weekly target / custom weekdays), target count, and reminder config; the overview panel shows today's completed, planned, 7/30-day completion rates, and planned minutes.
+- Dragging a habit back to the candidate area unschedules it for the day, removing the timeline record while preserving completion state.
 
 ## 2026-07-01 · 规划视图与任务计时恢复
 

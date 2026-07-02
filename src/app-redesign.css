@@ -130,11 +130,11 @@
 }
 
 /* Editorial controls */
-.df-panel-title button, .df-icon-action, .df-icon-button, .df-date-arrow, .df-back-today, .df-exit-fullscreen-btn {
+.df-panel-title button, .df-icon-action, .df-icon-button, .df-date-arrow, .df-back-today, .df-back-to-now, .df-exit-fullscreen-btn {
   border: 1px solid transparent !important; border-radius: var(--paper-radius) !important;
   color: var(--text-muted) !important; background: transparent !important; box-shadow: none !important; filter: none !important;
 }
-.df-panel-title button:hover, .df-icon-action:hover, .df-icon-button:hover, .df-date-arrow:hover, .df-back-today:hover, .df-exit-fullscreen-btn:hover {
+.df-panel-title button:hover, .df-icon-action:hover, .df-icon-button:hover, .df-date-arrow:hover, .df-back-today:hover, .df-back-to-now:hover, .df-exit-fullscreen-btn:hover {
   color: var(--text-main) !important; border-color: var(--paper-rule) !important; background: var(--paper-note) !important; transform: none !important;
 }
 .df-icon-action.active, .df-panel-title button.active, .df-icon-button.is-active {
@@ -178,7 +178,16 @@
 .df-duration-pill, .df-candidate-repeat-badge, .df-project-group-count, .df-candidate-subtask-count {
   border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; font-family: var(--paper-mono);
 }
-.df-candidate-subtask-count { font-size: 11px; color: var(--text-muted); opacity: .8; }
+.df-candidate-subtask-count {
+  position: absolute !important;
+  top: 9px !important;
+  right: 12px !important;
+  z-index: 3 !important;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: .8;
+  pointer-events: none;
+}
 .df-card-popover, .df-quick-add-project-menu, .df-project-popover, .df-project-popover-portal, .df-floating-unschedule {
   border: 1px solid var(--paper-rule-strong) !important; border-radius: var(--paper-radius-soft) !important;
   background: var(--surface-raised) !important; box-shadow: var(--paper-float-shadow) !important; backdrop-filter: none !important;
@@ -207,11 +216,13 @@
 .df-view-switch-vertical {
   right: 10px !important; top: 10px !important; gap: 8px !important; padding: 0 !important;
   border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important;
+  pointer-events: none;
 }
 .df-view-switch-vertical button {
   min-width: 34px !important; min-height: 26px !important; padding: 3px 2px !important;
   border: 0 !important; border-bottom: 1px solid transparent !important; border-radius: 0 !important;
   color: var(--text-faint) !important; background: transparent !important; font-family: var(--paper-mono); font-size: 9px !important; box-shadow: none !important;
+  pointer-events: auto;
 }
 .df-view-switch-vertical button:hover { color: var(--text-main) !important; }
 .df-view-switch-vertical button.active { color: var(--accent-active) !important; border-bottom-color: var(--accent-active) !important; background: transparent !important; box-shadow: none !important; }
@@ -750,6 +761,7 @@
 .df-app .df-icon-button,
 .df-app .df-date-arrow,
 .df-app .df-back-today,
+.df-app .df-back-to-now,
 .df-app .df-exit-fullscreen-btn,
 .df-app .df-preview-action,
 .df-app .df-ai-plan-toggle,
@@ -762,6 +774,7 @@
 .df-app .df-icon-button:hover,
 .df-app .df-date-arrow:hover,
 .df-app .df-back-today:hover,
+.df-app .df-back-to-now:hover,
 .df-app .df-exit-fullscreen-btn:hover,
 .df-app .df-preview-action:hover,
 .df-app .df-ai-plan-toggle:hover,
@@ -1921,20 +1934,19 @@
 .df-app .df-time-block .df-block-check,
 .df-app .df-event-blocks-layer .df-time-block .df-block-check,
 .df-app .df-all-day-block .df-block-check {
-  left: 8px !important;
-  top: 50% !important;
-  width: 18px !important;
-  height: 18px !important;
-  min-width: 18px !important;
-  min-height: 18px !important;
-  border: 2px solid var(--cat, var(--accent-active)) !important;
-  border-radius: 4px !important;
-  background: transparent !important;
+  left: 1px !important;
   border-color: var(--cat, var(--accent-active)) !important;
   color: var(--cat, var(--accent-active)) !important;
-  box-shadow: none !important;
-  opacity: 1 !important;
-  transform: translateY(-50%) !important;
+}
+.df-candidate-subtasks button em {
+  margin-left: auto;
+  color: var(--text-faint);
+  font: 650 10px/1 var(--paper-mono);
+  font-style: normal;
+  white-space: nowrap;
+}
+.df-candidate-subtasks button.planned {
+  color: color-mix(in srgb, var(--text-main) 82%, var(--text-muted));
 }
 
 .df-app .df-task-card .df-block-check {
@@ -1967,55 +1979,6 @@
   border-bottom-color: var(--cat, var(--accent-active)) !important;
   background: color-mix(in srgb, var(--surface-main) 92%, var(--cat, var(--accent-active)) 8%) !important;
   box-shadow: none !important;
-}
-
-.df-app .df-time-block,
-.df-app .df-event-blocks-layer .df-time-block,
-.df-app.theme-dark .df-time-block,
-.df-app:not(.theme-dark) .df-time-block,
-.df-app .df-all-day-block,
-.df-app.theme-dark .df-all-day-block,
-.df-app:not(.theme-dark) .df-all-day-block,
-.df-app .df-timeline-3day-allday .df-all-day-block,
-.df-app .df-month-task,
-.df-app.theme-dark .df-month-task,
-.df-app:not(.theme-dark) .df-month-task {
-  border: 2px solid color-mix(in srgb, var(--cat, var(--accent-active)) 84%, var(--paper-rule)) !important;
-  border-bottom: 5px solid var(--cat, var(--accent-active)) !important;
-  border-radius: 7px !important;
-  background: var(--navo-task-rest-bg) !important;
-  box-shadow: none !important;
-  filter: none !important;
-}
-
-.df-app .df-time-block:hover,
-.df-app .df-time-block:focus-within,
-.df-app .df-time-block:focus-visible,
-.df-app .df-time-block.project-open,
-.df-app .df-time-block.resizing,
-.df-app .df-time-block.is-dragging,
-.df-app .df-event-blocks-layer .df-time-block:hover,
-.df-app .df-event-blocks-layer .df-time-block:focus-within,
-.df-app .df-event-blocks-layer .df-time-block:focus-visible,
-.df-app .df-event-blocks-layer .df-time-block.project-open,
-.df-app .df-event-blocks-layer .df-time-block.resizing,
-.df-app .df-event-blocks-layer .df-time-block.is-dragging,
-.df-app .df-all-day-block:hover,
-.df-app .df-all-day-block:focus-within,
-.df-app .df-all-day-block:focus-visible,
-.df-app .df-all-day-block.project-open,
-.df-app .df-all-day-block.is-dragging,
-.df-app .df-month-task:hover,
-.df-app .df-month-task:focus-within,
-.df-app .df-month-task:focus-visible {
-  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 94%, var(--paper-rule-strong)) !important;
-  border-bottom-color: var(--cat, var(--accent-active)) !important;
-  background: color-mix(in srgb, var(--surface-main) 91%, var(--cat, var(--accent-active)) 9%) !important;
-  box-shadow: none !important;
-}
-
-.df-app :is(.df-task-card, .df-time-block, .df-all-day-block, .df-month-task) .df-category-strip {
-  display: none !important;
 }
 
 /* The planning action belongs to the timeline heading, not a separate toolbar. */
@@ -2147,6 +2110,23 @@
 .df-app .df-timeline-daily {
   flex: 1 1 auto !important;
   height: 100% !important;
+}
+.df-app .df-timeline-content {
+  position: relative;
+}
+.df-app .df-back-to-now {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 8;
+  min-height: 32px;
+  padding: 0 10px !important;
+  border-color: var(--paper-rule) !important;
+  border-bottom-color: var(--accent-active) !important;
+  color: var(--accent-active) !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent) !important;
 }
 
 /* Fullscreen is a viewport mode, not merely a hidden-header variant. Keep the
@@ -3103,20 +3083,24 @@
 .df-app .df-candidate-panel.drop-active .df-candidate-list {
   background: color-mix(in srgb, var(--accent-active) 3%, transparent) !important;
 }
-.df-habit-candidate-card {
-  margin: 12px 0 10px;
-  padding: 14px 0;
+.df-app .df-habit-candidate-card {
   display: grid;
-  gap: 10px;
-  border-top: 1px solid var(--paper-rule);
-  border-bottom: 1px solid var(--paper-rule);
+  gap: 14px;
+  --cat: var(--accent-active);
+  padding: 14px 14px 17px 14px !important;
 }
 .df-habit-candidate-card header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   color: var(--text-main);
-  font-family: var(--paper-display);
+  font-family: var(--paper-task);
+  padding: 0 0 2px;
+}
+.df-habit-candidate-card header strong {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -.012em;
 }
 .df-habit-candidate-card header span {
   color: var(--text-muted);
@@ -3125,70 +3109,469 @@
 }
 .df-habit-candidate-list {
   display: grid;
-  gap: 7px;
+  gap: 8px;
+  padding: 6px 22px 0 78px;
 }
 .df-habit-candidate-row {
-  min-height: 40px;
+  min-height: 48px;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--paper-rule) 78%, transparent);
+  padding: 8px 14px 9px 14px;
+  border: 2px solid color-mix(in srgb, var(--cat, var(--accent-active)) 26%, var(--paper-rule-strong));
+  border-bottom: 4px solid color-mix(in srgb, var(--cat, var(--accent-active)) 28%, var(--paper-rule-strong));
+  border-radius: 6px;
+  background: var(--navo-task-rest-bg, rgb(250, 249, 245));
   color: var(--text-main);
   cursor: grab;
   touch-action: none;
 }
-.df-habit-candidate-row:last-child {
-  border-bottom: 0;
-}
 .df-habit-candidate-row:active {
   cursor: grabbing;
+}
+.df-habit-candidate-row.scheduled {
+  border-color: color-mix(in srgb, var(--cat, var(--accent-active)) 42%, var(--paper-rule-strong));
+  border-bottom-color: color-mix(in srgb, var(--cat, var(--accent-active)) 45%, var(--paper-rule-strong));
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--cat, var(--accent-active)) 6%);
 }
 .df-habit-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--paper-task);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -.012em;
+  cursor: pointer;
 }
-.df-habit-candidate-row small {
+.df-habit-title:hover {
+  color: var(--cat, var(--accent-active));
+}
+.df-habit-duration {
   color: var(--text-muted);
   font-family: var(--paper-mono);
   font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.df-habit-duration:hover {
+  color: var(--cat, var(--accent-active));
 }
 .df-habit-candidate-row.completed .df-habit-title {
   color: var(--text-muted);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
-.df-habit-check {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--accent-active) !important;
-  border-radius: 5px 3px 6px 2px !important;
+.df-app .df-habit-check {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  border: 2px solid var(--cat, var(--accent-active)) !important;
+  border-radius: 5px !important;
   background: transparent !important;
-  color: var(--accent-active);
+  color: var(--cat, var(--accent-active)) !important;
   position: relative;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
-.df-habit-check[aria-pressed="true"]::after {
-  content: "";
+.df-app .df-habit-check[aria-pressed="true"]::after {
+  content: "✓";
   position: absolute;
-  left: 5px;
-  top: 4px;
-  width: 10px;
-  height: 6px;
-  border-left: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg);
+  left: 50%;
+  top: 50%;
+  font-family: "Comic Sans MS", "Segoe Print", var(--paper-sans);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: -.5px .2px currentColor, .4px -.3px color-mix(in srgb, currentColor 45%, transparent);
+  transform: translate(-48%, -57%) rotate(-8deg);
+}
+.df-habit-candidate-card header {
+  cursor: pointer;
+}
+.df-habit-candidate-card header:hover strong {
+  color: var(--accent-active);
 }
 .df-habit-scheduled {
   min-height: 28px;
   border: 0 !important;
-  border-bottom: 1px solid var(--accent-active) !important;
+  border-bottom: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
-  color: var(--accent-active) !important;
-  padding: 0 2px !important;
+  color: var(--text-muted) !important;
+  padding: 0 !important;
+  font-family: var(--paper-task);
+  font-size: 14px !important;
+  font-weight: 720;
   white-space: nowrap;
+}
+
+/* ===== Habit Panel (overview + detail) ===== */
+.df-habit-panel { width: min(520px, 100vw) !important; }
+.df-habit-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 4px 0 14px;
+}
+.df-habit-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 12px 14px;
+  border: 1px solid var(--paper-rule-strong, var(--paper-rule));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-main, transparent) 92%, var(--accent-active) 8%);
+}
+.df-habit-stat-value {
+  font-family: var(--paper-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -.01em;
+}
+.df-habit-stat-label {
+  font-family: var(--paper-sans);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: .04em;
+}
+.df-habit-list-group { padding-top: 6px; }
+.df-habit-overview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.df-habit-overview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+.df-habit-overview-row:last-child { border-bottom: 0; }
+.df-habit-overview-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--paper-task);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.df-habit-overview-title:hover { color: var(--accent-active); }
+.df-habit-overview-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--paper-rule-strong, var(--paper-rule));
+  flex-shrink: 0;
+}
+.df-habit-overview-dot.done { background: var(--accent-active); }
+.df-habit-overview-dot.planned { background: color-mix(in srgb, var(--accent-active) 50%, var(--paper-rule-strong)); }
+.df-habit-overview-meta {
+  font-family: var(--paper-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.df-habit-archive-toggle {
+  border: 1px solid var(--paper-rule-strong, var(--paper-rule));
+  border-radius: 5px;
+  background: transparent;
+  padding: 4px 8px;
+  font-family: var(--paper-sans);
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.df-habit-archive-toggle:hover {
+  color: var(--accent-active);
+  border-color: var(--accent-active);
+}
+.df-habit-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 12px 0;
+}
+.df-habit-weekday-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.df-habit-weekday-chip {
+  min-width: 34px;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-rule-strong, var(--paper-rule));
+  border-radius: 5px;
+  background: transparent;
+  font-family: var(--paper-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 120ms;
+}
+.df-habit-weekday-chip:hover {
+  border-color: var(--accent-active);
+  color: var(--text-main);
+}
+.df-habit-weekday-chip.active {
+  background: var(--accent-active);
+  border-color: var(--accent-active);
+  color: var(--surface-main, #fff);
+}
+.df-habit-detail-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 14px;
+}
+.df-habit-back-btn,
+.df-habit-archive-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--paper-rule-strong, var(--paper-rule));
+  background: transparent;
+  font-family: var(--paper-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 120ms;
+}
+.df-habit-back-btn:hover,
+.df-habit-archive-btn:hover {
+  border-color: var(--accent-active);
+  color: var(--accent-active);
+}
+.df-habit-archive-btn {
+  border-color: color-mix(in srgb, var(--accent-active) 30%, var(--paper-rule));
+}
+@media (max-width: 520px) {
+  .df-habit-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .df-habit-overview-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .df-habit-overview-meta { display: none; }
+}
+
+.df-search-trigger {
+  color: var(--text-muted);
+}
+
+.df-command-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  border: 0;
+  background: color-mix(in srgb, var(--surface-main) 42%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.df-command-palette {
+  position: fixed;
+  top: min(106px, 14vh);
+  left: 50%;
+  z-index: 1201;
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(620px, calc(100vh - 96px));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--paper-rule-strong);
+  border-bottom-color: var(--accent-active);
+  border-radius: 8px;
+  background: var(--surface-main);
+  color: var(--text-main);
+  box-shadow: var(--paper-float-shadow);
+}
+
+.df-command-input-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.df-command-input-row svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.df-command-input-row input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-main);
+  font: 650 16px/1.4 var(--paper-sans);
+}
+
+.df-command-input-row input::placeholder {
+  color: var(--text-muted);
+}
+
+.df-command-input-row kbd,
+.df-shortcut-row kbd {
+  min-height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 2px 7px;
+  border: 1px solid var(--paper-rule);
+  border-bottom-color: var(--paper-rule-strong);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--text-main) 6%);
+  color: var(--text-muted);
+  font: 650 10px/1.2 var(--paper-mono);
+}
+
+.df-command-results {
+  overflow: auto;
+  display: grid;
+  gap: 0;
+  padding: 8px;
+}
+
+.df-command-results button {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--paper-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+}
+
+.df-command-results button:hover,
+.df-command-results button:focus-visible {
+  background: color-mix(in srgb, var(--surface-main) 93%, var(--accent-active) 7%);
+}
+
+.df-command-results button:focus-visible {
+  outline: 1px solid var(--accent-active);
+  outline-offset: -1px;
+}
+
+.df-command-kind,
+.df-command-jump {
+  color: var(--text-muted);
+  font: 650 10px/1.2 var(--paper-mono);
+}
+
+.df-command-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.df-command-main strong,
+.df-command-main small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.df-command-main strong {
+  font: 720 13px/1.25 var(--paper-sans);
+}
+
+.df-command-main small {
+  color: var(--text-muted);
+  font: 11px/1.25 var(--paper-sans);
+}
+
+.df-command-empty {
+  margin: 18px 10px 24px;
+  color: var(--text-muted);
+  font: 12px/1.5 var(--paper-sans);
+}
+
+.df-shortcut-reference {
+  display: grid;
+  gap: 18px;
+}
+
+.df-shortcut-group {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.df-shortcut-group:last-child {
+  border-bottom: 0;
+}
+
+.df-shortcut-group h4 {
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 11px/1.3 var(--paper-mono);
+  text-transform: uppercase;
+}
+
+.df-shortcut-list {
+  display: grid;
+  gap: 4px;
+}
+
+.df-shortcut-row {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--paper-rule) 70%, transparent);
+  color: var(--text-main);
+  font: 12px/1.35 var(--paper-sans);
+}
+
+@media (max-width: 720px) {
+  .df-command-palette {
+    top: 72px;
+    width: calc(100vw - 18px);
+  }
+
+  .df-command-results button {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .df-command-jump {
+    display: none;
+  }
 }
 .df-app .df-floating-shelf-drag.candidate-target {
   border-color: var(--accent-active) !important;
@@ -6608,6 +6991,7 @@ body.df-timeline-pointer-drag * {
   position: relative;
 }
 .df-candidate-timer-btn {
+  display: none !important;
   position: absolute;
   top: 4px;
   right: 4px;
@@ -6749,6 +7133,155 @@ body.df-timeline-pointer-drag * {
   color: var(--focus-accent, var(--accent, #CAFF72));
 }
 
+/* Current task and focus mode final pass: editorial paper controls, not pills. */
+.df-app .df-header-timer-task {
+  min-height: 38px !important;
+  gap: 12px !important;
+  padding: 4px 14px 6px !important;
+  border: 0 !important;
+  border-bottom: 2px solid var(--timer-project-color, var(--accent-active)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  max-width: min(560px, 46vw) !important;
+}
+.df-app .df-header-timer-task.is-running {
+  box-shadow: none !important;
+}
+.df-app .df-header-timer-label {
+  gap: 8px !important;
+}
+.df-app .df-header-timer-status {
+  font: 700 10px/1 var(--paper-mono) !important;
+  color: var(--text-muted) !important;
+  letter-spacing: .08em !important;
+}
+.df-app .df-header-timer-name {
+  max-width: min(340px, 30vw) !important;
+  font-family: var(--paper-task) !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  color: var(--text-main) !important;
+  letter-spacing: -.02em !important;
+}
+.df-app .df-header-timer-display {
+  padding-left: 2px !important;
+  font: 800 16px/1 var(--paper-mono) !important;
+  color: var(--timer-project-color, var(--accent-active)) !important;
+}
+.df-app .df-header-timer-actions {
+  top: calc(100% + 1px) !important;
+  right: 0 !important;
+  gap: 8px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: 0 0 8px 8px !important;
+  background: var(--surface-raised) !important;
+  box-shadow: 0 12px 26px color-mix(in srgb, #000 14%, transparent) !important;
+}
+.df-app .df-timer-action {
+  width: 30px !important;
+  height: 30px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-muted) !important;
+  background: transparent !important;
+}
+.df-app .df-timer-action:hover,
+.df-app .df-timer-action:focus-visible {
+  color: var(--timer-project-color, var(--accent-active)) !important;
+  border-bottom-color: var(--timer-project-color, var(--accent-active)) !important;
+  background: transparent !important;
+}
+.df-app .df-candidate-timer-btn {
+  display: none !important;
+}
+.df-focus-overlay {
+  background: var(--surface-main) !important;
+  color: var(--text-main) !important;
+}
+.df-focus-topbar {
+  padding: 22px 28px 0 !important;
+}
+.df-focus-mode-switch {
+  gap: 18px !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+}
+.df-focus-mode-btn {
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font: 750 12px/1 var(--paper-mono) !important;
+  letter-spacing: .04em !important;
+}
+.df-focus-mode-btn:hover,
+.df-focus-mode-btn.active {
+  color: var(--focus-accent, var(--accent-active)) !important;
+  border-bottom-color: var(--focus-accent, var(--accent-active)) !important;
+  background: transparent !important;
+}
+.df-focus-close {
+  border-radius: 0 !important;
+  color: var(--text-muted) !important;
+}
+.df-focus-close:hover {
+  color: var(--focus-accent, var(--accent-active)) !important;
+  background: transparent !important;
+}
+.df-focus-timer-display {
+  color: var(--text-main) !important;
+  font-size: clamp(72px, 12vw, 132px) !important;
+  font-weight: 300 !important;
+  letter-spacing: 0 !important;
+}
+.df-focus-mode-note {
+  margin-top: -24px;
+  color: var(--text-muted);
+  font: 700 12px/1 var(--paper-mono);
+  letter-spacing: .04em;
+}
+.df-focus-task-wrap {
+  border: 2px solid var(--focus-accent, var(--accent-active)) !important;
+  border-bottom-width: 6px !important;
+  border-radius: 8px !important;
+  background: var(--navo-task-rest-bg, rgb(250, 249, 245)) !important;
+  color: var(--text-main) !important;
+}
+.df-focus-task-prefix {
+  color: var(--text-muted) !important;
+}
+.df-focus-task-name {
+  color: var(--text-main) !important;
+  font-family: var(--paper-task) !important;
+}
+.df-focus-project-name {
+  color: var(--text-muted) !important;
+  font: 700 12px/1 var(--paper-mono) !important;
+}
+.df-focus-controls button {
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-main) !important;
+  font: 750 13px/1 var(--paper-sans) !important;
+}
+.df-focus-controls button:hover:not(:disabled),
+.df-focus-controls button:focus-visible:not(:disabled) {
+  color: var(--focus-accent, var(--accent-active)) !important;
+  border-bottom-color: var(--focus-accent, var(--accent-active)) !important;
+}
+.df-focus-controls button:disabled {
+  opacity: .42 !important;
+  cursor: not-allowed !important;
+}
+
 /* ===== Settings features ===== */
 .df-utility-check {
   display: flex;
@@ -6762,4 +7295,857 @@ body.df-timeline-pointer-drag * {
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+/* 2026 planning card cleanup: one paper-card language, tighter controls. */
+.df-app .df-header-inner {
+  grid-template-columns: auto minmax(260px, 1fr) auto !important;
+}
+.df-app .df-brand { justify-self: start !important; }
+.df-app .df-month-year-selector {
+  justify-self: center !important;
+  min-width: 0 !important;
+}
+.df-app .df-month-year-selector:has(.df-header-timer-task) {
+  display: flex !important;
+}
+.df-app .df-header-right {
+  justify-self: end !important;
+  margin-right: 0 !important;
+}
+.df-app .df-tabs-right {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.df-app.mode-planning .df-tree-wrap {
+  padding: 54px 64px 16px 42px !important;
+}
+.df-planning-filter-bar {
+  position: absolute !important;
+  top: 14px !important;
+  right: 86px !important;
+  left: auto !important;
+  z-index: 35 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+}
+.df-planning-filter-menu { position: relative; }
+.df-filter-trigger {
+  min-height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--paper-rule) !important;
+  border-bottom-color: var(--paper-rule-strong) !important;
+  border-radius: 6px !important;
+  background: var(--navo-task-rest-bg, rgb(250, 249, 245)) !important;
+  color: var(--text-muted) !important;
+  font: 650 11px/1 var(--paper-mono) !important;
+  box-shadow: none !important;
+}
+.df-filter-trigger svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.df-filter-trigger b {
+  min-width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 46%, var(--paper-rule));
+  border-radius: 50%;
+  color: var(--accent-active);
+  font-size: 9px;
+}
+.df-filter-trigger:hover,
+.df-filter-trigger:focus-visible,
+.df-filter-trigger.active {
+  color: var(--text-main) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 48%, var(--paper-rule-strong)) !important;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important;
+}
+.df-filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 42px));
+  max-height: min(620px, calc(100vh - 150px));
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: 8px;
+  background: var(--surface-main);
+  color: var(--text-main);
+  box-shadow: var(--paper-float-shadow);
+}
+.df-filter-panel header,
+.df-filter-section-head {
+  display: none !important;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+.df-filter-panel header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+.df-filter-panel header strong {
+  font: 700 12px/1.3 var(--paper-sans);
+}
+.df-filter-panel header button {
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  padding: 0 0 2px !important;
+  font-size: 11px !important;
+}
+.df-filter-section {
+  display: grid;
+  gap: 8px;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+.df-filter-section:last-child { border-bottom: 0; }
+.df-filter-section-head span {
+  font: 650 11px/1.3 var(--paper-sans);
+}
+.df-filter-section-head small {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font: 10px/1.2 var(--paper-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.df-filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.df-filter-option {
+  min-width: 0;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-bottom-color: var(--paper-rule);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.df-filter-option:hover,
+.df-filter-option.checked {
+  color: var(--text-main);
+  border-color: color-mix(in srgb, var(--accent-active) 36%, var(--paper-rule));
+  background: color-mix(in srgb, var(--surface-main) 95%, var(--accent-active) 5%);
+}
+.df-filter-option input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent-active);
+}
+
+.df-planning-view-switch {
+  position: absolute !important;
+  top: 68px !important;
+  right: 14px !important;
+  z-index: 24 !important;
+  display: grid !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 6px 0 !important;
+  border-left: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+}
+.df-view-btn {
+  width: 52px !important;
+  min-height: 30px !important;
+  padding: 2px 4px !important;
+  border: 0 !important;
+  border-left: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  letter-spacing: 0 !important;
+  font: 650 11px/1.1 var(--paper-sans) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.df-view-btn:hover,
+.df-view-btn:focus-visible {
+  color: var(--text-main) !important;
+  border-left-color: var(--paper-rule-strong) !important;
+  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
+}
+.df-view-btn.active {
+  color: var(--accent-active) !important;
+  border-left-color: var(--accent-active) !important;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important;
+}
+
+.df-app {
+  --navo-card-rest-bg: rgb(250, 249, 245);
+}
+.df-app.theme-dark {
+  --navo-card-rest-bg: var(--surface-main);
+}
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block,
+.df-app .df-all-day-block,
+.df-app .df-timeline-3day-allday .df-all-day-block,
+.df-app .df-month-task,
+.df-kanban-card,
+.df-eisenhower-task,
+.df-planning-list-row {
+  --navo-card-project: var(--cat, var(--task-project-color, var(--accent-active)));
+  border: 2px solid color-mix(in srgb, var(--navo-card-project) 82%, var(--paper-rule)) !important;
+  border-bottom: 6px solid var(--navo-card-project) !important;
+  border-radius: 7px !important;
+  background: var(--navo-card-rest-bg) !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transition: background-color var(--paper-motion), border-color var(--paper-motion), opacity var(--paper-motion) !important;
+}
+.df-app .df-time-block:hover,
+.df-app .df-time-block:focus-within,
+.df-app .df-time-block.project-open,
+.df-app .df-time-block.resizing,
+.df-app .df-time-block.is-dragging,
+.df-app .df-event-blocks-layer .df-time-block:hover,
+.df-app .df-event-blocks-layer .df-time-block:focus-within,
+.df-app .df-event-blocks-layer .df-time-block.project-open,
+.df-app .df-event-blocks-layer .df-time-block.resizing,
+.df-app .df-event-blocks-layer .df-time-block.is-dragging,
+.df-app .df-all-day-block:hover,
+.df-app .df-all-day-block:focus-within,
+.df-app .df-all-day-block.project-open,
+.df-app .df-all-day-block.is-dragging,
+.df-app .df-month-task:hover,
+.df-app .df-month-task:focus-within,
+.df-kanban-card:hover,
+.df-kanban-card:focus-within,
+.df-kanban-card:active,
+.df-eisenhower-task:hover,
+.df-eisenhower-task:focus-within,
+.df-eisenhower-task:active,
+.df-planning-list-row:hover,
+.df-planning-list-row:focus-within {
+  border-color: color-mix(in srgb, var(--navo-card-project) 94%, var(--paper-rule-strong)) !important;
+  border-bottom-color: var(--navo-card-project) !important;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--navo-card-project) 8%) !important;
+}
+.df-app :is(.df-time-block, .df-all-day-block, .df-month-task) .df-category-strip {
+  display: none !important;
+}
+.df-app .df-time-block .df-block-check,
+.df-app .df-event-blocks-layer .df-time-block .df-block-check,
+.df-app .df-all-day-block .df-block-check {
+  left: 8px !important;
+  top: 50% !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  border: 2px solid var(--navo-card-project) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: var(--navo-card-project) !important;
+  transform: translateY(-50%) !important;
+  box-shadow: none !important;
+}
+.df-app .df-time-block .df-block-title-row,
+.df-app .df-event-blocks-layer .df-time-block .df-block-title-row {
+  padding-left: 26px !important;
+}
+.df-kanban-board {
+  gap: 14px !important;
+  padding: 18px 68px 18px 6px !important;
+}
+.df-kanban-column,
+.df-eisenhower-quadrant {
+  border: 1px solid var(--paper-rule) !important;
+  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--surface-main) 97%, var(--text-main) 3%) !important;
+}
+.df-kanban-column.is-drop-target,
+.df-eisenhower-quadrant.is-drop-target {
+  border-color: var(--accent-active) !important;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%) !important;
+}
+.df-kanban-card,
+.df-eisenhower-task {
+  cursor: grab !important;
+  padding: 12px 14px 14px !important;
+}
+.df-kanban-card:active,
+.df-eisenhower-task:active {
+  cursor: grabbing !important;
+}
+.df-kanban-card-title,
+.df-eisenhower-task-title {
+  font-size: 14px !important;
+  font-weight: 760 !important;
+  line-height: 1.35 !important;
+}
+.df-kanban-card-meta,
+.df-eisenhower-task-meta {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 7px !important;
+  margin-top: 5px !important;
+}
+.df-kanban-card-actions,
+.df-eisenhower-task-actions,
+.df-list-status-actions {
+  justify-content: flex-end !important;
+  margin-top: 10px !important;
+  padding-top: 7px !important;
+  border-top: 1px solid var(--paper-rule) !important;
+}
+.df-kanban-status-btn,
+.df-eisenhower-move-btn,
+.df-list-status-btn {
+  min-height: 24px !important;
+  padding: 2px 7px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  box-shadow: none !important;
+}
+.df-kanban-status-btn:hover,
+.df-kanban-status-btn.active,
+.df-eisenhower-move-btn:hover,
+.df-list-status-btn:hover,
+.df-list-status-btn.active {
+  color: var(--accent-active) !important;
+  border-bottom-color: var(--accent-active) !important;
+}
+.df-eisenhower-grid {
+  gap: 14px !important;
+  padding: 18px 68px 18px 6px !important;
+}
+.df-planning-list {
+  gap: 10px !important;
+  padding: 18px 72px 18px 6px !important;
+}
+.df-planning-list-row {
+  display: grid !important;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto auto minmax(180px, auto) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 12px 14px 14px !important;
+  border-left-width: 2px !important;
+}
+.df-list-status-toggle {
+  width: 18px !important;
+  height: 18px !important;
+  border: 2px solid var(--task-project-color, var(--accent-active)) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+}
+.df-list-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px !important;
+  font-weight: 760 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Final task-card unification: all task surfaces match Today Candidate cards. */
+.df-app {
+  --navo-task-card-bg: rgb(250, 249, 245);
+}
+.df-app.theme-dark {
+  --navo-task-card-bg: var(--surface-main);
+}
+.df-app .df-task-card,
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block,
+.df-app .df-all-day-block,
+.df-app .df-timeline-3day-allday .df-all-day-block,
+.df-app .df-month-task,
+.df-app .df-drop-preview,
+.df-kanban-card,
+.df-eisenhower-task,
+.df-planning-list-row {
+  --navo-card-project: var(--cat, var(--task-project-color, var(--accent-active)));
+  border: 2px solid color-mix(in srgb, var(--navo-card-project) 84%, var(--paper-rule)) !important;
+  border-bottom: 6px solid var(--navo-card-project) !important;
+  border-radius: 7px !important;
+  background: var(--navo-task-card-bg) !important;
+  background-image: none !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+  transition: background-color var(--paper-motion), border-color var(--paper-motion), opacity var(--paper-motion) !important;
+}
+.df-app .df-task-card:hover,
+.df-app .df-task-card:focus-within,
+.df-app .df-task-card.more-open,
+.df-app .df-task-card.placement-armed,
+.df-app .df-time-block:hover,
+.df-app .df-time-block:focus-within,
+.df-app .df-time-block.project-open,
+.df-app .df-time-block.resizing,
+.df-app .df-time-block.is-dragging,
+.df-app .df-event-blocks-layer .df-time-block:hover,
+.df-app .df-event-blocks-layer .df-time-block:focus-within,
+.df-app .df-event-blocks-layer .df-time-block.project-open,
+.df-app .df-event-blocks-layer .df-time-block.resizing,
+.df-app .df-event-blocks-layer .df-time-block.is-dragging,
+.df-app .df-all-day-block:hover,
+.df-app .df-all-day-block:focus-within,
+.df-app .df-all-day-block.project-open,
+.df-app .df-all-day-block.is-dragging,
+.df-app .df-month-task:hover,
+.df-app .df-month-task:focus-within,
+.df-app .df-drop-preview,
+.df-kanban-card:hover,
+.df-kanban-card:focus-within,
+.df-kanban-card:active,
+.df-eisenhower-task:hover,
+.df-eisenhower-task:focus-within,
+.df-eisenhower-task:active,
+.df-planning-list-row:hover,
+.df-planning-list-row:focus-within {
+  border-color: color-mix(in srgb, var(--navo-card-project) 94%, var(--paper-rule-strong)) !important;
+  border-bottom-color: var(--navo-card-project) !important;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--navo-card-project) 8%) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.df-app .df-time-block.completed,
+.df-app .df-all-day-block.completed,
+.df-app .df-month-task.completed,
+.df-kanban-card.completed,
+.df-eisenhower-task.completed,
+.df-planning-list-row.completed {
+  opacity: .64 !important;
+}
+.df-app :is(.df-time-block, .df-all-day-block, .df-month-task) .df-category-strip {
+  display: none !important;
+}
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block {
+  min-height: 38px !important;
+  padding: 9px 12px 10px 38px !important;
+  overflow: hidden !important;
+}
+.df-app .df-time-block.short-block:not(.df-time-block-week),
+.df-app .df-event-blocks-layer .df-time-block.short-block:not(.df-time-block-week) {
+  min-height: 30px !important;
+  padding: 5px 10px 7px 34px !important;
+}
+.df-app .df-time-block .df-block-title-row,
+.df-app .df-event-blocks-layer .df-time-block .df-block-title-row {
+  min-width: 0 !important;
+  padding-left: 0 !important;
+}
+.df-app .df-time-block .df-block-title-row strong,
+.df-app .df-event-blocks-layer .df-time-block .df-block-title-row strong,
+.df-app .df-all-day-block strong,
+.df-app .df-month-task,
+.df-kanban-card-title,
+.df-eisenhower-task-title,
+.df-list-title {
+  font-family: var(--paper-task) !important;
+  font-weight: 760 !important;
+  letter-spacing: -.012em !important;
+  color: var(--text-main) !important;
+}
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  font-size: 11px !important;
+  line-height: 1.05 !important;
+}
+.df-app .df-time-block .df-block-check,
+.df-app .df-event-blocks-layer .df-time-block .df-block-check,
+.df-app .df-all-day-block .df-block-check {
+  left: 10px !important;
+  top: 50% !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  border: 2px solid var(--navo-card-project) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: var(--navo-card-project) !important;
+  opacity: 1 !important;
+  transform: translateY(-50%) !important;
+  box-shadow: none !important;
+}
+.df-app .df-all-day-block {
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 10px 14px 12px 38px !important;
+}
+.df-app .df-month-task {
+  min-height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 8px 8px !important;
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+.df-app .df-month-task time {
+  color: var(--text-muted) !important;
+  font-family: var(--paper-mono) !important;
+}
+.df-kanban-card,
+.df-eisenhower-task {
+  padding: 12px 14px 14px !important;
+}
+.df-planning-list-row {
+  border-left-width: 2px !important;
+  border-left-color: color-mix(in srgb, var(--task-project-color, var(--accent-active)) 84%, var(--paper-rule)) !important;
+}
+.df-app .df-time-block .df-resize-dot,
+.df-app .df-event-blocks-layer .df-time-block .df-resize-dot {
+  color: var(--navo-card-project) !important;
+}
+
+/* Timeline cards need the same visual weight as Today Candidate cards. */
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block,
+.df-app .df-time-block.short-block:not(.df-time-block-week),
+.df-app .df-event-blocks-layer .df-time-block.short-block:not(.df-time-block-week) {
+  --navo-card-project: var(--cat, var(--task-project-color, var(--accent-active)));
+  box-sizing: border-box !important;
+  min-height: 56px !important;
+  padding: 12px 14px 14px 44px !important;
+  border: 2px solid color-mix(in srgb, var(--navo-card-project) 84%, var(--paper-rule)) !important;
+  border-bottom: 6px solid var(--navo-card-project) !important;
+  border-radius: 7px !important;
+  background: var(--navo-task-card-bg, rgb(250, 249, 245)) !important;
+  background-image: none !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+  overflow: hidden !important;
+}
+
+.df-app .df-time-block:hover,
+.df-app .df-time-block:focus-within,
+.df-app .df-time-block.project-open,
+.df-app .df-time-block.resizing,
+.df-app .df-time-block.is-dragging,
+.df-app .df-event-blocks-layer .df-time-block:hover,
+.df-app .df-event-blocks-layer .df-time-block:focus-within,
+.df-app .df-event-blocks-layer .df-time-block.project-open,
+.df-app .df-event-blocks-layer .df-time-block.resizing,
+.df-app .df-event-blocks-layer .df-time-block.is-dragging {
+  z-index: 32 !important;
+  border-color: color-mix(in srgb, var(--navo-card-project) 94%, var(--paper-rule-strong)) !important;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--navo-card-project) 8%) !important;
+}
+
+.df-app .df-time-block .df-category-strip,
+.df-app .df-event-blocks-layer .df-time-block .df-category-strip,
+.df-app .df-time-block .df-event-indicator,
+.df-app .df-event-blocks-layer .df-time-block .df-event-indicator {
+  display: none !important;
+}
+
+.df-app .df-time-block .df-block-check,
+.df-app .df-event-blocks-layer .df-time-block .df-block-check {
+  left: 14px !important;
+  top: 50% !important;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  border: 3px solid var(--navo-card-project) !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--navo-card-project) !important;
+  opacity: 1 !important;
+  transform: translateY(-50%) !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-time-block .df-block-title-row,
+.df-app .df-event-blocks-layer .df-time-block .df-block-title-row {
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  gap: 6px !important;
+  padding: 0 !important;
+}
+
+.df-app .df-time-block .df-block-title-row strong,
+.df-app .df-event-blocks-layer .df-time-block .df-block-title-row strong,
+.df-app .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong,
+.df-app .df-event-blocks-layer .df-time-block.short-block:not(.df-time-block-week) .df-block-title-row strong {
+  color: var(--text-main) !important;
+  font-family: var(--paper-task) !important;
+  font-size: 14px !important;
+  font-weight: 780 !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.df-app .df-time-block .df-next,
+.df-app .df-event-blocks-layer .df-time-block .df-next {
+  color: var(--text-muted) !important;
+  font-family: var(--paper-ui) !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
+}
+
+.df-app .df-time-block .df-block-project-wrap,
+.df-app .df-event-blocks-layer .df-time-block .df-block-project-wrap {
+  right: 10px !important;
+  bottom: 7px !important;
+  left: auto !important;
+  top: auto !important;
+}
+
+/* Timeline card content layout: same reading structure as Today Candidate cards. */
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block,
+.df-app .df-time-block.short-block:not(.df-time-block-week),
+.df-app .df-event-blocks-layer .df-time-block.short-block:not(.df-time-block-week) {
+  min-height: 72px !important;
+  padding: 14px 18px 16px !important;
+}
+
+.df-app .df-time-card-row {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.df-app .df-time-block .df-time-card-row > .df-block-check,
+.df-app .df-event-blocks-layer .df-time-block .df-time-card-row > .df-block-check {
+  position: static !important;
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  margin: 2px 0 0 !important;
+  border-width: 3px !important;
+  transform: none !important;
+}
+
+.df-app .df-time-card-event-mark {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border: 3px solid var(--navo-card-project);
+  border-radius: 5px;
+}
+
+.df-app .df-time-card-main {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding-top: 1px;
+}
+
+.df-app .df-time-card-title {
+  min-width: 0;
+  color: var(--text-main) !important;
+  font-family: var(--paper-task) !important;
+  font-size: 16px !important;
+  font-weight: 780 !important;
+  line-height: 1.18 !important;
+  letter-spacing: 0 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.df-app .df-time-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+}
+
+.df-app .df-time-card-next {
+  display: block;
+  color: var(--text-muted) !important;
+  font-family: var(--paper-ui) !important;
+  font-size: 11px !important;
+  line-height: 1.25;
+}
+
+/* Hard final override for timeline cards: no legacy absolute checkbox layout. */
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block {
+  border: 3px solid var(--navo-card-project, var(--cat, var(--accent-active))) !important;
+  border-bottom: 7px solid var(--navo-card-project, var(--cat, var(--accent-active))) !important;
+  background: var(--navo-task-card-bg, rgb(250, 249, 245)) !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-time-block:hover,
+.df-app .df-time-block:focus-within,
+.df-app .df-time-block.project-open,
+.df-app .df-time-block.resizing,
+.df-app .df-time-block.is-dragging,
+.df-app .df-event-blocks-layer .df-time-block:hover,
+.df-app .df-event-blocks-layer .df-time-block:focus-within,
+.df-app .df-event-blocks-layer .df-time-block.project-open,
+.df-app .df-event-blocks-layer .df-time-block.resizing,
+.df-app .df-event-blocks-layer .df-time-block.is-dragging {
+  border-color: var(--navo-card-project, var(--cat, var(--accent-active))) !important;
+  border-bottom-color: var(--navo-card-project, var(--cat, var(--accent-active))) !important;
+}
+
+.df-app .df-time-block .df-time-card-row > button.df-block-check,
+.df-app .df-event-blocks-layer .df-time-block .df-time-card-row > button.df-block-check,
+.df-app .df-time-block .df-time-card-row > button.df-block-check:active:not(:disabled),
+.df-app .df-event-blocks-layer .df-time-block .df-time-card-row > button.df-block-check:active:not(:disabled) {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+  border: 3px solid var(--navo-card-project, var(--cat, var(--accent-active))) !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--navo-card-project, var(--cat, var(--accent-active))) !important;
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-time-block .df-time-card-main,
+.df-app .df-event-blocks-layer .df-time-block .df-time-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 10px;
+}
+
+/* True candidate-card rendering inside timeline positioned blocks. */
+.df-app .df-time-block,
+.df-app .df-event-blocks-layer .df-time-block,
+.df-app .df-time-block.short-block:not(.df-time-block-week),
+.df-app .df-event-blocks-layer .df-time-block.short-block:not(.df-time-block-week) {
+  --navo-card-project: var(--cat, var(--task-project-color, var(--accent-active)));
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.df-app .df-time-card-shell {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 92px;
+  display: flex;
+  align-items: flex-start;
+  border: 2px solid color-mix(in srgb, var(--navo-card-project) 84%, var(--paper-rule));
+  border-bottom: 6px solid var(--navo-card-project);
+  border-radius: 7px;
+  background: var(--navo-task-card-bg, rgb(250, 249, 245));
+  padding: 28px 34px 26px 34px;
+  color: var(--text-main);
+  transition: background-color var(--paper-motion), border-color var(--paper-motion);
+}
+
+.df-app .df-time-block:hover .df-time-card-shell,
+.df-app .df-time-block:focus-within .df-time-card-shell,
+.df-app .df-time-block.project-open .df-time-card-shell,
+.df-app .df-time-block.resizing .df-time-card-shell,
+.df-app .df-time-block.is-dragging .df-time-card-shell,
+.df-app .df-event-blocks-layer .df-time-block:hover .df-time-card-shell,
+.df-app .df-event-blocks-layer .df-time-block:focus-within .df-time-card-shell,
+.df-app .df-event-blocks-layer .df-time-block.project-open .df-time-card-shell,
+.df-app .df-event-blocks-layer .df-time-block.resizing .df-time-card-shell,
+.df-app .df-event-blocks-layer .df-time-block.is-dragging .df-time-card-shell {
+  border-color: color-mix(in srgb, var(--navo-card-project) 94%, var(--paper-rule-strong));
+  border-bottom-color: var(--navo-card-project);
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--navo-card-project) 8%);
+}
+
+.df-app .df-time-card-row {
+  width: 100%;
+  height: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+}
+
+.df-app .df-time-block .df-time-card-row > button.df-block-check,
+.df-app .df-event-blocks-layer .df-time-block .df-time-card-row > button.df-block-check,
+.df-app .df-time-block .df-time-card-row > button.df-block-check:active:not(:disabled),
+.df-app .df-event-blocks-layer .df-time-block .df-time-card-row > button.df-block-check:active:not(:disabled) {
+  position: relative !important;
+  inset: auto !important;
+  flex: 0 0 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  margin: 7px 0 0 !important;
+  padding: 0 !important;
+  border: 2px solid var(--navo-card-project) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: var(--navo-card-project) !important;
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-time-card-title {
+  font-family: var(--paper-task) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -.012em !important;
+}
+
+.df-app .df-time-card-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 !important;
 }
