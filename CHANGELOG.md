@@ -3,17 +3,31 @@
 ## 2026-07-02 · 执行与规划界面重设计
 
 ### 改进
-- 顶栏常显当前计时任务，任务名外加分粗描边胶囊，计时数字常显，悬停显示暂停、保存、丢弃、进入专注等 SVG 图标操作。
-- 全屏专注模式重构：Stopwatch / Pomodoro / Flowtime 三种模式切换置于页面顶部，计时器居中超大显示，关闭按钮移至右上角；任务名下移并加粗，"正在做"小字置于左侧，整体用主题色描边，背景不透明。
-- 规划视图筛选面板改为 Linear 式悬停 flyout：项目、显示、状态、重要程度、紧急程度五个选项横向排列，悬停拉出多选列表，选项右侧显示已选值，重置按钮置于筛选顶栏。
-- 规划页整体上移，视图切换按钮改为竖排并定位到右侧。
-- 今日候选任务卡片新增状态、重要程度、紧急程度徽章与子任务进度计数；展开后可显示子任务色块列表并直接勾选完成。
-- 模版功能入口移至今日候选面板标题栏，使用日历 SVG 图标。
-- 规划列表视图补充重要程度、紧急程度、截止日期指示器。
-- 习惯系统完整化：习惯行改为紧凑子任务风格，复选框缩小统一；点击习惯名可编辑，点击外层卡片打开习惯总览右侧栏。
-- 习惯编辑面板支持标题、备注、预设时长、频率规则（每天/每周目标/指定星期）、目标次数与提醒配置；总览面板展示今日完成数、已规划数、7/30 天完成率与计划分钟数。
-- 拖回候选区可取消习惯当日计划，清除时间轴记录并保留完成状态。
+- 顶栏常显当前计时任务，任务名外加分粗描边胶囊，计时数字常显，悬停显示暂停、保存、丢弃、进�
+�专注等 SVG 图标操作�?- �
+�屏专注模式重构：Stopwatch / Pomodoro / Flowtime 三种模式切换置于页面顶部，计时器�
+中�
+大显示，�
+�闭按钮移至右上角；任务名下移并加粗，"正在�?小字置于左侧，整体用主题色描边，背景不透明�?- 规划视图筛选面板改�?Linear 式悬�?flyout：项目、显示、状态、重要程度、紧急程度五个选项横向排列，悬停拉出多选列表，选项右侧显示已选值，重置按钮置于筛选顶栏�?- 规划页整体上移，视图切换按钮改为竖排并定位到右侧�?- 今日候选任务卡片新增状态、重要程度、紧急程度徽章与子任务进度计数；展开后可显示子任务色块列表并直接勾选完成�?- 模版功能�
+�口移至今日候选面板标题栏，使用日�?SVG 图标�?- 规划列表视图补�
 
+重要程度、紧急程度、截止日期指示器�?- 习惯系统完整化：习惯行改为紧凑子任务风格，复选框缩小统一；点击习惯名可编辑，点击外层卡片打开习惯总览右侧栏�?- 习惯编辑面板支持标题、备注、预设时长、频率规则（每天/每周目标/指定星期）、目标次数与提醒�
+�置；总览面板展示今日完成数、已规划数�?/30 天完成率与计划分钟数�?- 拖回候选区可取消习惯当日计划，�
+除时间轴记录并保留完成状态�?- 主工作区回归「纸、墨、细线、间距」的编辑感：候选任务改为安静的行式�
+单，以 2px 左侧项目色标作为注解，移除厚重卡片边框与悬停抬升�?- 时间轴网格降低彩度，改用中性细线；日程块以极淡的项目色填�
+
+�?1px 边框呈现，左�?2px 注解线替代饱和描边，长时段通过纵向尺寸表达�?- 规划建议、视图切换、筛选排序等控件统一为透明/�
+色表面、细边框、小线图标，移除胶囊填�
+
+、渐变、彩色阴影与悬停抬升�?- �
+理�
+�享控件中的硬编码紫/青柠与厚重阴影，按钮激活状态�
+保留 `translateY(1px)`，聚焦环保持�
+晰�?`accent-active` 轮廓�?- 项目色标记缩小为 10px 圆点，颜色选择器移除手绘圆角与纸质纹理，回归软件原生形态�?- �
+色模式以炭色油�?(#27231E) 搭�
+�暖白纸面；深色模式以暖象牙色 (#EEE9DF) 搭�
+�炭色纸面，无霓虹或发�
+�效果�?
 ## 2026-07-02 · Execute & Planning Redesign
 
 ### Improvements
@@ -27,18 +41,23 @@
 - Habit system overhaul: habit rows restyled as compact subtask cards with smaller unified checkboxes; clicking a habit title opens the editor, and clicking the outer card opens the habit overview side panel.
 - Habit editor supports title, notes, default duration, frequency rule (daily / weekly target / custom weekdays), target count, and reminder config; the overview panel shows today's completed, planned, 7/30-day completion rates, and planned minutes.
 - Dragging a habit back to the candidate area unschedules it for the day, removing the timeline record while preserving completion state.
+- Main workspace returns to an editorial paper language of ink, fine rules, spacing, and type: candidate tasks now render as quiet row-based checklists with a 2px left project-color rule, removing heavy card borders and hover lift.
+- Timeline grid desaturates to neutral hairlines; scheduled blocks use faint project-tinted fills and 1px borders, with a 2px left annotation rule replacing saturated outlines; longer durations read through vertical size.
+- Workspace controls (planning suggestion, view switch, filters, sort) share transparent or lightly tinted surfaces, thin borders, and small line icons; filled capsules, gradients, colored shadows, and hover lift are removed.
+- Cleaned hard-coded purple/lime and heavy shadows from shared controls; active state uses only `translateY(1px)`, and focus-visible keeps a clear `accent-active` outline.
+- Project-color marks shrink to 10px dots; the color picker drops rough radii and paper texture for a software-native form.
+- Light mode pairs charcoal ink (#27231E) with warm paper; dark mode pairs warm ivory (#EEE9DF) with charcoal paper, without neon or glow effects.
 
-## 2026-07-01 · 规划视图与任务计时恢复
-
+## 2026-07-01 · 规划视图与任务计时恢�?
 ### 新增
-- 规划视图新增看板（代办 / 进行中 / 完成三列拖拽）、四象限（重要 × 紧急拖拽）、列表三种视图，配合视图切换按钮与筛选面板（项目、状态、重要度、紧急度）。
-- 任务级计时器：在候选任务上启动计时，header 中部显示当前计时任务与时长，支持暂停、保存、丢弃；保存后写入时间记录（timeEntries）。
-- 专注覆盖层：全屏计时显示，支持秒表 / 番茄 / 心流模式切换，便于专注执行。
-- 设置 → 功能区域：可单独开关看板、四象限、列表视图，并设置默认专注模式与空闲阈值。
-
+- 规划视图新增看板（代�?/ 进行�?/ 完成三列拖拽）、四象限（重�?× 紧急拖拽）、列表三种视图，�
+�合视图切换按钮与筛选面板（项目、状态、重要度、紧急度）�?- 任务级计时器：在候选任务上启动计时，header 中部显示当前计时任务与时长，支持暂停、保存、丢弃；保存后写�
+�时间记录（timeEntries）�?- 专注覆盖层：�
+�屏计时显示，支持秒�?/ 番茄 / 心流模式切换，便于专注执行�?- 设置 �?功能区域：可单独开�
+�看板、四象限、列表视图，并设置默认专注模式与空闲阈值�?
 ### 改进
-- 规划视图筛选栏新增「显示已完成」切换与「筛选」面板入口，视图切换按钮组改为纸面风格。
-
+- 规划视图筛选栏新增「显示已完成」切换与「筛选」面板�
+�口，视图切换按钮组改为纸面风格�?
 ## 2026-06-29 ? ????? 1.2.32 ????
 
 ### ???
@@ -51,236 +70,233 @@
 
 ## 2026-06-27 · 云端同步、AI 与响应式布局修复
 ### 改进
-- 新用户与本地预览默认进入浅色模式，保持 NavoPath 纸面风格的默认阅读体验。
-- 横屏窄窗口继续保持“今日候选在左、时间轴在右”的执行布局；竖屏才启用任务/日程单视图切换。
-- 设置页的云端同步、强调色、Navo AI 与账户区域改为更扁平的纸面分组，深色模式下按钮、弹窗和底部提示对比度更稳定。
-- Account 设置页新增独立订阅栏，当前 Free Plan 显示为开发测试期开放 Pro 权益，并把退出登录、关于与删除账号收进“更多”。
-- Account 设置页的方案权限细化为 Free、Supporter 与 Pro，并新增爱发电捐赠入口；网站首页也提供轻量捐赠入口。
-- Plugins / MCP 使用教程改为更新日志式纸面文档，明确当前仅支持随应用发布的官方内置插件。
-- 官方插件新增中文名称、说明、配置项和启用后说明，启用后会直接显示 Pomodoro、习惯打卡、本地天气徽章和任务笔记工具。
-- AI 模型 fallback 列表扩展到 DeepSeek、Qwen、GLM、Kimi、MiniMax、Step、Nex 和 Ling 系列。
-
+- 新用户与本地预览默认进�
+��
+色模式，保�?NavoPath 纸面风格的默认�
+读体验�?- 横屏窄窗口继续保持“今日候选在左、时间轴在右”的执行布局；竖屏才启用任务/日程单视图切换�?- 设置页的云端同步、强调色、Navo AI 与账户区域改为更扁平的纸面分组，深色模式下按钮、弹窗和底部提示对比度更稳定�?- Account 设置页新增独立订�
+栏，当�?Free Plan 显示为开发测试期开�?Pro 权益，并把退出登录、�
+�于与删除账号收进“更多”�?- Account 设置页的方案权限细化�?Free、Supporter �?Pro，并新增爱发电捐赠�
+�口；网站首页也提供轻量捐赠�
+�口�?- Plugins / MCP 使用教程改为更新日志式纸面文档，明确当前�
+支持随应用发布的官方�
+置插件�?- 官方插件新增中文名称、说明、�
+�置项和启用后说明，启用后会直接显�?Pomodoro、习惯打卡、本地天气徽章和任务笔记工�
+��?- AI 模型 fallback 列表扩展�?DeepSeek、Qwen、GLM、Kimi、MiniMax、Step、Nex �?Ling 系列�?
 ### 修复
-- 修复同一账号在新浏览器或重新安装桌面 app 后可能加载空数据的问题；云端 profile 读取失败时不再静默替换为空工作区，而是保留缓存并暴露错误。
-- 修复“Push to cloud / Pull from cloud”在桌面端被待保存队列静默跳过的问题；手动推送会先写完本地变更，手动拉取会明确以云端数据为准。
-- 修复 Navo AI 请求因模型或思考强度不兼容而持续失败的问题，并让 AI 记忆按当前中英文模式生成。
-- 修复 AI 对话框底部 Reasoning 控件、项目颜色调色盘自动关闭、Plan Suggestions 挡住三日/周视图日期、收起候选或全屏时未进入简洁显示等问题。
-- 修复部分模型不支持 JSON response_format 时导致 AI 请求直接失败的问题，Edge Function 会自动重试普通请求并保留稳定模型兜底。
-- 修复窄横屏三日/周视图下 Plan Suggestions 没有折叠成小日历按钮的问题。
-- 移除 Account 页 Cloud sync 重复标题，并给 About NavoPath 增加外部链接提示。
-- 修复三日/周视图下拖动或调整任务块时预览提示条可能偏移的问题；短任务和长任务现在使用同一套悬停显示的调整手柄逻辑，短任务悬停后也会显示所属项目。
-
+- 修复同一账号在新浏览器或重新安�
+桌面 app 后可能加载空数据的问题；云端 profile 读取失败时不再静默替换为空工作区，而是保留缓存并暴露错误�?- 修复“Push to cloud / Pull from cloud”在桌面端被�
+保存队列静默跳过的问题；手动推送会�
+�写完本地变更，手动拉取会明确以云端数据为准�?- 修复 Navo AI 请求因模型或思考强度不�
+�容而持续失败的问题，并�?AI 记忆按当前中英文模式生成�?- 修复 AI 对话框底�?Reasoning 控件、项目颜色调色盘自动�
+�闭、Plan Suggestions 挡住三日/周视图日期、收起候选或�
+�屏时未进�
+�简洁显示等问题�?- 修复部分模型不支�?JSON response_format 时导�?AI 请求直接失败的问题，Edge Function 会自动重试普通请求并保留稳定模型�
+�底�?- 修复窄横屏三�?周视图下 Plan Suggestions 没有折叠成小日历按钮的问题�?- 移除 Account �?Cloud sync 重复标题，并�?About NavoPath 增加外部链接提示�?- 修复三日/周视图下拖动或调整任务块时预览提示条可能偏移的问题；短任务和长任务现在使用同一套悬停显示的调整手柄逻辑，短任务悬停后也会显示所属项目�?
 ---
 
-## 2026-06-26 · 短任务时长调整、同步方向与更新检测
-
+## 2026-06-26 · 短任务时长调整、同步方向与更新检�?
 ### 改进
-- 设置 → 云端同步新增「推送到云端」「从云端拉取」两个方向按钮：可单独把本机数据上传到云端，或单独用云端数据覆盖本机，无需每次都执行双向合并，跨设备同步更可控。
-- 优化任务块调整手柄的视觉与交互：判定区域收窄为任务块宽度的四分之一并居中，避免遮挡标题；提示条改为更细的常驻指示线，悬停时高亮，减少视觉干扰。
-
+- 设置 �?云端同步新增「推送到云端」「从云端拉取」两个方向按钮：可单独把本机数据上传到云端，或单独用云端数据覆盖本机，无需每次都执行双向合并，跨设备同步更可控�?- 优化任务块调整手柄的视觉与交互：判定区域收窄为任务块宽度的四分之一并�
+中，避�
+�遮挡标题；提示条改为更细的常驻指示线，悬停时高亮，减少视觉干扰�?
 ### 修复
-- 修复重复创建后台窗口的问题：防止从托盘菜单或 app.activate 事件重复调用 createWindow() 时创建多个不可见窗口，确保应用始终只保留一个窗口。
-- 修复 15 分钟与 30 分钟短任务时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，调整手柄横向居中于任务块、悬停时清晰可见，且不再与拖动移动冲突。
-- 修复桌面应用检查更新始终提示「已是最新版本」的问题；此前的更新清单（latest.yml）版本号停留在旧版本，现已随每次发布正确生成，新版本发布后即可被准确检测到。
-
+- 修复重复创建后台窗口的问题：防止从托盘菜单或 app.activate 事件重复调用 createWindow() 时创建多个不可见窗口，确保应用始终只保留一个窗口�?- 修复 15 分钟�?30 分钟短任务时长无法调整的问题：短任务块现可在顶部与底部边缘拖拽缩放，调整手柄横向�
+中于任务块、悬停时�
+晰可见，且不再与拖动移动冲突�?- 修复桌面应用检查更新始终提示「已是最新版本」的问题；此前的更新�
+单（latest.yml）版本号停留在旧版本，现已随每次发布正确生成，新版本发布后即可被准确检测到�?
 ---
 
-## 2026-06-25 · 同步、本地备份与任务块填充
-
+## 2026-06-25 · 同步、本地备份与任务块填�
+?
 ### 改进
-- 设置 → 插件页面完成重构：所有插件卡片现由统一插件注册表驱动，「启用/停用」按钮真正写入设置并触发插件生命周期钩子；点击「配置」会弹出表单对话框编辑该插件的字段（番茄时长、城市、Markdown 开关等），保存后即时生效。
-- 同步按钮点击后现显示旋转加载动画，并根据结果给出明确反馈：同步完成、已是最新数据或同步失败均有对应提示，不再静默无响应。
-- 设置 → 外观新增「任务块颜色填充」开关：开启后时间轴任务块以归属项目色整块填充，任务名与悬停后的归属项目文字加上细微白色描边，在饱和色块上依旧清晰可读。
-- 每次打开桌面应用时自动将当前数据与设置导出为本地 JSON 快照（保留最近 10 份历史快照与一份最新副本），即便云端异常也不会丢失数据。
-- 桌面应用新增「开机自启动」开关（设置页），登录系统时可自动打开 NavoPath。
-- 桌面应用新增单实例锁，重复启动时会聚焦到已打开的窗口而非多开。
-- 时间轴短任务（15 分钟）标题字体最小提升至 12px 并启用抗锯齿渲染，解决文字模糊不清的问题；设置 → 外观新增"时间轴字体大小"滑块（85% – 130%），可在不同屏幕尺寸下自由调整。
-- 时间轴快速添加面板重构为单行紧凑布局：移除顶部时间显示区域，仅保留任务名输入框与确认勾选按钮，添加效率更高。
-- 时间轴左右翻页按钮宽度从 36px 扩大至 48px，并通过伪元素扩展横向触摸识别区域，减少误触与操作无效。
+- 设置 �?插件页面完成重构：所有插件卡片现由统一插件注册表驱动，「启�?停用」按钮真正写�
+�设置并触发插件生命周期钩子；点击「�
+�置」会弹出表单对话框编辑该插件的字段（番茄时长、城市、Markdown 开�
+�等），保存后即时生效�?- 同步按钮点击后现显示旋转加载动画，并根据结果给出明确反馈：同步完成、已是最新数据或同步失败均有对应提示，不再静默无响应�?- 设置 �?外观新增「任务块颜色填�
 
+」开�
+�：开启后时间轴任务块以归属项目色整块填�
+
+，任务名与悬停后的归属项目文字加上细微白色描边，在饱和色块上依旧�
+晰可读�?- 每次打开桌面应用时自动将当前数据与设置导出为本地 JSON 快�
+�（保留最�?10 份历史快�
+�与一份最新副本），即便云端异常也不会丢失数据�?- 桌面应用新增「开机自启动」开�
+�（设置页），登录系统时可自动打开 NavoPath�?- 桌面应用新增单实例锁，重复启动时会聚焦到已打开的窗口而非多开�?- 时间轴短任务�?5 分钟）标题字体最小提升至 12px 并启用抗锯齿渲染，解决文字模糊不�
+的问题；设�?�?外观新增"时间轴字体大�?滑块�?5% �?130%），可在不同屏幕尺寸下自由调整�?- 时间轴快速添加面板重构为单行紧凑布局：移除顶部时间显示区域，�
+保留任务名输�
+�框与确认勾选按钮，添加效率更高�?- 时间轴左右翻页按钮宽度从 36px 扩大�?48px，并通过伪�
+�素扩展横向触摸识别区域，减少误触与操作无效�?
 ### 修复
-- 修复任务块在「颜色填充」模式下完成时背景被替换为灰色的问题；现在完成态仅降低透明度并保留原项目色，删除线效果单独叠加，视觉一致性恢复。
-- 修复同步功能始终使用缓存数据、无法拉取服务器最新版本的问题；启动与刷新现在会强制拉取最新 profile，跨设备改动不再被本地缓存覆盖。
-- 修复短任务（15 分钟）调整手柄判定问题：短任务现在仅在块中心一条窄带可拖拽缩放，顶部与底部边缘回归拖动移动，避免误触改时长。
-- 修复已登录用户在云端 profile 查询失败时被强制进入本地预览模式、无法退出登录的问题；profile 查询失败现在降级为内存空数据，保持登录状态可用。
-- 修复运行时降级标志被持久化到 localStorage 导致应用永久困在预览模式的问题；降级现在仅在当前会话生效，重启后重新尝试云端后端，并清理旧版本残留的持久化标志。
-- 修复执行页候选任务卡片删除后任务重新出现的问题；所有删除路径现在统一使用 `dataRef.current` 读取最新数据，彻底消除 stale-closure 竞态。
-- 修复任务详情抽屉中删除任务后任务重新出现的问题。
-- 修复将任务转换为事件时删除原任务可能被恢复的问题。
-- 修复云端数据库查询失败时应用卡在加载页无法进入的问题；现在会自动降级到本地预览模式，保证工作区始终可用。
-- 修复应用被永久困在本地预览模式的问题；运行时降级现在仅在当前会话生效，下次启动会重新尝试云端后端。
-- 修复 15 分钟单行任务在时间轴中标题被调整手柄和勾选框遮挡的问题；标题现在占据完整高度并垂直居中，不再被裁切。
-- 修复 `package.json` 描述字段的编码乱码问题。
+- 修复任务块在「颜色填�
 
+」模式下完成时背景被替换为灰色的问题；现在完成态�
+降低透明度并保留原项目色，删除线效果单独叠加，视觉一致性恢复�?- 修复同步功能始终使用缓存数据、无法拉取服务器最新版本的问题；启动与刷新现在会强制拉取最�?profile，跨设备改动不再被本地缓存覆盖�?- 修复短任务（15 分钟）调整手柄判定问题：短任务现在�
+在块中心一条窄带可拖拽缩放，顶部与底部边缘回归拖动移动，避�
+�误触改时长�?- 修复已登录用户在云端 profile 查询失败时被强制进�
+�本地预览模式、无法退出登录的问题；profile 查询失败现在降级为�
+存空数据，保持登录状态可用�?- 修复运行时降级标志被持�
+化到 localStorage 导致应用永�
+困在预览模式的问题；降级现在�
+在当前会话生效，重启后重新尝试云端后端，并�
+理旧版本残留的持�
+化标志�?- 修复执行页候选任务卡片删除后任务重新出现的问题；所有删除路径现在统一使用 `dataRef.current` 读取最新数据，彻底消除 stale-closure 竞态�?- 修复任务详�
+抽屉中删除任务后任务重新出现的问题�?- 修复将任务转换为事件时删除原任务可能被恢复的问题�?- 修复云端数据库查询失败时应用卡在加载页无法进�
+�的问题；现在会自动降级到本地预览模式，保证工作区始终可用�?- 修复应用被永�
+困在本地预览模式的问题；运行时降级现在�
+在当前会话生效，下次启动会重新尝试云端后端�?- 修复 15 分钟单行任务在时间轴中标题被调整手柄和勾选框遮挡的问题；标题现在占据完整高度并垂直�
+中，不再被裁切�?- 修复 `package.json` 描述字段的编码乱码问题�?
 ---
 
-访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
-
-## 2026-06-23 · 更可靠的桌面登录与同步
-
+访问 [www.navopath.com](https://www.navopath.com) 来开�?NavoPath 之�
+�?
+## 2026-06-23 · 更可靠的桌面登录与同�?
 ### 改进
-- Windows 桌面端现在会使用系统加密存储长期保留登录会话，关闭应用或重启电脑后仍可直接进入工作区，主动退出登录后才会清除会话。
-- Windows 桌面端未登录时直接显示简洁的登录与注册页面，不再先展示网站介绍；网页端首页保持不变。
-- 多设备同步改为以最新版本合并，不再把本地数据固定覆盖到云端，其他设备新增的任务和计划不会再被误删。
-- 深色模式整体改为简约中性灰风格，移除蓝紫色调，文字、卡片与设置面板对比度更高，长时间使用更舒适。
-- 设置面板的强调色与导航项在深色模式下改为中性背景，去除蓝紫色高亮。
-- 左上角 NavoPath logo 在浅色与深色模式下都保持清晰，去除灰蒙蒙的反色滤镜。
-- 设置"一天开始时间"后时间轴会平滑滚动到对应时刻并显示确认提示。
-- 默认字号略微调大，阅读更舒适。
-
+- Windows 桌面端现在会使用系统加密存储长期保留登录会话，�
+�闭应用或重启电脑后仍可直接进�
+�工作区，主动退出登录后才会�
+除会话�?- Windows 桌面端未登录时直接显示简洁的登录与注册页面，不再�
+�展示网站介绍；网页端首页保持不变�?- 多设备同步改为以最新版本合并，不再把本地数据固定覆盖到云端，�
+�他设备新增的任务和计划不会再被误删�?- 深色模式整体改为简约中性灰风格，移除蓝紫色调，文字、卡片与设置面板对比度更高，长时间使用更舒适�?- 设置面板的强调色与导航项在深色模式下改为中性背景，去除蓝紫色高亮�?- 左上�?NavoPath logo 在�
+色与深色模式下都保持�
+晰，去除灰蒙蒙的反色滤镜�?- 设置"一天开始时�?后时间轴会平滑滚动到对应时刻并显示确认提示�?- 默认字号略微调大，�
+读更舒适�?
 ### 修复
-- 修复三日、周和月视图切换按钮被时间轴左右翻页热区遮挡而无法点击的问题。
-- 修复桌面端下载更新后点击"重启并安装"会触发 `quitAndInstall is not a function` 异常、导致无法进入安装流程的问题。
-- 修复深色模式下部分文字仍为黑色难以辨认的问题。
-- 修复时间轴中 15 分钟时长的任务标题显示不全的问题。
-
+- 修复三日、周和月视图切换按钮被时间轴左右翻页热区遮挡而无法点击的问题�?- 修复桌面端下载更新后点击"重启并安�?会触�?`quitAndInstall is not a function` 异常、导致无法进�
+�安�
+流程的问题�?- 修复深色模式下部分文字仍为黑色难以辨认的问题�?- 修复时间轴中 15 分钟时长的任务标题显示不�
+�的问题�?
 ---
 
-访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
-
-## 2026-06-24 · 时间轴快速添加与短任务修复
-
+访问 [www.navopath.com](https://www.navopath.com) 来开�?NavoPath 之�
+�?
+## 2026-06-24 · 时间轴快速添加与短任务修�?
 ### 改进
-- 时间轴快速添加弹窗重新设计为统一卡片样式，包含时间标签、输入框与项目选择菜单，视觉更连贯，不再出现割裂的浮层。
-- "一天开始时间"设置现在支持分钟精度（如 09:30），时间轴网格、任务块、当前时间线与拖放定位均按精确起点对齐。
-- 时间轴同一时段超过 4 个重叠任务时不再被压缩到同一列，每个任务都会获得独立列，不再互相遮挡。
-
+- 时间轴快速添加弹窗重新设计为统一卡片样式，�
+含时间标签、输�
+�框与项目选择菜单，视觉更连贯，不再出现割裂的浮层�?- "一天开始时�?设置现在支持分钟精度（如 09:30），时间轴网格、任务块、当前时间线与拖放定位均按精确起点对齐�?- 时间轴同一时段�
+过 4 个重叠任务时不再被压缩到同一列，每个任务都会获得独立列，不再互相遮挡�?
 ### 修复
-- 修复点击时间轴上已有任务块时仍会弹出快速添加面板的问题；现在仅在点击空白时段时触发。
-- 修复 15 分钟时长的短任务标题被截断、调整大小手柄不可操作的问题。
-- 修复快速添加任务后面板不关闭、持续残留的问题；现在保存后面板自动关闭并记住上次选择的项目。
-- 修复修改"一天开始时间"后快速点击添加任务导致时间轴错位的问题。
-- 修复规划页面删除子任务后子任务暂时消失又重新出现、无法成功删除的问题。
-- 修复规划页面添加大量子任务后按钮与图标布局错位的问题。
-- 修复三日、周视图中点击某天快速添加任务后，被点击的当天会跳到视图最左侧的问题；现在若目标日期已在可见范围内就保持原位。
-- 修复时间轴左右翻页切换日期失灵的问题。
-- 修复深色模式下快速添加确认按钮变成白色、几乎看不见的问题，现在恢复为强调色按钮。
-
+- 修复点击时间轴上已有任务块时仍会弹出快速添加面板的问题；现在�
+在点击空白时段时触发�?- 修复 15 分钟时长的短任务标题被截断、调整大小手柄不可操作的问题�?- 修复快速添加任务后面板不�
+�闭、持续残留的问题；现在保存后面板自动�
+�闭并记住上次选择的项目�?- 修复修改"一天开始时�?后快速点击添加任务导致时间轴错位的问题�?- 修复规划页面删除子任务后子任务暂时消失又重新出现、无法成功删除的问题�?- 修复规划页面添加大量子任务后按钮与图标布局错位的问题�?- 修复三日、周视图中点击某天快速添加任务后，被点击的当天会跳到视图最左侧的问题；现在若目标日期已在可见范围�
+就保持原位�?- 修复时间轴左右翻页切换日期失灵的问题�?- 修复深色模式下快速添加确认按钮变成白色、几乎看不见的问题，现在恢复为强调色按钮�?
 ---
 
-访问 [www.navopath.com](https://www.navopath.com) 来开启 NavoPath 之旅！
-
-## 2026-06-22 · 桌面端体验全面提升
-
-### 新功能
-- 桌面端新增系统托盘后台运行能力，关闭窗口后应用驻留托盘，点击托盘图标可恢复窗口。
-- 设置 → 外观新增"一天开始时间"选项，默认 0:00，可自定义一天起始时刻。
-- 全屏模式支持按 ESC 键快速退出。
-- 网页端与桌面端默认每小时自动同步一次云端任务、计划与设置；可在设置 → 账户 → 云端同步里改为每 15 分钟、每 6 小时、每 24 小时，或关闭自动同步、只保留手动同步。
-- 设置 → 账户新增"立即同步"按钮，可随时把本地修改推上云端并拉回最新版本，同步过程中按钮显示"正在同步"并被禁用。
-- 同步时间会被记录并跟随账户同步到所有设备，账户页会显示"刚刚 / N 分钟前 / N 小时前"相对时间与绝对时间，方便查看上次同步时间。
-
+访问 [www.navopath.com](https://www.navopath.com) 来开�?NavoPath 之�
+�?
+## 2026-06-22 · 桌面端体验�
+�面提�?
+### 新功�?- 桌面端新增系统托盘后台运行能力，�
+�闭窗口后应用驻留托盘，点击托盘图标可恢复窗口�?- 设置 �?外观新增"一天开始时�?选项，默�?0:00，可自定义一天起始时刻�?- �
+�屏模式支持�?ESC 键快速退出�?- 网页端与桌面端默认每小时自动同步一次云端任务、计划与设置；可在设�?�?账户 �?云端同步里改为每 15 分钟、每 6 小时、每 24 小时，或�
+�闭自动同步、只保留手动同步�?- 设置 �?账户新增"立即同步"按钮，可随时把本地修改推上云端并拉回最新版本，同步过程中按钮显�?正在同步"并被禁用�?- 同步时间会被记录并跟随账户同步到所有设备，账户页会显示"刚刚 / N 分钟�?/ N 小时�?相对时间与绝对时间，方便查看上次同步时间�?
 ### 改进
-- 桌面端 AI 功能改为优先使用本地 DeepSeek IPC 通道，网络异常时自动回退到云端 Edge Function。
-- "明确下一步"按钮新增加载状态和完成提示，点击后可见"生成中…"动画和结果通知。
-- 添加栏 Task / Project 切换按钮改为两等分占满全部横向空间。
-- 设置中强调色区域新增分隔线和分类标题，视觉层次更清晰。
-- 去除设置中强调色选择框的多余阴影。
-- 三日视图展开时勾选框与任务名不再重叠，短任务块布局更紧凑。
-- 时间轴 24:00 底部不再留有大段空白，时间轴紧贴底部结束。
-- Plan Suggestions 按钮缩小并左移，不再遮挡三日和周视图最左侧的日期。
-- 浅色模式下时间轴任务勾选确认色改为黑色，对比度更佳。
-- 今日候选标题和候选任务名加粗显示。
-- 时间轴左右切换按钮改为整个左侧/右侧纵向区域均可触发，操作更便捷。
-- 横屏模式左上角 NavoPath logo 去除外围描边并放大图标。
-- Planning 区域改用纸面层级风格，背景与 Execute 模式统一，去除灰色割裂感。
-- 桌面应用图标使用白色 N 表面、黑色立体阴影和透明外围，在浅色与深色系统界面中都保持清晰。
-- 收起今日候选后，三日、周和月视图会统一进入简洁阅读模式。
-- 周视图中 15 分钟长度的任务块标题现在清晰可读，去掉了多余的勾选与缩进，使短时长块也能在窄列里完整显示。
-
+- 桌面�?AI 功能改为优�
+�使用本地 DeepSeek IPC 通道，网络异常时自动回退到云�?Edge Function�?- "明确下一�?按钮新增加载状态和完成提示，点击后可见"生成中�?动画和结果通知�?- 添加�?Task / Project 切换按钮改为两等分占满�
+�部横向空间�?- 设置中强调色区域新增分隔线和分类标题，视觉层次更�
+晰�?- 去除设置中强调色选择框的多余阴影�?- 三日视图展开时勾选框与任务名不再重叠，短任务块布局更紧凑�?- 时间�?24:00 底部不再留有大段空白，时间轴紧贴底部结束�?- Plan Suggestions 按钮缩小并左移，不再遮挡三日和周视图最左侧的日期�?- �
+色模式下时间轴任务勾选确认色改为黑色，对比度更佳�?- 今日候选标题和候选任务名加粗显示�?- 时间轴左右切换按钮改为整个左�?右侧纵向区域均可触发，操作更便捷�?- 横屏模式左上�?NavoPath logo 去除外围描边并放大图标�?- Planning 区域改用纸面层级风格，背景与 Execute 模式统一，去除灰色割裂感�?- 桌面应用图标使用白色 N 表面、黑色立体阴影和透明外围，在�
+色与深色系统界面中都保持�
+晰�?- 收起今日候选后，三日、周和月视图会统一进�
+�简洁�
+读模式�?- 周视图中 15 分钟长度的任务块标题现在�
+晰可读，去掉了多余的勾选与缩进，使短时长块也能在窄列里完整显示�?
 ### 修复
-- 修复时间轴全屏后仍受普通工作区高度约束、顶部留下大块空白的问题；全屏现在会铺满整个可用视口。
-- "查看发布说明"现在稳定打开应用内更新日志，不再依赖临时或未标记的 GitHub 发布地址。
-- 修复单日时间轴在当日未添加任何任务时，0:00 顶部与全天栏下方出现大段空白的问题；0:00 现在紧贴在全天栏下方。
-
-## 1.2.1 · 图标重绘与启动加速
+- 修复时间轴�
+�屏后仍受普通工作区高度约束、顶部留下大块空白的问题；�
+�屏现在会铺满整个可用视口�?- "查看发布说明"现在稳定打开应用�
+更新日志，不再依赖临时或未标记�?GitHub 发布地址�?- 修复单日时间轴在当日未添加任何任务时�?:00 顶部与�
+�天栏下方出现大段空白的问题；0:00 现在紧贴在�
+�天栏下方�?
+## 1.2.1 · 图标重绘与启动加�?
+### 改进
+- 桌面应用图标重绘为涂鸦风�?N（白色字�?+ 黑色 3D 阴影 + 透明背景），与参考图一致�?- Electron 启动速度优化：延迟加�?electron-updater、crypto 和智能备注模板，窗口创建优�
+�级提升�?
+## 1.2.0 · 图标升级与安�
+�
+瘦身
 
 ### 改进
-- 桌面应用图标重绘为涂鸦风格 N（白色字母 + 黑色 3D 阴影 + 透明背景），与参考图一致。
-- Electron 启动速度优化：延迟加载 electron-updater、crypto 和智能备注模板，窗口创建优先级提升。
+- 应用图标 N 字母改为白色填�
 
-## 1.2.0 · 图标升级与安装包瘦身
-
-### 改进
-- 应用图标 N 字母改为白色填充，与深色背景和阴影形成清晰区分。
-- Windows 安装包体积从 132 MB 缩小至 92 MB（-30%），app.asar 从 143 MB 降至 6.5 MB（-95%）。
-
+，与深色背景和阴影形成�
+晰区分�?- Windows 安�
+�
+体积从 132 MB 缩小�?92 MB�?30%），app.asar �?143 MB 降至 6.5 MB�?95%）�?
 ### 修复
-- AI 助手移除串行 Router 请求以避免 Edge Function 超时；默认改用稳定的 DeepSeek-V3.2 模型，V4 或其他模型失败时自动回退，旧 V4 设置自动迁移。
-
+- AI 助手移除串行 Router 请求以避�
+?Edge Function �
+时；默认改用稳定的 DeepSeek-V3.2 模型，V4 或�
+�他模型失败时自动回退，旧 V4 设置自动迁移�?
 ## 2026-06-21 · 连续年度日历
 
-### 新功能
-- 点击工作区顶部的月份和年份可打开连续年度日历，并通过上一年、下一年、回到今天或任意日期直接导航。
-- 官网与 Web 工作区设置新增最新版 Windows 安装包下载入口；桌面应用每 24 小时自动检查更新，也支持手动下载并重启安装。
-
+### 新功�?- 点击工作区顶部的月份和年份可打开连续年度日历，并通过上一年、下一年、回到今天或任意日期直接导航�?- 官网�?Web 工作区设置新增最新版 Windows 安�
+�
+下载�
+�口；桌面应用�?24 小时自动检查更新，也支持手动下载并重启安�
+�?
 ### 改进
-- 年度日历在横屏下保留今日候选任务，在竖屏下使用全宽月份画布并继续显示主屏的执行、规划与添加工具坞；当前月份、所选日期、今天和已有安排均有清晰标记。
-- 年度日历会自动定位当前月份，切换年份或横竖屏方向时保持正在查看的月份，并继承当前页面的明暗主题与交互强调色。
-- Windows 桌面应用现在使用与网页端相同的账户和云端工作区，登录同一账户即可同步任务、日程与设置。
-- Windows 桌面应用现在始终直接进入 `/app` 工作区，不再在应用窗口中显示官网首页；窗口、可执行文件、安装器与快捷方式统一使用 NavoPath 名称和品牌图标。
-- 竖屏时间轴任务改为短暂长按后才可拖动，并缩窄日期切换箭头的横向触控区域。
-- Windows 安装包体积大幅缩小，下载与安装更快捷；自动更新、PDF、DOCX、图片 OCR 与 Supabase 同步等功能全部保留。
-
+- 年度日历在横屏下保留今日候选任务，在竖屏下使用�
+�宽月份画布并继续显示主屏的执行、规划与添加工�
+�坞；当前月份、所选日期、今天和已有安排均有�
+晰标记�?- 年度日历会自动定位当前月份，切换年份或横竖屏方向时保持正在查看的月份，并继承当前页面的明暗主题与交互强调色�?- Windows 桌面应用现在使用与网页端相同的账户和云端工作区，登录同一账户即可同步任务、日程与设置�?- Windows 桌面应用现在始终直接进�
+� `/app` 工作区，不再在应用窗口中显示官网首页；窗口、可执行文件、安�
+器与快捷方式统一使用 NavoPath 名称和品牌图标�?- 竖屏时间轴任务改为短暂长按后才可拖动，并缩窄日期切换箭头的横向触控区域�?- Windows 安�
+�
+体积大�
+缩小，下载与安�
+更快捷；自动更新、PDF、DOCX、图�?OCR �?Supabase 同步等功能�
+�部保留�?
 ### 修复
-- 修复竖屏快速添加中的归属项目列表被页头遮挡、任务标题输入框未适配深色模式，以及任务或事件详情缺少明确退出按钮的问题。
-
-## 2026-06-20 · 更可靠的排程与连接
-
-### 新功能
-- 设置中的 MCP 分区现在直接显示服务地址、客户端配置和可复制的个人访问令牌。
-- 竖屏工作区新增底部模式工具坞、顶部快速添加和可展开的 Navo AI 输入。
-
+- 修复竖屏快速添加中的归属项目列表被页头遮挡、任务标题输�
+�框未适�
+�深色模式，以及任务或事件详�
+缺少明确退出按钮的问题�?
+## 2026-06-20 · 更可靠的排程与连�?
+### 新功�?- 设置中的 MCP 分区现在直接显示服务地址、客户端�
+�置和可复制的个人访问令牌�?- 竖屏工作区新增底部模式工�
+�坞、顶部快速添加和可展开�?Navo AI 输�
+��?
 ### 改进
-- 官网现在固定使用根路径，登录、注册、邮箱确认和密码重置后统一进入 `/app` 工作区。
-- 设置改为清晰的页面、Navo AI、MCP 和账户分区导航，并适配桌面与移动端。
-- 整个右侧日历面板都可驱动时间轴滚动，全天栏、标题和视图控件不再阻断滚轮操作。
-- 跨设备同步以云端为基线，只重放明确尚未上传的本地修改，并在保存后接收排队的实时更新。
-- 候选任务、全天任务和时间块使用一致的拖动反馈；全天任务可像 Trevor AI 一样直接拖回今日候选，拖动纸片会明确显示当前落点。
-- “关于 NavoPath”现在直接打开更新日志；日志默认跟随账户语言，并可在页面右上角单独切换。
-- Execute 在窄屏下改为任务与日程单画布切换，并提供适合手机的日视图和月视图。
-- Planning 移除临时候选篮，任务和子任务可从树中直接加入今日候选并撤销。
-- 竖屏布局改为仅在 900px 以下启用；Navo AI 移到左上角图标，计划建议并入对话面板，底部工具坞收敛为模式切换与新增。
-- 竖屏日程控件紧贴日期并以单按钮切换日/月视图；从任务画布拖动候选任务时会自动进入时间轴继续选择落点。
-- 竖屏时间轴的日期严格居中，日期切换箭头移到 Day/Month 按钮左侧；时间块拖到左侧刻度区可直接放回今日候选。
-- 竖屏头部与底部工具坞移除可见控件边框，Navo 图标更靠左并略微放大，新增按钮使用更完整的圆形轮廓。
-- 竖屏 Day 控件改为视图菜单，可直接选择天、3 天、周和月；时间轴增加底部滚动安全空间，23:00 后的落点不再被工具坞遮挡。
-
+- 官网现在固定使用根路径，登录、注册、邮箱确认和密码重置后统一进�
+� `/app` 工作区�?- 设置改为�
+晰的页面、Navo AI、MCP 和账户分区导航，并适�
+�桌面与移动端�?- 整个右侧日历面板都可驱动时间轴滚动，�
+�天栏、标题和视图控件不再阻断滚轮操作�?- 跨设备同步以云端为基线，只重放明确尚未上传的本地修改，并在保存后接收排队的实时更新�?- 候选任务、�
+�天任务和时间块使用一致的拖动反馈；�
+�天任务可�?Trevor AI 一样直接拖回今日候选，拖动纸片会明确显示当前落点�?- “�
+��?NavoPath”现在直接打开更新日志；日志默认跟随账户语言，并可在页面右上角单独切换�?- Execute 在窄屏下改为任务与日程单画布切换，并提供适合手机的日视图和月视图�?- Planning 移除临时候选篮，任务和子任务可从树中直接加�
+�今日候选并撤销�?- 竖屏布局改为�
+在 900px 以下启用；Navo AI 移到左上角图标，计划建议并�
+�对话面板，底部工�
+�坞收敛为模式切换与新增�?- 竖屏日程控件紧贴日期并以单按钮切换日/月视图；从任务画布拖动候选任务时会自动进�
+�时间轴继续选择落点�?- 竖屏时间轴的日期严格�
+中，日期切换箭头移�?Day/Month 按钮左侧；时间块拖到左侧刻度区可直接放回今日候选�?- 竖屏头部与底部工�
+�坞移除可见控件边框，Navo 图标更靠左并略微放大，新增按钮使用更完整的圆形轮廓�?- 竖屏 Day 控件改为视图菜单，可直接选择天�? 天、周和月；时间轴增加底部滚动安�
+�空间�?3:00 后的落点不再被工�
+�坞遮挡�?
 ### 修复
-- 修复 MCP 配置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题。
-- 修复全天任务无法稳定拖回时间轴或今日候选，以及悬停在全天栏时底部时间轴仍继续滚动的问题；全天栏保持干净的无灰底、无重叠色条样式。
-
-## 2026-06-19 · 更清晰的任务工作区
-
-### 新功能
-- AI 对话新增分段思考提示、可用模型的思考模式选择，以及可恢复的任务安排确认。
-- MCP 升级为标准 Streamable HTTP 服务，并提供完整的客户端配置指南。
-
+- 修复 MCP �
+�置说明不显示、令牌生成失败后无反馈，以及中文生成按钮错位的问题�?- 修复�
+�天任务无法稳定拖回时间轴或今日候选，以及悬停在�
+�天栏时底部时间轴仍继续滚动的问题；�
+�天栏保持干净的无灰底、无重叠色条样式�?
+## 2026-06-19 · 更�
+晰的任务工作�?
+### 新功�?- AI 对话新增分段思考提示、可用模型的思考模式选择，以及可恢复的任务安排确认�?- MCP 升级为标�?Streamable HTTP 服务，并提供完整的客户端�
+�置指南�?
 ### 改进
-- 设置按页面、Navo AI、MCP 和账户重新分类，面板更宽，勾选样式与任务完成保持一致。
-- 时间轴和 AI 对话恢复自然的触控板与惯性滚动；启动时直接显示执行页骨架。
-- 浅色模式使用炭黑文字，深色模式使用暖米色文字和默认交互强调。
-- 旧事件会自动转为时间任务，新工作区统一使用任务完成计划与排程。
-- 多设备同步增加版本冲突合并、删除记录、离线重试和实时更新。
-
+- 设置按页面、Navo AI、MCP 和账户重新分类，面板更宽，勾选样式与任务完成保持一致�?- 时间轴和 AI 对话恢复自然的触控板与惯性滚动；启动时直接显示执行页骨架�?- �
+色模式使用炭黑文字，深色模式使用暖米色文字和默认交互强调�?- 旧事件会自动转为时间任务，新工作区统一使用任务完成计划与排程�?- 多设备同步增加版本冲突合并、删除记录、离线重试和实时更新�?
 ### 修复
-- 修复任务编辑页无法添加子任务，以及多行任务名输入框高度固定的问题。
-- 修复 AI 任务安排确认在会话恢复后丢失的问题。
-
-## 2026-06-18 · 工作区流程
-
-### 新功能
-- Planning 支持项目、任务和子任务拖动排序及跨项目移动。
-- 月视图支持连续滚动浏览日期。
-- 今日候选可以将任务移回 Planning。
-- 新增远程 HTTP MCP 和个人访问令牌管理。
-
+- 修复任务编辑页无法添加子任务，以及多行任务名输�
+�框高度固定的问题�?- 修复 AI 任务安排确认在会话恢复后丢失的问题�?
+## 2026-06-18 · 工作区流�?
+### 新功�?- Planning 支持项目、任务和子任务拖动排序及跨项目移动�?- 月视图支持连续滚动浏览日期�?- 今日候选可以将任务移回 Planning�?- 新增远程 HTTP MCP 和个人访问令牌管理�?
 ### 改进
-- 输入文字时可直接打开添加任务栏。
-- 新手指南覆盖完整工作流并可随时重新开始。
-- AI 使用用户本地时区判断相对日期。
-- 修复拖动时间轴任务时意外选中文字的问题。
-
+- 输�
+�文字时可直接打开添加任务栏�?- 新手指南覆盖完整工作流并可随时重新开始�?- AI 使用用户本地时区判断相对日期�?- 修复拖动时间轴任务时意外选中文字的问题�?
 # NavoPath Changelog
 
 ## 2026-07-01 · Planning views and task timer restored
@@ -289,7 +305,7 @@
 - Planning view now offers Kanban (To do / Doing / Done drag-and-drop), Eisenhower four-quadrant (important × urgent drag-and-drop), and List views, with a view switcher and filter panel (project, status, importance, urgency).
 - Task-level timer: start timing from a candidate task; the header center shows the active timer task and elapsed time with pause, save, and discard controls; saving writes a time entry.
 - Focus overlay: full-screen timer display with Stopwatch / Pomodoro / Flowtime mode switching for focused execution.
-- Settings → Features section: toggle Kanban, Quadrant, and List views independently, and set the default focus mode plus idle threshold.
+- Settings �?Features section: toggle Kanban, Quadrant, and List views independently, and set the default focus mode plus idle threshold.
 
 ### Improved
 - Planning filter bar adds a "Show completed" toggle and a "Filter" panel entry; the view switcher button group adopts the paper style.
@@ -331,7 +347,7 @@
 ## 2026-06-26 · Short-block resize, sync direction, and update detection
 
 ### Improvements
-- Settings → Cloud sync now exposes dedicated "Push to cloud" and "Pull from cloud" direction buttons: upload this device's data alone, or overwrite this device with cloud data alone, without forcing a bidirectional merge every time — cross-device sync is now fully under your control.
+- Settings �?Cloud sync now exposes dedicated "Push to cloud" and "Pull from cloud" direction buttons: upload this device's data alone, or overwrite this device with cloud data alone, without forcing a bidirectional merge every time �?cross-device sync is now fully under your control.
 - Refined task-block resize handles: the hit area is now a centered quarter of the block width so it never crowds the title, and the indicator is a thinner always-visible line that brightens on hover for less visual clutter.
 
 ### Fixes
@@ -344,11 +360,11 @@
 ## 2026-06-25 · Short-block display and deletion stability
 
 ### Improved
-- Settings → Plugins page rebuilt on a unified plugin registry: the Enable/Disable buttons now persist to settings and fire plugin lifecycle hooks, and Configure opens a form dialog to edit that plugin's fields (focus minutes, city, markdown toggle, etc.) with instant effect.
+- Settings �?Plugins page rebuilt on a unified plugin registry: the Enable/Disable buttons now persist to settings and fire plugin lifecycle hooks, and Configure opens a form dialog to edit that plugin's fields (focus minutes, city, markdown toggle, etc.) with instant effect.
 - The Sync button now shows a spinner during the operation and surfaces clear results: "Sync complete", "Already up to date", or a failure toast, instead of silently doing nothing.
 - Added a "Launch at startup" toggle in Settings so NavoPath can open automatically when you sign in to Windows.
 - Added a single-instance lock to the desktop app; launching a second copy now focuses the running window instead of opening a duplicate.
-- Raised the minimum font size for 15-minute short task titles to 12px with antialiasing enabled, fixing blurry text; added a "Timeline font size" slider (85% – 130%) under Settings → Appearance so the size can be tuned for any screen.
+- Raised the minimum font size for 15-minute short task titles to 12px with antialiasing enabled, fixing blurry text; added a "Timeline font size" slider (85% �?130%) under Settings �?Appearance so the size can be tuned for any screen.
 - Redesigned the timeline quick-add popup as a single-line compact layout: removed the top time-display area, keeping only the task-name input and a confirm check button for faster entry.
 - Widened the timeline left/right navigation buttons from 36px to 48px and extended the horizontal touch hit area via a pseudo-element, reducing missed taps and misfires.
 
@@ -392,9 +408,9 @@ Visit [www.navopath.com](https://www.navopath.com) to start your NavoPath journe
 ## 2026-06-24 · Timeline quick-add and short-block fixes
 
 ### Improved
-- Redesigned the timeline quick-add popup as a unified card with a time label, input field, and project picker menu for a more cohesive look — no more fragmented floating layers.
+- Redesigned the timeline quick-add popup as a unified card with a time label, input field, and project picker menu for a more cohesive look �?no more fragmented floating layers.
 - The "Day start time" setting now supports minute precision (e.g. 09:30); the timeline grid, task blocks, now-line, and drop targeting all align to the exact start.
-- Overlapping tasks in the same time slot are no longer capped at 4 columns — every task gets its own column and none are hidden behind another.
+- Overlapping tasks in the same time slot are no longer capped at 4 columns �?every task gets its own column and none are hidden behind another.
 
 ### Fixed
 - Fixed the quick-add panel appearing when clicking on an existing task block; it now only triggers on blank timeline slots.
@@ -414,8 +430,8 @@ Visit [www.navopath.com](https://www.navopath.com) to start your NavoPath journe
 ## 2026-06-22 · Clearer week view and desktop icon
 
 ### Added
-- The web and desktop apps now auto-sync cloud tasks, schedules, and settings every hour by default; open Settings → Account → Cloud sync to change it to every 15 minutes, every 6 hours, every 24 hours, or to disable auto-sync and rely on manual sync only.
-- Settings → Account now includes a "Sync now" button that pushes local changes to the cloud and pulls the latest version on demand; the button shows "Syncing…" and is disabled while a sync is in flight.
+- The web and desktop apps now auto-sync cloud tasks, schedules, and settings every hour by default; open Settings �?Account �?Cloud sync to change it to every 15 minutes, every 6 hours, every 24 hours, or to disable auto-sync and rely on manual sync only.
+- Settings �?Account now includes a "Sync now" button that pushes local changes to the cloud and pulls the latest version on demand; the button shows "Syncing�? and is disabled while a sync is in flight.
 - The last sync time is recorded and synced with the account across devices, and the Account page shows a relative timestamp ("Just now / N minutes ago / N hours ago") plus the absolute date and time.
 
 ### Improved
