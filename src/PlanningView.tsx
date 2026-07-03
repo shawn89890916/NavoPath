@@ -1172,60 +1172,63 @@ export default function PlanningView(props: {
       {dialog.host}
       <div className="df-planning-body">
         <section className="df-mindmap no-root">
-          <div className="df-tree-wrap">
-          <div className="df-planning-filter-bar">
-            <div className="df-planning-filter-menu">
-              <button
-                type="button"
-                className={`df-filter-trigger${filterOpen ? " active" : ""}${hasActiveFilters ? " has-active" : ""}`}
-                aria-expanded={filterOpen}
-                onClick={() => setFilterOpen((open) => !open)}
-              >
-                <svg viewBox="0 0 18 18" aria-hidden="true">
-                  <path d="M3 4h12M5 9h8M7 14h4" />
-                </svg>
-                <span>{props.lang === "zh" ? "Filter" : "Filter"}</span>
-                {hasActiveFilters && <b>{filterProjects.length + filterWorkflows.length + filterImportances.length + filterUrgencies.length + (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0)}</b>}
-              </button>
-              {filterOpen && (
-                <div className="df-filter-panel" onClick={(e) => e.stopPropagation()}>
-                  <header>
-                    <strong>{props.lang === "zh" ? "Task filters" : "Task filters"}</strong>
-                    {hasActiveFilters && (
-                      <button type="button" onClick={() => { setFilterProjects([]); setFilterWorkflows([]); setFilterImportances([]); setFilterUrgencies([]); }}>
-                        {props.lang === "zh" ? "Reset" : "Reset"}
-                      </button>
-                    )}
-                  </header>
-                  {filterChips.map((chip) => (
-                    <section key={chip.key} className="df-filter-section">
-                      <div className="df-filter-section-head">
-                        <span>{chip.label}</span>
-                        <small>{chip.selected.length > 0 ? chip.selected.join(", ") : (props.lang === "zh" ? "All" : "All")}</small>
-                      </div>
-                      <div className="df-filter-options">
-                        {chip.options.map((opt) => (
-                          <label key={opt.value} className={`df-filter-option${opt.checked ? " checked" : ""}`}>
-                            <input type="checkbox" checked={opt.checked} onChange={opt.onToggle} />
-                            <span>{opt.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </section>
+          <aside className="df-planning-sidebar" aria-label={props.lang === "zh" ? "规划工具" : "Planning tools"}>
+            <div className="df-planning-filter-bar">
+              <div className="df-planning-filter-menu">
+                <button
+                  type="button"
+                  className={`df-filter-trigger${filterOpen ? " active" : ""}${hasActiveFilters ? " has-active" : ""}`}
+                  aria-expanded={filterOpen}
+                  aria-label={props.lang === "zh" ? "Filter" : "Filter"}
+                  title={props.lang === "zh" ? "Filter" : "Filter"}
+                  onClick={() => setFilterOpen((open) => !open)}
+                >
+                  <svg viewBox="0 0 18 18" aria-hidden="true">
+                    <path d="M3 4h12M5 9h8M7 14h4" />
+                  </svg>
+                  {hasActiveFilters && <b>{filterProjects.length + filterWorkflows.length + filterImportances.length + filterUrgencies.length + (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0)}</b>}
+                </button>
+                {filterOpen && (
+                  <div className="df-filter-panel" onClick={(e) => e.stopPropagation()}>
+                    <header>
+                      <strong>{props.lang === "zh" ? "Task filters" : "Task filters"}</strong>
+                      {hasActiveFilters && (
+                        <button type="button" onClick={() => { setFilterProjects([]); setFilterWorkflows([]); setFilterImportances([]); setFilterUrgencies([]); }}>
+                          {props.lang === "zh" ? "Reset" : "Reset"}
+                        </button>
+                      )}
+                    </header>
+                    {filterChips.map((chip) => (
+                      <section key={chip.key} className="df-filter-section">
+                        <div className="df-filter-section-head">
+                          <span>{chip.label}</span>
+                          <small>{chip.selected.length > 0 ? chip.selected.join(", ") : (props.lang === "zh" ? "All" : "All")}</small>
+                        </div>
+                        <div className="df-filter-options">
+                          {chip.options.map((opt) => (
+                            <label key={opt.value} className={`df-filter-option${opt.checked ? " checked" : ""}`}>
+                              <input type="checkbox" checked={opt.checked} onChange={opt.onToggle} />
+                              <span>{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {availableModes.length > 1 && (
+                <div className="df-planning-view-switch">
+                  {availableModes.map((m) => (
+                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)}>
+                      {m === "tree" ? (props.lang === "zh" ? "Tree" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "Matrix" : "Matrix") : (props.lang === "zh" ? "List" : "List")}
+                    </button>
                   ))}
                 </div>
               )}
             </div>
-            {availableModes.length > 1 && (
-              <div className="df-planning-view-switch">
-                {availableModes.map((m) => (
-                  <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)}>
-                    {m === "tree" ? (props.lang === "zh" ? "Tree" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "Matrix" : "Matrix") : (props.lang === "zh" ? "List" : "List")}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          </aside>
+          <div className="df-tree-wrap">
 
           {viewMode === "kanban" && (
             <div className="df-kanban-board">

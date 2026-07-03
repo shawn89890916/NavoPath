@@ -6818,6 +6818,7 @@ body.df-timeline-pointer-drag * {
 /* 2026 planning card cleanup: one paper-card language, tighter controls. */
 .df-app .df-header-inner {
   grid-template-columns: auto minmax(260px, 1fr) auto !important;
+  position: relative !important;
 }
 .df-app .df-brand { justify-self: start !important; }
 .df-app .df-month-year-selector {
@@ -6835,31 +6836,63 @@ body.df-timeline-pointer-drag * {
   display: inline-flex !important;
   align-items: center !important;
 }
+.df-app .df-header-inner > .df-tabs-center {
+  position: fixed !important;
+  left: 50% !important;
+  top: 29px !important;
+  transform: translate(-50%, -50%) !important;
+  grid-column: auto !important;
+  justify-self: auto !important;
+  z-index: 4 !important;
+}
 
 .df-app.mode-planning .df-tree-wrap {
-  padding: 54px 64px 16px 42px !important;
+  padding: 34px 46px 16px 92px !important;
+}
+.df-planning-sidebar {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 36 !important;
+  width: 58px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 14px !important;
+  padding: 16px 0 0 !important;
+  border-right: 1px solid var(--paper-rule) !important;
+  background: color-mix(in srgb, var(--surface-main) 96%, transparent) !important;
+  pointer-events: none !important;
 }
 .df-planning-filter-bar {
-  position: absolute !important;
-  top: 14px !important;
-  right: 86px !important;
-  left: auto !important;
-  z-index: 35 !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  gap: 10px !important;
+  position: static !important;
+  z-index: auto !important;
+  display: grid !important;
+  align-items: start !important;
+  justify-items: stretch !important;
+  gap: 14px !important;
+  width: 100% !important;
+  pointer-events: auto !important;
 }
-.df-planning-filter-menu { position: relative; }
+.df-planning-filter-menu {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
 .df-filter-trigger {
-  min-height: 34px !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
   display: inline-flex !important;
   align-items: center !important;
+  justify-content: center !important;
   gap: 8px !important;
-  padding: 0 10px !important;
-  border: 1px solid var(--paper-rule) !important;
-  border-bottom-color: var(--paper-rule-strong) !important;
-  border-radius: 6px !important;
-  background: var(--navo-task-rest-bg, rgb(250, 249, 245)) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-right: 1px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
   color: var(--text-muted) !important;
   font: 650 11px/1 var(--paper-mono) !important;
   box-shadow: none !important;
@@ -6886,13 +6919,14 @@ body.df-timeline-pointer-drag * {
 .df-filter-trigger:focus-visible,
 .df-filter-trigger.active {
   color: var(--text-main) !important;
-  border-color: color-mix(in srgb, var(--accent-active) 48%, var(--paper-rule-strong)) !important;
+  border-right-color: var(--accent-active) !important;
   background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important;
 }
 .df-filter-panel {
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  top: 0;
+  left: calc(100% + 10px);
+  right: auto;
   width: min(360px, calc(100vw - 42px));
   max-height: min(620px, calc(100vh - 150px));
   overflow: auto;
@@ -6976,23 +7010,24 @@ body.df-timeline-pointer-drag * {
 }
 
 .df-planning-view-switch {
-  position: absolute !important;
-  top: 68px !important;
-  right: 14px !important;
-  z-index: 24 !important;
+  position: static !important;
+  z-index: auto !important;
   display: grid !important;
-  gap: 6px !important;
+  justify-items: stretch !important;
+  gap: 2px !important;
   margin: 0 !important;
-  padding: 6px 0 !important;
-  border-left: 1px solid var(--paper-rule) !important;
+  padding: 4px 0 0 !important;
+  border-top: 1px solid var(--paper-rule) !important;
+  border-left: 0 !important;
   background: transparent !important;
 }
 .df-view-btn {
-  width: 52px !important;
-  min-height: 30px !important;
-  padding: 2px 4px !important;
+  width: 100% !important;
+  min-height: 34px !important;
+  padding: 2px 3px !important;
   border: 0 !important;
-  border-left: 2px solid transparent !important;
+  border-right: 1px solid transparent !important;
+  border-left: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   color: var(--text-muted) !important;
@@ -7006,13 +7041,38 @@ body.df-timeline-pointer-drag * {
 .df-view-btn:hover,
 .df-view-btn:focus-visible {
   color: var(--text-main) !important;
-  border-left-color: var(--paper-rule-strong) !important;
+  border-right-color: var(--paper-rule-strong) !important;
   background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
 }
 .df-view-btn.active {
   color: var(--accent-active) !important;
-  border-left-color: var(--accent-active) !important;
+  border-right-color: var(--accent-active) !important;
   background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important;
+}
+
+.df-app.mode-planning .df-tree {
+  gap: 0 !important;
+}
+.df-app.mode-planning .df-category-branch {
+  margin-bottom: 28px !important;
+}
+.df-app.mode-planning .df-project-tasks {
+  margin-top: 10px !important;
+  gap: 8px !important;
+}
+.df-app.mode-planning .df-task-branch {
+  margin-top: 8px !important;
+}
+.df-app.mode-planning .df-plan-project-node {
+  min-height: 54px !important;
+}
+.df-app.mode-planning .df-tree .df-task-block[data-task-variant="planning"] {
+  --task-project-accent-size: 0px;
+  border-left-width: 1px !important;
+  border-left-color: var(--task-border) !important;
+}
+.df-app.mode-planning .df-tree .df-task-block[data-task-variant="planning"] > .df-task-block-accent {
+  display: none !important;
 }
 
 .df-app {

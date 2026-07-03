@@ -142,4 +142,18 @@ describe("TaskBlock shared component contract", () => {
       }),
     });
   });
+
+  it("keeps Planning tree controls in the left sidebar with compact tree rows and no task left strip", () => {
+    const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
+    const css = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
+
+    expect(planning).toContain('className="df-planning-sidebar"');
+    expect(planning).toMatch(/<aside className="df-planning-sidebar"[\s\S]*df-planning-filter-menu[\s\S]*df-planning-view-switch[\s\S]*<\/aside>/);
+    expect(css).toContain(".df-planning-sidebar");
+    expect(css).toContain("left: 0 !important;");
+    expect(css).toContain(".df-app.mode-planning .df-tree .df-task-block[data-task-variant=\"planning\"]");
+    expect(css).toContain("--task-project-accent-size: 0px;");
+    expect(css).toContain(".df-category-branch");
+    expect(css).toContain("margin-bottom: 28px !important;");
+  });
 });
