@@ -305,11 +305,13 @@ function PlanningTaskNode(props: {
   onSetDate: () => void;
   onMoveProject: () => void;
   onDelete: () => void;
+  onToggleComplete: () => void;
   onToggleSubtask: (subtaskId: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
+  const done = normalizeWorkflowStatus(props.task) === "done" || Boolean(props.task.completed);
   const hasSubtasks = (props.task.subtasks || []).length > 0;
   const doneCount = countDoneSubtasks(props.task.subtasks);
   const totalCount = countSubtasks(props.task.subtasks);
@@ -326,27 +328,38 @@ function PlanningTaskNode(props: {
         style={{ "--project-color": props.projectColor, "--task-project-color": props.projectColor } as React.CSSProperties}
       >
         <div className="df-task-node-inner" onClick={props.onOpen}>
-          <span
-            className="df-task-title"
-            ref={titleRef}
-            onMouseEnter={() => {
-              if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
-                showTip(props.task.title, titleRef.current);
-              }
+          <button
+            type="button"
+            className={`df-list-status-toggle df-planning-task-check check-${normalizeTaskCheckTone(props.task)}${done ? " completed" : ""}`}
+            aria-label={done ? "Mark open" : "Mark done"}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onToggleComplete();
             }}
-            onMouseLeave={hideTip}
-          >
-            {props.task.title}
-          </span>
-          {metaBadges.length > 0 && (
-            <span className="df-task-meta-badges" aria-label={props.lang === "zh" ? "Task status" : "Task status"}>
-              {metaBadges.map((badge) => (
-                <span key={badge.key} className={badge.className}>{badge.label}</span>
-              ))}
+          />
+          <div className="df-planning-task-copy">
+            <span
+              className="df-task-title"
+              ref={titleRef}
+              onMouseEnter={() => {
+                if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
+                  showTip(props.task.title, titleRef.current);
+                }
+              }}
+              onMouseLeave={hideTip}
+            >
+              {props.task.title}
             </span>
-          )}
-          {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
-          {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "Today" : "Today"}</span>}
+            {(metaBadges.length > 0 || hasSubtasks || props.addedToToday) && (
+              <span className="df-task-meta-badges" aria-label={props.lang === "zh" ? "Task status" : "Task status"}>
+                {metaBadges.map((badge) => (
+                  <span key={badge.key} className={badge.className}>{badge.label}</span>
+                ))}
+                {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
+                {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "Today" : "Today"}</span>}
+              </span>
+            )}
+          </div>
           {hasSubtasks && (
             <button
               className="df-task-chevron"
@@ -1376,6 +1389,7 @@ export default function PlanningView(props: {
                           onSetDate={() => setTaskDate(task)}
                           onMoveProject={() => moveTaskProject(task)}
                           onDelete={() => props.onTaskDelete(task.id)}
+                          onToggleComplete={() => props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done"))}
                           onToggleSubtask={(subtaskId) => toggleSubtask(task.id, subtaskId)}
                         />
                         {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
@@ -1433,6 +1447,7 @@ export default function PlanningView(props: {
                           onSetDate={() => setTaskDate(task)}
                           onMoveProject={() => moveTaskProject(task)}
                           onDelete={() => props.onTaskDelete(task.id)}
+                          onToggleComplete={() => props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done"))}
                           onToggleSubtask={(subtaskId) => toggleSubtask(task.id, subtaskId)}
                         />
                         {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (

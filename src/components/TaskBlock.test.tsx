@@ -100,6 +100,42 @@ describe("TaskBlock shared component contract", () => {
     expect(appCss).toContain("border-left-color: var(--task-project-color");
   });
 
+  it("keeps candidate content vertically centered while allowing long titles to wrap left-aligned", () => {
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
+    const contentRule = css.match(/Content[\s\S]*?\.df-app \.df-task-block\[data-task-appearance\] \.df-task-block-main[\s\S]*?\n}/)?.[0] || "";
+    const titleRule = css.match(/Title[\s\S]*?\.df-app \.df-task-block\[data-task-appearance\] \.df-task-block-title[\s\S]*?\n}/)?.[0] || "";
+    const actionsRule = css.match(/Actions[\s\S]*?\.df-app \.df-task-block\[data-task-appearance\] \.df-task-actions[\s\S]*?\n}/)?.[0] || "";
+
+    expect(contentRule).toContain("justify-content: center;");
+    expect(contentRule).toContain("align-self: stretch;");
+    expect(titleRule).toContain("line-height: 1.35;");
+    expect(titleRule).toContain("text-align: left;");
+    expect(titleRule).toContain("overflow-wrap: anywhere;");
+    expect(titleRule).toContain("word-break: break-word;");
+    expect(titleRule).toContain("white-space: normal;");
+    expect(actionsRule).toContain("align-self: center;");
+    expect(actionsRule).toContain("flex-shrink: 0;");
+  });
+
+  it("declares a final Planning override that reuses the Today Candidate paper-card visual language", () => {
+    const css = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
+    const marker = "Canonical Planning task blocks: Today Candidate style wins over legacy Planning cards.";
+    const override = css.slice(css.indexOf(marker));
+
+    expect(override).toContain(".df-app.mode-planning");
+    expect(override).toContain(".df-plan-task-node > .df-task-node-inner");
+    expect(override).toContain(".df-kanban-card");
+    expect(override).toContain(".df-eisenhower-task");
+    expect(override).toContain(".df-planning-list-row");
+    expect(override).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto;");
+    expect(override).toContain("border-top: 1px solid var(--task-border");
+    expect(override).toContain("border-bottom: 1px solid var(--task-border");
+    expect(override).toContain("border-left: 2px solid var(--task-project-color");
+    expect(override).toContain("border-radius: var(--task-radius");
+    expect(override).toContain("box-shadow: none !important;");
+    expect(override).toContain("transform: none !important;");
+  });
+
   it("renders the accent layer with a position modifier", () => {
     expect(TaskBlockAccent({ position: "left" })).toMatchObject({
       props: expect.objectContaining({

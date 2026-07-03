@@ -278,7 +278,10 @@
   min-width: 0 !important;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
   gap: 2px;
+  text-align: left;
 }
 
 /* Duration — right aligned, nowrap. */
@@ -304,6 +307,8 @@
   align-items: center !important;
   gap: 8px;
   flex: 0 0 auto !important;
+  flex-shrink: 0;
+  align-self: center;
   justify-self: end;
   color: var(--task-action-color);
 }
@@ -319,11 +324,21 @@
   color: var(--task-title-color) !important;
   font-family: var(--paper-task, var(--paper-sans, inherit));
   font-weight: 680;
-  letter-spacing: -.012em;
+  line-height: 1.35;
+  letter-spacing: 0;
   overflow: hidden;
+  text-overflow: clip;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: pretty;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-title {
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-wrap: pretty;
 }
 
 /* Metadata — muted. */

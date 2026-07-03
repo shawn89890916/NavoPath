@@ -8189,3 +8189,209 @@ body.df-timeline-pointer-drag * {
   border-left-style: solid !important;
   border-left-color: var(--task-project-color, var(--accent-active)) !important;
 }
+
+/* Canonical Planning task blocks: Today Candidate style wins over legacy Planning cards. */
+.df-app.mode-planning,
+.df-app.mode-planning.theme-dark,
+.df-app.mode-planning:not(.theme-dark) {
+  --task-bg: var(--surface-card, var(--surface-main, rgb(250, 249, 245)));
+  --task-border: color-mix(in srgb, var(--paper-rule, #D8D1C5) 88%, var(--surface-main, #FFF));
+  --task-border-hover: color-mix(in srgb, var(--task-project-color, var(--accent-active)) 38%, var(--paper-rule-strong, #C8BFAF));
+  --task-radius: 6px;
+  --task-padding-x: 16px;
+  --task-padding-y: 14px;
+  --task-min-height: 64px;
+}
+
+.df-app.mode-planning :is(
+  .df-plan-task-node > .df-task-node-inner,
+  .df-plan-subtask-node > .df-subtask-inner,
+  .df-kanban-card,
+  .df-eisenhower-task,
+  .df-planning-list-row
+),
+.df-app.mode-planning.theme-dark :is(
+  .df-plan-task-node > .df-task-node-inner,
+  .df-plan-subtask-node > .df-subtask-inner,
+  .df-kanban-card,
+  .df-eisenhower-task,
+  .df-planning-list-row
+),
+.df-app.mode-planning:not(.theme-dark) :is(
+  .df-plan-task-node > .df-task-node-inner,
+  .df-plan-subtask-node > .df-subtask-inner,
+  .df-kanban-card,
+  .df-eisenhower-task,
+  .df-planning-list-row
+) {
+  box-sizing: border-box;
+  min-height: var(--task-min-height, 64px) !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center !important;
+  column-gap: 12px !important;
+  row-gap: 0 !important;
+  padding: var(--task-padding-y, 14px) var(--task-padding-x, 16px) !important;
+  border-top: 1px solid var(--task-border, var(--paper-rule)) !important;
+  border-right: 1px solid var(--task-border, var(--paper-rule)) !important;
+  border-bottom: 1px solid var(--task-border, var(--paper-rule)) !important;
+  border-left: 2px solid var(--task-project-color, var(--project-color, var(--accent-active))) !important;
+  border-radius: var(--task-radius, 6px) !important;
+  background: var(--task-bg, var(--surface-card, var(--surface-main))) !important;
+  background-image: none !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+  transition: background-color var(--paper-motion), border-color var(--paper-motion), opacity var(--paper-motion) !important;
+}
+
+.df-app.mode-planning :is(
+  .df-plan-task-node > .df-task-node-inner:hover,
+  .df-plan-task-node > .df-task-node-inner:focus-within,
+  .df-plan-task-node.picked > .df-task-node-inner,
+  .df-plan-subtask-node > .df-subtask-inner:hover,
+  .df-plan-subtask-node > .df-subtask-inner:focus-within,
+  .df-plan-subtask-node.selected > .df-subtask-inner,
+  .df-kanban-card:hover,
+  .df-kanban-card:focus-within,
+  .df-kanban-card:active,
+  .df-eisenhower-task:hover,
+  .df-eisenhower-task:focus-within,
+  .df-eisenhower-task:active,
+  .df-planning-list-row:hover,
+  .df-planning-list-row:focus-within
+) {
+  border-top-color: var(--task-border-hover, var(--paper-rule-strong)) !important;
+  border-right-color: var(--task-border-hover, var(--paper-rule-strong)) !important;
+  border-bottom-color: var(--task-border-hover, var(--paper-rule-strong)) !important;
+  border-left-color: var(--task-project-color, var(--project-color, var(--accent-active))) !important;
+  background: var(--task-bg, var(--surface-card, var(--surface-main))) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+.df-app.mode-planning :is(.df-plan-task-node > .df-task-node-inner, .df-kanban-card, .df-eisenhower-task, .df-planning-list-row).completed,
+.df-app.mode-planning :is(.df-plan-subtask-node.done > .df-subtask-inner) {
+  opacity: .62 !important;
+}
+
+.df-app.mode-planning :is(
+  .df-list-status-toggle,
+  .df-planning-task-check,
+  .df-subtask-check
+) {
+  grid-column: 1 / 2;
+  align-self: center !important;
+  flex-shrink: 0;
+  margin: 0 !important;
+}
+
+.df-app.mode-planning :is(
+  .df-planning-task-copy,
+  .df-kanban-card-main,
+  .df-eisenhower-task-main
+) {
+  grid-column: 2 / 3;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-self: stretch !important;
+  gap: 2px !important;
+  text-align: left !important;
+}
+
+.df-app.mode-planning .df-planning-list-row .df-list-title {
+  grid-column: 2 / 3;
+  min-width: 0 !important;
+  align-self: center !important;
+}
+
+.df-app.mode-planning :is(
+  .df-task-title,
+  .df-subtask-title,
+  .df-kanban-card-title,
+  .df-eisenhower-task-title,
+  .df-list-title
+) {
+  min-width: 0 !important;
+  color: var(--text-main) !important;
+  font-family: var(--paper-task, var(--paper-sans, inherit)) !important;
+  font-size: 14px !important;
+  font-weight: 680 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0 !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  text-align: left !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.df-app.mode-planning :is(
+  .df-task-meta-badges,
+  .df-kanban-card-meta,
+  .df-eisenhower-task-meta
+) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 5px 8px !important;
+  min-width: 0 !important;
+  color: var(--text-muted) !important;
+  font-family: var(--paper-ui, var(--paper-sans, inherit)) !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+
+.df-app.mode-planning :is(.df-list-project, .df-list-tag) {
+  align-self: center !important;
+  white-space: nowrap !important;
+}
+
+.df-app.mode-planning :is(.df-list-project) {
+  grid-column: 3 / 4;
+}
+
+.df-app.mode-planning :is(.df-list-tag) {
+  grid-column: 4 / 5;
+}
+
+.df-app.mode-planning :is(
+  .df-task-chevron,
+  .df-task-node-actions,
+  .df-kanban-card-actions,
+  .df-eisenhower-task-actions,
+  .df-list-status-actions
+) {
+  align-self: center !important;
+  justify-self: end !important;
+}
+
+.df-app.mode-planning :is(
+  .df-task-node-actions,
+  .df-kanban-card-actions,
+  .df-eisenhower-task-actions,
+  .df-list-status-actions
+) {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.df-app.mode-planning .df-task-chevron {
+  grid-column: 3 / 4;
+  margin: 0 !important;
+}
+
+.df-app.mode-planning .df-task-node-actions {
+  grid-column: 4 / 5;
+}
