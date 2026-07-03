@@ -8,6 +8,7 @@ import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { kanbanGroups, WORKFLOW_LABELS } from "./utils/productivity";
 import { normalizeTaskCheckTone, normalizeWorkflowStatus, workflowStatusForPatch, type UiWorkflowStatus, type StateFilterValue } from "./utils/productivityModel";
 import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
+import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox } from "./components/TaskBlock";
 
 type TreeNodeKind = "project" | "task" | "subtask";
 type TreeDragNode = { kind: TreeNodeKind; id: string };
@@ -43,6 +44,13 @@ function alphaColor(color: string, alpha: number) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
   return color;
+}
+
+function planningTaskPriority(task: Pick<Task, "importance" | "urgency">) {
+  if (task.urgency === "high" && task.importance === "high") return "urgent";
+  if (task.importance === "high") return "high";
+  if (task.urgency === "low" && task.importance === "low") return "low";
+  return "normal";
 }
 
 function createProjectShell(title: string): Project {
@@ -200,62 +208,79 @@ function PlanningSubtaskNode(props: {
         data-node-type="subtask"
         style={{ "--project-color": props.projectColor, "--task-project-color": props.projectColor } as React.CSSProperties}
       >
-        <div className="df-subtask-inner">
-          <button
-            className={`df-subtask-check ${done ? "done" : ""}`}
-            onClick={() => props.onToggle(props.subtask.id)}
-            aria-label={done ? t(props.lang, "planning.markIncomplete") : t(props.lang, "planning.markComplete")}
-            style={done ? { "--project-color": props.projectColor } as React.CSSProperties : undefined}
-          >
-            {done && <CheckIcon size={10} />}
-          </button>
-          <span
-            className="df-subtask-title"
-            ref={titleRef}
-            onMouseEnter={() => {
-              if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
-                showTip(props.subtask.title, titleRef.current);
-              }
-            }}
-            onMouseLeave={hideTip}
-          >
-            {props.subtask.title}
-          </span>
-          {hasChildren && (
-            <button
-              className="df-task-chevron df-subtask-chevron"
+        <TaskBlock
+          as="div"
+          variant="habit-child"
+          appearance="calm"
+          checked={done}
+          projectColor={props.projectColor}
+          className="df-subtask-inner"
+        >
+          <TaskBlockRow>
+            <TaskCheckbox
+              checked={done}
+              tone="muted"
+              className={`df-subtask-check ${done ? "done" : ""}`}
               onClick={(event) => {
                 event.stopPropagation();
-                setCollapsed((v) => !v);
+                props.onToggle(props.subtask.id);
               }}
-              aria-label={collapsed ? t(props.lang, "planning.expandSubtasks") : t(props.lang, "planning.collapseSubtasks")}
+              ariaLabel={done ? t(props.lang, "planning.markIncomplete") : t(props.lang, "planning.markComplete")}
             >
-              <ChevronIcon open={!collapsed} />
-            </button>
-          )}
-          <div className="df-task-node-actions">
-            <button
-              className="df-tree-icon-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onPromote(props.subtask.id);
-              }}
-              aria-label={t(props.lang, "planning.addToCandidate")}
-            >
-              <ArrowRightIcon />
-            </button>
-            <button
-              className="df-tree-icon-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setMenuOpen((open) => !open);
-              }}
-              aria-label={t(props.lang, "planning.more")}
-            >
-              <MoreIcon />
-            </button>
-          </div>
-        </div>
+              {done && <CheckIcon size={10} />}
+            </TaskCheckbox>
+            <TaskBlockContent
+              title={(
+                <span
+                  className="df-subtask-title"
+                  ref={titleRef}
+                  onMouseEnter={() => {
+                    if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
+                      showTip(props.subtask.title, titleRef.current);
+                    }
+                  }}
+                  onMouseLeave={hideTip}
+                >
+                  {props.subtask.title}
+                </span>
+              )}
+            />
+            <TaskActions className="df-task-node-actions">
+              {hasChildren && (
+                <button
+                  className="df-task-chevron df-subtask-chevron"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setCollapsed((v) => !v);
+                  }}
+                  aria-label={collapsed ? t(props.lang, "planning.expandSubtasks") : t(props.lang, "planning.collapseSubtasks")}
+                >
+                  <ChevronIcon open={!collapsed} />
+                </button>
+              )}
+              <button
+                className="df-tree-icon-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onPromote(props.subtask.id);
+                }}
+                aria-label={t(props.lang, "planning.addToCandidate")}
+              >
+                <ArrowRightIcon />
+              </button>
+              <button
+                className="df-tree-icon-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMenuOpen((open) => !open);
+                }}
+                aria-label={t(props.lang, "planning.more")}
+              >
+                <MoreIcon />
+              </button>
+            </TaskActions>
+          </TaskBlockRow>
+        </TaskBlock>
         <TreeMenu
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
@@ -327,76 +352,93 @@ function PlanningTaskNode(props: {
         data-node-type="task"
         style={{ "--project-color": props.projectColor, "--task-project-color": props.projectColor } as React.CSSProperties}
       >
-        <div className="df-task-node-inner" onClick={props.onOpen}>
-          <button
-            type="button"
-            className={`df-list-status-toggle df-planning-task-check check-${normalizeTaskCheckTone(props.task)}${done ? " completed" : ""}`}
-            aria-label={done ? "Mark open" : "Mark done"}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onToggleComplete();
-            }}
-          />
-          <div className="df-planning-task-copy">
-            <span
-              className="df-task-title"
-              ref={titleRef}
-              onMouseEnter={() => {
-                if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
-                  showTip(props.task.title, titleRef.current);
-                }
-              }}
-              onMouseLeave={hideTip}
-            >
-              {props.task.title}
-            </span>
-            {(metaBadges.length > 0 || hasSubtasks || props.addedToToday) && (
-              <span className="df-task-meta-badges" aria-label={props.lang === "zh" ? "Task status" : "Task status"}>
-                {metaBadges.map((badge) => (
-                  <span key={badge.key} className={badge.className}>{badge.label}</span>
-                ))}
-                {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
-                {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "Today" : "Today"}</span>}
-              </span>
-            )}
-          </div>
-          {hasSubtasks && (
-            <button
-              className="df-task-chevron"
+        <TaskBlock
+          as="div"
+          variant="planning"
+          appearance="calm"
+          priority={planningTaskPriority(props.task)}
+          checked={done}
+          selected={props.addedToToday}
+          projectColor={props.projectColor}
+          className="df-task-node-inner"
+          onClick={props.onOpen}
+        >
+          <TaskBlockRow>
+            <TaskCheckbox
+              checked={done}
+              tone={normalizeTaskCheckTone(props.task)}
+              className="df-list-status-toggle df-planning-task-check"
+              ariaLabel={done ? "Mark open" : "Mark done"}
               onClick={(event) => {
                 event.stopPropagation();
-                props.onToggleCollapse();
+                props.onToggleComplete();
               }}
-              aria-label={props.collapsed ? t(props.lang, "planning.expandSubtasks") : t(props.lang, "planning.collapseSubtasks")}
+            />
+            <TaskBlockContent
+              className="df-planning-task-copy"
+              title={(
+                <span
+                  className="df-task-title"
+                  ref={titleRef}
+                  onMouseEnter={() => {
+                    if (titleRef.current && titleRef.current.scrollWidth > titleRef.current.clientWidth) {
+                      showTip(props.task.title, titleRef.current);
+                    }
+                  }}
+                  onMouseLeave={hideTip}
+                >
+                  {props.task.title}
+                </span>
+              )}
             >
-              <ChevronIcon open={!props.collapsed} />
-            </button>
-          )}
-          <div className="df-task-node-actions">
-            <button
-              className="df-tree-icon-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onToggleTodayCandidate();
-              }}
-              aria-label={props.addedToToday
-                ? (props.lang === "zh" ? "Return to Planning" : "Return to Planning")
-                : t(props.lang, "planning.addToCandidate")}
-              aria-pressed={props.addedToToday}
-            >
-              <ArrowRightIcon />
-            </button>
-            <button
-              className="df-tree-icon-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setMenuOpen((open) => !open);
-              }}
-              aria-label={t(props.lang, "planning.more")}
-            >
-              <MoreIcon />
-            </button>
-          </div>
+              {(metaBadges.length > 0 || hasSubtasks || props.addedToToday) && (
+                <span className="df-task-meta-badges" aria-label={props.lang === "zh" ? "Task status" : "Task status"}>
+                  {metaBadges.map((badge) => (
+                    <span key={badge.key} className={badge.className}>{badge.label}</span>
+                  ))}
+                  {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
+                  {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "Today" : "Today"}</span>}
+                </span>
+              )}
+            </TaskBlockContent>
+            <TaskActions className="df-task-node-actions">
+              {hasSubtasks && (
+                <button
+                  className="df-task-chevron"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onToggleCollapse();
+                  }}
+                  aria-label={props.collapsed ? t(props.lang, "planning.expandSubtasks") : t(props.lang, "planning.collapseSubtasks")}
+                >
+                  <ChevronIcon open={!props.collapsed} />
+                </button>
+              )}
+              <button
+                className="df-tree-icon-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onToggleTodayCandidate();
+                }}
+                aria-label={props.addedToToday
+                  ? (props.lang === "zh" ? "Return to Planning" : "Return to Planning")
+                  : t(props.lang, "planning.addToCandidate")}
+                aria-pressed={props.addedToToday}
+              >
+                <ArrowRightIcon />
+              </button>
+              <button
+                className="df-tree-icon-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMenuOpen((open) => !open);
+                }}
+                aria-label={t(props.lang, "planning.more")}
+              >
+                <MoreIcon />
+              </button>
+            </TaskActions>
+          </TaskBlockRow>
           <TreeMenu
             open={menuOpen}
             onClose={() => setMenuOpen(false)}
@@ -408,7 +450,7 @@ function PlanningTaskNode(props: {
               { label: t(props.lang, "planning.delete"), danger: true, onClick: props.onDelete },
             ]}
           />
-        </div>
+        </TaskBlock>
       </div>
     </>
   );
@@ -1203,29 +1245,36 @@ export default function PlanningView(props: {
                     </div>
                     <div className="df-kanban-card-list">
                       {columnTasks.map((task) => (
-                        <article
+                        <TaskBlock
                           key={task.id}
+                          as="div"
+                          variant="planning"
+                          appearance="calm"
+                          priority={planningTaskPriority(task)}
+                          checked={normalizeWorkflowStatus(task) === "done"}
+                          projectColor={projectColor(task.projectId)}
                           className={`df-kanban-card${normalizeWorkflowStatus(task) === "done" ? " completed" : ""}`}
                           draggable
                           onDragStart={() => setKanbanDragTaskId(task.id)}
                           onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
                           onClick={() => props.onTaskEdit(task)}
-                          style={{ ["--task-project-color" as string]: projectColor(task.projectId) }}
                         >
-                          <button
-                            type="button"
-                            className={`df-list-status-toggle check-${normalizeTaskCheckTone(task)}${normalizeWorkflowStatus(task) === "done" ? " completed" : ""}`}
-                            aria-label={normalizeWorkflowStatus(task) === "done" ? "Mark open" : "Mark done"}
-                            onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done")); }}
-                          />
-                          <div className="df-planning-task-copy">
-                            <div className="df-kanban-card-title">{task.title}</div>
-                            <div className="df-kanban-card-meta">
-                              <span className="df-kanban-project-name" style={{ color: projectColor(task.projectId) }}>{projectName(task.projectId)}</span>
-                              {task.dueDate && <span className="df-kanban-tag df-tag-due" title={props.lang === "zh" ? "Due" : "Due"}>{task.dueDate.slice(5)}</span>}
-                            </div>
-                          </div>
-                        </article>
+                          <TaskBlockRow>
+                            <TaskCheckbox
+                              checked={normalizeWorkflowStatus(task) === "done"}
+                              tone={normalizeTaskCheckTone(task)}
+                              className="df-list-status-toggle"
+                              ariaLabel={normalizeWorkflowStatus(task) === "done" ? "Mark open" : "Mark done"}
+                              onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done")); }}
+                            />
+                            <TaskBlockContent className="df-planning-task-copy" title={<span className="df-kanban-card-title">{task.title}</span>}>
+                              <span className="df-kanban-card-meta">
+                                <span className="df-kanban-project-name" style={{ color: projectColor(task.projectId) }}>{projectName(task.projectId)}</span>
+                                {task.dueDate && <span className="df-kanban-tag df-tag-due" title={props.lang === "zh" ? "Due" : "Due"}>{task.dueDate.slice(5)}</span>}
+                              </span>
+                            </TaskBlockContent>
+                          </TaskBlockRow>
+                        </TaskBlock>
                       ))}
                       {columnTasks.length === 0 && <div className="df-kanban-empty">{props.lang === "zh" ? "Drop tasks here" : "Drop tasks here"}</div>}
                     </div>
@@ -1263,29 +1312,36 @@ export default function PlanningView(props: {
                       {quadTasks.map((task) => {
                         const taskDone = normalizeWorkflowStatus(task) === "done";
                         return (
-                          <article
+                          <TaskBlock
                             key={task.id}
+                            as="div"
+                            variant="planning"
+                            appearance="calm"
+                            priority={planningTaskPriority(task)}
+                            checked={taskDone}
+                            projectColor={projectColor(task.projectId)}
                             className={`df-eisenhower-task${taskDone ? " completed" : ""}`}
                             draggable
                             onDragStart={() => setKanbanDragTaskId(task.id)}
                             onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
                             onClick={() => props.onTaskEdit(task)}
-                            style={{ ["--task-project-color" as string]: projectColor(task.projectId) }}
                           >
-                            <button
-                              type="button"
-                              className={`df-list-status-toggle check-${normalizeTaskCheckTone(task)}${taskDone ? " completed" : ""}`}
-                              aria-label={taskDone ? "Mark open" : "Mark done"}
-                              onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(taskDone ? "backlog" : "done")); }}
-                            />
-                            <div className="df-planning-task-copy">
-                              <div className="df-eisenhower-task-title">{task.title}</div>
-                              <div className="df-eisenhower-task-meta">
-                                <span className="df-eisenhower-project-name" style={{ color: projectColor(task.projectId) }}>{projectName(task.projectId)}</span>
-                                {task.dueDate && <span className="df-eisenhower-due">{task.dueDate.slice(5)}</span>}
-                              </div>
-                            </div>
-                          </article>
+                            <TaskBlockRow>
+                              <TaskCheckbox
+                                checked={taskDone}
+                                tone={normalizeTaskCheckTone(task)}
+                                className="df-list-status-toggle"
+                                ariaLabel={taskDone ? "Mark open" : "Mark done"}
+                                onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(taskDone ? "backlog" : "done")); }}
+                              />
+                              <TaskBlockContent className="df-planning-task-copy" title={<span className="df-eisenhower-task-title">{task.title}</span>}>
+                                <span className="df-eisenhower-task-meta">
+                                  <span className="df-eisenhower-project-name" style={{ color: projectColor(task.projectId) }}>{projectName(task.projectId)}</span>
+                                  {task.dueDate && <span className="df-eisenhower-due">{task.dueDate.slice(5)}</span>}
+                                </span>
+                              </TaskBlockContent>
+                            </TaskBlockRow>
+                          </TaskBlock>
                         );
                       })}
                       {quadTasks.length === 0 && <div className="df-eisenhower-empty">Drop tasks here</div>}
@@ -1301,17 +1357,33 @@ export default function PlanningView(props: {
               {viewFilteredTasks.map((task) => {
                 const uiStatus = normalizeWorkflowStatus(task);
                 return (
-                  <div key={task.id} className="df-planning-list-row" style={{ ["--task-project-color" as string]: projectColor(task.projectId) }}>
-                    <button
-                      type="button"
-                      className={`df-list-status-toggle check-${normalizeTaskCheckTone(task)}${uiStatus === "done" ? " completed" : ""}`}
-                      aria-label={uiStatus === "done" ? "Mark open" : "Mark done"}
-                      onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}
-                    />
-                    <span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>
-                    <span className="df-list-project">{projectName(task.projectId)}</span>
-                    {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
-                  </div>
+                  <TaskBlock
+                    key={task.id}
+                    as="div"
+                    variant="compact"
+                    appearance="calm"
+                    priority={planningTaskPriority(task)}
+                    checked={uiStatus === "done"}
+                    projectColor={projectColor(task.projectId)}
+                    className="df-planning-list-row"
+                  >
+                    <TaskBlockRow>
+                      <TaskCheckbox
+                        checked={uiStatus === "done"}
+                        tone={normalizeTaskCheckTone(task)}
+                        className="df-list-status-toggle"
+                        ariaLabel={uiStatus === "done" ? "Mark open" : "Mark done"}
+                        onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}
+                      />
+                      <TaskBlockContent title={<span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>} />
+                      <TaskBlockDuration>
+                        <span className="df-list-project">{projectName(task.projectId)}</span>
+                      </TaskBlockDuration>
+                      <TaskActions>
+                        {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
+                      </TaskActions>
+                    </TaskBlockRow>
+                  </TaskBlock>
                 );
               })}
             </div>

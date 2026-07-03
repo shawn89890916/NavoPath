@@ -91,13 +91,10 @@ describe("TaskBlock shared component contract", () => {
     expect(scheduledRule).not.toContain("height: 100% !important;");
   });
 
-  it("uses a project-color left rule as the shared task annotation across Execute and Planning task surfaces", () => {
+  it("uses a project-color left rule in the shared TaskBlock stylesheet", () => {
     const taskBlockCss = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
-    const appCss = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
     expect(taskBlockCss).toContain("--task-accent-position: left;");
     expect(taskBlockCss).toContain("border-left-color: var(--task-project-color");
-    expect(appCss).toContain(".df-kanban-card");
-    expect(appCss).toContain("border-left-color: var(--task-project-color");
   });
 
   it("keeps candidate content vertically centered while allowing long titles to wrap left-aligned", () => {
@@ -117,23 +114,25 @@ describe("TaskBlock shared component contract", () => {
     expect(actionsRule).toContain("flex-shrink: 0;");
   });
 
-  it("declares a final Planning override that reuses the Today Candidate paper-card visual language", () => {
+  it("keeps Planning task-like surfaces on TaskBlock instead of CSS-only legacy card systems", () => {
+    const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
     const css = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
-    const marker = "Canonical Planning task blocks: Today Candidate style wins over legacy Planning cards.";
-    const override = css.slice(css.indexOf(marker));
 
-    expect(override).toContain(".df-app.mode-planning");
-    expect(override).toContain(".df-plan-task-node > .df-task-node-inner");
-    expect(override).toContain(".df-kanban-card");
-    expect(override).toContain(".df-eisenhower-task");
-    expect(override).toContain(".df-planning-list-row");
-    expect(override).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto;");
-    expect(override).toContain("border-top: 1px solid var(--task-border");
-    expect(override).toContain("border-bottom: 1px solid var(--task-border");
-    expect(override).toContain("border-left: 2px solid var(--task-project-color");
-    expect(override).toContain("border-radius: var(--task-radius");
-    expect(override).toContain("box-shadow: none !important;");
-    expect(override).toContain("transform: none !important;");
+    expect(planning).toContain('variant="planning"');
+    expect(planning).toContain('variant="compact"');
+    expect(planning).toContain('variant="habit-child"');
+    expect(planning).not.toContain("<article");
+    expect(css).not.toContain("Canonical Planning task blocks: Today Candidate style wins over legacy Planning cards.");
+    expect(css).not.toMatch(/\.df-app\.mode-planning[\s\S]*?\.df-kanban-card[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto auto;/);
+  });
+
+  it("keeps completed task blocks free of full-card opacity and overlay masks", () => {
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
+    const completedRule = css.match(/Completed[\s\S]*?\.df-app \.df-task-block\[data-task-appearance\]\.is-checked[\s\S]*?\n}/)?.[0] || "";
+
+    expect(completedRule).toContain("opacity: 1;");
+    expect(completedRule).not.toContain("opacity: .");
+    expect(css).not.toMatch(/\.df-task-block[\s\S]*?::(?:before|after)[\s\S]*?background:\s*(?:gray|grey|rgba\(128|#ccc|#d)/i);
   });
 
   it("renders the accent layer with a position modifier", () => {
