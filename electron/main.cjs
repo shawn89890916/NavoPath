@@ -664,6 +664,8 @@ function getSettings() {
   }
   return {
     activeMode: ["today", "calendar", "planning"].includes(raw.activeMode) ? raw.activeMode : "today",
+    defaultTimelineView: ["daily", "3day", "weekly", "month"].includes(raw.defaultTimelineView) ? raw.defaultTimelineView : "daily",
+    continuousCrossDayScroll: raw.continuousCrossDayScroll !== false,
     planningView: ["tree", "matrix", "split"].includes(raw.planningView) ? raw.planningView : "tree",
     aiDockOpen: Boolean(raw.aiDockOpen),
     appTitle: "NavoPath",
@@ -707,6 +709,12 @@ function saveSettings(settings) {
   const existing = readJson(getPaths().settingsPath, {});
   const next = {
     activeMode: ["today", "calendar", "planning"].includes(settings.activeMode) ? settings.activeMode : existing.activeMode || "today",
+    defaultTimelineView: ["daily", "3day", "weekly", "month"].includes(settings.defaultTimelineView)
+      ? settings.defaultTimelineView
+      : ["daily", "3day", "weekly", "month"].includes(existing.defaultTimelineView)
+        ? existing.defaultTimelineView
+        : "daily",
+    continuousCrossDayScroll: typeof settings.continuousCrossDayScroll === "boolean" ? settings.continuousCrossDayScroll : existing.continuousCrossDayScroll !== false,
     planningView: ["tree", "matrix", "split"].includes(settings.planningView) ? settings.planningView : existing.planningView || "tree",
     aiDockOpen: typeof settings.aiDockOpen === "boolean" ? settings.aiDockOpen : Boolean(existing.aiDockOpen),
     addAdvancedOpen: typeof settings.addAdvancedOpen === "boolean" ? settings.addAdvancedOpen : Boolean(existing.addAdvancedOpen),

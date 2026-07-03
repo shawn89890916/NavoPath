@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SHORTCUTS, isTypingContext } from "./shortcuts";
+import { SHORTCUTS, groupShortcutsByScope, isTypingContext } from "./shortcuts";
 
 describe("shortcuts", () => {
   it("contains the fixed first-version shortcut set", () => {
@@ -10,5 +10,12 @@ describe("shortcuts", () => {
     expect(isTypingContext({ tagName: "input" } as unknown as EventTarget)).toBe(true);
     expect(isTypingContext({ tagName: "div", isContentEditable: true } as unknown as EventTarget)).toBe(true);
     expect(isTypingContext({ tagName: "button" } as unknown as EventTarget)).toBe(false);
+  });
+
+  it("groups shortcut references by scope in registry order", () => {
+    const groups = groupShortcutsByScope(SHORTCUTS);
+    expect(groups.map((group) => group.scope)).toEqual(["global", "timeline", "mode", "timer"]);
+    expect(groups[0].shortcuts.map((shortcut) => shortcut.id)).toContain("command-search");
+    expect(groups[1].shortcuts.map((shortcut) => shortcut.id)).toContain("today");
   });
 });

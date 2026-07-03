@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductIcon } from "./main";
+import { TaskBlock } from "./components/TaskBlock";
 import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 import { SLOT_HEIGHT, SLOT_MINUTES, addMinutes, minutesToTime, timeToMinutes } from "./timelineGeometry";
 
@@ -370,22 +371,24 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
         <section className="mini-candidates df-candidate-panel">
           <header className="df-panel-title"><h2>Today's Candidates</h2><span className="mini-count">1</span></header>
           {tasks.map((task, index) => (
-            <button
+            <TaskBlock
+              as="button"
+              type="button"
+              variant="candidate"
               ref={index === 0 ? firstCandidateRef : undefined}
               className={`mini-task df-task-card t-${index}${placedIndex === index ? " is-placed" : ""}`}
               draggable={false}
-              style={{ "--cat": DEMO_PROJECT_COLOR } as React.CSSProperties}
-              onPointerDown={(event) => beginCandidateDrag(event, index, task)}
+              projectColor={DEMO_PROJECT_COLOR}
+              onPointerDown={(event) => beginCandidateDrag(event as React.PointerEvent<HTMLButtonElement>, index, task)}
               onPointerMove={moveCandidateDrag}
               onPointerUp={endCandidateDrag}
               onPointerCancel={() => { floatingTaskRef.current?.style.removeProperty("animation"); floatingTaskRef.current?.style.removeProperty("opacity"); dragGhostRef.current = null; setDragGhost(null); }}
               key={task}
-              type="button"
             >
               <i className="df-block-check" />
               <span className="df-candidate-title">{task}</span>
               <small className="df-duration-pill">45m</small>
-            </button>
+            </TaskBlock>
           ))}
           {step === "expanded" && !dragGhost && (
             <div className="mini-candidate-arrow" aria-hidden="true">
@@ -418,18 +421,21 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
                 ))}
                 {nowTop >= 0 && nowTop <= hourLabels.length * DEMO_HOUR_HEIGHT && <div className="df-now-line" style={{ top: `${nowTop}px` }} />}
                 {(step === "expanded" || step === "placed") && scheduledBlocks.map((block) => (
-                  <div
+                  <TaskBlock
+                    as="div"
+                    variant="scheduled"
+                    checked={block.done}
+                    projectColor={block.color}
                     key={`${block.title}-${block.start}`}
                     className={`df-time-block mini-scheduled-block${block.done ? " is-done" : ""}`}
                     style={{
                       top: `${timeBlockTopLocal(block.start, startHour)}px`,
                       height: `${timeBlockHeightLocal(block.start, block.end)}px`,
-                      "--cat": block.color,
                     } as React.CSSProperties}
                   >
                     <button className="df-block-check" aria-hidden="true">{block.done ? "✓" : ""}</button>
                     <div className="df-block-title-row"><strong>{block.title}</strong></div>
-                  </div>
+                  </TaskBlock>
                 ))}
                 {step === "expanded" && (
                   <div
@@ -476,19 +482,21 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
                   </div>
                 )}
                 {step === "placed" && (
-                  <div
+                  <TaskBlock
+                    as="div"
+                    variant="scheduled"
+                    projectColor={DEMO_PROJECT_COLOR}
                     className="df-time-block mini-placement"
                     style={{
                       top: `${timeBlockTopLocal(placedStart || targetStart, startHour)}px`,
                       height: `${timeBlockHeightLocal(placedStart || targetStart, addMinutes(placedStart || targetStart, 45))}px`,
-                      "--cat": DEMO_PROJECT_COLOR,
                     } as React.CSSProperties}
                   >
                     <button className="df-block-check" aria-hidden="true" />
                     <div className="df-block-title-row"><strong>{placedTask ?? tasks[0]}</strong></div>
                     <span className="df-resize-dot top" />
                     <span className="df-resize-dot bottom" />
-                  </div>
+                  </TaskBlock>
                 )}
               </div>
             </div>
@@ -656,18 +664,21 @@ function ProductDemo({ lang }: { lang: Lang }) {
                 ))}
                 <div className="df-now-line" style={{ top: `${timeBlockTopLocal("19:34", startHour)}px` }} />
                 {scheduledBlocks.map((block) => (
-                  <div
+                  <TaskBlock
+                    as="div"
+                    variant="scheduled"
+                    checked={block.done}
+                    projectColor={block.color}
                     key={block.title}
                     className={`df-time-block mini-scheduled-block${block.done ? " is-done" : ""}`}
                     style={{
                       top: `${timeBlockTopLocal(block.start, startHour)}px`,
                       height: `${timeBlockHeightLocal(block.start, block.end)}px`,
-                      "--cat": block.color,
                     } as React.CSSProperties}
                   >
                     <button className="df-block-check" aria-hidden="true">{block.done ? "✓" : ""}</button>
                     <div className="df-block-title-row"><strong>{block.title}</strong></div>
-                  </div>
+                  </TaskBlock>
                 ))}
                 {!placed && (
                   <div
@@ -680,17 +691,19 @@ function ProductDemo({ lang }: { lang: Lang }) {
                   />
                 )}
                 {placed && (
-                  <div
+                  <TaskBlock
+                    as="div"
+                    variant="scheduled"
+                    projectColor={DEMO_PROJECT_COLOR}
                     className="df-time-block mini-placement"
                     style={{
                       top: `${timeBlockTopLocal(placedStart, startHour)}px`,
                       height: `${timeBlockHeightLocal(placedStart, addMinutes(placedStart, 45))}px`,
-                      "--cat": DEMO_PROJECT_COLOR,
                     } as React.CSSProperties}
                   >
                     <button className="df-block-check" aria-hidden="true" />
                     <div className="df-block-title-row"><strong>{tasks[0]}</strong></div>
-                  </div>
+                  </TaskBlock>
                 )}
               </div>
             </div>

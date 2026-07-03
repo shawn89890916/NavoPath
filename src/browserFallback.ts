@@ -74,9 +74,16 @@ function migrateEventsToTasks(data: PlannerData): Task[] {
   return migrated;
 }
 
+export function shouldUseLocalPreviewByDefault(hostname: string, pathname: string, preview: string | null) {
+  if (preview) return false;
+  const localHost = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  return localHost && (pathname === "/app" || pathname.startsWith("/app/"));
+}
+
 function configurePreviewMode() {
   const params = new URLSearchParams(window.location.search);
   const preview = params.get("preview");
+  const useLocalPreviewByDefault = shouldUseLocalPreviewByDefault(window.location.hostname, window.location.pathname, preview);
   if (preview === "local") localStorage.setItem(PREVIEW_MODE_KEY, "1");
   if (preview === "cloud" || preview === "off") localStorage.removeItem(PREVIEW_MODE_KEY);
   // Migration: earlier builds persisted the runtime fallback to localStorage, which
@@ -85,7 +92,7 @@ function configurePreviewMode() {
   if (preview !== "local" && localStorage.getItem(PREVIEW_MODE_KEY) === "1") {
     localStorage.removeItem(PREVIEW_MODE_KEY);
   }
-  return preview === "local" || localStorage.getItem(PREVIEW_MODE_KEY) === "1";
+  return preview === "local" || useLocalPreviewByDefault || localStorage.getItem(PREVIEW_MODE_KEY) === "1";
 }
 
 function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
@@ -503,6 +510,7 @@ export function installBrowserFallback() {
   const defaultSettings: Settings = {
     activeMode: "execute",
     defaultTimelineView: "daily",
+    continuousCrossDayScroll: true,
     language: "en",
     planningView: "tree",
     aiDockOpen: false,

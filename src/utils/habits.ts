@@ -20,6 +20,7 @@ export function normalizeHabits(data: PlannerData, now = new Date().toISOString(
     id: uid("habit", title),
     title,
     defaultDurationMinutes: 20,
+    activeWeekdays: [1, 2, 3, 4, 5],
     archived: false,
     order: index,
     createdAt: now,
@@ -136,13 +137,12 @@ export function unscheduleHabitRecord(data: PlannerData, habitId: string, date: 
         ? {
             ...task,
             timelineRecords: (task.timelineRecords || []).filter((record) => record.executionStatus !== "scheduled"),
-            plannedForDate: date,
-            executionLane: "candidate" as const,
+            plannedForDate: undefined,
+            executionLane: undefined,
             updatedAt: now,
           }
         : task
     )
-    .filter((task) => !(task.id === taskId && (task.timelineRecords || []).length === 0 && !task.notes && task.title === (data.habits || []).find((h) => h.id === habitId)?.title));
   return { ...data, tasks, habitDailyStates: states };
 }
 

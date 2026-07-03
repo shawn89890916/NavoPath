@@ -45,4 +45,25 @@ describe("time share metrics", () => {
     const result = buildTimeShareMetrics(data, { mode: "planned", dimension: "importance", range: "all" });
     expect(result.segments).toEqual([{ key: "high", label: "High", minutes: 90, ratio: 1, taskIds: ["task-1"] }]);
   });
+
+  it("filters actual and planned minutes by rolling range", () => {
+    const olderTask: Task = {
+      ...task,
+      id: "task-old",
+      title: "Old work",
+      timelineRecords: [{ id: "record-old", taskId: "task-old", scheduledDate: "2026-05-01", scheduledStart: "09:00", scheduledEndDate: "2026-05-01", scheduledEnd: "10:00", executionStatus: "scheduled", createdAt: "now" }],
+    };
+    const source: PlannerData = {
+      ...data,
+      tasks: [task, olderTask],
+      timeEntries: [
+        ...data.timeEntries!,
+        { id: "time-old", taskId: "task-old", projectId: "project-1", startAt: "2026-05-01T09:00:00.000Z", endAt: "2026-05-01T10:00:00.000Z", durationMinutes: 60, source: "timer", createdAt: "now", updatedAt: "now" },
+      ],
+    };
+
+    expect(buildTimeShareMetrics(source, { mode: "actual", dimension: "project", range: "30" }, "2026-07-02").totalMinutes).toBe(60);
+    expect(buildTimeShareMetrics(source, { mode: "planned", dimension: "project", range: "30" }, "2026-07-02").totalMinutes).toBe(90);
+    expect(buildTimeShareMetrics(source, { mode: "actual", dimension: "project", range: "all" }, "2026-07-02").totalMinutes).toBe(120);
+  });
 });

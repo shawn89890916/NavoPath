@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData } from "../types";
-import { normalizeHabits, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, buildHabitMetrics, isHabitDueOnDate, updateHabit, archiveHabit } from "./habits";
+import { normalizeHabits, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, buildHabitMetrics, isHabitDueOnDate, updateHabit, archiveHabit, weekdayLabels } from "./habits";
 
 const baseData: PlannerData = {
   version: 1,
@@ -23,6 +23,7 @@ describe("habits", () => {
   it("migrates plugin habit lines into first-class habits", () => {
     const result = normalizeHabits(baseData, "2026-07-01T00:00:00.000Z");
     expect(result.habits?.map((habit) => habit.title)).toEqual(["Read", "Stretch"]);
+    expect(result.habits?.[0].activeWeekdays).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("records daily completion without removing the habit", () => {
@@ -51,7 +52,7 @@ describe("habits", () => {
     expect(habitTask?.timelineRecords?.map((record) => record.scheduledStart)).toEqual(["10:00"]);
   });
 
-  it("unscheduleHabitRecord clears timelineRecordId and removes the scheduled record", () => {
+  it("unscheduleHabitRecord clears only the planned marker and scheduled record", () => {
     const data = { ...baseData, ...normalizeHabits(baseData, "2026-07-01T00:00:00.000Z") };
     const habitId = data.habits![0].id;
     const scheduled = scheduleHabitRecord(data, habitId, "2026-07-01", "09:00", "2026-07-01T08:00:00.000Z");
@@ -61,6 +62,8 @@ describe("habits", () => {
     const habitTask = unscheduled.tasks.find((t) => t.id === `habit-task-${habitId}-2026-07-01`);
     const scheduledRecords = habitTask?.timelineRecords?.filter((r) => r.executionStatus === "scheduled") || [];
     expect(scheduledRecords).toHaveLength(0);
+    expect(habitTask?.plannedForDate).toBeUndefined();
+    expect(habitTask?.executionLane).toBeUndefined();
   });
 
   it("unscheduleHabitRecord preserves the habit completion state", () => {
@@ -88,6 +91,11 @@ describe("habits", () => {
     expect(isHabitDueOnDate(archivedHabit, "2026-07-01")).toBe(false);
   });
 
+  it("returns readable localized weekday labels", () => {
+    expect(weekdayLabels("zh")).toEqual(["日", "一", "二", "三", "四", "五", "六"]);
+    expect(weekdayLabels("en")).toEqual(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+  });
+
   it("buildHabitMetrics computes completion rates and planned minutes", () => {
     const data = { ...baseData, ...normalizeHabits(baseData, "2026-07-01T00:00:00.000Z") };
     const habitId = data.habits![0].id;
@@ -111,10 +119,12 @@ describe("habits", () => {
   it("updateHabit patches fields and updates timestamp", () => {
     const data = { ...baseData, ...normalizeHabits(baseData, "2026-07-01T00:00:00.000Z") };
     const habitId = data.habits![0].id;
-    const updated = updateHabit(data, habitId, { notes: "New notes", frequencyRule: "weekly" }, "2026-07-01T10:00:00.000Z");
+    const updated = updateHabit(data, habitId, { notes: "New notes", frequencyRule: "weekly", activeWeekdays: [1, 2, 3, 4, 5], targetCount: 2 }, "2026-07-01T10:00:00.000Z");
     const habit = updated.habits?.find((h) => h.id === habitId);
     expect(habit?.notes).toBe("New notes");
     expect(habit?.frequencyRule).toBe("weekly");
+    expect(habit?.activeWeekdays).toEqual([1, 2, 3, 4, 5]);
+    expect(habit?.targetCount).toBe(2);
     expect(habit?.updatedAt).toBe("2026-07-01T10:00:00.000Z");
   });
 

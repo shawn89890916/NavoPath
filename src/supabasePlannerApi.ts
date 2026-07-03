@@ -23,6 +23,8 @@ function tokenMetadata(row: any): McpTokenMetadata {
 
 const defaultSettings: Settings = {
   activeMode: "execute",
+  defaultTimelineView: "daily",
+  continuousCrossDayScroll: true,
   language: "en",
   planningView: "tree",
   aiDockOpen: false,

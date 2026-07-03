@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData, Task } from "../types";
-import { promoteSubtaskToToday, toggleTodayCandidate } from "./todayCandidates";
+import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./todayCandidates";
 
 function task(overrides: Partial<Task> = {}): Task {
   return {
@@ -52,5 +52,27 @@ describe("today candidate transformations", () => {
     expect(first.data.tasks[1]).toMatchObject({ id: "promoted-1", parentTaskId: "task-1", title: "Collect sources", executionLane: "candidate" });
     expect(second.action).toBe("existing");
     expect(second.data.tasks).toHaveLength(2);
+  });
+
+  it("returns a scheduled promoted subtask to today without clearing its planned marker", () => {
+    const source = data([
+      task({
+        subtasks: [{ id: "sub-1", title: "Collect sources", completed: false, plannedTaskId: "promoted-1", createdAt: "now" }],
+      }),
+      task({
+        id: "promoted-1",
+        parentTaskId: "task-1",
+        title: "Collect sources",
+        plannedForDate: "2026-06-20",
+        executionLane: undefined,
+        timelineRecords: [{ id: "record-1", taskId: "promoted-1", scheduledDate: "2026-06-20", scheduledStart: "09:00", scheduledEnd: "09:30", executionStatus: "scheduled", createdAt: "now" }],
+      }),
+    ]);
+
+    const result = returnScheduledTaskToToday(source, "record-1", "2026-06-20", "now");
+
+    expect(result.action).toBe("returned");
+    expect(result.data.tasks[1]).toMatchObject({ plannedForDate: "2026-06-20", executionLane: "candidate", timelineRecords: [] });
+    expect(result.data.tasks[0].subtasks?.[0].plannedTaskId).toBe("promoted-1");
   });
 });
