@@ -1342,7 +1342,7 @@ export default function PlanningView(props: {
                         aria-label={props.lang === "zh" ? "添加筛选" : "Add filter"}
                       />
                     </div>
-                    {!filterExpandedCategory && (
+                    <div className="df-filter-body">
                       <div className="df-filter-categories">
                         {filterCategories
                           .filter((cat) => !filterQuery || cat.label.toLowerCase().includes(filterQuery.toLowerCase()))
@@ -1350,8 +1350,9 @@ export default function PlanningView(props: {
                             <button
                               key={cat.key}
                               type="button"
-                              className={`df-filter-cat-row${cat.activeCount > 0 ? " has-active" : ""}`}
-                              onClick={() => setFilterExpandedCategory(cat.key)}
+                              className={`df-filter-cat-row${filterExpandedCategory === cat.key ? " active" : ""}${cat.activeCount > 0 ? " has-active" : ""}`}
+                              onMouseEnter={() => setFilterExpandedCategory(cat.key)}
+                              onFocus={() => setFilterExpandedCategory(cat.key)}
                             >
                               <span className="df-filter-cat-icon" aria-hidden="true">
                                 {cat.icon === "circle" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>}
@@ -1373,130 +1374,111 @@ export default function PlanningView(props: {
                           <div className="df-filter-empty">{props.lang === "zh" ? "无匹配类别" : "No matching categories"}</div>
                         )}
                       </div>
-                    )}
-                    {filterExpandedCategory === "status" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Status" : "Status"}
-                        </button>
-                        {(["backlog", "done"] as UiWorkflowStatus[]).map((s) => (
-                          <label key={s} className={`df-filter-option${filterWorkflows.includes(s) ? " checked" : ""}`}>
-                            <input type="checkbox" checked={filterWorkflows.includes(s)} onChange={() => toggleArray(setFilterWorkflows, s)} />
-                            <span>{workflowLabel(s)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {filterExpandedCategory === "importance" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Priority" : "Priority"}
-                        </button>
-                        {(["high", "medium", "low", "empty"] as StateFilterValue[]).map((v) => (
-                          <label key={v} className={`df-filter-option${filterImportances.includes(v) ? " checked" : ""}`}>
-                            <input type="checkbox" checked={filterImportances.includes(v)} onChange={() => toggleArray(setFilterImportances, v)} />
-                            <span>{stateLabel(v)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {filterExpandedCategory === "urgency" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Urgency" : "Urgency"}
-                        </button>
-                        {(["high", "medium", "low", "empty"] as StateFilterValue[]).map((v) => (
-                          <label key={v} className={`df-filter-option${filterUrgencies.includes(v) ? " checked" : ""}`}>
-                            <input type="checkbox" checked={filterUrgencies.includes(v)} onChange={() => toggleArray(setFilterUrgencies, v)} />
-                            <span>{stateLabel(v)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {filterExpandedCategory === "project" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Project" : "Project"}
-                        </button>
-                        {safeProjects.length === 0 && <div className="df-filter-empty">{props.lang === "zh" ? "暂无项目" : "No projects"}</div>}
-                        {safeProjects.map((p) => (
-                          <label key={p.id} className={`df-filter-option${filterProjects.includes(String(p.id)) ? " checked" : ""}`}>
-                            <input type="checkbox" checked={filterProjects.includes(String(p.id))} onChange={() => toggleArray(setFilterProjects, String(p.id))} />
-                            <span className="df-filter-option-dot" style={{ background: p.color || DEFAULT_PROJECT_COLOR }} />
-                            <span>{p.title}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {filterExpandedCategory === "due" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Due date" : "Due date"}
-                        </button>
-                        {(["overdue", "this-week", "no-date"] as const).map((d) => (
-                          <label key={d} className={`df-filter-option${filterDueDate === d ? " checked" : ""}`}>
-                            <input type="radio" checked={filterDueDate === d} onChange={() => setFilterDueDate(filterDueDate === d ? null : d)} />
-                            <span>{dueDateLabel(d)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {filterExpandedCategory === "scheduled" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Scheduled" : "Scheduled"}
-                        </button>
-                        {(["scheduled", "unscheduled"] as const).map((s) => (
-                          <label key={s} className={`df-filter-option${filterScheduled === s ? " checked" : ""}`}>
-                            <input type="radio" checked={filterScheduled === s} onChange={() => setFilterScheduled(filterScheduled === s ? null : s)} />
-                            <span>{s === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {filterExpandedCategory === "completed" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Completed" : "Completed"}
-                        </button>
-                        <label className={`df-filter-option${showCompleted ? " checked" : ""}`}>
-                          <input type="checkbox" checked={showCompleted} onChange={() => setShowCompleted((v) => !v)} />
-                          <span>{props.lang === "zh" ? "Show done" : "Show done"}</span>
-                        </label>
-                        <label className={`df-filter-option${showAddedTasks ? " checked" : ""}`}>
-                          <input type="checkbox" checked={showAddedTasks} onChange={() => setShowAddedTasks((v) => !v)} />
-                          <span>{props.lang === "zh" ? "Show added" : "Show added"}</span>
-                        </label>
-                      </div>
-                    )}
-                    {filterExpandedCategory === "search" && (
-                      <div className="df-filter-options-view">
-                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
-                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          {props.lang === "zh" ? "Search text" : "Search text"}
-                        </button>
-                        <input
-                          type="text"
-                          className="df-filter-text-input"
-                          value={filterSearchText}
-                          onChange={(e) => setFilterSearchText(e.target.value)}
-                          placeholder={props.lang === "zh" ? "输入搜索文本…" : "Type to search…"}
-                          autoFocus
-                        />
-                        {filterSearchText.trim() && (
-                          <button type="button" className="df-filter-clear-text" onClick={() => setFilterSearchText("")}>
-                            {props.lang === "zh" ? "清除" : "Clear"}
-                          </button>
+                      <div className="df-filter-options">
+                        {filterExpandedCategory === "status" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Status" : "Status"}</div>
+                            {(["backlog", "done"] as UiWorkflowStatus[]).map((s) => (
+                              <label key={s} className={`df-filter-option${filterWorkflows.includes(s) ? " checked" : ""}`}>
+                                <input type="checkbox" checked={filterWorkflows.includes(s)} onChange={() => toggleArray(setFilterWorkflows, s)} />
+                                <span>{workflowLabel(s)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {filterExpandedCategory === "importance" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Priority" : "Priority"}</div>
+                            {(["high", "medium", "low", "empty"] as StateFilterValue[]).map((v) => (
+                              <label key={v} className={`df-filter-option${filterImportances.includes(v) ? " checked" : ""}`}>
+                                <input type="checkbox" checked={filterImportances.includes(v)} onChange={() => toggleArray(setFilterImportances, v)} />
+                                <span>{stateLabel(v)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {filterExpandedCategory === "urgency" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Urgency" : "Urgency"}</div>
+                            {(["high", "medium", "low", "empty"] as StateFilterValue[]).map((v) => (
+                              <label key={v} className={`df-filter-option${filterUrgencies.includes(v) ? " checked" : ""}`}>
+                                <input type="checkbox" checked={filterUrgencies.includes(v)} onChange={() => toggleArray(setFilterUrgencies, v)} />
+                                <span>{stateLabel(v)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {filterExpandedCategory === "project" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Project" : "Project"}</div>
+                            {safeProjects.length === 0 && <div className="df-filter-empty">{props.lang === "zh" ? "暂无项目" : "No projects"}</div>}
+                            {safeProjects.map((p) => (
+                              <label key={p.id} className={`df-filter-option${filterProjects.includes(String(p.id)) ? " checked" : ""}`}>
+                                <input type="checkbox" checked={filterProjects.includes(String(p.id))} onChange={() => toggleArray(setFilterProjects, String(p.id))} />
+                                <span className="df-filter-option-dot" style={{ background: p.color || DEFAULT_PROJECT_COLOR }} />
+                                <span>{p.title}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {filterExpandedCategory === "due" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Due date" : "Due date"}</div>
+                            {(["overdue", "this-week", "no-date"] as const).map((d) => (
+                              <label key={d} className={`df-filter-option${filterDueDate === d ? " checked" : ""}`}>
+                                <input type="radio" checked={filterDueDate === d} onChange={() => setFilterDueDate(filterDueDate === d ? null : d)} />
+                                <span>{dueDateLabel(d)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {filterExpandedCategory === "scheduled" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Scheduled" : "Scheduled"}</div>
+                            {(["scheduled", "unscheduled"] as const).map((s) => (
+                              <label key={s} className={`df-filter-option${filterScheduled === s ? " checked" : ""}`}>
+                                <input type="radio" checked={filterScheduled === s} onChange={() => setFilterScheduled(filterScheduled === s ? null : s)} />
+                                <span>{s === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {filterExpandedCategory === "completed" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Completed" : "Completed"}</div>
+                            <label className={`df-filter-option${showCompleted ? " checked" : ""}`}>
+                              <input type="checkbox" checked={showCompleted} onChange={() => setShowCompleted((v) => !v)} />
+                              <span>{props.lang === "zh" ? "Show done" : "Show done"}</span>
+                            </label>
+                            <label className={`df-filter-option${showAddedTasks ? " checked" : ""}`}>
+                              <input type="checkbox" checked={showAddedTasks} onChange={() => setShowAddedTasks((v) => !v)} />
+                              <span>{props.lang === "zh" ? "Show added" : "Show added"}</span>
+                            </label>
+                          </div>
+                        )}
+                        {filterExpandedCategory === "search" && (
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">{props.lang === "zh" ? "Search text" : "Search text"}</div>
+                            <input
+                              type="text"
+                              className="df-filter-text-input"
+                              value={filterSearchText}
+                              onChange={(e) => setFilterSearchText(e.target.value)}
+                              placeholder={props.lang === "zh" ? "输入搜索文本…" : "Type to search…"}
+                              autoFocus
+                            />
+                            {filterSearchText.trim() && (
+                              <button type="button" className="df-filter-clear-text" onClick={() => setFilterSearchText("")}>
+                                {props.lang === "zh" ? "清除" : "Clear"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {!filterExpandedCategory && (
+                          <div className="df-filter-empty">{props.lang === "zh" ? "悬停左侧类别以筛选" : "Hover a category to filter"}</div>
                         )}
                       </div>
-                    )}
+                    </div>
                     {hasActiveFilters && (
                       <button type="button" className="df-filter-reset" onClick={clearAllFilters}>
                         {props.lang === "zh" ? "清除全部" : "Clear all"}

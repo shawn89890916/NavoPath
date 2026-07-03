@@ -6829,7 +6829,9 @@ body.df-timeline-pointer-drag * {
   display: flex !important;
 }
 .df-app .df-header-right {
+  grid-column: -2 !important;
   justify-self: end !important;
+  margin-left: auto !important;
   margin-right: 0 !important;
 }
 .df-app .df-tabs-right {
@@ -7066,12 +7068,12 @@ body.df-timeline-pointer-drag * {
 .df-app.mode-planning .df-plan-project-node {
   min-height: 54px !important;
 }
-.df-app.mode-planning .df-tree .df-task-block[data-task-variant="planning"] {
+.df-app.mode-planning .df-task-block[data-task-variant="planning"] {
   --task-project-accent-size: 0px;
   border-left-width: 1px !important;
   border-left-color: var(--task-border) !important;
 }
-.df-app.mode-planning .df-tree .df-task-block[data-task-variant="planning"] > .df-task-block-accent {
+.df-app.mode-planning .df-task-block[data-task-variant="planning"] > .df-task-block-accent {
   display: none !important;
 }
 
@@ -7227,8 +7229,16 @@ body.df-timeline-pointer-drag * {
   min-height: 0 !important;
   overflow: visible !important;
 }
-/* Sidebar becomes a compact vertical rail (view switcher + filter trigger). */
+/* Sidebar becomes a compact vertical rail (view switcher + filter trigger).
+   Override the legacy absolute-positioned 58px sidebar so it sits in the
+   grid column 1 (44px) and does not overlap the tree-wrap. */
 .df-app .df-planning .df-planning-sidebar {
+  position: relative !important;
+  position: static !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: 44px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
@@ -7236,6 +7246,8 @@ body.df-timeline-pointer-drag * {
   padding: 10px 4px !important;
   border-right: 1px solid var(--paper-rule) !important;
   background: transparent !important;
+  pointer-events: auto !important;
+  z-index: auto !important;
 }
 .df-app .df-planning .df-planning-filter-bar {
   flex-direction: column !important;
@@ -7414,12 +7426,13 @@ body.df-timeline-pointer-drag * {
 }
 
 /* =========================================================================
-   Linear-style nested filter popover — overrides the old flat filter panel.
-   Level 1: category list (icon + label + count + summary + chevron).
-   Level 2: nested options view with back button.
+   Linear-style cascading filter popover — hover to open categories.
+   Two-column body: categories list (left) + options panel (right), both
+   visible simultaneously. Hovering a category row immediately reveals its
+   options on the right, mirroring Linear's filter menu.
    ========================================================================= */
 .df-filter-panel {
-  width: min(320px, calc(100vw - 42px)) !important;
+  width: min(520px, calc(100vw - 42px)) !important;
   max-height: min(560px, calc(100vh - 150px)) !important;
   display: flex !important;
   flex-direction: column !important;
@@ -7443,7 +7456,23 @@ body.df-timeline-pointer-drag * {
 }
 .df-filter-search input::placeholder { color: var(--text-muted); }
 
-.df-filter-categories { display: flex; flex-direction: column; gap: 1px; }
+.df-filter-body {
+  display: grid !important;
+  grid-template-columns: minmax(150px, 1fr) minmax(200px, 1.25fr) !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+.df-filter-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-right: 1px solid var(--paper-rule);
+  padding-right: 4px;
+  overflow-y: auto;
+  max-height: min(380px, calc(100vh - 220px));
+}
 .df-filter-cat-row {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto auto auto;
@@ -7460,10 +7489,18 @@ body.df-timeline-pointer-drag * {
   cursor: pointer;
   transition: background .12s ease;
 }
-.df-filter-cat-row:hover { background: color-mix(in srgb, var(--surface-main) 94%, var(--text-main) 6%); }
+.df-filter-cat-row:hover,
+.df-filter-cat-row.active {
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--text-main) 6%);
+}
+.df-filter-cat-row.active {
+  color: var(--accent-active);
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%);
+}
 .df-filter-cat-row.has-active { color: var(--accent-active); }
 .df-filter-cat-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
-.df-filter-cat-row.has-active .df-filter-cat-icon { color: var(--accent-active); }
+.df-filter-cat-row.has-active .df-filter-cat-icon,
+.df-filter-cat-row.active .df-filter-cat-icon { color: var(--accent-active); }
 .df-filter-cat-icon svg { width: 14px; height: 14px; }
 .df-filter-cat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .df-filter-cat-count {
@@ -7473,21 +7510,30 @@ body.df-timeline-pointer-drag * {
   color: var(--accent-active); font: 600 10px/1 var(--paper-sans);
 }
 .df-filter-cat-summary {
-  max-width: 110px; overflow: hidden; color: var(--text-muted);
+  max-width: 90px; overflow: hidden; color: var(--text-muted);
   font: 10px/1.2 var(--paper-mono); text-overflow: ellipsis; white-space: nowrap;
 }
 .df-filter-cat-chevron { width: 7px; height: 11px; color: var(--text-muted); opacity: .6; }
-.df-filter-cat-row:hover .df-filter-cat-chevron { opacity: 1; }
+.df-filter-cat-row:hover .df-filter-cat-chevron,
+.df-filter-cat-row.active .df-filter-cat-chevron { opacity: 1; }
 
-.df-filter-options-view { display: flex; flex-direction: column; gap: 2px; }
-.df-filter-back {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 4px; border: 0; border-bottom: 1px solid var(--paper-rule);
-  border-radius: 0; background: transparent; color: var(--text-main);
-  font: 650 12px/1.3 var(--paper-sans); cursor: pointer; margin-bottom: 4px;
+.df-filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+  overflow-y: auto;
+  max-height: min(380px, calc(100vh - 220px));
 }
-.df-filter-back:hover { color: var(--accent-active); }
-.df-filter-back svg { width: 7px; height: 11px; }
+.df-filter-options-view { display: flex; flex-direction: column; gap: 2px; }
+.df-filter-options-title {
+  padding: 6px 4px 8px;
+  border-bottom: 1px solid var(--paper-rule);
+  margin-bottom: 4px;
+  color: var(--text-main);
+  font: 650 12px/1.3 var(--paper-sans);
+}
+.df-filter-back { display: none !important; }
 
 .df-filter-option {
   min-width: 0; min-height: 30px;
