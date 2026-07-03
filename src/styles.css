@@ -11076,7 +11076,9 @@ h3 {
 
 .long-task-row.done {
 
-  opacity: 0.56;
+  /* Clean completed style: no opacity/gray overlay. Title muted + strike handled per-component. */
+
+  opacity: 1;
 
 }
 

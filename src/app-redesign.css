@@ -7197,3 +7197,219 @@ body.df-timeline-pointer-drag * {
   color: #B6423C !important;
   background: transparent !important;
 }
+
+/* =========================================================================
+   Planning workspace rebuild — structured task surface, Linear-style filters,
+   clean drag/drop placeholders. Follows NavoPath paper rules: no glow, no scale,
+   no dirty gray surfaces, no hover lift.
+   ========================================================================= */
+
+/* Tighter, structured canvas: less floating empty space, predictable grid. */
+.df-app .df-planning .df-mindmap.no-root {
+  padding: 14px 18px !important;
+  border-radius: 10px !important;
+}
+.df-app .df-planning .df-planning-body {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+.df-app .df-planning .df-mindmap {
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+/* Sidebar becomes a compact vertical rail (view switcher + filter trigger). */
+.df-app .df-planning .df-planning-sidebar {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 10px 4px !important;
+  border-right: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+}
+.df-app .df-planning .df-planning-filter-bar {
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 0 !important;
+}
+.df-app .df-planning .df-planning-filter-menu {
+  position: relative !important;
+}
+.df-app .df-planning .df-planning-view-switch {
+  position: static !important;
+  display: grid !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.df-app .df-planning .df-view-btn {
+  width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-right: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  writing-mode: vertical-rl !important;
+  text-orientation: mixed !important;
+  letter-spacing: 1px !important;
+  font: 650 10px/1 var(--paper-sans) !important;
+  display: inline-grid !important;
+  place-items: center !important;
+}
+.df-app .df-planning .df-view-btn:hover,
+.df-app .df-planning .df-view-btn:focus-visible {
+  color: var(--text-main) !important;
+  border-right-color: var(--paper-rule-strong) !important;
+  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
+}
+.df-app .df-planning .df-view-btn.active {
+  color: var(--accent-active) !important;
+  border-right-color: var(--accent-active) !important;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%) !important;
+}
+.df-app .df-planning .df-filter-trigger {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  border: 0 !important;
+  border-right: 2px solid transparent !important;
+  border-radius: 0 !important;
+}
+.df-app .df-planning .df-filter-trigger:hover,
+.df-app .df-planning .df-filter-trigger.active {
+  border-right-color: var(--accent-active) !important;
+}
+.df-app .df-planning .df-filter-panel {
+  left: calc(100% + 8px) !important;
+  top: 0 !important;
+}
+
+/* View area: structured surface, predictable alignment, no floating cards. */
+.df-app .df-planning .df-tree-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  padding: 14px 18px 18px !important;
+  overflow: auto !important;
+}
+.df-app .df-planning .df-kanban-board,
+.df-app .df-planning .df-eisenhower-grid,
+.df-app .df-planning .df-planning-list,
+.df-app .df-planning .df-tree {
+  padding-right: 6px !important;
+}
+.df-app .df-planning .df-kanban-board {
+  padding-top: 4px !important;
+  padding-left: 0 !important;
+}
+.df-app .df-planning .df-eisenhower-grid {
+  padding-top: 4px !important;
+  padding-left: 0 !important;
+}
+.df-app .df-planning .df-planning-list {
+  padding-top: 4px !important;
+  padding-left: 0 !important;
+}
+
+/* Linear-style active filter chips bar — small text chips, thin borders. */
+.df-active-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+.df-active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 32%, var(--paper-rule));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%);
+  color: var(--text-main);
+  font: 500 11px/1.3 var(--paper-sans);
+  cursor: pointer;
+  transition: border-color .14s ease, color .14s ease, background .14s ease;
+}
+.df-active-filter-chip:hover {
+  border-color: color-mix(in srgb, var(--accent-active) 56%, var(--paper-rule));
+  color: var(--accent-active);
+}
+.df-active-filter-chip-label {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.df-active-filter-chip svg {
+  width: 8px;
+  height: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: .7;
+}
+.df-active-filter-chip:hover svg { opacity: 1; }
+.df-active-filter-clear {
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  padding: 2px 4px !important;
+  font: 500 11px/1.3 var(--paper-sans) !important;
+  cursor: pointer;
+  transition: color .14s ease, border-color .14s ease;
+}
+.df-active-filter-clear:hover {
+  color: var(--text-main) !important;
+  border-bottom-color: var(--paper-rule-strong) !important;
+}
+
+/* Filter panel section heads visible now that all chips render. */
+.df-app .df-planning .df-filter-panel header,
+.df-app .df-planning .df-filter-section-head {
+  display: flex !important;
+}
+
+/* Drag/drop placeholder + insertion line — clean, no glow, no gray fill. */
+.df-kanban-drop-placeholder {
+  height: 44px;
+  min-height: 44px;
+  border: 1px dashed color-mix(in srgb, var(--accent-active) 48%, var(--paper-rule));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%);
+  pointer-events: none;
+}
+/* Drag source: slight ink reduction only, no opacity flicker, no gray. */
+.df-kanban-card.is-drag-source,
+.df-eisenhower-task.is-drag-source {
+  opacity: .5 !important;
+}
+/* Stronger (but still clean) border on drop targets, no shadow. */
+.df-kanban-column.is-drop-target,
+.df-eisenhower-quadrant.is-drop-target {
+  border-color: var(--accent-active) !important;
+  border-style: dashed !important;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important;
+}
+

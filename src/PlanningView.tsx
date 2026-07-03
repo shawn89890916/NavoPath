@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PlannerData, Project, Subtask, Task, WorkflowStatus } from "./types";
 import { t, type Language } from "./i18n";
@@ -1165,7 +1165,49 @@ export default function PlanningView(props: {
         onToggle: () => toggleArray(setFilterUrgencies, u),
       })),
     },
-  ].filter((chip) => chip.key === "project" || chip.key === "display");
+  ];
+
+  // Linear-style active filter chips: each active filter becomes a removable chip.
+  type ActiveChip = { key: string; label: string; onClear: () => void };
+  const stateLabel = (v: StateFilterValue) =>
+    v === "high" ? (props.lang === "zh" ? "High" : "High")
+    : v === "medium" ? (props.lang === "zh" ? "Medium" : "Medium")
+    : v === "low" ? (props.lang === "zh" ? "Low" : "Low")
+    : (props.lang === "zh" ? "Unset" : "Unset");
+  const workflowLabel = (s: UiWorkflowStatus) =>
+    s === "backlog" ? (props.lang === "zh" ? "To do" : "To do")
+    : s === "doing" ? (props.lang === "zh" ? "Doing" : "Doing")
+    : (props.lang === "zh" ? "Done" : "Done");
+
+  const activeFilterChips: ActiveChip[] = [
+    ...filterProjects.map((id) => ({
+      key: `project-${id}`,
+      label: `${props.lang === "zh" ? "Project" : "Project"}: ${safeProjects.find((p) => String(p.id) === id)?.title || id}`,
+      onClear: () => toggleArray(setFilterProjects, id),
+    })),
+    ...filterWorkflows.map((s) => ({
+      key: `status-${s}`,
+      label: `${props.lang === "zh" ? "Status" : "Status"}: ${workflowLabel(s)}`,
+      onClear: () => toggleArray(setFilterWorkflows, s),
+    })),
+    ...filterImportances.map((v) => ({
+      key: `importance-${v}`,
+      label: `${props.lang === "zh" ? "Importance" : "Importance"}: ${stateLabel(v)}`,
+      onClear: () => toggleArray(setFilterImportances, v),
+    })),
+    ...filterUrgencies.map((v) => ({
+      key: `urgency-${v}`,
+      label: `${props.lang === "zh" ? "Urgency" : "Urgency"}: ${stateLabel(v)}`,
+      onClear: () => toggleArray(setFilterUrgencies, v),
+    })),
+  ];
+
+  const clearAllFilters = () => {
+    setFilterProjects([]);
+    setFilterWorkflows([]);
+    setFilterImportances([]);
+    setFilterUrgencies([]);
+  };
 
   return (
     <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
@@ -1229,6 +1271,25 @@ export default function PlanningView(props: {
             </div>
           </aside>
           <div className="df-tree-wrap">
+          {activeFilterChips.length > 0 && (
+            <div className="df-active-filter-bar" role="region" aria-label={props.lang === "zh" ? "Active filters" : "Active filters"}>
+              {activeFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className="df-active-filter-chip"
+                  onClick={chip.onClear}
+                  title={props.lang === "zh" ? "移除筛选" : "Remove filter"}
+                >
+                  <span className="df-active-filter-chip-label">{chip.label}</span>
+                  <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" /></svg>
+                </button>
+              ))}
+              <button type="button" className="df-active-filter-clear" onClick={clearAllFilters}>
+                {props.lang === "zh" ? "清除全部" : "Clear all"}
+              </button>
+            </div>
+          )}
 
           {viewMode === "kanban" && (
             <div className="df-kanban-board">
@@ -1256,7 +1317,7 @@ export default function PlanningView(props: {
                           priority={planningTaskPriority(task)}
                           checked={normalizeWorkflowStatus(task) === "done"}
                           projectColor={projectColor(task.projectId)}
-                          className={`df-kanban-card${normalizeWorkflowStatus(task) === "done" ? " completed" : ""}`}
+                          className={`df-kanban-card${normalizeWorkflowStatus(task) === "done" ? " completed" : ""}${kanbanDragTaskId === task.id ? " is-drag-source" : ""}`}
                           draggable
                           onDragStart={() => setKanbanDragTaskId(task.id)}
                           onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
@@ -1279,7 +1340,10 @@ export default function PlanningView(props: {
                           </TaskBlockRow>
                         </TaskBlock>
                       ))}
-                      {columnTasks.length === 0 && <div className="df-kanban-empty">{props.lang === "zh" ? "Drop tasks here" : "Drop tasks here"}</div>}
+                      {kanbanDragTaskId && kanbanDropStatus === status && (
+                        <div className="df-kanban-drop-placeholder" aria-hidden="true" />
+                      )}
+                      {columnTasks.length === 0 && kanbanDragTaskId == null && <div className="df-kanban-empty">{props.lang === "zh" ? "Drop tasks here" : "Drop tasks here"}</div>}
                     </div>
                   </div>
                 );
@@ -1323,7 +1387,7 @@ export default function PlanningView(props: {
                             priority={planningTaskPriority(task)}
                             checked={taskDone}
                             projectColor={projectColor(task.projectId)}
-                            className={`df-eisenhower-task${taskDone ? " completed" : ""}`}
+                            className={`df-eisenhower-task${taskDone ? " completed" : ""}${kanbanDragTaskId === task.id ? " is-drag-source" : ""}`}
                             draggable
                             onDragStart={() => setKanbanDragTaskId(task.id)}
                             onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
@@ -1347,7 +1411,10 @@ export default function PlanningView(props: {
                           </TaskBlock>
                         );
                       })}
-                      {quadTasks.length === 0 && <div className="df-eisenhower-empty">Drop tasks here</div>}
+                      {kanbanDragTaskId && kanbanDropStatus === (("q-" + quad.key) as unknown as UiWorkflowStatus) && (
+                        <div className="df-kanban-drop-placeholder" aria-hidden="true" />
+                      )}
+                      {quadTasks.length === 0 && kanbanDragTaskId == null && <div className="df-eisenhower-empty">Drop tasks here</div>}
                     </div>
                   </div>
                 );
