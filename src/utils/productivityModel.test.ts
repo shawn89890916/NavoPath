@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
-import { matchesLevelFilter, normalizeNullableLevel, normalizeTaskState, validateProjectCompletion } from "./productivityModel";
+import { matchesLevelFilter, normalizeNullableLevel, normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProjectCompletion } from "./productivityModel";
 
 const baseTask: Task = {
   id: "task-1",
@@ -31,6 +31,20 @@ describe("productivity model", () => {
     expect(normalizeTaskState({ ...baseTask, workflowStatus: "doing" }).workflow).toBe("doing");
     expect(normalizeTaskState({ ...baseTask, completed: true }).workflow).toBe("done");
     expect(normalizeTaskState({ ...baseTask, urgency: undefined }).urgency).toBe("low");
+  });
+
+  it("marks important or urgent tasks for attention checkboxes", () => {
+    expect(normalizeTaskCheckTone(baseTask)).toBe("muted");
+    expect(normalizeTaskCheckTone({ ...baseTask, importance: "high" })).toBe("attention");
+    expect(normalizeTaskCheckTone({ ...baseTask, urgency: "high" })).toBe("attention");
+    expect(normalizeTaskCheckTone({ ...baseTask, importance: "medium", urgency: "medium" })).toBe("muted");
+  });
+
+  it("builds task setting patches for importance and urgency controls", () => {
+    expect(taskMetaPatch("importance", "high")).toEqual({ importance: "high" });
+    expect(taskMetaPatch("importance", "")).toEqual({ importance: null });
+    expect(taskMetaPatch("urgency", "medium")).toEqual({ urgency: "medium" });
+    expect(taskMetaPatch("urgency", "")).toEqual({ urgency: "low" });
   });
 
   it("blocks project completion while child tasks remain open", () => {

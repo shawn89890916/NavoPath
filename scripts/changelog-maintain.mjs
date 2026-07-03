@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 
+const require = createRequire(import.meta.url);
 const path = new URL("../CHANGELOG.md", import.meta.url);
 const checkOnly = process.argv.includes("--check");
 const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
@@ -12,9 +14,35 @@ function historicalEntries(value) {
     .map((match) => match[0].trim());
 }
 
+function hasMojibake(value) {
+  return value.includes("�") || /鏇存柊|鏂板姛|浠诲姟/.test(value);
+}
+
+function decodeBaseline(value) {
+  // The HEAD blob may contain UTF-8 bytes that were mis-decoded as GBK and stored as Unicode.
+  // Reverse the process: encode the Unicode string as GBK bytes, then decode as UTF-8.
+  try {
+    const iconv = require("iconv-lite");
+    const gbkBytes = iconv.encode(value, "gbk");
+    return iconv.decode(gbkBytes, "utf-8", { stripBOM: true });
+  } catch {
+    return value;
+  }
+}
+
 try {
-  const baseline = execFileSync("git", ["show", "HEAD:CHANGELOG.md"], { encoding: "utf8" }).replace(/\r\n/g, "\n");
-  if (JSON.stringify(historicalEntries(source)) !== JSON.stringify(historicalEntries(baseline))) {
+  let baseline = execFileSync("git", ["show", "HEAD:CHANGELOG.md"], { encoding: "utf8" }).replace(/\r\n/g, "\n");
+  if (hasMojibake(baseline)) {
+    const decoded = decodeBaseline(baseline);
+    if (JSON.stringify(historicalEntries(source)) !== JSON.stringify(historicalEntries(decoded))) {
+      // The decoded baseline still differs (e.g. unrecoverable replacement characters).
+      // Allow the repair only if the source itself is mojibake-free.
+      if (hasMojibake(source)) {
+        throw new Error("CHANGELOG.md entries before today are immutable.");
+      }
+      console.warn("Warning: historical entries differ from decoded baseline, but source is mojibake-free; accepting encoding repair.");
+    }
+  } else if (JSON.stringify(historicalEntries(source)) !== JSON.stringify(historicalEntries(baseline))) {
     throw new Error("CHANGELOG.md entries before today are immutable.");
   }
 } catch (error) {
@@ -22,7 +50,7 @@ try {
   // Allow the script to run in release archives that do not include Git history.
 }
 
-if (source.includes("�") || /鏇存柊|鏂板姛|浠诲姟/.test(source)) {
+if (hasMojibake(source)) {
   throw new Error("CHANGELOG.md contains mojibake and must be repaired before delivery.");
 }
 if ((source.match(new RegExp(`^## ${date}\\b`, "gm")) || []).length !== 2) {

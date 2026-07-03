@@ -2,7 +2,7 @@ import type { PlannerData, Subtask, Task } from "../types";
 
 export type TodayCandidateResult = {
   data: PlannerData;
-  action: "added" | "removed" | "existing";
+  action: "added" | "removed" | "existing" | "returned";
   taskId: string;
 };
 
@@ -88,5 +88,43 @@ export function promoteSubtaskToToday(
     data: { ...data, tasks: [...data.tasks, promoted] },
     action: "added",
     taskId: promoted.id,
+  };
+}
+
+export function returnScheduledTaskToToday(
+  data: PlannerData,
+  taskOrRecordId: string,
+  today: string,
+  now = new Date().toISOString(),
+): TodayCandidateResult {
+  const owner = data.tasks.find((task) =>
+    task.id === taskOrRecordId || (task.timelineRecords || []).some((record) => record.id === taskOrRecordId)
+  );
+  if (!owner) return { data, action: "existing", taskId: taskOrRecordId };
+
+  return {
+    data: {
+      ...data,
+      tasks: data.tasks.map((task) => {
+        if (task.id !== owner.id) return task;
+        const isRecordReturn = (task.timelineRecords || []).some((record) => record.id === taskOrRecordId);
+        const remainingRecords = isRecordReturn
+          ? (task.timelineRecords || []).filter((record) => record.id !== taskOrRecordId)
+          : [];
+        return {
+          ...task,
+          scheduledDate: undefined,
+          scheduledStart: undefined,
+          scheduledEnd: undefined,
+          executionStatus: undefined,
+          timelineRecords: remainingRecords,
+          plannedForDate: today,
+          executionLane: "candidate",
+          updatedAt: now,
+        };
+      }),
+    },
+    action: "returned",
+    taskId: owner.id,
   };
 }

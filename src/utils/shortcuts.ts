@@ -8,6 +8,11 @@ export type ShortcutDefinition = {
   scope: ShortcutScope;
 };
 
+export type ShortcutGroup = {
+  scope: ShortcutScope;
+  shortcuts: ShortcutDefinition[];
+};
+
 export const SHORTCUTS: ShortcutDefinition[] = [
   { id: "command-search", labelZh: "搜索", labelEn: "Search", keys: ["Ctrl/Cmd+K"], scope: "global" },
   { id: "help", labelZh: "快捷键帮助", labelEn: "Shortcut help", keys: ["?"], scope: "global" },
@@ -33,6 +38,19 @@ export function isTypingContext(target: EventTarget | null): boolean {
   const candidate = target as { tagName?: string; isContentEditable?: boolean };
   const tag = String(candidate.tagName || "").toLowerCase();
   return tag === "input" || tag === "textarea" || tag === "select" || Boolean(candidate.isContentEditable);
+}
+
+export function groupShortcutsByScope(shortcuts: ShortcutDefinition[] = SHORTCUTS): ShortcutGroup[] {
+  const groups: ShortcutGroup[] = [];
+  for (const shortcut of shortcuts) {
+    let group = groups.find((item) => item.scope === shortcut.scope);
+    if (!group) {
+      group = { scope: shortcut.scope, shortcuts: [] };
+      groups.push(group);
+    }
+    group.shortcuts.push(shortcut);
+  }
+  return groups;
 }
 
 export function matchShortcut(event: KeyboardEvent, shortcuts: ShortcutDefinition[] = SHORTCUTS): ShortcutDefinition | null {

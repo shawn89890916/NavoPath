@@ -57,7 +57,24 @@ function plannedMinutes(task: Task) {
   }, 0);
 }
 
-export function buildTimeShareMetrics(data: PlannerData, options: TimeShareOptions): TimeShareResult {
+function isoDate(value: string | undefined) {
+  return String(value || "").slice(0, 10);
+}
+
+function addDays(iso: string, days: number) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function inRange(date: string | undefined, range: TimeShareRange, todayIso: string) {
+  const iso = isoDate(date);
+  if (!iso) return false;
+  if (range === "all") return true;
+  return iso >= addDays(todayIso, -Number(range) + 1) && iso <= todayIso;
+}
+
+export function buildTimeShareMetrics(data: PlannerData, options: TimeShareOptions, todayIso = new Date().toISOString().slice(0, 10)): TimeShareResult {
   const taskById = new Map((data.tasks || []).map((task) => [task.id, task]));
   const buckets = new Map<string, { minutes: number; taskIds: Set<string> }>();
   const add = (task: Task, minutes: number) => {
@@ -71,11 +88,15 @@ export function buildTimeShareMetrics(data: PlannerData, options: TimeShareOptio
 
   if (options.mode === "actual") {
     for (const entry of data.timeEntries || []) {
+      if (!inRange(entry.startAt, options.range, todayIso)) continue;
       const task = taskById.get(entry.taskId);
       if (task) add(task, Math.max(0, Math.round(entry.durationMinutes || 0)));
     }
   } else {
-    for (const task of data.tasks || []) add(task, plannedMinutes(task));
+    for (const task of data.tasks || []) {
+      const records = (task.timelineRecords || []).filter((record) => inRange(record.scheduledDate, options.range, todayIso) || inRange(record.scheduledEndDate, options.range, todayIso));
+      add({ ...task, timelineRecords: records }, plannedMinutes({ ...task, timelineRecords: records }));
+    }
   }
 
   const totalMinutes = Array.from(buckets.values()).reduce((sum, bucket) => sum + bucket.minutes, 0);

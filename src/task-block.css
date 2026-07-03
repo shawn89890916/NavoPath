@@ -1,0 +1,850 @@
+/*
+ * NavoPath — Unified TaskBlock system
+ *
+ * One shared anatomy for every task surface:
+ *   [ checkbox ][ content: title + optional metadata ][ duration ][ actions ]
+ *
+ * Anatomy stays consistent across variants (candidate | scheduled | allDay | compact | habit-child).
+ * Variant tokens control density, height, padding, and alignment. Appearance modes only change visual intensity:
+ *   data-task-appearance="calm"    (default — clean paper, neutral border, weak bottom accent)
+ *   data-task-appearance="medium"  (stronger project visibility, muted full border, thicker bottom)
+ *   data-task-appearance="custom"  (user-configurable via --task-accent-position / --task-accent-strength)
+ *
+ * Project color is a separate visual layer (accent line/border). It never dominates
+ * title, duration, icons, or large backgrounds. Priority is shown by checkbox color.
+ *
+ * This stylesheet intentionally overrides the fragmented legacy patches in
+ * app-redesign.css (.df-task-card / .df-time-block / .df-candidate-row) via
+ * [data-task-appearance] specificity so the shared anatomy is enforced everywhere.
+ */
+
+.df-app,
+.navo-demo-app {
+  /* Shared task-block tokens (Calm defaults) */
+  --task-bg: var(--surface-card, var(--surface-main, #FBF9FF));
+  --task-border: color-mix(in srgb, var(--paper-rule, var(--border-subtle, #E7E2D8)) 90%, transparent);
+  --task-border-hover: color-mix(in srgb, var(--text-faint, #807A70) 38%, var(--paper-rule, #E7E2D8));
+  --task-radius: 6px;
+  --task-padding-x: 12px;
+  --task-padding-y: 9px;
+  --task-min-height: 42px;
+  --task-gap: 12px;
+  --task-align-items: center;
+  --task-justify-items: stretch;
+  --task-grid-template: auto minmax(0, 1fr) auto auto;
+  --task-title-color: var(--text-main, #27231E);
+  --task-meta-color: var(--text-muted, #6B6358);
+  --task-duration-color: var(--text-muted, #6B6358);
+  --task-action-color: var(--text-muted, #6B6358);
+  --task-project-color: var(--accent-active, #7EA172);
+  --task-project-accent-size: 2px;
+  --task-accent-position: left;
+  --task-accent-strength: subtle;
+  --task-checkbox-color: var(--task-project-color);
+  --task-selected-border: color-mix(in srgb, var(--task-project-color) 48%, var(--task-border));
+
+  /* Priority → checkbox color palette (muted, editorial) */
+  --task-priority-low: #8A7B6A;
+  --task-priority-normal: #6F8A86;
+  --task-priority-high: #C2853E;
+  --task-priority-urgent: #B6423C;
+}
+
+/* ============================================================
+ * Appearance mode 1 — Calm (default)
+ * Clean pure background, neutral 1px paper border, weak bottom
+ * project accent (~2px). No full project outline, no glow, no lift.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance="calm"],
+.navo-demo-app .df-task-block[data-task-appearance="calm"] {
+  --task-bg: var(--surface-card, var(--surface-main, #FBF9FF));
+  --task-border: color-mix(in srgb, var(--paper-rule, var(--border-subtle, #E7E2D8)) 90%, transparent);
+  --task-border-hover: color-mix(in srgb, var(--text-faint, #807A70) 34%, var(--paper-rule, #E7E2D8));
+  --task-project-accent-size: 2px;
+  --task-accent-position: left;
+  --task-accent-strength: subtle;
+}
+
+/* ============================================================
+ * Appearance mode 2 — Medium
+ * Stronger project visibility: muted full project border allowed,
+ * bottom border may be thicker. Same anatomy as Calm.
+ * No glow, no colored shadow, no dirty fill.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance="medium"],
+.navo-demo-app .df-task-block[data-task-appearance="medium"] {
+  --task-border: color-mix(in srgb, var(--task-project-color) 30%, var(--paper-rule, #E7E2D8));
+  --task-border-hover: color-mix(in srgb, var(--task-project-color) 52%, var(--paper-rule, #E7E2D8));
+  --task-project-accent-size: 4px;
+  --task-accent-position: left;
+  --task-accent-strength: medium;
+  --task-selected-border: color-mix(in srgb, var(--task-project-color) 62%, var(--paper-rule, #E7E2D8));
+}
+
+/* ============================================================
+ * Appearance mode 3 — Custom (user-configurable hooks)
+ * Reads --task-accent-position and --task-accent-strength so a
+ * settings UI can drive layout without duplicating components.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance="custom"],
+.navo-demo-app .df-task-block[data-task-appearance="custom"] {
+  /* Defaults mirror Calm; a settings layer may override these vars. */
+  --task-bg: var(--surface-card, var(--surface-main, #FBF9FF));
+  --task-border: color-mix(in srgb, var(--paper-rule, var(--border-subtle, #E7E2D8)) 90%, transparent);
+  --task-border-hover: color-mix(in srgb, var(--text-faint, #807A70) 34%, var(--paper-rule, #E7E2D8));
+}
+
+.df-app .df-task-block[data-task-appearance="custom"][data-task-accent-position="full"],
+.navo-demo-app .df-task-block[data-task-appearance="custom"][data-task-accent-position="full"] {
+  --task-border: color-mix(in srgb, var(--task-project-color) 28%, var(--paper-rule, #E7E2D8));
+  --task-border-hover: color-mix(in srgb, var(--task-project-color) 50%, var(--paper-rule, #E7E2D8));
+}
+
+.df-app .df-task-block[data-task-appearance="custom"][data-task-accent-position="left"],
+.navo-demo-app .df-task-block[data-task-appearance="custom"][data-task-accent-position="left"] {
+  --task-project-accent-size: 0px;
+}
+
+/* ============================================================
+ * Core block surface — shared by every variant.
+ * Overrides legacy !important patches via [data-task-appearance].
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance],
+.navo-demo-app .df-task-block[data-task-appearance] {
+  position: relative;
+  box-sizing: border-box;
+  display: block !important;
+  border: 1px solid var(--task-border) !important;
+  border-left-width: var(--task-project-accent-size, 2px) !important;
+  border-left-color: var(--task-project-color, var(--accent-active)) !important;
+  border-bottom-color: var(--task-border) !important;
+  border-radius: var(--task-radius) !important;
+  background: var(--task-bg) !important;
+  background-image: none !important;
+  color: var(--task-title-color) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+  padding: var(--task-padding-y) var(--task-padding-x) !important;
+  min-height: var(--task-min-height) !important;
+  transition: background-color 160ms var(--paper-ease, ease), border-color 160ms var(--paper-ease, ease), opacity 160ms var(--paper-ease, ease) !important;
+  --cat: var(--task-project-color, var(--accent-active));
+  --navo-card-project: var(--task-project-color, var(--accent-active));
+}
+
+/* Project accent layer — separate from content.
+   Calm = weak bottom line; Medium = thicker bottom line; Custom = position-driven. */
+.df-app .df-task-block[data-task-appearance] > .df-task-block-accent,
+.navo-demo-app .df-task-block[data-task-appearance] > .df-task-block-accent {
+  position: absolute;
+  pointer-events: none;
+  background: var(--task-project-color, var(--accent-active));
+  opacity: .55;
+  border-radius: inherit;
+}
+
+.df-app .df-task-block[data-task-appearance] > .df-task-block-accent.df-task-block-accent--bottom,
+.navo-demo-app .df-task-block[data-task-appearance] > .df-task-block-accent.df-task-block-accent--bottom {
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: var(--task-project-accent-size, 2px);
+  border-radius: 0 0 var(--task-radius) var(--task-radius);
+}
+
+.df-app .df-task-block[data-task-appearance] > .df-task-block-accent.df-task-block-accent--left,
+.navo-demo-app .df-task-block[data-task-appearance] > .df-task-block-accent.df-task-block-accent--left {
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  height: auto;
+  border-radius: var(--task-radius) 0 0 var(--task-radius);
+}
+
+.df-app .df-task-block[data-task-appearance] > .df-task-block-accent.df-task-block-accent--full,
+.navo-demo-app .df-task-block[data-task-appearance] > .df-task-block-accent.df-task-block-accent--full {
+  inset: 0;
+  height: auto;
+  border-radius: inherit;
+  opacity: .08;
+}
+
+/* Hover — slightly stronger neutral border + slightly stronger bottom accent.
+   No dirty gray fill, no glow, no scale, no lift. */
+.df-app .df-task-block[data-task-appearance]:hover,
+.df-app .df-task-block[data-task-appearance]:focus-within,
+.navo-demo-app .df-task-block[data-task-appearance]:hover,
+.navo-demo-app .df-task-block[data-task-appearance]:focus-within {
+  border-color: var(--task-border-hover) !important;
+  background: var(--task-bg) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.df-app .df-task-block[data-task-appearance]:hover > .df-task-block-accent--bottom,
+.navo-demo-app .df-task-block[data-task-appearance]:hover > .df-task-block-accent--bottom {
+  opacity: .8;
+}
+
+/* Selected / dragging / active — stronger border/accent allowed, bg stays clean. */
+.df-app .df-task-block[data-task-appearance].is-selected,
+.df-app .df-task-block[data-task-appearance].is-dragging,
+.navo-demo-app .df-task-block[data-task-appearance].is-selected,
+.navo-demo-app .df-task-block[data-task-appearance].is-dragging {
+  border-color: var(--task-selected-border) !important;
+  background: var(--task-bg) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.df-app .df-task-block[data-task-appearance].is-selected > .df-task-block-accent--bottom,
+.navo-demo-app .df-task-block[data-task-appearance].is-selected > .df-task-block-accent--bottom {
+  opacity: 1;
+}
+
+.df-app .df-task-block[data-task-appearance].is-dragging,
+.navo-demo-app .df-task-block[data-task-appearance].is-dragging {
+  opacity: .9;
+}
+
+.df-app .df-task-block[data-task-appearance]:focus-visible,
+.navo-demo-app .df-task-block[data-task-appearance]:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--accent-active) 62%, transparent);
+  outline-offset: 2px;
+}
+
+.df-app .df-task-block[data-task-appearance]:active,
+.navo-demo-app .df-task-block[data-task-appearance]:active {
+  transform: translateY(1px);
+}
+
+/* Completed — quiet opacity only, never a dirty fill. */
+.df-app .df-task-block[data-task-appearance].is-checked,
+.df-app .df-task-block[data-task-appearance].completed,
+.navo-demo-app .df-task-block[data-task-appearance].is-checked,
+.navo-demo-app .df-task-block[data-task-appearance].completed {
+  opacity: .62;
+  background: var(--task-bg) !important;
+}
+
+/* ============================================================
+ * Shared grid anatomy — [ checkbox ][ content ][ duration ][ actions ]
+ * This is the core layout fix. 4 columns, checkbox inside the grid.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance] .df-task-block-row,
+.df-app .df-task-block[data-task-appearance] .df-task-block-grid,
+.df-app .df-task-block[data-task-appearance] .df-candidate-row,
+.df-app .df-task-block[data-task-appearance] .df-time-card-row,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-row,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-grid {
+  display: grid !important;
+  grid-template-columns: var(--task-grid-template) !important;
+  align-items: var(--task-align-items) !important;
+  justify-items: var(--task-justify-items) !important;
+  column-gap: var(--task-gap) !important;
+  row-gap: 0 !important;
+  min-width: 0 !important;
+  width: 100%;
+}
+
+.df-app .df-task-block[data-task-appearance] .df-task-block-row.is-align-start,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-row.is-align-start {
+  align-items: flex-start !important;
+}
+
+/* Leading / checkbox — fixed size, no shrink. */
+.df-app .df-task-block[data-task-appearance] .df-task-block-leading,
+.df-app .df-task-block[data-task-appearance] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance] .df-block-check,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-leading,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-check {
+  flex: 0 0 auto !important;
+  grid-column: 1 / 2;
+  align-self: center;
+  width: auto;
+  min-width: 0;
+}
+
+/* Content — min-width: 0 so title truncates. */
+.df-app .df-task-block[data-task-appearance] .df-task-block-main,
+.df-app .df-task-block[data-task-appearance] .df-task-block-content,
+.df-app .df-task-block[data-task-appearance] .df-candidate-main,
+.df-app .df-task-block[data-task-appearance] .df-time-card-main,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-main,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-content {
+  grid-column: 2 / 3;
+  min-width: 0 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Duration — right aligned, nowrap. */
+.df-app .df-task-block[data-task-appearance] .df-task-block-duration,
+.df-app .df-task-block[data-task-appearance] .df-duration-pill,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-duration {
+  grid-column: 3 / 4;
+  justify-self: end;
+  align-self: center;
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+  color: var(--task-duration-color);
+}
+
+/* Actions — inline-flex, aligned center, no shrink. */
+.df-app .df-task-block[data-task-appearance] .df-task-actions,
+.df-app .df-task-block[data-task-appearance] .df-task-block-actions,
+.df-app .df-task-block[data-task-appearance] .df-task-block-trailing,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-actions,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-actions {
+  grid-column: 4 / 5;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px;
+  flex: 0 0 auto !important;
+  justify-self: end;
+  color: var(--task-action-color);
+}
+
+/* Title — truncates with ellipsis, neutral ink. */
+.df-app .df-task-block[data-task-appearance] .df-task-block-title,
+.df-app .df-task-block[data-task-appearance] .df-candidate-title,
+.df-app .df-task-block[data-task-appearance] .df-time-card-title,
+.df-app .df-task-block[data-task-appearance] .df-block-title-row strong,
+.df-app .df-task-block[data-task-appearance] .df-habit-title,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-title {
+  min-width: 0;
+  color: var(--task-title-color) !important;
+  font-family: var(--paper-task, var(--paper-sans, inherit));
+  font-weight: 680;
+  letter-spacing: -.012em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-wrap: pretty;
+}
+
+/* Metadata — muted. */
+.df-app .df-task-block[data-task-appearance] .df-candidate-meta-badges,
+.df-app .df-task-block[data-task-appearance] .df-candidate-subtask-count,
+.df-app .df-task-block[data-task-appearance] .df-candidate-repeat-badge,
+.df-app .df-task-block[data-task-appearance] .df-time-card-next,
+.df-app .df-task-block[data-task-appearance] .df-next,
+.navo-demo-app .df-task-block[data-task-appearance] .df-time-card-next {
+  color: var(--task-meta-color) !important;
+  font-family: var(--paper-ui, var(--paper-sans, inherit));
+  font-size: 11px;
+  font-weight: 550;
+}
+
+/* ============================================================
+ * Checkbox — priority is shown by checkbox color.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance] .df-block-check,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-check {
+  position: static !important;
+  inset: auto !important;
+  flex: 0 0 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid var(--task-checkbox-color) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: var(--task-checkbox-color) !important;
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.df-app .df-task-block[data-task-appearance] .df-task-block-check.completed,
+.df-app .df-task-block[data-task-appearance] .df-block-check.completed,
+.navo-demo-app .df-task-block[data-task-appearance] .df-task-block-check.completed {
+  color: var(--surface-main, #FBF9FF) !important;
+  background: var(--task-checkbox-color) !important;
+  border-color: var(--task-checkbox-color) !important;
+}
+
+/* Priority → checkbox color overrides. check-muted tone stays neutral. */
+.df-app .df-task-block[data-task-appearance][data-task-priority="low"] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-priority="low"] .df-block-check {
+  --task-checkbox-color: var(--task-priority-low);
+  border-color: var(--task-priority-low) !important;
+  color: var(--task-priority-low) !important;
+}
+.df-app .df-task-block[data-task-appearance][data-task-priority="low"] .df-task-block-check.completed,
+.df-app .df-task-block[data-task-appearance][data-task-priority="low"] .df-block-check.completed {
+  background: var(--task-priority-low) !important;
+  border-color: var(--task-priority-low) !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-priority="normal"] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-priority="normal"] .df-block-check {
+  --task-checkbox-color: var(--task-priority-normal);
+  border-color: var(--task-priority-normal) !important;
+  color: var(--task-priority-normal) !important;
+}
+.df-app .df-task-block[data-task-appearance][data-task-priority="normal"] .df-task-block-check.completed,
+.df-app .df-task-block[data-task-appearance][data-task-priority="normal"] .df-block-check.completed {
+  background: var(--task-priority-normal) !important;
+  border-color: var(--task-priority-normal) !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-block-check {
+  --task-checkbox-color: var(--task-priority-high);
+  border-color: var(--task-priority-high) !important;
+  color: var(--task-priority-high) !important;
+}
+.df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-task-block-check.completed,
+.df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-block-check.completed {
+  background: var(--task-priority-high) !important;
+  border-color: var(--task-priority-high) !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-block-check {
+  --task-checkbox-color: var(--task-priority-urgent);
+  border-color: var(--task-priority-urgent) !important;
+  color: var(--task-priority-urgent) !important;
+}
+.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-task-block-check.completed,
+.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-block-check.completed {
+  background: var(--task-priority-urgent) !important;
+  border-color: var(--task-priority-urgent) !important;
+}
+
+/* ============================================================
+ * Variant adjustments — layout anatomy stays the same,
+ * only padding/density/height rules change.
+ * ============================================================ */
+
+/* Candidate — default density. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"],
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="candidate"] {
+  --task-padding-x: 16px;
+  --task-padding-y: 14px;
+  --task-min-height: 64px;
+  --task-gap: 12px;
+  --task-align-items: center;
+  --task-grid-template: auto minmax(0, 1fr) auto auto;
+}
+
+/* Scheduled — content top-left aligned, height can stretch by time duration.
+   Actions may hide until hover/selected; checkbox stays near top-left. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"],
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] {
+  --task-padding-x: 12px;
+  --task-padding-y: 10px;
+  --task-min-height: unset;
+  --task-gap: 8px;
+  --task-align-items: start;
+  --task-grid-template: auto minmax(0, 1fr);
+  position: absolute !important;
+  align-content: start !important;
+  min-height: unset !important;
+  overflow: hidden !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-row,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-row,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-row {
+  align-items: start !important;
+  justify-content: start !important;
+  height: 100%;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-block-check,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-check {
+  margin-top: 1px !important;
+}
+
+/* Short scheduled block — tighter. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block {
+  --task-padding-x: 10px;
+  --task-padding-y: 6px;
+  --task-min-height: unset;
+  min-height: unset !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-title,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-title,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-title {
+  font-size: 12px;
+}
+
+/* All-day block — inline, compact. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="allDay"],
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="allDay"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 8px 12px !important;
+  min-height: 36px;
+}
+
+/* Compact — used by habits and dense lists. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="compact"],
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="compact"] {
+  --task-padding-x: 12px;
+  --task-padding-y: 8px;
+  --task-min-height: 42px;
+  --task-gap: 10px;
+  --task-align-items: center;
+  --task-grid-template: auto minmax(0, 1fr) auto;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="habit-child"],
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="habit-child"] {
+  --task-padding-x: 10px;
+  --task-padding-y: 7px;
+  --task-min-height: 40px;
+  --task-gap: 10px;
+  --task-align-items: center;
+  --task-grid-template: auto minmax(0, 1fr) auto;
+  border-radius: 4px !important;
+}
+
+/* ============================================================
+ * Habit / group behavior — child items use compact TaskBlock.
+ * Avoid conflicting borders between group and child cards.
+ * ============================================================ */
+.df-app .df-habit-candidate-card,
+.navo-demo-app .df-habit-candidate-card {
+  padding: 8px 10px 4px;
+}
+
+.df-app .df-habit-candidate-card .df-task-block[data-task-appearance],
+.navo-demo-app .df-habit-candidate-card .df-task-block[data-task-appearance] {
+  border: 1px solid var(--task-border) !important;
+  border-left-width: var(--task-project-accent-size, 2px) !important;
+  border-left-color: var(--task-project-color, var(--accent-active)) !important;
+  border-radius: 4px !important;
+  margin-bottom: 4px;
+}
+
+.df-app .df-habit-candidate-card .df-task-block[data-task-appearance]:last-child,
+.navo-demo-app .df-habit-candidate-card .df-task-block[data-task-appearance]:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+ * Candidate subtasks row — second row appears only when needed.
+ * Reuses the same anatomy, never breaks the primary row.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance] .df-candidate-subtasks,
+.navo-demo-app .df-task-block[data-task-appearance] .df-candidate-subtasks {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+}
+
+.df-app .df-task-block[data-task-appearance]:not(:has(.df-candidate-subtasks)) .df-candidate-row,
+.navo-demo-app .df-task-block[data-task-appearance]:not(:has(.df-candidate-subtasks)) .df-candidate-row {
+  grid-template-rows: 1fr;
+}
+
+/* ============================================================
+ * Action icons — quiet, line-based, no decorative containers.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance] .df-icon-button,
+.df-app .df-task-block[data-task-appearance] .df-task-block-actions .df-icon-button,
+.navo-demo-app .df-task-block[data-task-appearance] .df-icon-button {
+  flex: 0 0 auto !important;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--task-action-color);
+  padding: 0;
+  transition: color 140ms var(--paper-ease, ease), border-color 140ms var(--paper-ease, ease), background-color 140ms var(--paper-ease, ease);
+}
+
+.df-app .df-task-block[data-task-appearance] .df-icon-button:hover,
+.navo-demo-app .df-task-block[data-task-appearance] .df-icon-button:hover {
+  color: var(--task-title-color);
+  border-color: var(--task-border-hover);
+  background: color-mix(in srgb, var(--task-project-color, var(--accent-active)) 6%, transparent);
+}
+
+/* Duration pill — quiet, monospace-ish, right aligned. */
+.df-app .df-task-block[data-task-appearance] .df-duration-pill,
+.navo-demo-app .df-task-block[data-task-appearance] .df-duration-pill {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--task-duration-color);
+  font-family: var(--paper-mono, var(--paper-ui, inherit));
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  line-height: 1.2;
+  transition: color 140ms var(--paper-ease, ease), border-color 140ms var(--paper-ease, ease);
+}
+
+.df-app .df-task-block[data-task-appearance] .df-duration-pill:hover,
+.navo-demo-app .df-task-block[data-task-appearance] .df-duration-pill:hover {
+  color: var(--task-title-color);
+  border-color: var(--task-border-hover);
+}
+
+/* ============================================================
+ * Scheduled block extras — resize dots, project chip, preview.
+ * Kept here so the scheduled variant shares the same tokens.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-resize-dot,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-resize-dot {
+  color: var(--task-project-color, var(--accent-active));
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-block-project-wrap,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-block-project-wrap {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  left: auto;
+  top: auto;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-block-project,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-block-project {
+  border: 1px solid var(--task-border);
+  border-radius: 999px;
+  background: var(--task-bg);
+  color: var(--task-meta-color);
+  font-family: var(--paper-ui, var(--paper-sans, inherit));
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+/* ============================================================
+ * Compact active task chip — lives inside the workspace, not the chrome.
+ * Quiet paper pill with a tiny project-color bottom rule.
+ * ============================================================ */
+.df-app .df-active-task-chip,
+.navo-demo-app .df-active-task-chip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--task-border);
+  border-bottom: 2px solid var(--timer-project-color, var(--task-project-color, var(--accent-active)));
+  border-radius: var(--task-radius);
+  background: var(--task-bg);
+  color: var(--task-title-color);
+  font-size: 12px;
+}
+
+.df-app .df-active-task-chip .df-active-task-chip-main,
+.navo-demo-app .df-active-task-chip .df-active-task-chip-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.df-app .df-active-task-chip .df-active-task-chip-status,
+.navo-demo-app .df-active-task-chip .df-active-task-chip-status {
+  flex: 0 0 auto;
+  color: var(--timer-project-color, var(--task-meta-color));
+  font-weight: 650;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.df-app .df-active-task-chip .df-active-task-chip-name,
+.navo-demo-app .df-active-task-chip .df-active-task-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 680;
+}
+
+.df-app .df-active-task-chip .df-active-task-chip-time,
+.navo-demo-app .df-active-task-chip .df-active-task-chip-time {
+  justify-self: end;
+  font-family: var(--paper-mono, var(--paper-ui, inherit));
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--task-duration-color);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.df-app .df-active-task-chip .df-active-task-chip-actions,
+.navo-demo-app .df-active-task-chip .df-active-task-chip-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.df-app .df-active-task-chip .df-icon-button,
+.navo-demo-app .df-active-task-chip .df-icon-button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+/* ============================================================
+ * TaskGroup — neutral container for grouped/habit tasks.
+ * Keeps child blocks visually subordinate.
+ * ============================================================ */
+.df-app .df-task-group,
+.navo-demo-app .df-task-group {
+  margin: 6px 0 0;
+  padding: 10px;
+  border: 1px solid var(--task-border);
+  border-radius: var(--task-radius);
+  background: color-mix(in srgb, var(--task-bg) 96%, var(--paper-rule, #E7E2D8));
+}
+
+.df-app .df-task-group-header,
+.navo-demo-app .df-task-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+  color: var(--task-meta-color);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.df-app .df-task-group-title,
+.navo-demo-app .df-task-group-title {
+  color: var(--task-title-color);
+}
+
+.df-app .df-task-group-count,
+.navo-demo-app .df-task-group-count {
+  font-family: var(--paper-mono, var(--paper-ui, inherit));
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.df-app .df-task-group-list,
+.navo-demo-app .df-task-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ============================================================
+ * Habit / group child task blocks
+ * ============================================================ */
+.df-app .df-task-group .df-task-block[data-task-appearance][data-task-variant="habit-child"],
+.navo-demo-app .df-task-group .df-task-block[data-task-appearance][data-task-variant="habit-child"] {
+  border-radius: 4px;
+}
+
+.df-app .df-task-group .df-task-block[data-task-appearance][data-task-variant="habit-child"]:last-child,
+.navo-demo-app .df-task-group .df-task-block[data-task-appearance][data-task-variant="habit-child"]:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+ * All-day block — row stays compact, content truncates.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-row,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-row {
+  align-items: center;
+  gap: 8px;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-main,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-main {
+  display: inline;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-main .df-task-block-title,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-main .df-task-block-title {
+  display: inline;
+  white-space: nowrap;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-actions,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="allDay"] .df-all-day-actions {
+  grid-column: 4 / 5;
+}
+
+/* ============================================================
+ * Scheduled block event mark placeholder in checkbox column.
+ * ============================================================ */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-event-mark,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-event-mark {
+  grid-column: 1 / 2;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--task-project-color, var(--accent-active));
+  opacity: .55;
+  margin-top: 4px;
+}
+
+/* Hide legacy category strip — project accent is now the accent layer. */
+.df-app .df-task-block[data-task-appearance] .df-category-strip,
+.navo-demo-app .df-task-block[data-task-appearance] .df-category-strip {
+  display: none !important;
+}
+
+/* Scheduled layout reset: remove legacy candidate-card shell from timeline blocks. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-shell,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-shell {
+  box-sizing: border-box !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-main,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-main {
+  align-self: start !important;
+  justify-content: start !important;
+  padding: 0 !important;
+}
+
+/* ============================================================
+ * Reduced motion
+ * ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .df-app .df-task-block[data-task-appearance],
+  .navo-demo-app .df-task-block[data-task-appearance] {
+    transition: none !important;
+  }
+}
