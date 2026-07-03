@@ -760,8 +760,16 @@ export default function PlanningView(props: {
   const [filterImportances, setFilterImportances] = useState<StateFilterValue[]>([]);
   const [filterUrgencies, setFilterUrgencies] = useState<StateFilterValue[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [filterExpandedCategory, setFilterExpandedCategory] = useState<string | null>(null);
+  const [filterSearchText, setFilterSearchText] = useState("");
+  const [filterDueDate, setFilterDueDate] = useState<"overdue" | "this-week" | "no-date" | null>(null);
+  const [filterScheduled, setFilterScheduled] = useState<"scheduled" | "unscheduled" | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
   const [kanbanDragTaskId, setKanbanDragTaskId] = useState<string | null>(null);
   const [kanbanDropStatus, setKanbanDropStatus] = useState<UiWorkflowStatus | null>(null);
+  const [listDragTaskId, setListDragTaskId] = useState<string | null>(null);
+  const [listDropTargetId, setListDropTargetId] = useState<string | null>(null);
+  const [listDropPosition, setListDropPosition] = useState<"before" | "after">("before");
 
   const today = todayIso();
 
@@ -1063,9 +1071,29 @@ export default function PlanningView(props: {
         const matches = filterUrgencies.some((f) => f === "empty" ? !urg : urg === f);
         if (!matches) return false;
       }
+      if (filterSearchText.trim()) {
+        const q = filterSearchText.trim().toLowerCase();
+        if (!task.title.toLowerCase().includes(q) && !(task.notes || "").toLowerCase().includes(q)) return false;
+      }
+      if (filterDueDate) {
+        const due = task.dueDate;
+        if (filterDueDate === "no-date") { if (due) return false; }
+        else if (filterDueDate === "overdue") { if (!due || due >= today) return false; }
+        else if (filterDueDate === "this-week") {
+          if (!due) return false;
+          const dueTime = new Date(due + "T00:00:00").getTime();
+          const now = new Date(today + "T00:00:00").getTime();
+          if (dueTime < now || dueTime > now + 6 * 86400000) return false;
+        }
+      }
+      if (filterScheduled) {
+        const hasSchedule = !!(task.timelineRecords && task.timelineRecords.length > 0) || !!task.plannedForDate;
+        if (filterScheduled === "scheduled" && !hasSchedule) return false;
+        if (filterScheduled === "unscheduled" && hasSchedule) return false;
+      }
       return true;
     });
-  }, [safeTasks, showCompleted, showAddedTasks, today, filterProjects, filterWorkflows, filterImportances, filterUrgencies]);
+  }, [safeTasks, showCompleted, showAddedTasks, today, filterProjects, filterWorkflows, filterImportances, filterUrgencies, filterSearchText, filterDueDate, filterScheduled]);
 
   const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
 
@@ -1097,7 +1125,37 @@ export default function PlanningView(props: {
     setKanbanDropStatus(null);
   }, [kanbanDragTaskId, props]);
 
-  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0;
+  const handleListDrop = useCallback((targetTaskId: string, position: "before" | "after") => {
+    const dragId = listDragTaskId;
+    if (!dragId || dragId === targetTaskId) {
+      setListDragTaskId(null);
+      setListDropTargetId(null);
+      return;
+    }
+    // Build the current display sequence (sorted by order then createdAt).
+    const sequence = [...viewFilteredTasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt.localeCompare(b.createdAt));
+    // Remove the dragged task, then insert at the target position.
+    const without = sequence.filter((t) => t.id !== dragId);
+    const targetIdx = without.findIndex((t) => t.id === targetTaskId);
+    if (targetIdx < 0) {
+      setListDragTaskId(null);
+      setListDropTargetId(null);
+      return;
+    }
+    const insertAt = position === "before" ? targetIdx : targetIdx + 1;
+    without.splice(insertAt, 0, sequence.find((t) => t.id === dragId)!);
+    // Assign sequential orders (index * 10) and patch only changed ones.
+    without.forEach((t, idx) => {
+      const newOrder = idx * 10;
+      if ((t.order ?? -1) !== newOrder) {
+        props.onTaskUpdate(t.id, { order: newOrder });
+      }
+    });
+    setListDragTaskId(null);
+    setListDropTargetId(null);
+  }, [listDragTaskId, viewFilteredTasks, props]);
+
+  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0 || !!filterSearchText.trim() || !!filterDueDate || !!filterScheduled || showCompleted || showAddedTasks;
 
   const toggleArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, value: T) => {
     setter((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]);
@@ -1192,7 +1250,7 @@ export default function PlanningView(props: {
     })),
     ...filterImportances.map((v) => ({
       key: `importance-${v}`,
-      label: `${props.lang === "zh" ? "Importance" : "Importance"}: ${stateLabel(v)}`,
+      label: `${props.lang === "zh" ? "Priority" : "Priority"}: ${stateLabel(v)}`,
       onClear: () => toggleArray(setFilterImportances, v),
     })),
     ...filterUrgencies.map((v) => ({
@@ -1200,6 +1258,21 @@ export default function PlanningView(props: {
       label: `${props.lang === "zh" ? "Urgency" : "Urgency"}: ${stateLabel(v)}`,
       onClear: () => toggleArray(setFilterUrgencies, v),
     })),
+    ...(filterSearchText.trim() ? [{
+      key: "search",
+      label: `${props.lang === "zh" ? "Search" : "Search"}: ${filterSearchText.trim()}`,
+      onClear: () => setFilterSearchText(""),
+    }] : []),
+    ...(filterDueDate ? [{
+      key: `due-${filterDueDate}`,
+      label: `${props.lang === "zh" ? "Due" : "Due"}: ${filterDueDate === "overdue" ? (props.lang === "zh" ? "Overdue" : "Overdue") : filterDueDate === "this-week" ? (props.lang === "zh" ? "This week" : "This week") : (props.lang === "zh" ? "No date" : "No date")}`,
+      onClear: () => setFilterDueDate(null),
+    }] : []),
+    ...(filterScheduled ? [{
+      key: `scheduled-${filterScheduled}`,
+      label: `${props.lang === "zh" ? "Scheduled" : "Scheduled"}: ${filterScheduled === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")}`,
+      onClear: () => setFilterScheduled(null),
+    }] : []),
   ];
 
   const clearAllFilters = () => {
@@ -1207,7 +1280,34 @@ export default function PlanningView(props: {
     setFilterWorkflows([]);
     setFilterImportances([]);
     setFilterUrgencies([]);
+    setFilterSearchText("");
+    setFilterDueDate(null);
+    setFilterScheduled(null);
   };
+
+  // Linear-style nested filter categories. Level 1 = category list, Level 2 = options.
+  const dueDateLabel = (d: "overdue" | "this-week" | "no-date") =>
+    d === "overdue" ? (props.lang === "zh" ? "Overdue" : "Overdue")
+    : d === "this-week" ? (props.lang === "zh" ? "This week" : "This week")
+    : (props.lang === "zh" ? "No date" : "No date");
+
+  type FilterCategory = {
+    key: string;
+    label: string;
+    icon: string;
+    activeCount: number;
+    summary: string;
+  };
+  const filterCategories: FilterCategory[] = [
+    { key: "status", label: props.lang === "zh" ? "Status" : "Status", icon: "circle", activeCount: filterWorkflows.length, summary: filterWorkflows.length > 0 ? filterWorkflows.map(workflowLabel).join(", ") : "" },
+    { key: "importance", label: props.lang === "zh" ? "Priority" : "Priority", icon: "flag", activeCount: filterImportances.length, summary: filterImportances.length > 0 ? filterImportances.map(stateLabel).join(", ") : "" },
+    { key: "urgency", label: props.lang === "zh" ? "Urgency" : "Urgency", icon: "clock", activeCount: filterUrgencies.length, summary: filterUrgencies.length > 0 ? filterUrgencies.map(stateLabel).join(", ") : "" },
+    { key: "project", label: props.lang === "zh" ? "Project" : "Project", icon: "folder", activeCount: filterProjects.length, summary: filterProjects.length > 0 ? filterProjects.map((id) => safeProjects.find((p) => String(p.id) === id)?.title || id).join(", ") : "" },
+    { key: "due", label: props.lang === "zh" ? "Due date" : "Due date", icon: "calendar", activeCount: filterDueDate ? 1 : 0, summary: filterDueDate ? dueDateLabel(filterDueDate) : "" },
+    { key: "scheduled", label: props.lang === "zh" ? "Scheduled" : "Scheduled", icon: "layers", activeCount: filterScheduled ? 1 : 0, summary: filterScheduled ? (filterScheduled === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")) : "" },
+    { key: "completed", label: props.lang === "zh" ? "Completed" : "Completed", icon: "check", activeCount: (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0), summary: [showCompleted ? (props.lang === "zh" ? "Show done" : "Show done") : "", showAddedTasks ? (props.lang === "zh" ? "Show added" : "Show added") : ""].filter(Boolean).join(", ") },
+    { key: "search", label: props.lang === "zh" ? "Search text" : "Search text", icon: "search", activeCount: filterSearchText.trim() ? 1 : 0, summary: filterSearchText.trim() || "" },
+  ];
 
   return (
     <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
@@ -1223,47 +1323,197 @@ export default function PlanningView(props: {
                   aria-expanded={filterOpen}
                   aria-label={props.lang === "zh" ? "Filter" : "Filter"}
                   title={props.lang === "zh" ? "Filter" : "Filter"}
-                  onClick={() => setFilterOpen((open) => !open)}
+                  onClick={() => { setFilterOpen((open) => !open); setFilterExpandedCategory(null); setFilterQuery(""); }}
                 >
                   <svg viewBox="0 0 18 18" aria-hidden="true">
                     <path d="M3 4h12M5 9h8M7 14h4" />
                   </svg>
-                  {hasActiveFilters && <b>{filterProjects.length + filterWorkflows.length + filterImportances.length + filterUrgencies.length + (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0)}</b>}
+                  {hasActiveFilters && <b>{activeFilterChips.length}</b>}
                 </button>
                 {filterOpen && (
                   <div className="df-filter-panel" onClick={(e) => e.stopPropagation()}>
-                    <header>
-                      <strong>{props.lang === "zh" ? "Task filters" : "Task filters"}</strong>
-                      {hasActiveFilters && (
-                        <button type="button" onClick={() => { setFilterProjects([]); setFilterWorkflows([]); setFilterImportances([]); setFilterUrgencies([]); }}>
-                          {props.lang === "zh" ? "Reset" : "Reset"}
-                        </button>
-                      )}
-                    </header>
-                    {filterChips.map((chip) => (
-                      <section key={chip.key} className="df-filter-section">
-                        <div className="df-filter-section-head">
-                          <span>{chip.label}</span>
-                          <small>{chip.selected.length > 0 ? chip.selected.join(", ") : (props.lang === "zh" ? "All" : "All")}</small>
-                        </div>
-                        <div className="df-filter-options">
-                          {chip.options.map((opt) => (
-                            <label key={opt.value} className={`df-filter-option${opt.checked ? " checked" : ""}`}>
-                              <input type="checkbox" checked={opt.checked} onChange={opt.onToggle} />
-                              <span>{opt.label}</span>
-                            </label>
+                    <div className="df-filter-search">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                      <input
+                        type="text"
+                        value={filterQuery}
+                        onChange={(e) => setFilterQuery(e.target.value)}
+                        placeholder={props.lang === "zh" ? "添加筛选…" : "Add filter…"}
+                        aria-label={props.lang === "zh" ? "添加筛选" : "Add filter"}
+                      />
+                    </div>
+                    {!filterExpandedCategory && (
+                      <div className="df-filter-categories">
+                        {filterCategories
+                          .filter((cat) => !filterQuery || cat.label.toLowerCase().includes(filterQuery.toLowerCase()))
+                          .map((cat) => (
+                            <button
+                              key={cat.key}
+                              type="button"
+                              className={`df-filter-cat-row${cat.activeCount > 0 ? " has-active" : ""}`}
+                              onClick={() => setFilterExpandedCategory(cat.key)}
+                            >
+                              <span className="df-filter-cat-icon" aria-hidden="true">
+                                {cat.icon === "circle" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>}
+                                {cat.icon === "flag" && <svg viewBox="0 0 14 14"><path d="M3 2v10M3 3h8l-1.5 2.5L11 8H3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
+                                {cat.icon === "clock" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                                {cat.icon === "folder" && <svg viewBox="0 0 14 14"><path d="M2 4v7h10V5H7L5.5 3.5H2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
+                                {cat.icon === "calendar" && <svg viewBox="0 0 14 14"><rect x="2" y="3" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M2 6h10M5 2v2M9 2v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                                {cat.icon === "layers" && <svg viewBox="0 0 14 14"><path d="M7 2l5 2.5-5 2.5-5-2.5L7 2zM2 7l5 2.5L12 7M2 9.5L7 12l5-2.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>}
+                                {cat.icon === "check" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M4.5 7l1.8 1.8L9.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                                {cat.icon === "search" && <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="3.8" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M9 9l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                              </span>
+                              <span className="df-filter-cat-label">{cat.label}</span>
+                              {cat.activeCount > 0 && <span className="df-filter-cat-count">{cat.activeCount}</span>}
+                              {cat.activeCount > 0 && cat.summary && <span className="df-filter-cat-summary">{cat.summary}</span>}
+                              <svg className="df-filter-cat-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M2 2l4 5-4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </button>
                           ))}
-                        </div>
-                      </section>
-                    ))}
+                        {filterCategories.filter((cat) => !filterQuery || cat.label.toLowerCase().includes(filterQuery.toLowerCase())).length === 0 && (
+                          <div className="df-filter-empty">{props.lang === "zh" ? "无匹配类别" : "No matching categories"}</div>
+                        )}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "status" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Status" : "Status"}
+                        </button>
+                        {(["backlog", "done"] as UiWorkflowStatus[]).map((s) => (
+                          <label key={s} className={`df-filter-option${filterWorkflows.includes(s) ? " checked" : ""}`}>
+                            <input type="checkbox" checked={filterWorkflows.includes(s)} onChange={() => toggleArray(setFilterWorkflows, s)} />
+                            <span>{workflowLabel(s)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "importance" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Priority" : "Priority"}
+                        </button>
+                        {(["high", "medium", "low", "empty"] as StateFilterValue[]).map((v) => (
+                          <label key={v} className={`df-filter-option${filterImportances.includes(v) ? " checked" : ""}`}>
+                            <input type="checkbox" checked={filterImportances.includes(v)} onChange={() => toggleArray(setFilterImportances, v)} />
+                            <span>{stateLabel(v)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "urgency" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Urgency" : "Urgency"}
+                        </button>
+                        {(["high", "medium", "low", "empty"] as StateFilterValue[]).map((v) => (
+                          <label key={v} className={`df-filter-option${filterUrgencies.includes(v) ? " checked" : ""}`}>
+                            <input type="checkbox" checked={filterUrgencies.includes(v)} onChange={() => toggleArray(setFilterUrgencies, v)} />
+                            <span>{stateLabel(v)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "project" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Project" : "Project"}
+                        </button>
+                        {safeProjects.length === 0 && <div className="df-filter-empty">{props.lang === "zh" ? "暂无项目" : "No projects"}</div>}
+                        {safeProjects.map((p) => (
+                          <label key={p.id} className={`df-filter-option${filterProjects.includes(String(p.id)) ? " checked" : ""}`}>
+                            <input type="checkbox" checked={filterProjects.includes(String(p.id))} onChange={() => toggleArray(setFilterProjects, String(p.id))} />
+                            <span className="df-filter-option-dot" style={{ background: p.color || DEFAULT_PROJECT_COLOR }} />
+                            <span>{p.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "due" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Due date" : "Due date"}
+                        </button>
+                        {(["overdue", "this-week", "no-date"] as const).map((d) => (
+                          <label key={d} className={`df-filter-option${filterDueDate === d ? " checked" : ""}`}>
+                            <input type="radio" checked={filterDueDate === d} onChange={() => setFilterDueDate(filterDueDate === d ? null : d)} />
+                            <span>{dueDateLabel(d)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "scheduled" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Scheduled" : "Scheduled"}
+                        </button>
+                        {(["scheduled", "unscheduled"] as const).map((s) => (
+                          <label key={s} className={`df-filter-option${filterScheduled === s ? " checked" : ""}`}>
+                            <input type="radio" checked={filterScheduled === s} onChange={() => setFilterScheduled(filterScheduled === s ? null : s)} />
+                            <span>{s === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {filterExpandedCategory === "completed" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Completed" : "Completed"}
+                        </button>
+                        <label className={`df-filter-option${showCompleted ? " checked" : ""}`}>
+                          <input type="checkbox" checked={showCompleted} onChange={() => setShowCompleted((v) => !v)} />
+                          <span>{props.lang === "zh" ? "Show done" : "Show done"}</span>
+                        </label>
+                        <label className={`df-filter-option${showAddedTasks ? " checked" : ""}`}>
+                          <input type="checkbox" checked={showAddedTasks} onChange={() => setShowAddedTasks((v) => !v)} />
+                          <span>{props.lang === "zh" ? "Show added" : "Show added"}</span>
+                        </label>
+                      </div>
+                    )}
+                    {filterExpandedCategory === "search" && (
+                      <div className="df-filter-options-view">
+                        <button type="button" className="df-filter-back" onClick={() => setFilterExpandedCategory(null)}>
+                          <svg viewBox="0 0 8 14" aria-hidden="true"><path d="M6 2L2 7l4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          {props.lang === "zh" ? "Search text" : "Search text"}
+                        </button>
+                        <input
+                          type="text"
+                          className="df-filter-text-input"
+                          value={filterSearchText}
+                          onChange={(e) => setFilterSearchText(e.target.value)}
+                          placeholder={props.lang === "zh" ? "输入搜索文本…" : "Type to search…"}
+                          autoFocus
+                        />
+                        {filterSearchText.trim() && (
+                          <button type="button" className="df-filter-clear-text" onClick={() => setFilterSearchText("")}>
+                            {props.lang === "zh" ? "清除" : "Clear"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {hasActiveFilters && (
+                      <button type="button" className="df-filter-reset" onClick={clearAllFilters}>
+                        {props.lang === "zh" ? "清除全部" : "Clear all"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
               {availableModes.length > 1 && (
                 <div className="df-planning-view-switch">
                   {availableModes.map((m) => (
-                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)}>
-                      {m === "tree" ? (props.lang === "zh" ? "Tree" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "Matrix" : "Matrix") : (props.lang === "zh" ? "List" : "List")}
+                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={m === "tree" ? (props.lang === "zh" ? "树" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "矩阵" : "Matrix") : (props.lang === "zh" ? "列表" : "List")}>
+                      {m === "tree" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M3 5h4M3 9h6M3 13h5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                      {m === "kanban" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="3.5" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="6.5" y="3" width="3.5" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="11" y="3" width="3.5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
+                      {m === "eisenhower" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="2" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
+                      {m === "list" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                      <span>{m === "tree" ? (props.lang === "zh" ? "树" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "矩阵" : "Matrix") : (props.lang === "zh" ? "列表" : "List")}</span>
                     </button>
                   ))}
                 </div>
@@ -1306,6 +1556,9 @@ export default function PlanningView(props: {
                     <div className="df-kanban-column-header">
                       <span>{status === "done" ? (props.lang === "zh" ? "Done" : "Done") : (props.lang === "zh" ? "Tasks" : "Tasks")}</span>
                       <small>{columnTasks.length}</small>
+                      {columnTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0) > 0 && (
+                        <em className="df-kanban-column-duration">{columnTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0)}h</em>
+                      )}
                     </div>
                     <div className="df-kanban-card-list">
                       {columnTasks.map((task) => (
@@ -1374,7 +1627,13 @@ export default function PlanningView(props: {
                     onDragLeave={() => setKanbanDropStatus(null)}
                     onDrop={(e) => { e.preventDefault(); handleQuadrantDrop(quad.importance, quad.urgency); }}
                   >
-                    <div className="df-eisenhower-quadrant-header"><span>{quad.label}</span><small>{quadTasks.length}</small></div>
+                    <div className="df-eisenhower-quadrant-header">
+                      <span>{quad.label}</span>
+                      <small>{quadTasks.length}</small>
+                      {quadTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0) > 0 && (
+                        <em className="df-eisenhower-quadrant-duration">{quadTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0)}h</em>
+                      )}
+                    </div>
                     <div className="df-eisenhower-task-list">
                       {quadTasks.map((task) => {
                         const taskDone = normalizeWorkflowStatus(task) === "done";
@@ -1422,38 +1681,61 @@ export default function PlanningView(props: {
             </div>
           )}
           {viewMode === "list" && (
-            <div className="df-planning-list">
+            <div
+              className="df-planning-list"
+              onDragOver={(e) => { if (listDragTaskId) e.preventDefault(); }}
+              onDrop={(e) => { e.preventDefault(); setListDragTaskId(null); setListDropTargetId(null); }}
+            >
               {viewFilteredTasks.length === 0 && <div className="df-planning-list-empty">{props.lang === "zh" ? "暂无任务" : "No tasks"}</div>}
-              {viewFilteredTasks.map((task) => {
+              {[...viewFilteredTasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt.localeCompare(b.createdAt)).map((task) => {
                 const uiStatus = normalizeWorkflowStatus(task);
+                const isDropTarget = listDropTargetId === task.id;
                 return (
-                  <TaskBlock
+                  <div
                     key={task.id}
-                    as="div"
-                    variant="compact"
-                    appearance="calm"
-                    priority={planningTaskPriority(task)}
-                    checked={uiStatus === "done"}
-                    projectColor={projectColor(task.projectId)}
-                    className="df-planning-list-row"
+                    className={`df-planning-list-row-wrap${isDropTarget ? ` is-list-drop is-${listDropPosition}` : ""}${listDragTaskId === task.id ? " is-drag-source" : ""}`}
+                    onDragOver={(e) => {
+                      if (!listDragTaskId || listDragTaskId === task.id) return;
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const isBefore = (e.clientY - rect.top) < rect.height / 2;
+                      setListDropTargetId(task.id);
+                      setListDropPosition(isBefore ? "before" : "after");
+                    }}
+                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleListDrop(task.id, listDropPosition); }}
                   >
-                    <TaskBlockRow>
-                      <TaskCheckbox
-                        checked={uiStatus === "done"}
-                        tone={normalizeTaskCheckTone(task)}
-                        className="df-list-status-toggle"
-                        ariaLabel={uiStatus === "done" ? "Mark open" : "Mark done"}
-                        onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}
-                      />
-                      <TaskBlockContent title={<span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>} />
-                      <TaskBlockDuration>
-                        <span className="df-list-project">{projectName(task.projectId)}</span>
-                      </TaskBlockDuration>
-                      <TaskActions>
-                        {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
-                      </TaskActions>
-                    </TaskBlockRow>
-                  </TaskBlock>
+                    {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                    <TaskBlock
+                      as="div"
+                      variant="compact"
+                      appearance="calm"
+                      priority={planningTaskPriority(task)}
+                      checked={uiStatus === "done"}
+                      projectColor={projectColor(task.projectId)}
+                      className="df-planning-list-row"
+                      draggable
+                      onDragStart={() => setListDragTaskId(task.id)}
+                      onDragEnd={() => { setListDragTaskId(null); setListDropTargetId(null); }}
+                    >
+                      <TaskBlockRow>
+                        <TaskCheckbox
+                          checked={uiStatus === "done"}
+                          tone={normalizeTaskCheckTone(task)}
+                          className="df-list-status-toggle"
+                          ariaLabel={uiStatus === "done" ? "Mark open" : "Mark done"}
+                          onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}
+                        />
+                        <TaskBlockContent title={<span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>} />
+                        <TaskBlockDuration>
+                          <span className="df-list-project">{projectName(task.projectId)}</span>
+                        </TaskBlockDuration>
+                        <TaskActions>
+                          {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
+                        </TaskActions>
+                      </TaskBlockRow>
+                    </TaskBlock>
+                    {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  </div>
                 );
               })}
             </div>

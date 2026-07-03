@@ -19,6 +19,10 @@
 - 新增 Linear 风格的活动筛选片栏：当前生效的筛选条件以小尺寸可移除片显示在视图上方，支持单独删除与一键清除全部。
 - 拖拽体验增强：Kanban 与 Matrix 拖动时在目标列/象限内显示占位插槽与虚线高亮，拖动源以轻微淡化表示，无灰色蒙层、无发光。
 - 清理已完成任务的旧版灰色蒙层与整体透明度，统一为干净的删除线 + 弱化文字 + 优先级色复选框。
+- 筛选面板重构为 Linear 风格嵌套弹出层：顶部"添加筛选"输入框，一级为带图标 / 标签 / 活动数 / 摘要 / 箭头的类别行，点击进入二级选项视图并带返回按钮；新增搜索文本、截止日期（逾期 / 本周 / 无日期）、是否已排程三类筛选。
+- 视图切换器改为图标 + 短标签的紧凑竖向按钮，活动项以左侧细线标记，不再像悬挂标签。
+- List 视图新增拖拽排序：行间显示插入线（带轻微脉动），拖动源淡化，松开后按新顺序写入 order 字段。
+- Kanban 列头与 Matrix 象限头新增任务总数与预估总时长（仅当时长 > 0 时显示）。
 
 ### 修复
 - 修复长标题挤出时长与操作按钮、复选框与下拉图标堆叠错位、习惯卡片布局不一致等问题。
@@ -47,6 +51,10 @@
 - Added a Linear-style active-filter chip bar: active filters appear as small removable chips above the views, with per-chip removal and a clear-all action.
 - Drag/drop feel: Kanban and Matrix now show a placeholder slot and dashed highlight inside the target column/quadrant while dragging, with the drag source subtly dimmed; no gray film, no glow.
 - Cleaned up legacy gray overlay and whole-card opacity on completed tasks, standardizing on strikethrough + muted text + priority-colored checkbox.
+- Rebuilt the filter panel as a Linear-style nested popover: an "Add filter" input on top, level 1 shows category rows (icon / label / active count / summary / chevron), clicking a category opens level 2 options with a back button. Added Search text, Due date (overdue / this week / no date), and Scheduled (scheduled / unscheduled) filter types.
+- View switcher is now compact vertical buttons with icon + short label; the active view is marked by a left rule instead of a hanging tag.
+- List view now supports drag-to-reorder: an insertion line (with a subtle pulse) appears between rows, the drag source dims, and the new order is written to the task's order field on drop.
+- Kanban column headers and Matrix quadrant headers now show total task count and total estimated hours (only when hours > 0).
 
 ### Fixes
 - Removed the remaining legacy timeline task-card, habit child mini-card, and Planning CSS-only task-card visual implementations, leaving TaskBlock variants to own candidate, Planning, scheduled, and habit-child rows.
