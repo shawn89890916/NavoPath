@@ -1,6 +1,6 @@
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
-/*  NavoPath Stylesheet 锟斤�?Reorganized                               */
+/*  NavoPath Stylesheet 锟斤�?Reorganized                               */
 
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
@@ -806,7 +806,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Wizard 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Wizard 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .wizard-summary {
 
@@ -874,7 +874,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Planning Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Planning Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-planning-shell {
 
@@ -1306,12 +1306,11 @@
 
 
 
+/* Completed month tasks — clean styling */
 .df-month-task.completed {
-
-  opacity: .55;
-
+  opacity: 1;
   text-decoration: line-through;
-
+  text-decoration-thickness: 1px;
 }
 
 
@@ -1358,7 +1357,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Calendar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Calendar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .day-cell,
 
@@ -1438,7 +1437,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Animation Polish 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Animation Polish 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 /* Unified transition duration across all interactive elements */
 
@@ -1540,7 +1539,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Month Task Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Month Task Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-month-task {
 
@@ -1660,10 +1659,9 @@
 
 
 
+/* Dark mode: completed month task — clean styling */
 .df-app.theme-dark .df-month-task.completed {
-
-  opacity: .5;
-
+  opacity: 1;
 }
 
 
@@ -2218,7 +2216,7 @@
 
 
 
-/* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟皆讹拷锟斤拷色圆始锟秸可硷拷锟斤拷锟斤拷锟斤拷锟截ｏ�?*/
+/* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟皆讹拷锟斤拷色圆始锟秸可硷拷锟斤拷锟斤拷锟斤拷锟截ｏ�?*/
 
 .df-theme-setting .df-project-color-custom {
 
@@ -2282,7 +2280,7 @@
 
 
 
-/* 锟斤拷锟斤拷 17. df-project-popover / df-drawer-project-list 锟斤拷锟斤拷锟斤�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 17. df-project-popover / df-drawer-project-list 锟斤拷锟斤拷锟斤�?锟斤拷锟斤拷 */
 
 .df-project-popover > button:active,
 
@@ -2540,7 +2538,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Toast / Notification 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Toast / Notification 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .df-toast {
 
@@ -3244,7 +3242,7 @@
 
 
 
-/* 锟斤拷锟斤拷锟斤拷锟斤拷预锟斤拷圆�
+/* 锟斤拷锟斤拷锟斤拷锟斤拷预锟斤拷圆�
 色锟斤拷锟斤拷色锟斤拷锟?*/
 
 .df-theme-setting > div > span.color-light {
@@ -4089,7 +4087,7 @@
 
 /* ================================================================
 
-   THEME: NEUMORPHIC (Soft 3D) 锟斤�?Activated via .theme-neumorphic
+   THEME: NEUMORPHIC (Soft 3D) 锟斤�?Activated via .theme-neumorphic
 
    ================================================================
 
@@ -4237,7 +4235,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Panels & Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Panels & Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .add-panel {
 
@@ -4267,7 +4265,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Tabs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Tabs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .df-tabs {
 
@@ -4329,7 +4327,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Stat Chips 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Stat Chips 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .planning-stat-chip,
 
@@ -4401,7 +4399,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Color Picker 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Color Picker 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .ProjectColorPicker {
 
@@ -4449,7 +4447,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Execute Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Execute Layout 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .df-execute {
 
@@ -4473,7 +4471,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Tree Nodes 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Tree Nodes 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .tree-category-node,
 
@@ -4505,7 +4503,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Settings 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Settings 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .settings-card {
 
@@ -4537,7 +4535,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Event Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Event Pill 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .event-pill {
 
@@ -4569,7 +4567,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic no-theme-gradient override 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic no-theme-gradient override 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic.df-app.no-theme-gradient {
 
@@ -4597,7 +4595,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Dark Theme Fine-tuning 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Dark Theme Fine-tuning 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic.theme-dark {
 
@@ -4693,7 +4691,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Close Button 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Close Button 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .close-button {
 
@@ -4731,7 +4729,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic User Avatar Menu 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic User Avatar Menu 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .df-user-menu {
 
@@ -4927,12 +4925,9 @@
 
 
 
-/* 锟斤拷锟斤拷 Dark mode: completed task card 锟斤拷锟斤拷 */
-
+/* Dark mode: completed task card — clean styling */
 .df-app.theme-dark .df-task-card.completed {
-
-  opacity: .85;
-
+  opacity: 1;
 }
 
 
@@ -5187,32 +5182,23 @@
 
 
 
+/* Dark mode: completed time block — clean styling */
 .df-app.theme-dark .df-time-block.completed {
-
   background: rgba(255,255,255,0.035) !important;
-
   border-color: color-mix(in srgb, var(--accent-active) 14%, rgba(255,255,255,0.08)) !important;
-
   box-shadow: none !important;
-
+  opacity: 1 !important;
 }
-
-
 
 .df-app.theme-dark .df-time-block.completed .df-block-title-row strong {
-
   color: #AAB0BD !important;
-
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
 
-
-
 .df-app.theme-dark .df-time-block.completed .df-block-check {
-
   background: var(--cat, var(--accent-active)) !important;
-
   border-color: var(--cat, var(--accent-active)) !important;
-
 }
 
 
@@ -5371,7 +5357,7 @@
 
 
 
-/* View switch 锟斤�?blend into dark timeline panel */
+/* View switch 锟斤�?blend into dark timeline panel */
 
 .df-app.theme-dark .df-view-switch,
 
@@ -5537,7 +5523,7 @@
 
 
 
-/* 锟斤拷锟斤拷 3Day / Week view 锟斤�?dark 锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 3Day / Week view 锟斤�?dark 锟斤拷锟斤拷 */
 
 .df-app.theme-dark .df-timeline-3day-top {
 
@@ -5641,7 +5627,7 @@
 
 
 
-/* 锟斤拷锟斤拷 Month view 锟斤�?dark 锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 Month view 锟斤�?dark 锟斤拷锟斤拷 */
 
 .df-app.theme-dark .df-month-view {
 
@@ -5969,7 +5955,7 @@
 
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
 
-   NavoPath 锟斤�?Unified Design System
+   NavoPath 锟斤�?Unified Design System
 
    Refined minimal / calm / student-tool aesthetic
 
@@ -7339,7 +7325,7 @@ h3 {
 
 
 
-/* 思维锟斤拷图锟斤拷锟节碉�?*/
+/* 思维锟斤拷图锟斤拷锟节碉�?*/
 
 .tree-root-node {
 
@@ -7609,8 +7595,8 @@ h3 {
 
 
 
-/* 锟斤拷锟斤拷 锟斤拷锟斤拷锟睫�
-拷锟斤�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 锟斤拷锟斤拷锟睫�
+拷锟斤�?锟斤拷锟斤拷 */
 
 .matrix-board {
 
@@ -8738,7 +8724,7 @@ h3 {
 
 
 
-/* 锟斤拷锟斤拷 AI 锟斤拷锟斤拷为锟狡伙�?Modal 锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 AI 锟斤拷锟斤拷为锟狡伙�?Modal 锟斤拷锟斤拷 */
 
 .ai-plan-modal-overlay {
 
@@ -9664,7 +9650,7 @@ h3 {
 
 
 
-/* Confirm button 锟斤�?compact */
+/* Confirm button 锟斤�?compact */
 
 .ai-task-confirm-btn {
 
@@ -11364,8 +11350,8 @@ input:focus, select:focus, textarea:focus {
 
 
 
-/* 锟斤拷锟斤拷片锟较凤拷锟接�
-拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷片锟较凤拷锟接�
+拷锟斤拷锟斤�?*/
 
 .task-list {
 
@@ -11385,7 +11371,7 @@ input:focus, select:focus, textarea:focus {
 
 
 
-/* 锟洁辑模式锟斤拷�?*/
+/* 锟洁辑模式锟斤拷�?*/
 
 .task-card.editing {
 
@@ -11395,8 +11381,8 @@ input:focus, select:focus, textarea:focus {
 
 
 
-/* AI Dock锟较凤拷目锟斤拷 锟斤�?使锟斤拷 .drag-active 伪�
-�锟截边匡�?*/
+/* AI Dock锟较凤拷目锟斤拷 锟斤�?使锟斤拷 .drag-active 伪�
+�锟截边匡�?*/
 
 .ai-dock.drag-active::before {
 
@@ -15880,7 +15866,7 @@ input[type="range"] {
 
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
 
-   锟斤拷锟斤拷 .df-app Root 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?
+   锟斤拷锟斤拷 .df-app Root 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?
    锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 
@@ -16139,7 +16125,7 @@ input[type="range"] {
 
 /* 锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋
 
-   锟斤拷锟斤拷 Execute Page 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?
+   锟斤拷锟斤拷 Execute Page 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?
    锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋锟絋 */
 
 
@@ -16358,7 +16344,7 @@ input[type="range"] {
 
 /* 锟斤拷锟斤拷 Candidate accent bar (project color) & hover checkbox 锟斤拷锟斤拷 */
 
-/* category accent removed �?border uses project colour via --cat */
+/* category accent removed �?border uses project colour via --cat */
 
 
 
@@ -17894,11 +17880,11 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 1. �
-�锟斤拷 button 锟斤拷锟斤拷锟斤�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 1. �
+�锟斤拷 button 锟斤拷锟斤拷锟斤�?锟斤拷锟斤拷 */
 
-/* 锟斤拷�
-� active锟斤拷锟斤拷锟铰感ｏ拷锟斤拷 focus-visible锟斤拷锟斤拷锟教碉拷锟斤拷锟斤拷 */
+/* 锟斤拷�
+� active锟斤拷锟斤拷锟铰感ｏ拷锟斤拷 focus-visible锟斤拷锟斤拷锟教碉拷锟斤拷锟斤拷 */
 
 .df-app button:not(:disabled) {
 
@@ -18106,7 +18092,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 20. df-quadrant article锟斤拷锟芥划锟斤拷锟睫匡拷片锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 20. df-quadrant article锟斤拷锟芥划锟斤拷锟睫匡拷片锟斤拷锟斤拷锟斤�?*/
 
 .df-quadrant article {
 
@@ -18126,7 +18112,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 21. df-auth 锟斤拷录锟斤拷锟芥按�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 21. df-auth 锟斤拷录锟斤拷锟芥按�?锟斤拷锟斤拷 */
 
 .df-auth-tabs button:not(.active):hover {
 
@@ -18216,7 +18202,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 锟斤拷锟斤拷�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 锟斤拷锟斤拷�?锟斤拷锟斤拷 */
 
 .df-timeline-3day-top {
 
@@ -18334,7 +18320,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 时锟斤拷锟斤�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 时锟斤拷锟斤�?锟斤拷锟斤拷 */
 
 .df-timeline-3day-ruler {
 
@@ -18394,7 +18380,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Buttons 锟斤�?flat with hover lift 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 Buttons 锟斤�?flat with hover lift 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 
 .df-app button {
 
@@ -18504,7 +18490,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Tabs 锟斤�?segmented control style 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 Tabs 锟斤�?segmented control style 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 
 .df-tabs {
 
@@ -18522,7 +18508,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Mode Switch 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Mode Switch 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-top-view-switch {
 
@@ -18568,7 +18554,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Stat Chips 锟斤�?pill style 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Stat Chips 锟斤�?pill style 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .planning-stat-chip,
 
@@ -18600,7 +18586,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Quick Prompts 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Quick Prompts 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .quick-prompt-chip {
 
@@ -18618,7 +18604,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 AI Panel & Dock 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 AI Panel & Dock 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-ai-panel {
 
@@ -18778,7 +18764,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Settings Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Settings Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .settings-card {
 
@@ -18796,7 +18782,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Empty State 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Empty State 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-empty {
 
@@ -18828,7 +18814,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Note Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Note Card 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .note-card {
 
@@ -18902,7 +18888,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Panel Title Buttons 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Panel Title Buttons 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-panel-title button {
 
@@ -18946,7 +18932,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 Quick Time Select 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Quick Time Select 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-quick-time select {
 
@@ -18962,7 +18948,7 @@ body.df-resizing, body.df-resizing * {
 
 
 
-/* 锟斤拷锟斤拷 All Day Bar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 All Day Bar 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-all-day-bar {
 
@@ -19460,9 +19446,9 @@ body.df-resizing, body.df-resizing * {
 
 /* ================================================================
 
-   NAVOPATH 锟斤�?INTERACTION LAYER
+   NAVOPATH 锟斤�?INTERACTION LAYER
 
-   统一锟斤拷锟斤拷 df- 锟斤拷锟斤拷�?hover / :active / focus-visible 状�?
+   统一锟斤拷锟斤拷 df- 锟斤拷锟斤拷�?hover / :active / focus-visible 状�?
    Design token: 锟斤拷锟斤拷时锟斤拷 140ms ease锟斤拷focus ring: color-mix(in srgb, var(--mode-primary) 45%, transparent)
 
 ================================================================ */
@@ -19933,7 +19919,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Tabs inside header 锟斤�?subtle glass */
+/* Tabs inside header 锟斤�?subtle glass */
 
 .df-header .df-tabs {
 
@@ -20131,7 +20117,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Header tabs 锟斤�?keep special dark treatment */
+/* Header tabs 锟斤�?keep special dark treatment */
 
 .theme-neumorphic .df-header .df-tabs {
 
@@ -20193,7 +20179,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Header tabs 锟斤�?clean tint */
+/* Header tabs 锟斤�?clean tint */
 
 .df-header .df-tabs {
 
@@ -22675,9 +22661,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 3. df-task-card 锟斤拷锟斤拷�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 3. df-task-card 锟斤拷锟斤拷�?锟斤拷锟斤拷 */
 
-/* 锟斤拷拽锟斤拷锟铰革�?*/
+/* 锟斤拷拽锟斤拷锟铰革�?*/
 
 .df-task-card:active {
 
@@ -22715,7 +22701,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 19. df-pick-card 拾取锟斤拷灏�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 19. df-pick-card 拾取锟斤拷灏�?锟斤拷锟斤拷 */
 
 .df-pick-card button:not(:disabled):hover {
 
@@ -22795,7 +22781,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Task Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Task Cards 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-task-card,
 
@@ -22901,13 +22887,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 /* ================================================================
 
-   GRADIENT DESIGN SYSTEM 锟斤�?NavoPath Default Theme
+   GRADIENT DESIGN SYSTEM 锟斤�?NavoPath Default Theme
 
    ================================================================
 
-   Aesthetic: gradient 锟斤�?frosted glass 锟斤�?structured 锟斤�?calm
+   Aesthetic: gradient 锟斤�?frosted glass 锟斤�?structured 锟斤�?calm
 
-              high-density 锟斤�?subtle depth 锟斤�?rounded but not cute
+              high-density 锟斤�?subtle depth 锟斤�?rounded but not cute
 
    Reference: Linear, Notion, Things 3, macOS Sonoma
 
@@ -22915,7 +22901,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Cards & Panels 锟斤�?subtle shadow, thin border 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Cards & Panels 锟斤�?subtle shadow, thin border 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-candidate-panel,
 
@@ -22971,7 +22957,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Task Cards 锟斤�?clean, compact 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Task Cards 锟斤�?clean, compact 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-task-card,
 
@@ -23035,7 +23021,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Ghost / icon buttons 锟斤�?transparent, no border */
+/* Ghost / icon buttons 锟斤�?transparent, no border */
 
 .ghost-button,
 
@@ -23059,7 +23045,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Popover 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Popover 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-card-popover {
 
@@ -23973,7 +23959,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 日期标题紧凑样式 - 日期和星期并排显�?*/
+/* 日期标题紧凑样式 - 日期和星期并排显�?*/
 
 .df-date-title-compact {
 
@@ -24075,7 +24061,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 三日/周视图日期样�?- 日期和星期并排显�?*/
+/* 三日/周视图日期样�?- 日期和星期并排显�?*/
 
 .df-timeline-3day-date {
 
@@ -25119,7 +25105,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 }
 
-/* Keep resize dots visible on short blocks �?usable hit area at edges */
+/* Keep resize dots visible on short blocks �?usable hit area at edges */
 
 .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot {
 
@@ -25157,7 +25143,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-time-block.short-block:not(.df-time-block-week) .df-resize-dot.bottom { bottom: -3px; }
 
-/* Keep check button visible on short blocks �?smaller */
+/* Keep check button visible on short blocks �?smaller */
 
 .df-time-block.short-block:not(.df-time-block-week) .df-block-check {
 
@@ -25221,7 +25207,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-time-block:hover .df-block-title-row {
 
-  /* Remove full-width mask 锟斤�?badge sits on top with its own background */
+  /* Remove full-width mask 锟斤�?badge sits on top with its own background */
 
 }
 
@@ -25743,7 +25729,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 11. df-ai-plan AI锟芥划锟斤拷�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 11. df-ai-plan AI锟芥划锟斤拷�?锟斤拷锟斤拷 */
 
 .df-ai-plan:not(.thinking):not(:disabled):hover {
 
@@ -25767,7 +25753,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 13. df-date-arrow 锟斤拷锟斤拷前锟斤拷页锟斤拷�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 13. df-date-arrow 锟斤拷锟斤拷前锟斤拷页锟斤拷�?锟斤拷锟斤拷 */
 
 .df-date-arrow:not(:disabled):active {
 
@@ -25779,7 +25765,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 14. df-block-project 时锟斤拷锟斤拷锟侥匡拷锟斤拷�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 14. df-block-project 时锟斤拷锟斤拷锟侥匡拷锟斤拷�?锟斤拷锟斤拷 */
 
 .df-block-project:hover {
 
@@ -25801,7 +25787,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 23. df-suggestion AI锟斤拷锟斤拷�?apply/ignore 锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 23. df-suggestion AI锟斤拷锟斤拷�?apply/ignore 锟斤拷锟斤拷 */
 
 .df-suggestion-action.apply:hover { background: color-mix(in srgb, var(--mode-primary) 28%, transparent) !important; }
 
@@ -25903,7 +25889,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Layer 1: Hour/slot lines 锟斤�?shared across all day columns */
+/* Layer 1: Hour/slot lines 锟斤�?shared across all day columns */
 
 .df-hour-lines-layer {
 
@@ -25975,7 +25961,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Layer 3: Event blocks 锟斤�?absolutely positioned on the shared time-grid */
+/* Layer 3: Event blocks 锟斤�?absolutely positioned on the shared time-grid */
 
 .df-event-blocks-layer {
 
@@ -26215,7 +26201,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Event indicator �?gray box replacing checkbox on event blocks */
+/* Event indicator �?gray box replacing checkbox on event blocks */
 
 .df-event-indicator {
 
@@ -26387,7 +26373,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-event-blocks-layer .df-resize-dot { width: 7px; height: 7px; }
 
-/* When block height is very short (�?2px), hide secondary elements */
+/* When block height is very short (�?2px), hide secondary elements */
 
 .df-event-blocks-layer .df-time-block[style*="height: 3"],
 
@@ -26427,7 +26413,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━�?Week View �?compact calendar strips ━━━━━━━━━━━━━━━━━━━━�?*/
+/* ━━�?Week View �?compact calendar strips ━━━━━━━━━━━━━━━━━━━━�?*/
 
 .df-week-view .df-block-project {
 
@@ -26437,7 +26423,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Compact week-view event blocks �?no color strip, no checkbox */
+/* Compact week-view event blocks �?no color strip, no checkbox */
 
 .df-week-view .df-time-block.df-time-block-week,
 
@@ -26555,7 +26541,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Hide space-taking elements in week view �?checkbox handled separately */
+/* Hide space-taking elements in week view �?checkbox handled separately */
 
 .df-week-view .df-time-block.df-time-block-week .df-block-project-wrap,
 
@@ -26571,7 +26557,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Week view checkbox: smaller, absolute-overlay �?always visible in the top-left */
+/* Week view checkbox: smaller, absolute-overlay �?always visible in the top-left */
 
 .df-week-view .df-time-block.df-time-block-week .df-block-check,
 
@@ -26677,7 +26663,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Dragging state �?freeze layout during drag, highest z-index */
+/* Dragging state �?freeze layout during drag, highest z-index */
 
 .df-time-block.is-dragging,
 
@@ -26715,7 +26701,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Time Slots / Ruler 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Time Slots / Ruler 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .theme-neumorphic .df-slot {
 
@@ -26801,7 +26787,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Time Block (3Day) 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Time Block (3Day) 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-time-block {
 
@@ -27249,7 +27235,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Overlay event blocks 锟斤�?dark completed 锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 Overlay event blocks 锟斤�?dark completed 锟斤拷锟斤拷 */
 
 .df-app.theme-dark .df-event-blocks-layer .df-time-block.completed {
 
@@ -27435,7 +27421,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Daily All Day 锟斤�?锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 Daily All Day 锟斤�?锟斤拷锟斤拷 */
 
 .df-timeline-allday {
 
@@ -27615,7 +27601,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-all-day-block:hover strong {
 
-  /* Mask removed 锟斤�?badge sits on top with its own background */
+  /* Mask removed 锟斤�?badge sits on top with its own background */
 
 }
 
@@ -28463,7 +28449,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Primary / accent buttons 锟斤�?colored neumorphic style */
+/* Primary / accent buttons 锟斤�?colored neumorphic style */
 
 .df-tabs button.active,
 
@@ -28537,7 +28523,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Neumorphic Inputs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Neumorphic Inputs 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-app input,
 
@@ -28581,7 +28567,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Override neumorphic !important on popover inputs 锟斤�?must come AFTER to win cascade */
+/* Override neumorphic !important on popover inputs 锟斤�?must come AFTER to win cascade */
 
 .drag-create-quick-add input {
 
@@ -28617,7 +28603,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Primary buttons 锟斤�?brand color */
+/* Primary buttons 锟斤�?brand color */
 
 .df-tabs button.active,
 
@@ -28695,7 +28681,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Inputs 锟斤�?clean, bordered 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 Inputs 锟斤�?clean, bordered 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 */
 
 .df-app input,
 
@@ -28739,7 +28725,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Quick Add 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Quick Add 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-quick-add {
 
@@ -29173,7 +29159,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Project menu �?now a child of the unified container */
+/* Project menu �?now a child of the unified container */
 
 .df-quick-add-project-menu {
 
@@ -30573,7 +30559,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 8. df-detail-chips 锟斤拷锟斤拷锟角┭�
+/* 锟斤拷锟斤拷 8. df-detail-chips 锟斤拷锟斤拷锟角┭�
 拷锟?锟斤拷锟斤拷 */
 
 .df-detail-chips button:not(.active):hover {
@@ -30610,7 +30596,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 15. df-drawer 锟斤�?input / select / textarea focus 锟斤拷锟斤拷 */
+/* 锟斤拷锟斤拷 15. df-drawer 锟斤�?input / select / textarea focus 锟斤拷锟斤拷 */
 
 .df-drawer input:focus,
 
@@ -30664,7 +30650,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 锟斤拷锟斤拷 Utility Panel 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
+/* 锟斤拷锟斤拷 Utility Panel 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤�?*/
 
 .df-utility-panel,
 
@@ -30688,7 +30674,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━ 画布 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━�?*/
+/* ━━ 画布 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━�?*/
 
 .df-app .df-planning,
 
@@ -30804,7 +30790,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━ 项目�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━ 项目�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .df-app .df-category-branch,
 
@@ -31078,7 +31064,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━ 任务列表（缩进在项目下方�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━�?*/
+/* ━━ 任务列表（缩进在项目下方�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━�?*/
 
 .df-app .df-project-tasks,
 
@@ -31442,7 +31428,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━ 任务分支 & 子任务列�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━ 任务分支 & 子任务列�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .df-app .df-task-branch,
 
@@ -31488,7 +31474,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━ 子任务节�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━�?*/
+/* ━━ 子任务节�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━�?*/
 
 .df-app .df-plan-subtask-node,
 
@@ -31584,7 +31570,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Subtask inner row �?flex container for check, title, chevron, actions */
+/* Subtask inner row �?flex container for check, title, chevron, actions */
 
 .df-app .df-subtask-inner,
 
@@ -31612,7 +31598,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Subtask node with children �?switch to column layout so children appear below the row */
+/* Subtask node with children �?switch to column layout so children appear below the row */
 
 .df-app .df-plan-subtask-node.has-children,
 
@@ -31632,7 +31618,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Subtask children container �?nested subtask list */
+/* Subtask children container �?nested subtask list */
 
 .df-app .df-subtask-children,
 
@@ -31656,7 +31642,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Subtask chevron �?align with task chevron */
+/* Subtask chevron �?align with task chevron */
 
 .df-app .df-subtask-chevron,
 
@@ -31892,7 +31878,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━ SVG 连接�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━ SVG 连接�?━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .df-app .df-tree-svg,
 
@@ -32502,7 +32488,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* 鈹€鈹€ 鎸戦€夋ā寮忔í�?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+/* 鈹€鈹€ 鎸戦€夋ā寮忔í�?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 
 .df-app .df-pick-banner,
 
@@ -32596,7 +32582,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 /* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?
 
-   �
+   �
 愯棌鏃犵敤鐨勬棫鏍峰紡閫夋嫨锟?
 
    鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?*/
@@ -32629,7 +32615,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 /* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?
 
-   鍝�
+   鍝�
 簲锟?
 
    鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲锟?*/
@@ -32680,8 +32666,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ===== 规划页�
-色模式精�?===== */
+/* ===== 规划页�
+色模式精�?===== */
 
 .df-app:not(.theme-dark) .df-planning {
 
@@ -32935,9 +32921,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ===== �
-色模式�
-�局组件统一 (白底+细描�? ===== */
+/* ===== �
+色模式�
+�局组件统一 (白底+细描�? ===== */
 
 .df-app:not(.theme-dark) input[type="text"],
 
@@ -33015,8 +33001,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ===== 执行页�
-色模�?(候选卡�?+ 快速添�? ===== */
+/* ===== 执行页�
+色模�?(候选卡�?+ 快速添�? ===== */
 
 .df-app:not(.theme-dark) .df-task-card {
 
@@ -33218,9 +33204,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ===== �
-�天栏�
-色模�?===== */
+/* ===== �
+�天栏�
+色模�?===== */
 
 .df-app:not(.theme-dark) .df-all-day-bar {
 
@@ -33274,7 +33260,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ===== 分栏拖拽分隔�?===== */
+/* ===== 分栏拖拽分隔�?===== */
 
 .df-app .df-planning-body,
 
@@ -33398,12 +33384,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━�?Auto-schedule preview (variant on real TimeBlock) ━━━━━━━━━━━━━━ */
+/* ━━�?Auto-schedule preview (variant on real TimeBlock) ━━━━━━━━━━━━━━ */
 
 /* Preview tasks are rendered by the same TimeBlock component as real
 
- * tasks. The only visual difference is the dashed border + "�
-确�? badge. */
+ * tasks. The only visual difference is the dashed border + "�
+确�? badge. */
 
 
 
@@ -33501,7 +33487,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━�?Per-preview action buttons (accept / cancel) ━━━━━━━━━━━━━━━━�?*/
+/* ━━�?Per-preview action buttons (accept / cancel) ━━━━━━━━━━━━━━━━�?*/
 
 .df-time-block .df-preview-actions {
 
@@ -33621,7 +33607,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ━━�?Undo toast (5-second window) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━�?Undo toast (5-second window) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .df-toast.df-toast-undo {
 
@@ -33729,10 +33715,10 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ══════════════════════════════════════════════════════════════�?
+/* ══════════════════════════════════════════════════════════════�?
    AI Panel action confirmation cards
 
-   ══════════════════════════════════════════════════════════════�?*/
+   ══════════════════════════════════════════════════════════════�?*/
 
 .df-ai-actions {
 
@@ -33922,10 +33908,10 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ══════════════════════════════════════════════════════════════�?
-   Preview block �?hide badge when block is too short
+/* ══════════════════════════════════════════════════════════════�?
+   Preview block �?hide badge when block is too short
 
-   ══════════════════════════════════════════════════════════════�?*/
+   ══════════════════════════════════════════════════════════════�?*/
 
 .df-time-block[data-preview="true"][style*="height:48"],
 
@@ -33947,10 +33933,10 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 }
 
-/* ══════════════════════════════════════════════════════════════�?
-   TrevorAI-style AI Panel �?complete rewrite
+/* ══════════════════════════════════════════════════════════════�?
+   TrevorAI-style AI Panel �?complete rewrite
 
-   ══════════════════════════════════════════════════════════════�?*/
+   ══════════════════════════════════════════════════════════════�?*/
 
 .df-ai-panel {
 
@@ -34232,7 +34218,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* Plan card �?time-block list shown alongside chat reply */
+/* Plan card �?time-block list shown alongside chat reply */
 
 .df-ai-plan {
 
@@ -34748,7 +34734,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
-/* ══�?Light mode ══�?*/
+/* ══�?Light mode ══�?*/
 
 .df-app:not(.theme-dark) .df-ai-panel {
 
@@ -40918,7 +40904,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-app.task-block-fill .df-time-block:not(.is-event).completed:not(.df-time-block-preview) {
 
-  /* Keep the original project color on completion �?only add a subtle desaturation
+  /* Keep the original project color on completion �?only add a subtle desaturation
 
      via opacity, never swap to a different hue. */
 

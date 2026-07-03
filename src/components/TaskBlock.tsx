@@ -1,6 +1,6 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 
-export type TaskBlockVariant = "candidate" | "scheduled" | "allDay" | "compact" | "habit-child";
+export type TaskBlockVariant = "candidate" | "planning" | "scheduled" | "allDay" | "compact" | "habit-child";
 export type TaskBlockDensity = "normal" | "compact" | "dense";
 export type TaskBlockAppearance = "calm" | "medium" | "custom";
 export type TaskBlockPriority = "low" | "normal" | "high" | "urgent";
@@ -82,6 +82,7 @@ type TaskBlockProps = TaskBlockClassOptions & TaskBlockStyleOptions & {
   onPointerUp?: React.PointerEventHandler<HTMLElement>;
   onPointerCancel?: React.PointerEventHandler<HTMLElement>;
   onDragStart?: React.DragEventHandler<HTMLElement>;
+  onDragEnd?: React.DragEventHandler<HTMLElement>;
 };
 
 export const TaskBlock = React.forwardRef<HTMLElement, TaskBlockProps>(function TaskBlock({
@@ -125,6 +126,7 @@ export const TaskBlock = React.forwardRef<HTMLElement, TaskBlockProps>(function 
       onPointerUp={props.onPointerUp}
       onPointerCancel={props.onPointerCancel}
       onDragStart={props.onDragStart}
+      onDragEnd={props.onDragEnd}
       {...baseData}
       {...extraData}
     >

@@ -4,7 +4,7 @@
  * One shared anatomy for every task surface:
  *   [ checkbox ][ content: title + optional metadata ][ duration ][ actions ]
  *
- * Anatomy stays consistent across variants (candidate | scheduled | allDay | compact | habit-child).
+ * Anatomy stays consistent across variants (candidate | planning | scheduled | allDay | compact | habit-child).
  * Variant tokens control density, height, padding, and alignment. Appearance modes only change visual intensity:
  *   data-task-appearance="calm"    (default — clean paper, neutral border, weak bottom accent)
  *   data-task-appearance="medium"  (stronger project visibility, muted full border, thicker bottom)
@@ -220,13 +220,29 @@
   transform: translateY(1px);
 }
 
-/* Completed — quiet opacity only, never a dirty fill. */
+/* Completed — clean styling, no opacity or gray overlay. */
 .df-app .df-task-block[data-task-appearance].is-checked,
 .df-app .df-task-block[data-task-appearance].completed,
 .navo-demo-app .df-task-block[data-task-appearance].is-checked,
 .navo-demo-app .df-task-block[data-task-appearance].completed {
-  opacity: .62;
+  opacity: 1;
   background: var(--task-bg) !important;
+}
+
+.df-app .df-task-block[data-task-appearance].is-checked .df-task-block-title,
+.df-app .df-task-block[data-task-appearance].completed .df-task-block-title,
+.navo-demo-app .df-task-block[data-task-appearance].is-checked .df-task-block-title,
+.navo-demo-app .df-task-block[data-task-appearance].completed .df-task-block-title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--task-meta-color);
+}
+
+.df-app .df-task-block[data-task-appearance].is-checked .df-task-block-duration,
+.df-app .df-task-block[data-task-appearance].completed .df-task-block-duration,
+.navo-demo-app .df-task-block[data-task-appearance].is-checked .df-task-block-duration,
+.navo-demo-app .df-task-block[data-task-appearance].completed .df-task-block-duration {
+  color: var(--task-meta-color);
 }
 
 /* ============================================================
@@ -454,12 +470,22 @@
   --task-grid-template: auto minmax(0, 1fr) auto auto;
 }
 
+.df-app .df-task-block[data-task-appearance][data-task-variant="planning"],
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="planning"] {
+  --task-padding-x: 14px;
+  --task-padding-y: 10px;
+  --task-min-height: 52px;
+  --task-gap: 12px;
+  --task-align-items: center;
+  --task-grid-template: auto minmax(0, 1fr) auto auto;
+}
+
 /* Scheduled — content top-left aligned, height can stretch by time duration.
    Actions may hide until hover/selected; checkbox stays near top-left. */
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"],
 .navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] {
-  --task-padding-x: 12px;
-  --task-padding-y: 10px;
+  --task-padding-x: 10px;
+  --task-padding-y: 6px;
   --task-min-height: unset;
   --task-gap: 8px;
   --task-align-items: start;
@@ -468,6 +494,19 @@
   align-content: start !important;
   min-height: unset !important;
   overflow: hidden !important;
+}
+
+/* Short scheduled blocks — vertically centered, compact padding. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block {
+  --task-padding-x: 8px;
+  --task-padding-y: 4px;
+  --task-align-items: center;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-row,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-row {
+  align-items: center !important;
 }
 
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-row,
@@ -551,6 +590,14 @@
 .df-app .df-habit-candidate-card .df-task-block[data-task-appearance]:last-child,
 .navo-demo-app .df-habit-candidate-card .df-task-block[data-task-appearance]:last-child {
   margin-bottom: 0;
+}
+
+.df-app .df-task-block[data-task-appearance] .df-habit-check::before,
+.df-app .df-task-block[data-task-appearance] .df-habit-check::after,
+.navo-demo-app .df-task-block[data-task-appearance] .df-habit-check::before,
+.navo-demo-app .df-task-block[data-task-appearance] .df-habit-check::after {
+  content: none !important;
+  display: none !important;
 }
 
 /* ============================================================
