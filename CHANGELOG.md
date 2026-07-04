@@ -15,6 +15,8 @@
 - 修复拖动预览因继承源元素拖拽态类而导致克隆卡片呈现为虚化占位的问题。
 - 修复 Planning 页面拖拽预览呈现为蓝灰浮卡而非原始任务块的问题。
 - 修复不同视图拖拽反馈样式各自为政、CSS 重复堆叠的问题，收敛为共享类驱动。
+- 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
+- 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
 
 ## 2026-07-04 · Unified drag experience
 
@@ -31,6 +33,8 @@
 - Fixed the drag preview inheriting the source's drag-state class, which made the cloned card render as a dimmed placeholder.
 - Fixed the Planning page drag preview rendering as a blue-gray floating card instead of the original task block.
 - Fixed per-view drag feedback styles diverging and duplicating CSS; consolidated onto shared class-driven feedback.
+- Fixed page text being accidentally selected while dragging a task; text selection is now disabled during drags (inputs, textareas, and editable regions are unaffected).
+- Fixed the drag source placeholder showing a purple tint; it is now a neutral gray dashed slot, staying gray in dark mode too.
 
 ## 2026-07-03 · 统一任务块与精简顶栏
 

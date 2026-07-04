@@ -1374,13 +1374,37 @@
 
 body.df-planning-native-dragging,
 body.df-planning-native-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
   cursor: grabbing !important;
+}
+body.df-planning-native-dragging input,
+body.df-planning-native-dragging textarea,
+body.df-planning-native-dragging [contenteditable],
+body.df-planning-native-dragging [contenteditable] * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 /* ============================================================
    Unified drag system — shared source placeholder, overlay,
    container outline, and insertion line for every task view.
    ============================================================ */
+
+:root,
+.df-app {
+  --drag-placeholder-bg: rgba(128, 128, 128, 0.14);
+  --drag-placeholder-border: rgba(128, 128, 128, 0.35);
+  --task-drag-shadow: 0 6px 20px rgba(40, 36, 31, 0.12), 0 1px 3px rgba(40, 36, 31, 0.08);
+}
+
+/* Dark mode: keep the placeholder neutral gray, never purple/lavender. */
+.df-app.theme-dark {
+  --drag-placeholder-bg: rgba(255, 255, 255, 0.08);
+  --drag-placeholder-border: rgba(255, 255, 255, 0.18);
+}
 
 /* Source placeholder: the original position becomes a muted, dashed,
    faint-paper box that preserves layout space. No opacity-only ghost,
@@ -1390,8 +1414,8 @@ body.df-planning-native-dragging * {
 .df-task-block[data-task-appearance].is-dragging-source,
 .df-app .df-task-block[data-task-appearance].is-dragging-source {
   opacity: 1 !important;
-  border: 1px dashed color-mix(in srgb, var(--paper-muted, #9a9388) 42%, transparent) !important;
-  background: color-mix(in srgb, var(--paper-rule, #efece4) 22%, var(--paper-bg, #fbf9ff) 78%) !important;
+  border: 1px dashed var(--drag-placeholder-border) !important;
+  background: var(--drag-placeholder-bg) !important;
   box-shadow: none !important;
   transform: none !important;
   color: transparent !important;
@@ -1414,7 +1438,18 @@ body.df-unified-dragging .df-task-block[data-task-appearance]:active {
 }
 body.df-unified-dragging,
 body.df-unified-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
   cursor: grabbing !important;
+}
+body.df-unified-dragging input,
+body.df-unified-dragging textarea,
+body.df-unified-dragging [contenteditable],
+body.df-unified-dragging [contenteditable] * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 /* The floating overlay: a full intact TaskBlock clone following the
@@ -1486,8 +1521,8 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
    (kanban column, matrix quadrant) when a card would be dropped in. */
 .is-drop-placeholder,
 .df-kanban-drop-placeholder {
-  border: 1px dashed color-mix(in srgb, var(--paper-muted, #9a9388) 42%, transparent) !important;
-  background: color-mix(in srgb, var(--paper-rule, #efece4) 18%, transparent) !important;
+  border: 1px dashed var(--drag-placeholder-border) !important;
+  background: var(--drag-placeholder-bg) !important;
   border-radius: var(--task-radius, 10px) !important;
   min-height: 36px !important;
 }
@@ -1504,7 +1539,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-task-block[data-drag-state="overlay"] {
   background: var(--task-bg) !important;
   border-color: var(--task-border-hover) !important;
-  box-shadow: 0 6px 20px rgba(40, 36, 31, 0.12), 0 1px 3px rgba(40, 36, 31, 0.08) !important;
+  box-shadow: var(--task-drag-shadow) !important;
   opacity: 1 !important;
   transform: none !important;
   pointer-events: none !important;
@@ -1520,7 +1555,23 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
    Same approximate size, light neutral dashed border, clean paper tint.
    No purple/blue loud fill, no dirty gray, no text content. */
 .df-task-block[data-drag-state="source-placeholder"] {
-  visibility: hidden !important;
+  opacity: 1 !important;
+  border: 1px dashed var(--drag-placeholder-border) !important;
+  background: var(--drag-placeholder-bg) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: transparent !important;
+}
+.df-app .df-time-block[data-drag-state="source-placeholder"].is-dragging,
+.df-app .df-event-blocks-layer .df-time-block[data-drag-state="source-placeholder"].is-dragging {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+.df-task-block[data-drag-state="source-placeholder"] > * {
+  opacity: 0 !important;
+}
+.df-task-block[data-drag-state="source-placeholder"] .df-task-block-accent {
+  display: none !important;
 }
 
 /* TaskDragLayer container: transparent, no background, just positions
@@ -1532,12 +1583,33 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-task-drag-layer .df-task-block {
   border-radius: var(--task-radius, 6px);
 }
+.df-task-drag-layer > .df-task-block {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+.df-app .df-task-drag-layer > .df-task-block[data-drag-state="overlay"],
+.navo-demo-app .df-task-drag-layer > .df-task-block[data-drag-state="overlay"] {
+  --task-min-height: 0px;
+  min-height: 0 !important;
+}
+.df-task-drag-layer .df-time-block {
+  position: relative !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
 
 /* Drop placeholder slot: clean empty slot shown inside a container. */
 .task-drop-placeholder {
   height: 40px;
-  border: 1px dashed color-mix(in srgb, var(--paper-muted, #9a9388) 42%, transparent) !important;
-  background: transparent !important;
+  border: 1px dashed var(--drag-placeholder-border) !important;
+  background: var(--drag-placeholder-bg) !important;
   border-radius: var(--task-radius, 6px) !important;
 }
 
@@ -1569,8 +1641,8 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-app .df-planning .df-planning-list-row-wrap.is-drag-source .df-planning-list-row,
 .df-app .df-tree [aria-grabbed="true"] {
   opacity: 1 !important;
-  border: 1px dashed color-mix(in srgb, var(--paper-muted, #9a9388) 42%, transparent) !important;
-  background: color-mix(in srgb, var(--paper-rule, #efece4) 22%, var(--paper-bg, #fbf9ff) 78%) !important;
+  border: 1px dashed var(--drag-placeholder-border) !important;
+  background: var(--drag-placeholder-bg) !important;
   box-shadow: none !important;
   transform: none !important;
   color: transparent !important;
