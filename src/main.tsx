@@ -8,7 +8,7 @@ import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssista
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks } from "./autoSchedule";
-import { UnifiedDragOverlay, type UnifiedDragSnapshot } from "./unifiedDrag";
+import { TaskDragLayer, UnifiedDragOverlay, type UnifiedDragSnapshot } from "./unifiedDrag";
 import { installBrowserFallback, forceLocalPreviewMode } from "./browserFallback";
 import {
   getVisibleDays,
@@ -1521,6 +1521,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
   const [dragOverlay, setDragOverlay] = useState<UnifiedDragSnapshot | null>(null);
+  const [dragOverlayTask, setDragOverlayTask] = useState<{ task: Task; variant: "candidate" | "allDay" | "scheduled" } | null>(null);
   const [dragOverlayPointer, setDragOverlayPointer] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [resizePreview, setResizePreview] = useState<ResizePreview>(null);
   const [hoverSlot, setHoverSlot] = useState<string>("");
@@ -4377,6 +4378,7 @@ function App() {
       dragElement.classList.remove("is-dragging-source");
       setDrag(null);
       setDragOverlay(null);
+      setDragOverlayTask(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
       if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
@@ -4747,6 +4749,7 @@ function App() {
       window.removeEventListener("keydown", keydown);
       setDrag(null);
       setDragOverlay(null);
+      setDragOverlayTask(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
       clearHold();
@@ -4768,6 +4771,7 @@ function App() {
       document.body.classList.remove("df-timeline-pointer-drag");
       setDrag(null);
       setDragOverlay(null);
+      setDragOverlayTask(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
       clearHold();
@@ -5547,6 +5551,7 @@ function App() {
       dragElement.classList.remove("is-dragging-source");
       setDrag(null);
       setDragOverlay(null);
+      setDragOverlayTask(null);
       setHoverSlot("");
       setAllDayDragOver(false);
       setAllDayDragDate("");
@@ -5604,6 +5609,7 @@ function App() {
         const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
         const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
         setDragOverlay({ taskId: task.id, sourceElement: dragElement, sourceRect: rect, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "candidate", source } });
+        setDragOverlayTask({ task, variant: source === "candidate" ? "candidate" : "allDay" });
         if (compactLayout && source === "candidate") {
           setCompactExecuteView("schedule");
           if (timelineView === "month") setTimelineView("daily");
@@ -7606,7 +7612,34 @@ function App() {
       )}
       {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && !dragOverlay && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && !dragOverlay && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
-      {dragOverlay && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
+      {dragOverlay && dragOverlayTask && (
+        <TaskDragLayer pointer={dragOverlayPointer} sourceRect={{ width: dragOverlay.sourceRect.width, height: dragOverlay.sourceRect.height }} offset={dragOverlay.offset}>
+          <TaskBlock
+            as="article"
+            variant={dragOverlayTask.variant}
+            appearance="calm"
+            priority={taskBlockPriorityFor(dragOverlayTask.task.importance, dragOverlayTask.task.urgency)}
+            checked={dragOverlayTask.task.completed}
+            dragState="overlay"
+            projectColor={projects.find((p) => String(p.id) === String(dragOverlayTask.task.projectId || ""))?.color || "var(--accent-active)"}
+            className="df-task-card"
+          >
+            <TaskBlockRow className="df-candidate-row">
+              <TaskCheckbox
+                checked={dragOverlayTask.task.completed}
+                tone="muted"
+              >
+                {dragOverlayTask.task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}
+              </TaskCheckbox>
+              <TaskBlockContent className="df-candidate-main" title={dragOverlayTask.task.title.trimStart()} />
+              <TaskBlockDuration>
+                <span className="df-duration-pill">{formatDuration(dragOverlayTask.task.estimatedHours || 0.5)}</span>
+              </TaskBlockDuration>
+            </TaskBlockRow>
+          </TaskBlock>
+        </TaskDragLayer>
+      )}
+      {dragOverlay && !dragOverlayTask && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>

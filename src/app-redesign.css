@@ -7412,11 +7412,6 @@ body.df-timeline-pointer-drag * {
   background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%);
   pointer-events: none;
 }
-/* Drag source: slight ink reduction only, no opacity flicker, no gray. */
-.df-kanban-card.is-drag-source,
-.df-eisenhower-task.is-drag-source {
-  opacity: .5 !important;
-}
 /* Stronger (but still clean) border on drop targets, no shadow. */
 .df-kanban-column.is-drop-target,
 .df-eisenhower-quadrant.is-drop-target {
@@ -7601,12 +7596,9 @@ body.df-timeline-pointer-drag * {
   color: var(--accent-active) !important;
 }
 
-/* List view drag/drop: insertion line + drag source. */
+/* List view drag/drop: insertion line. */
 .df-planning-list-row-wrap {
   position: relative;
-}
-.df-planning-list-row-wrap.is-drag-source {
-  opacity: .5;
 }
 .df-list-insertion-line {
   height: 2px;

@@ -220,10 +220,13 @@ describe("TaskBlock shared component contract", () => {
     expect(main).toContain("data-cross-day-scroll");
   });
 
-  it("uses a native drag preview helper for Planning native drag views", () => {
+  it("uses a shared pointer-event drag system for Planning views", () => {
     const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
 
-    expect(planning).toContain("setPlanningDragImage");
+    expect(planning).toContain("beginPlanningDrag");
+    expect(planning).toContain("beginTreeDrag");
+    expect(planning).toContain("TaskDragLayer");
+    expect(planning).toContain('dragState="overlay"');
     expect(planning).toContain("data-planning-drag-card");
     expect(planning).toContain("aria-grabbed");
   });
@@ -242,7 +245,7 @@ describe("TaskBlock shared component contract", () => {
     expect(css).toContain("content: none !important;");
     expect(css).toContain("border: 0 !important;");
     expect(css).toContain(".df-app.mode-planning .df-planning-native-drag-image");
-    expect(planning).toContain('source.closest<HTMLElement>(".df-planning")');
+    expect(planning).toContain("beginTreeDrag");
     expect(css).toContain("cursor: grabbing !important;");
   });
 });

@@ -212,6 +212,11 @@ export function UnifiedDragOverlay({ snapshot, pointer }: {
   pointer: { x: number; y: number };
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setTarget(document.querySelector<HTMLElement>(".df-app") || document.body);
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -257,6 +262,7 @@ export function UnifiedDragOverlay({ snapshot, pointer }: {
     container.appendChild(clone);
   }, [snapshot.sourceElement, snapshot.sourceRect.width, snapshot.sourceRect.height]);
 
+  if (!target) return null;
   return createPortal(
     <div
       ref={containerRef}
@@ -271,7 +277,45 @@ export function UnifiedDragOverlay({ snapshot, pointer }: {
         zIndex: 99999,
       }}
     />,
-    document.body,
+    target,
+  );
+}
+
+/**
+ * TaskDragLayer — renders a real React TaskBlock (or any React node) as the
+ * drag overlay, following the pointer. Unlike UnifiedDragOverlay which clones
+ * the source DOM, this renders an actual React component so it always has the
+ * correct, intact TaskBlock styling.
+ *
+ * Portals to .df-app (falling back to document.body) so CSS variables and
+ * theme tokens resolve correctly.
+ */
+export function TaskDragLayer({ children, pointer, sourceRect, offset }: {
+  children: React.ReactNode;
+  pointer: { x: number; y: number };
+  sourceRect: { width: number; height: number };
+  offset: { x: number; y: number };
+}) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(document.querySelector<HTMLElement>(".df-app") || document.body);
+  }, []);
+  if (!target) return null;
+  return createPortal(
+    <div
+      className="df-task-drag-layer"
+      style={{
+        position: "fixed",
+        left: `${pointer.x - offset.x}px`,
+        top: `${pointer.y - offset.y}px`,
+        width: `${sourceRect.width}px`,
+        pointerEvents: "none",
+        zIndex: 99999,
+      }}
+    >
+      {children}
+    </div>,
+    target,
   );
 }
 

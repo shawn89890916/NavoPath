@@ -4,6 +4,7 @@ export type TaskBlockVariant = "candidate" | "planning" | "scheduled" | "allDay"
 export type TaskBlockDensity = "normal" | "compact" | "dense";
 export type TaskBlockAppearance = "calm" | "medium" | "custom";
 export type TaskBlockPriority = "low" | "normal" | "high" | "urgent";
+export type TaskBlockDragState = "overlay" | "source-placeholder";
 
 export type TaskBlockClassOptions = {
   variant?: TaskBlockVariant;
@@ -12,6 +13,7 @@ export type TaskBlockClassOptions = {
   checked?: boolean;
   selected?: boolean;
   dragging?: boolean;
+  dragState?: TaskBlockDragState;
   disabled?: boolean;
   className?: string;
 };
@@ -55,6 +57,7 @@ export function taskBlockDataAttrs(options: TaskBlockClassOptions): Record<strin
     "data-task-priority": options.priority,
     "data-task-checked": options.checked ? "true" : undefined,
     "data-task-selected": options.selected ? "true" : undefined,
+    "data-drag-state": options.dragState,
   };
 }
 

@@ -1492,6 +1492,74 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   min-height: 36px !important;
 }
 
+/* ============================================================
+   Shared drag-state tokens (data-drag-state attribute)
+   Used by TaskDragLayer + source placeholder system.
+   ============================================================ */
+
+/* The overlay card: a full intact TaskBlock rendered by TaskDragLayer.
+   Same clean paper background as original, slightly stronger neutral
+   border allowed, subtle neutral shadow allowed. No opacity fade, no
+   glow, no scale. */
+.df-task-block[data-drag-state="overlay"] {
+  background: var(--task-bg) !important;
+  border-color: var(--task-border-hover) !important;
+  box-shadow: 0 6px 20px rgba(40, 36, 31, 0.12), 0 1px 3px rgba(40, 36, 31, 0.08) !important;
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: none !important;
+}
+.df-task-block[data-drag-state="overlay"] > *,
+.df-task-block[data-drag-state="overlay"] button,
+.df-task-block[data-drag-state="overlay"] input,
+.df-task-block[data-drag-state="overlay"] a {
+  pointer-events: none !important;
+}
+
+/* Source placeholder: the original position becomes a clean empty slot.
+   Same approximate size, light neutral dashed border, clean paper tint.
+   No purple/blue loud fill, no dirty gray, no text content. */
+.df-task-block[data-drag-state="source-placeholder"] {
+  visibility: hidden !important;
+}
+
+/* TaskDragLayer container: transparent, no background, just positions
+   the intact TaskBlock clone following the pointer. */
+.df-task-drag-layer {
+  border-radius: var(--task-radius, 6px);
+  overflow: visible;
+}
+.df-task-drag-layer .df-task-block {
+  border-radius: var(--task-radius, 6px);
+}
+
+/* Drop placeholder slot: clean empty slot shown inside a container. */
+.task-drop-placeholder {
+  height: 40px;
+  border: 1px dashed color-mix(in srgb, var(--paper-muted, #9a9388) 42%, transparent) !important;
+  background: transparent !important;
+  border-radius: var(--task-radius, 6px) !important;
+}
+
+/* Insertion line: thin active-accent rule for reorder between tasks. */
+.task-insertion-line {
+  height: 2px;
+  background: var(--accent-active);
+  border-radius: 2px;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* Drop container active: restrained active-accent outline around the
+   whole target area (kanban column, matrix quadrant, tree group).
+   Clean paper background, no dirty gray fill. */
+.drop-container-active {
+  outline: 1px solid color-mix(in srgb, var(--accent-active) 56%, transparent) !important;
+  outline-offset: -2px !important;
+  background: color-mix(in srgb, var(--accent-active) 4%, var(--paper-bg)) !important;
+  box-shadow: none !important;
+}
+
 /* Planning native-drag source placeholder: unify with the shared
    is-dragging-source visual so all views share one placeholder look.
    Keep the is-drag-source selector (contract) but render the same
