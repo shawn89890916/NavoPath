@@ -73,6 +73,7 @@ type TaskBlockProps = TaskBlockClassOptions & TaskBlockStyleOptions & {
   dataAttrs?: Record<string, string | undefined>;
   ariaLabel?: string;
   ariaPressed?: boolean;
+  ariaGrabbed?: boolean;
   onClick?: React.MouseEventHandler<HTMLElement>;
   onDoubleClick?: React.MouseEventHandler<HTMLElement>;
   onMouseEnter?: React.MouseEventHandler<HTMLElement>;
@@ -117,6 +118,7 @@ export const TaskBlock = React.forwardRef<HTMLElement, TaskBlockProps>(function 
       draggable={props.draggable}
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
+      aria-grabbed={props.ariaGrabbed}
       onClick={props.onClick}
       onDoubleClick={props.onDoubleClick}
       onMouseEnter={props.onMouseEnter}

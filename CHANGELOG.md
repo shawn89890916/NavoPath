@@ -1,5 +1,33 @@
 # NavoPath 更新日志
 
+## 2026-07-04 · 统一拖拽体验
+
+### 改进
+- 拖动任务时，整张完整卡片跟随指针移动，不再仅以半透明残影呈现，手感对齐 TickTick。
+- 拖动源原位置变为克制的虚线占位槽，保留布局空间，不再消失或仅做透明化处理。
+- 在列表/候选/Tree 之间排序时显示清晰的插入线（带轻微脉动），落点一目了然。
+- 拖入看板列、Matrix 象限或 Tree 节点时，整个目标容器显示统一的外描边高亮，而非局部灰底。
+- 今日候选、全天日程栏、习惯子任务、Planning 的 Tree / Kanban / Matrix / List 与时间轴任务统一使用同一套拖拽视觉语言，跨视图行为一致。
+- 清理旧的透明幽灵预览与仅靠 opacity 表达拖拽状态的样式，统一为完整卡片跟随 + 占位槽 + 插入线 + 容器描边四件套。
+
+### 修复
+- 修复拖动预览因继承源元素拖拽态类而导致克隆卡片呈现为虚化占位的问题。
+- 修复不同视图拖拽反馈样式各自为政、CSS 重复堆叠的问题，收敛为共享类驱动。
+
+## 2026-07-04 · Unified drag experience
+
+### Improvements
+- Dragging a task now moves a complete intact card that follows the pointer, replacing the old opacity-only ghost and matching TickTick's feel.
+- The source slot becomes a restrained dashed placeholder that preserves layout space, instead of vanishing or only going transparent.
+- Reordering inside lists, candidates, and the tree shows a clear insertion line (with a subtle pulse) so the drop target is unambiguous.
+- Dropping into a Kanban column, Matrix quadrant, or tree node outlines the whole target container with a unified accent border, rather than a partial gray fill.
+- Today candidates, the all-day shelf, habit child rows, and Planning's Tree / Kanban / Matrix / List views plus the timeline now share one drag visual language, so behavior is consistent across surfaces.
+- Removed the legacy transparent ghost and opacity-only drag-state styling in favor of a single quartet: intact card follows pointer, placeholder slot, insertion line, and container outline.
+
+### Fixes
+- Fixed the drag preview inheriting the source's drag-state class, which made the cloned card render as a dimmed placeholder.
+- Fixed per-view drag feedback styles diverging and duplicating CSS; consolidated onto shared class-driven feedback.
+
 ## 2026-07-03 · 统一任务块与精简顶栏
 
 ### 改进

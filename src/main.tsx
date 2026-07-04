@@ -8,6 +8,7 @@ import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssista
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks } from "./autoSchedule";
+import { UnifiedDragOverlay, type UnifiedDragSnapshot } from "./unifiedDrag";
 import { installBrowserFallback, forceLocalPreviewMode } from "./browserFallback";
 import {
   getVisibleDays,
@@ -1519,6 +1520,8 @@ function App() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
+  const [dragOverlay, setDragOverlay] = useState<UnifiedDragSnapshot | null>(null);
+  const [dragOverlayPointer, setDragOverlayPointer] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [resizePreview, setResizePreview] = useState<ResizePreview>(null);
   const [hoverSlot, setHoverSlot] = useState<string>("");
   const [hoveredBlock, setHoveredBlock] = useState("");
@@ -1737,6 +1740,8 @@ function App() {
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
   const suppressBlockClickRef = useRef(false);
+  const crossDayWheelRef = useRef<{ key: string; at: number } | null>(null);
+  const crossDayTouchRef = useRef<{ y: number; atTop: boolean; atBottom: boolean } | null>(null);
 
   useEffect(() => {
     const scrollElement = timelineRef.current;
@@ -4282,6 +4287,24 @@ function App() {
     setHabitPanel("overview");
   }
 
+  function createHabit() {
+    if (!data) return;
+    const now = new Date().toISOString();
+    const habit: Habit = {
+      id: uid("habit"),
+      title: lang === "zh" ? "新习惯" : "New habit",
+      defaultDurationMinutes: 20,
+      frequencyRule: "daily",
+      activeWeekdays: [1, 2, 3, 4, 5],
+      order: Date.now(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    void saveData({ ...data, habits: [...(data.habits || []), habit] });
+    setEditingHabitId(habit.id);
+    setHabitPanel("detail");
+  }
+
   function saveHabitEdit(habitId: string, patch: Partial<Habit>) {
     if (!data) return;
     const next = updateHabit(data, habitId, patch);
@@ -4351,7 +4374,9 @@ function App() {
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
       document.body.classList.remove("df-timeline-pointer-drag");
+      dragElement.classList.remove("is-dragging-source");
       setDrag(null);
+      setDragOverlay(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
       if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
@@ -4377,8 +4402,13 @@ function App() {
         active = true;
         dragElement.setPointerCapture(pointerId);
         document.body.classList.add("df-timeline-pointer-drag");
+        dragElement.classList.add("is-dragging-source");
         suppressBlockClickRef.current = true;
         setDragCreate(null);
+        const rect = dragElement.getBoundingClientRect();
+        const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+        const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+        setDragOverlay({ taskId, sourceElement: dragElement, sourceRect: rect, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "habit" } });
         if (compactLayout) {
           setCompactExecuteView("schedule");
           if (timelineView === "month") setTimelineView("daily");
@@ -4386,6 +4416,7 @@ function App() {
         }
       }
       pointerEvent.preventDefault();
+      setDragOverlayPointer({ x: pointerEvent.clientX, y: pointerEvent.clientY });
       setDrag({ taskId, kind: "candidate", source: "candidate", duration, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
       updateTarget(pointerEvent);
     };
@@ -4602,11 +4633,17 @@ function App() {
         active = true;
         clearHold();
         target.classList.add("is-dragging");
+        target.classList.add("is-dragging-source");
         document.body.classList.add("df-timeline-pointer-drag");
         suppressBlockClickRef.current = true;
         setDragCreate(null);
+        const blockRect = rect;
+        const offX = Math.min(Math.max(event.clientX - blockRect.left, 0), blockRect.width);
+        const offY = Math.min(Math.max(event.clientY - blockRect.top, 0), blockRect.height);
+        setDragOverlay({ taskId: task.id, sourceElement: target, sourceRect: blockRect, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "block" } });
         setDrag({ taskId: task.id, kind: "block", duration, offsetMinutes, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline: pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY) });
       }
+      setDragOverlayPointer({ x: moveEvent.clientX, y: moveEvent.clientY });
       const outsideTimeline = pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY);
       setDrag((current) => current && current.taskId === task.id ? { ...current, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline } : current);
       if (!outsideTimeline) {
@@ -4661,10 +4698,12 @@ function App() {
             window.removeEventListener("pointercancel", cancel);
             window.removeEventListener("keydown", keydown);
             setDrag(null);
+            setDragOverlay(null);
             setHoverSlot("");
             dragTargetDateRef.current = "";
             clearHold();
             target.classList.remove("is-dragging");
+            target.classList.remove("is-dragging-source");
             document.body.classList.remove("df-timeline-pointer-drag");
             window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
             return;
@@ -4707,10 +4746,12 @@ function App() {
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
       setDrag(null);
+      setDragOverlay(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
       clearHold();
       target.classList.remove("is-dragging");
+      target.classList.remove("is-dragging-source");
       document.body.classList.remove("df-timeline-pointer-drag");
       window.setTimeout(() => {
         suppressBlockClickRef.current = false;
@@ -4723,8 +4764,10 @@ function App() {
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
       target.classList.remove("is-dragging");
+      target.classList.remove("is-dragging-source");
       document.body.classList.remove("df-timeline-pointer-drag");
       setDrag(null);
+      setDragOverlay(null);
       setHoverSlot("");
       dragTargetDateRef.current = "";
       clearHold();
@@ -5402,14 +5445,85 @@ function App() {
     persistAiMessage(messageId, { actionState: "rejected", actions: [] });
   }
 
+  function shiftTimelineAtScrollBoundary(direction: -1 | 1, scrollElement: HTMLElement) {
+    if (settings?.continuousCrossDayScroll !== false && timelineView !== "month") {
+      const key = `${timelineView}:${selectedDate}:${direction}`;
+      const now = Date.now();
+      if (crossDayWheelRef.current?.key === key && now - crossDayWheelRef.current.at < 520) return true;
+      crossDayWheelRef.current = { key, at: now };
+      setSelectedDate((date) => addDays(date, direction));
+      window.setTimeout(() => {
+        const nextScroll = timelineRef.current;
+        if (!nextScroll) return;
+        nextScroll.scrollTop = direction > 0 ? 0 : Math.max(0, nextScroll.scrollHeight - nextScroll.clientHeight - 1);
+      }, 0);
+      return true;
+    }
+    return false;
+  }
+
   function handleTimelinePanelWheel(event: React.WheelEvent<HTMLElement>) {
     if (event.ctrlKey || event.metaKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
     const target = event.target as HTMLElement;
     if (target.closest("input,textarea,select,[contenteditable=true],.df-drawer,.df-utility-panel,.df-project-popover-portal")) return;
     const scrollElement = timelineView === "month" ? monthScrollRef.current : timelineRef.current;
-    if (!scrollElement || scrollElement.contains(target)) return;
-    if (scrollElement.scrollHeight <= scrollElement.clientHeight) return;
-    scrollElement.scrollTop += event.deltaY;
+    if (!scrollElement) return;
+    const maxScroll = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+    const atTop = scrollElement.scrollTop <= 1;
+    const atBottom = scrollElement.scrollTop >= maxScroll - 1;
+    const direction: -1 | 1 = event.deltaY < 0 ? -1 : 1;
+    const wantsBoundary = direction < 0 ? atTop : atBottom;
+    const insideScroll = scrollElement.contains(target);
+
+    if (insideScroll) {
+      if ((maxScroll <= 0 || wantsBoundary) && shiftTimelineAtScrollBoundary(direction, scrollElement)) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if (maxScroll <= 0) {
+      if (shiftTimelineAtScrollBoundary(direction, scrollElement)) event.preventDefault();
+      return;
+    }
+
+    if (wantsBoundary && shiftTimelineAtScrollBoundary(direction, scrollElement)) {
+      event.preventDefault();
+      return;
+    }
+
+    scrollElement.scrollTop = Math.min(maxScroll, Math.max(0, scrollElement.scrollTop + event.deltaY));
+  }
+
+  function handleTimelineTouchStart(event: React.TouchEvent<HTMLElement>) {
+    if (timelineView === "month") {
+      crossDayTouchRef.current = null;
+      return;
+    }
+    const scrollElement = timelineRef.current;
+    if (!scrollElement || event.touches.length !== 1) {
+      crossDayTouchRef.current = null;
+      return;
+    }
+    const maxScroll = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+    crossDayTouchRef.current = {
+      y: event.touches[0].clientY,
+      atTop: scrollElement.scrollTop <= 1 || maxScroll <= 0,
+      atBottom: scrollElement.scrollTop >= maxScroll - 1 || maxScroll <= 0,
+    };
+  }
+
+  function handleTimelineTouchMove(event: React.TouchEvent<HTMLElement>) {
+    const state = crossDayTouchRef.current;
+    const scrollElement = timelineRef.current;
+    if (!state || !scrollElement || event.touches.length !== 1) return;
+    const deltaY = event.touches[0].clientY - state.y;
+    if (Math.abs(deltaY) < 42) return;
+    const direction: -1 | 1 = deltaY > 0 ? -1 : 1;
+    const atBoundary = direction < 0 ? state.atTop : state.atBottom;
+    if (!atBoundary || !shiftTimelineAtScrollBoundary(direction, scrollElement)) return;
+    if (event.cancelable) event.preventDefault();
+    crossDayTouchRef.current = null;
   }
 
   function beginShelfDrag(event: React.PointerEvent, task: Task, source: "candidate" | "allDay") {
@@ -5430,7 +5544,9 @@ function App() {
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
       document.body.classList.remove("df-timeline-pointer-drag");
+      dragElement.classList.remove("is-dragging-source");
       setDrag(null);
+      setDragOverlay(null);
       setHoverSlot("");
       setAllDayDragOver(false);
       setAllDayDragDate("");
@@ -5481,8 +5597,13 @@ function App() {
         active = true;
         dragElement.setPointerCapture(pointerId);
         document.body.classList.add("df-timeline-pointer-drag");
+        dragElement.classList.add("is-dragging-source");
         suppressBlockClickRef.current = true;
         setDragCreate(null);
+        const rect = dragElement.getBoundingClientRect();
+        const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+        const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+        setDragOverlay({ taskId: task.id, sourceElement: dragElement, sourceRect: rect, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "candidate", source } });
         if (compactLayout && source === "candidate") {
           setCompactExecuteView("schedule");
           if (timelineView === "month") setTimelineView("daily");
@@ -5490,6 +5611,7 @@ function App() {
         }
       }
       pointerEvent.preventDefault();
+      setDragOverlayPointer({ x: pointerEvent.clientX, y: pointerEvent.clientY });
       setDrag({ taskId: task.id, kind: "candidate", source, duration, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
       updateTarget(pointerEvent);
     };
@@ -6506,7 +6628,15 @@ function App() {
             )}
           </section>
 
-          <section className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`} aria-hidden={compactLayout && compactExecuteView !== "schedule"} id="df-execute-timeline" onWheelCapture={handleTimelinePanelWheel}>
+          <section
+            className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`}
+            aria-hidden={compactLayout && compactExecuteView !== "schedule"}
+            id="df-execute-timeline"
+            data-cross-day-scroll={settings.continuousCrossDayScroll !== false ? "true" : "false"}
+            onWheelCapture={handleTimelinePanelWheel}
+            onTouchStart={handleTimelineTouchStart}
+            onTouchMove={handleTimelineTouchMove}
+          >
             {yearOverviewOpen ? (
               <YearCalendarOverview
                 year={overviewYear}
@@ -7428,7 +7558,7 @@ function App() {
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
-      {habitPanel && data && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} />}
+      {habitPanel && data && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
       {focusOverlayMode && (
         <div className="df-focus-overlay" style={focusProject?.color ? { ["--focus-accent" as string]: focusProject.color } as React.CSSProperties : undefined}>
           <div className="df-focus-topbar">
@@ -7474,8 +7604,9 @@ function App() {
           onClose={() => setScheduleTemplateOpen(false)}
         />
       )}
-      {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
-      {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
+      {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && !dragOverlay && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
+      {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && !dragOverlay && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
+      {dragOverlay && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
@@ -8209,7 +8340,25 @@ function HabitCandidateCard(props: {
   return (
     <TaskGroup
       className="df-habit-candidate-card"
-      title={<strong>{props.lang === "zh" ? "习惯" : "Habits"}</strong>}
+      title={(
+        <span className="df-habit-card-title">
+          <strong>{props.lang === "zh" ? "习惯" : "Habits"}</strong>
+          <button
+            type="button"
+            className="df-habit-candidate-settings"
+            aria-label={props.lang === "zh" ? "打开习惯设置" : "Open habit settings"}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onOpenOverview();
+            }}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="2.4" />
+              <path d="M10 3.5v2M10 14.5v2M4.4 5.6l1.4 1.4M14.2 13l1.4 1.4M3.5 10h2M14.5 10h2M4.4 14.4 5.8 13M14.2 7l1.4-1.4" />
+            </svg>
+          </button>
+        </span>
+      )}
       count={`${completed}/${active.length}`}
       onClick={() => { if (!props.isClickSuppressed?.()) props.onOpenOverview(); }}
       aria-label={props.lang === "zh" ? "习惯" : "Habits"}
@@ -8256,6 +8405,22 @@ function HabitCandidateCard(props: {
                   </button>
                 ) : (`${habit.defaultDurationMinutes || 20}m`)}
               </TaskBlockDuration>
+              <TaskActions>
+                <button
+                  type="button"
+                  className="df-habit-row-settings"
+                  aria-label={props.lang === "zh" ? "编辑习惯设置" : "Edit habit settings"}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onEditHabit(habit.id);
+                  }}
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M4 15.5h12M6 13l6.8-6.8 1.8 1.8L7.8 14.8 6 15z" />
+                  </svg>
+                </button>
+              </TaskActions>
             </TaskBlockRow>
           </TaskBlock>
         );
@@ -8276,6 +8441,7 @@ function HabitPanel(props: {
   onSave: (habitId: string, patch: Partial<Habit>) => void;
   onArchive: (habitId: string, archived: boolean) => void;
   onToggleDay: (habitId: string, date: string, completed: boolean) => void;
+  onCreateHabit: () => void;
 }) {
   const metrics = buildHabitMetrics(props.data, props.today);
   const zh = props.lang === "zh";
@@ -8297,7 +8463,7 @@ function HabitPanel(props: {
         </div>
         <div className="df-utility-body">
           {props.mode === "overview" ? (
-            <HabitOverviewBody metrics={metrics} archivedHabits={archivedHabits} dailyStates={props.data.habitDailyStates || []} zh={zh} today={props.today} onEditHabit={props.onEditHabit} onArchive={props.onArchive} onToggleDay={props.onToggleDay} />
+            <HabitOverviewBody metrics={metrics} archivedHabits={archivedHabits} dailyStates={props.data.habitDailyStates || []} zh={zh} today={props.today} onEditHabit={props.onEditHabit} onArchive={props.onArchive} onToggleDay={props.onToggleDay} onCreateHabit={props.onCreateHabit} />
           ) : detailHabit ? (
             <HabitDetailBody habit={detailHabit} zh={zh} weekdays={weekdays} onSave={(patch) => props.onSave(detailHabit.id, patch)} onArchive={(archived) => props.onArchive(detailHabit.id, archived)} onBack={props.onBack} />
           ) : (
@@ -8318,6 +8484,7 @@ function HabitOverviewBody(props: {
   onEditHabit: (habitId: string) => void;
   onArchive: (habitId: string, archived: boolean) => void;
   onToggleDay: (habitId: string, date: string, completed: boolean) => void;
+  onCreateHabit: () => void;
 }) {
   const { metrics, zh } = props;
   const [weekOffset, setWeekOffset] = useState(0);
@@ -8327,28 +8494,42 @@ function HabitOverviewBody(props: {
   const mondayOffset = (baseDate.getDay() + 6) % 7;
   const weekStart = addDays(baseDay, -mondayOffset);
   const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const weekRange = `${weekDays[0].slice(5).replace("-", "/")} - ${weekDays[6].slice(5).replace("-", "/")}`;
   return (
     <>
       <section className="df-habit-week-board" aria-label={zh ? "习惯周视图" : "Habit week view"}>
-        <div className="df-habit-week-grid">
-          <div className="df-habit-week-days">
-            <span className="df-habit-week-head">
-              <strong>{weekDays[0].slice(5).replace("-", "/")} - {weekDays[6].slice(5).replace("-", "/")}</strong>
-              <button type="button" aria-label={zh ? "上一周" : "Previous week"} onClick={() => setWeekOffset((value) => value - 1)}>‹</button>
-              <button type="button" aria-label={zh ? "下一周" : "Next week"} onClick={() => setWeekOffset((value) => value + 1)}>›</button>
-              <button type="button" className="df-habit-week-today" onClick={() => setWeekOffset(0)}>{zh ? "今天" : "Today"}</button>
-            </span>
+        <div className="df-habit-week-toolbar">
+          <div>
+            <strong>{weekRange}</strong>
+            <span>{zh ? `${metrics.todayCompleted}/${metrics.active} 今日完成` : `${metrics.todayCompleted}/${metrics.active} complete today`}</span>
+          </div>
+          <div className="df-habit-week-actions">
+            <button type="button" aria-label={zh ? "上一周" : "Previous week"} onClick={() => setWeekOffset((value) => value - 1)}>‹</button>
+            <button type="button" className="df-habit-week-today" onClick={() => setWeekOffset(0)}>{zh ? "今天" : "Today"}</button>
+            <button type="button" aria-label={zh ? "下一周" : "Next week"} onClick={() => setWeekOffset((value) => value + 1)}>›</button>
+            <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
+          </div>
+        </div>
+        <div className="df-habit-week-table">
+          <div className="df-habit-week-header">
+            <span>{zh ? "习惯" : "Habit"}</span>
             {weekDays.map((day) => {
               const date = new Date(`${day}T00:00:00`);
               const label = date.toLocaleDateString(zh ? "zh-CN" : "en-US", { weekday: "short" });
-              return <span key={day}><b>{label}</b><small>{day.slice(8)}</small></span>;
+              return <span key={day} className={day === props.today ? "today" : ""}><b>{label}</b><small>{day.slice(8)}</small></span>;
             })}
           </div>
-          {metrics.perHabit.map((item) => (
+          {metrics.perHabit.length === 0 ? (
+            <div className="df-habit-week-empty">
+              <span>{zh ? "还没有启用习惯。" : "No active habits yet."}</span>
+              <button type="button" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
+            </div>
+          ) : metrics.perHabit.map((item) => (
             <div key={item.habit.id} className="df-habit-week-row">
               <button type="button" className="df-habit-week-name" onClick={() => props.onEditHabit(item.habit.id)}>
                 <span className={`df-habit-overview-dot${item.completedToday ? " done" : ""}${item.plannedToday ? " planned" : ""}`} />
                 <strong>{item.habit.title}</strong>
+                <small>{item.habit.defaultDurationMinutes || 20}m</small>
               </button>
               {weekDays.map((day) => {
                 const state = props.dailyStates.find((entry) => entry.habitId === item.habit.id && entry.date === day);
@@ -8359,11 +8540,13 @@ function HabitOverviewBody(props: {
                   <button
                     type="button"
                     key={`${item.habit.id}-${day}`}
-                    className={`df-habit-week-dot${due ? " due" : ""}${completed ? " done" : ""}${planned ? " planned" : ""}`}
+                    className={`df-habit-week-cell${due ? " due" : ""}${completed ? " done" : ""}${planned ? " planned" : ""}`}
                     aria-pressed={completed}
                     aria-label={`${completed ? (zh ? "取消完成" : "Mark incomplete") : (zh ? "完成" : "Mark complete")} ${item.habit.title} ${day}`}
                     onClick={() => props.onToggleDay(item.habit.id, day, !completed)}
-                  />
+                  >
+                    <span aria-hidden="true" />
+                  </button>
                 );
               })}
             </div>
@@ -8567,6 +8750,100 @@ function TaskMetaIconBar({ task, lang, onUpdate }: { task: Task; lang: Language;
   );
 }
 
+function CandidateSubtaskItem({
+  subtask,
+  depth = 0,
+  lang,
+  onToggleSubtask,
+  onSubtaskDragStart,
+}: {
+  subtask: Subtask;
+  depth?: number;
+  lang: Language;
+  onToggleSubtask: (subtaskId: string) => void;
+  onSubtaskDragStart?: (event: React.PointerEvent, subtaskId: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const children = subtask.subtasks || [];
+  const hasChildren = children.length > 0;
+  const done = Boolean(subtask.completed || subtask.done);
+  const planned = Boolean(subtask.plannedTaskId);
+  const displayTitle = subtask.title.trimStart();
+
+  return (
+    <div
+      className="df-candidate-subtask-item"
+      data-depth={depth}
+      style={{ "--candidate-subtask-depth": String(depth) } as CSSProperties}
+    >
+      <TaskBlock
+        as="div"
+        variant="habit-child"
+        appearance="calm"
+        checked={done}
+        selected={planned}
+        projectColor="var(--accent-active)"
+        className={`df-candidate-subtask-row${done ? " done" : ""}${planned ? " planned" : ""}`}
+        dataAttrs={{ "candidate-subtask": subtask.id }}
+        title={displayTitle}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          onSubtaskDragStart?.(event, subtask.id);
+        }}
+      >
+        <TaskBlockRow className="df-candidate-subtask-row-inner">
+          <TaskCheckbox
+            checked={done}
+            tone={done ? "done" : "muted"}
+            title={done ? (lang === "zh" ? "Mark incomplete" : "Mark incomplete") : (lang === "zh" ? "Mark complete" : "Mark complete")}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSubtask(subtask.id);
+            }}
+          >
+            {done ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}
+          </TaskCheckbox>
+          <TaskBlockContent className="df-candidate-subtask-main" title={displayTitle} />
+          <TaskBlockDuration>{planned ? (lang === "zh" ? "Planned" : "Planned") : null}</TaskBlockDuration>
+          <TaskActions>
+            {hasChildren ? (
+              <button
+                type="button"
+                className="df-candidate-subtask-toggle"
+                aria-label={open ? "Collapse subtasks" : "Expand subtasks"}
+                aria-expanded={open}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpen((value) => !value);
+                }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d={open ? "M4 9.5 8 5.5l4 4" : "M5.5 4 9.5 8l-4 4"} /></svg>
+              </button>
+            ) : null}
+          </TaskActions>
+        </TaskBlockRow>
+      </TaskBlock>
+      {hasChildren && open ? (
+        <div className="df-candidate-subtask-nest">
+          {children.map((child) => (
+            <CandidateSubtaskItem
+              key={child.id}
+              subtask={child}
+              depth={depth + 1}
+              lang={lang}
+              onToggleSubtask={onToggleSubtask}
+              onSubtaskDragStart={onSubtaskDragStart}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskCard({
   task,
   projects,
@@ -8615,6 +8892,7 @@ function TaskCard({
   lang: Language;
 }) {
   const [openPanel, setOpenPanel] = useState<"more" | null>(null);
+  const [subtasksOpen, setSubtasksOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState<"duration" | "deadline" | null>(null);
   const [morePopover, setMorePopover] = useState<"project" | null>(null);
   const [repeatOpen, setRepeatOpen] = useState(false);
@@ -8637,6 +8915,8 @@ function TaskCard({
     : projects.find((p) => String(p.id) === String(task.projectId || ""))?.color || "var(--accent-active)";
   const recurringLocked = hasRecurringRule(task);
   const isPlacementArmed = placementPreview?.taskId === task.id;
+  const hasSubtasks = (task.subtasks || []).length > 0;
+  const displayTitle = task.title.trimStart();
 
   useEffect(() => {
     setDraftDueDate(task.dueDate || focusDate);
@@ -8690,7 +8970,7 @@ function TaskCard({
           {isEvent ? <span className="df-task-block-check df-candidate-kind" aria-hidden="true" /> : null}
           <TaskBlockContent
             className="df-candidate-main"
-            title={task.title}
+            title={displayTitle}
           >
             {isEvent ? <span className="df-candidate-kind">EVENT</span> : null}
             {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
@@ -8709,6 +8989,20 @@ function TaskCard({
             </button>
           </TaskBlockDuration>}
           {!isEvent && <TaskActions>
+            {hasSubtasks && onToggleSubtask ? (
+              <button
+                type="button"
+                className="df-candidate-subtask-toggle"
+                aria-label={subtasksOpen ? "Collapse subtasks" : "Expand subtasks"}
+                aria-expanded={subtasksOpen}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSubtasksOpen((value) => !value);
+                }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d={subtasksOpen ? "M4 9.5 8 5.5l4 4" : "M5.5 4 9.5 8l-4 4"} /></svg>
+              </button>
+            ) : null}
             <button
               className="df-icon-button icon-schedule"
               title={t(lang, "taskCard.openScheduling")}
@@ -8739,32 +9033,21 @@ function TaskCard({
           </TaskActions>}
         </TaskBlockRow>}
 
-        {!isMoreOpen && !isEvent && onToggleSubtask && (task.subtasks || []).length > 0 && (
+        {!isMoreOpen && !isEvent && onToggleSubtask && hasSubtasks && subtasksOpen && (
           <div className="df-candidate-subtasks">
-            {(task.subtasks || []).map((subtask) => {
-              const subDone = Boolean(subtask.completed || subtask.done);
-              const subPlanned = Boolean(subtask.plannedTaskId);
-              return (
-                <button
-                  key={subtask.id}
-                  type="button"
-                  className={`${subDone ? "done" : ""}${subPlanned ? " planned" : ""}`}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    onSubtaskDragStart?.(event, subtask.id);
-                  }}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleSubtask(subtask.id);
-                  }}
-                  title={subtask.title}
-                >
-                  <span aria-hidden="true">{subDone ? <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}</span>
-                  <small>{subtask.title}</small>
-                  {subPlanned ? <em>{lang === "zh" ? "已规划" : "Planned"}</em> : null}
-                </button>
-              );
-            })}
+            <div className="df-candidate-subtask-list-head">
+              <span>Subtasks</span>
+              <small>{countDoneSubtasks(task.subtasks)}/{countSubtasks(task.subtasks)}</small>
+            </div>
+            {(task.subtasks || []).map((subtask) => (
+              <CandidateSubtaskItem
+                key={subtask.id}
+                subtask={subtask}
+                lang={lang}
+                onToggleSubtask={onToggleSubtask}
+                onSubtaskDragStart={onSubtaskDragStart}
+              />
+            ))}
           </div>
         )}
 
@@ -8802,7 +9085,7 @@ function TaskCard({
           <div className="df-task-card-more" onClick={stop}>
             <div className="df-task-card-more-head">
               <div className="df-candidate-main">
-                <strong className="df-candidate-title" title={task.title}>{task.title}</strong>
+                <strong className="df-candidate-title" title={displayTitle}>{displayTitle}</strong>
                 {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
               </div>
               <div className="df-task-card-more-actions">

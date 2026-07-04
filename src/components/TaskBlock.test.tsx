@@ -143,17 +143,106 @@ describe("TaskBlock shared component contract", () => {
     });
   });
 
-  it("keeps Planning tree controls in the left sidebar with compact tree rows and no task left strip", () => {
+  it("keeps Planning view controls in the left sidebar with compact tree rows and no task left strip", () => {
     const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
     const css = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
 
     expect(planning).toContain('className="df-planning-sidebar"');
-    expect(planning).toMatch(/<aside className="df-planning-sidebar"[\s\S]*df-planning-filter-menu[\s\S]*df-planning-view-switch[\s\S]*<\/aside>/);
+    expect(planning).not.toMatch(/<aside className="df-planning-sidebar"[\s\S]*df-planning-filter-menu[\s\S]*<\/aside>/);
+    expect(planning).toMatch(/<aside className="df-planning-sidebar"[\s\S]*df-planning-view-switch[\s\S]*<\/aside>/);
     expect(css).toContain(".df-planning-sidebar");
     expect(css).toContain("left: 0 !important;");
     expect(css).toContain(".df-app.mode-planning .df-task-block[data-task-variant=\"planning\"]");
     expect(css).toContain("--task-project-accent-size: 0px;");
     expect(css).toContain(".df-category-branch");
     expect(css).toContain("margin-bottom: 28px !important;");
+  });
+
+  it("keeps Planning filters as a top-right compact hover menu without search", () => {
+    const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
+
+    expect(planning).toContain("effectiveFilterCategories");
+    expect(planning).toContain("const filterOptionsByCategory");
+    expect(planning).toContain("df-planning-filter-corner");
+    expect(planning).not.toContain("df-filter-search");
+    expect(planning).not.toContain('key: "search"');
+    expect(planning).not.toContain("filterQuery");
+    expect(planning).not.toContain("filterSearchText");
+    expect(planning).toContain("df-filter-flyout-panel");
+    expect(planning).toContain("const activeFilterCategory = filterExpandedCategory");
+    expect(planning).not.toContain("effectiveFilterCategories[0]?.key || null");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-planning-filter-corner");
+    expect(css).toContain("position: sticky !important;");
+    expect(css).toContain("top: 0 !important;");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-filter-panel");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-filter-flyout-panel");
+    expect(css).toContain("font: 500 11px/1.25 var(--paper-sans) !important;");
+  });
+
+  it("keeps the final Planning repair layer in the last-loaded TaskBlock stylesheet", () => {
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
+
+    expect(css).toContain("Planning repair layer");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-mindmap.no-root");
+    expect(css).toContain("display: grid !important;");
+    expect(css).toContain("grid-template-columns: var(--planning-sidebar-width, 86px) minmax(0, 1fr)");
+    expect(css).toContain("grid-column: 2 / 3 !important;");
+    expect(css).toContain(".df-app .df-planning .df-view-btn span");
+    expect(css).toContain("transform: none !important;");
+    expect(css).toContain(".df-kanban-card.is-drag-source");
+  });
+
+  it("renders candidate subtasks as collapsible TaskBlock child rows", () => {
+    const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
+
+    expect(main).toContain("function CandidateSubtaskItem");
+    expect(main).toContain("df-candidate-subtask-toggle");
+    expect(main).toContain('variant="habit-child"');
+    expect(main).toContain("df-candidate-subtask-nest");
+  });
+
+  it("exposes a clear habit settings entry and weekly overview toolbar", () => {
+    const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
+
+    expect(main).toContain("df-habit-week-toolbar");
+    expect(main).toContain("df-habit-overview-add");
+    expect(main).toContain("df-habit-candidate-settings");
+    expect(css).toContain(".df-habit-week-table");
+  });
+
+  it("routes continuous cross-day wheel navigation through a boundary helper", () => {
+    const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
+
+    expect(main).toContain("shiftTimelineAtScrollBoundary");
+    expect(main).toContain("settings.continuousCrossDayScroll !== false");
+    expect(main).toContain("data-cross-day-scroll");
+  });
+
+  it("uses a native drag preview helper for Planning native drag views", () => {
+    const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
+
+    expect(planning).toContain("setPlanningDragImage");
+    expect(planning).toContain("data-planning-drag-card");
+    expect(planning).toContain("aria-grabbed");
+  });
+
+  it("keeps Planning tree drag UX stable and removes tree row color strips", () => {
+    const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
+
+    expect(planning).toContain("df-planning-sidebar-collapse");
+    expect(planning).toContain("sidebarCollapsed");
+    expect(planning).toContain("clearPlanningDragState");
+    expect(css).toContain("rgb(245, 244, 237)");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-task-node-inner > .df-task-block-accent");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-task-node-inner::before");
+    expect(css).toContain(".df-app.mode-planning .df-planning .df-plan-subtask-node::after");
+    expect(css).toContain("content: none !important;");
+    expect(css).toContain("border: 0 !important;");
+    expect(css).toContain(".df-app.mode-planning .df-planning-native-drag-image");
+    expect(planning).toContain('source.closest<HTMLElement>(".df-planning")');
+    expect(css).toContain("cursor: grabbing !important;");
   });
 });
