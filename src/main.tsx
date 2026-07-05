@@ -10317,10 +10317,10 @@ function EditDrawer(props: {
                   onClick={() => commitTaskMeta("importance", option.value)}
                   title={props.lang === "zh" ? option.zh : option.en}
                 >
-                  {option.value === "high" && <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
-                  {option.value === "medium" && <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
-                  {option.value === "low" && <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
-                  {option.value === "unset" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
+                  {option.value === "high" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="currentColor"/></svg>}
+                  {option.value === "medium" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="currentColor"/></svg>}
+                  {option.value === "low" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="currentColor"/></svg>}
+                  {option.value === "unset" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>}
                 </button>
               ))}
             </div>
@@ -10337,10 +10337,10 @@ function EditDrawer(props: {
                   onClick={() => commitTaskMeta("urgency", option.value)}
                   title={props.lang === "zh" ? option.zh : option.en}
                 >
-                  {option.value === "high" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v6m0 4v2M6 5h.01M6 13h.01M9 2v6m0 4v2M9 5h.01M9 13h.01M12 2v6m0 4v2M12 5h.01M12 13h.01" /></svg>}
-                  {option.value === "medium" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 2v6m0 4v2M5 5h.01M5 13h.01M10 2v6m0 4v2M10 5h.01M10 13h.01" /></svg>}
-                  {option.value === "low" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 2v6m0 4v2M8 5h.01M8 13h.01" /></svg>}
-                  {option.value === "unset" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 8h8" /></svg>}
+                  {option.value === "high" && <span className="df-urgency-mark">!!!</span>}
+                  {option.value === "medium" && <span className="df-urgency-mark">!!</span>}
+                  {option.value === "low" && <span className="df-urgency-mark">!</span>}
+                  {option.value === "unset" && <span className="df-urgency-mark df-urgency-dash">—</span>}
                 </button>
               ))}
             </div>

@@ -445,13 +445,13 @@
 
 .df-detail-meta-settings {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   padding: 12px 0;
 }
 .df-detail-meta-setting {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .df-detail-meta-setting > span {
   min-width: 72px;
@@ -462,21 +462,22 @@
 }
 .df-level-selector {
   display: flex;
-  gap: 3px;
+  gap: 6px;
 }
 .df-level-option {
   position: relative;
-  width: 30px;
-  height: 30px;
-  display: flex;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--paper-rule);
-  border-radius: 3px;
-  background: transparent;
+  border-radius: 6px;
+  background: var(--paper-bg);
   color: var(--text-faint);
   cursor: pointer;
-  transition: color var(--paper-motion), border-color var(--paper-motion), background-color var(--paper-motion);
+  padding: 0;
+  transition: color var(--paper-motion), border-color var(--paper-motion), background-color var(--paper-motion), box-shadow var(--paper-motion);
 }
 .df-level-option:hover {
   border-color: var(--paper-rule-strong);
@@ -486,47 +487,48 @@
   transform: translateY(1px);
 }
 .df-level-option:focus-visible {
-  outline: 1px solid var(--accent-active);
+  outline: 2px solid var(--accent-active);
   outline-offset: 2px;
 }
 .df-level-option.active {
   border-width: 1.5px;
   border-color: var(--paper-rule-strong);
-  background: color-mix(in srgb, var(--text-main) 4%, transparent);
+  background: color-mix(in srgb, var(--text-main) 5%, var(--paper-bg));
+  box-shadow: inset 0 -2px 0 var(--accent-active);
 }
-.df-level-option.active::after {
-  content: "";
-  position: absolute;
-  bottom: 2px;
-  left: 5px;
-  right: 5px;
-  height: 1px;
-  border-radius: 1px;
+.df-level-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.df-urgency-mark {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  display: block;
+}
+.df-urgency-dash {
+  font-size: 22px;
+  font-weight: 400;
 }
 .df-level-importance .df-level-high { color: var(--navo-coral); }
-.df-level-importance .df-level-high.active { border-color: var(--navo-coral); }
-.df-level-importance .df-level-high.active::after { background: var(--navo-coral); }
+.df-level-importance .df-level-high.active { border-color: var(--navo-coral); background: color-mix(in srgb, var(--navo-coral) 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--navo-coral); }
 .df-level-importance .df-level-medium { color: #c4a038; }
-.df-level-importance .df-level-medium.active { border-color: #c4a038; }
-.df-level-importance .df-level-medium.active::after { background: #c4a038; }
+.df-level-importance .df-level-medium.active { border-color: #c4a038; background: color-mix(in srgb, #c4a038 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 #c4a038; }
 .df-level-importance .df-level-low { color: var(--navo-sage); }
-.df-level-importance .df-level-low.active { border-color: var(--navo-sage); }
-.df-level-importance .df-level-low.active::after { background: var(--navo-sage); }
+.df-level-importance .df-level-low.active { border-color: var(--navo-sage); background: color-mix(in srgb, var(--navo-sage) 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--navo-sage); }
 .df-level-importance .df-level-unset { color: var(--text-faint); }
-.df-level-importance .df-level-unset.active { border-color: var(--text-faint); color: var(--text-muted); }
-.df-level-importance .df-level-unset.active::after { background: var(--text-faint); }
+.df-level-importance .df-level-unset.active { border-color: var(--paper-rule-strong); color: var(--text-muted); box-shadow: inset 0 -2px 0 var(--text-faint); }
 
 .df-level-urgency .df-level-high { color: var(--navo-coral); }
-.df-level-urgency .df-level-high.active { border-color: var(--navo-coral); }
-.df-level-urgency .df-level-high.active::after { background: var(--navo-coral); }
+.df-level-urgency .df-level-high.active { border-color: var(--navo-coral); background: color-mix(in srgb, var(--navo-coral) 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--navo-coral); }
 .df-level-urgency .df-level-medium { color: #c4a038; }
-.df-level-urgency .df-level-medium.active { border-color: #c4a038; }
-.df-level-urgency .df-level-medium.active::after { background: #c4a038; }
+.df-level-urgency .df-level-medium.active { border-color: #c4a038; background: color-mix(in srgb, #c4a038 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 #c4a038; }
 .df-level-urgency .df-level-low { color: var(--text-muted); }
-.df-level-urgency .df-level-low.active { border-color: var(--text-muted); }
+.df-level-urgency .df-level-low.active { border-color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 6%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--text-muted); }
 .df-level-urgency .df-level-unset { color: var(--text-faint); }
-.df-level-urgency .df-level-unset.active { border-color: var(--text-faint); color: var(--text-muted); }
-.df-level-urgency .df-level-unset.active::after { background: var(--text-faint); }
+.df-level-urgency .df-level-unset.active { border-color: var(--paper-rule-strong); color: var(--text-muted); box-shadow: inset 0 -2px 0 var(--text-faint); }
 .df-toast { border: 1px solid var(--paper-rule-strong) !important; border-radius: var(--paper-radius) !important; background: var(--surface-raised) !important; box-shadow: var(--paper-float-shadow) !important; backdrop-filter: none !important; }
 
 /* Restrained floating actions */
