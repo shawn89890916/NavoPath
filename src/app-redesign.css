@@ -473,22 +473,25 @@
   width: max-content;
   flex: 0 0 auto;
   align-items: stretch;
+  gap: 1px;                                 /* divider gap between segments */
   border: 1px solid var(--paper-rule) !important;
   border-radius: 8px !important;
   overflow: hidden;
-  background: var(--paper-bg) !important;
+  background: var(--paper-rule) !important; /* shows through gap as divider */
   box-shadow: none !important;
 }
 .df-app .df-level-selector .df-level-option {
+  box-sizing: border-box;
   width: 42px;
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0 !important;
-  border-right: 1px solid var(--paper-rule) !important;
+  /* Real 2px border reserved on EVERY option so selected border never causes layout shift.
+     Divider is NOT on the button border — it comes from the container gap + background. */
+  border: 2px solid transparent !important;
   border-radius: 0 !important;
-  background: transparent !important;
+  background: var(--paper-bg) !important;   /* opaque so the gap shows only as a 1px divider */
   background-image: none !important;
   box-shadow: none !important;
   color: var(--option-color, var(--df-option-color, #8E8478)) !important;
@@ -496,10 +499,7 @@
   padding: 0;
   filter: none !important;
   text-shadow: none !important;
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
-.df-app .df-level-selector .df-level-option:last-child {
-  border-right: 0 !important;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 .df-app .df-level-selector .df-level-option:hover {
   background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
@@ -516,17 +516,17 @@
   position: relative;
   z-index: 1;
 }
-/* Selected option: 2px semantic inset ring + subtle tint.
+/* Selected option: real 2px semantic border ON THE BUTTON ITSELF + subtle tint.
    --option-color is set via inline style on each button. */
 .df-app .df-level-selector .df-level-option[data-selected="true"] {
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 10%, var(--paper-bg)) !important;
+  border-color: var(--option-color, var(--df-option-color, #8E8478)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 8%, var(--paper-bg)) !important;
   background-image: none !important;
-  box-shadow: inset 0 0 0 2px var(--option-color, var(--df-option-color, #8E8478)) !important;
 }
-/* Unselected option: ensure no ring, clean paper background. */
+/* Unselected option: transparent border, clean paper background. */
 .df-app .df-level-selector .df-level-option[data-selected="false"] {
-  box-shadow: none !important;
-  background: transparent !important;
+  border-color: transparent !important;
+  background: var(--paper-bg) !important;
   background-image: none !important;
 }
 .df-app .df-level-selector .df-level-option[data-selected="false"]:hover {
@@ -1715,20 +1715,20 @@
   filter: none !important;
   text-shadow: none !important;
 }
-.df-app button:not(.df-resize-dot) {
+.df-app button:not(.df-resize-dot):not(.df-level-option) {
   border-color: var(--pencil-rule) !important;
   border-radius: 5px 2px 6px 3px !important;
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
 }
-.df-app button:not(.df-resize-dot):hover:not(:disabled),
-.df-app button:not(.df-resize-dot):focus-visible {
+.df-app button:not(.df-resize-dot):not(.df-level-option):hover:not(:disabled),
+.df-app button:not(.df-resize-dot):not(.df-level-option):focus-visible {
   border-color: var(--pencil-rule-strong) !important;
   background-color: transparent !important;
   box-shadow: none !important;
 }
-.df-app button:not(.df-resize-dot):active:not(:disabled) {
+.df-app button:not(.df-resize-dot):not(.df-level-option):active:not(:disabled) {
   background: transparent !important;
   transform: translateY(1px) !important;
   box-shadow:
