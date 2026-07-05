@@ -10337,7 +10337,6 @@ function EditDrawer(props: {
                 );
               })}
             </div>
-            <span className="df-level-current">{props.lang === "zh" ? "当前" : "Current"}：{importanceOptions.find((o) => o.value === (f.importance || "unset"))?.[props.lang === "zh" ? "zh" : "en"] ?? (props.lang === "zh" ? "未设置" : "Unset")}</span>
           </div>
           <div className="df-detail-meta-setting">
             <span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>
@@ -10364,7 +10363,6 @@ function EditDrawer(props: {
                 );
               })}
             </div>
-            <span className="df-level-current">{props.lang === "zh" ? "当前" : "Current"}：{urgencyOptions.find((o) => o.value === (f.urgency || "unset"))?.[props.lang === "zh" ? "zh" : "en"] ?? (props.lang === "zh" ? "未设置" : "Unset")}</span>
           </div>
         </section>
 

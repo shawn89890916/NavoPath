@@ -450,7 +450,7 @@
 }
 .df-detail-meta-setting {
   display: grid;
-  grid-template-columns: 72px max-content auto;
+  grid-template-columns: 72px max-content;
   align-items: center;
   column-gap: 16px;
 }
@@ -460,38 +460,29 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.df-level-current {
-  justify-self: end;
-  color: var(--text-muted);
-  font: 500 11px/1.4 var(--paper-mono);
-  letter-spacing: 0.04em;
-  text-transform: none;
-  white-space: nowrap;
-}
 .df-app .df-level-selector {
   display: inline-flex;
   width: max-content;
   flex: 0 0 auto;
   align-items: stretch;
-  gap: 1px;                                 /* divider gap between segments */
   border: 1px solid var(--paper-rule) !important;
-  border-radius: 8px !important;
+  border-radius: 12px !important;
   overflow: hidden;
-  background: var(--paper-rule) !important; /* shows through gap as divider */
+  background: var(--paper-bg) !important;   /* warm clean paper, no gray fill */
   box-shadow: none !important;
 }
 .df-app .df-level-selector .df-level-option {
+  position: relative;
   box-sizing: border-box;
   width: 42px;
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Real 2px border reserved on EVERY option so selected border never causes layout shift.
-     Divider is NOT on the button border — it comes from the container gap + background. */
-  border: 2px solid transparent !important;
+  border: none !important;
+  border-right: 1px solid var(--paper-rule) !important;  /* segment separator */
   border-radius: 0 !important;
-  background: var(--paper-bg) !important;   /* opaque so the gap shows only as a 1px divider */
+  background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
   color: var(--option-color, var(--df-option-color, #8E8478)) !important;
@@ -499,14 +490,17 @@
   padding: 0;
   filter: none !important;
   text-shadow: none !important;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.df-app .df-level-selector .df-level-option:last-child {
+  border-right: none !important;
 }
 .df-app .df-level-selector .df-level-option:hover {
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 5%, var(--paper-bg)) !important;
   background-image: none !important;
 }
 .df-app .df-level-selector .df-level-option:active {
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 10%, var(--paper-bg)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 8%, var(--paper-bg)) !important;
   background-image: none !important;
   transform: none !important;
 }
@@ -516,21 +510,23 @@
   position: relative;
   z-index: 1;
 }
-/* Selected option: real 2px semantic border ON THE BUTTON ITSELF + subtle tint.
-   --option-color is set via inline style on each button. */
+/* Selected option: crisp 2px semantic inset ring + very subtle tint.
+   The inset ring hugs the inside of the segment and, thanks to the
+   container's overflow:hidden + border-radius, follows the rounded
+   corners at the edges so it looks integrated, not patched on. */
 .df-app .df-level-selector .df-level-option[data-selected="true"] {
-  border-color: var(--option-color, var(--df-option-color, #8E8478)) !important;
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 8%, var(--paper-bg)) !important;
+  box-shadow: inset 0 0 0 2px var(--option-color, var(--df-option-color, #8E8478)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
   background-image: none !important;
 }
-/* Unselected option: transparent border, clean paper background. */
+/* Unselected option: quiet paper background, no ring. */
 .df-app .df-level-selector .df-level-option[data-selected="false"] {
-  border-color: transparent !important;
-  background: var(--paper-bg) !important;
+  box-shadow: none !important;
+  background: transparent !important;
   background-image: none !important;
 }
 .df-app .df-level-selector .df-level-option[data-selected="false"]:hover {
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 5%, var(--paper-bg)) !important;
 }
 .df-app .df-level-selector .df-level-icon {
   width: 19px;

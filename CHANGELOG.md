@@ -4,15 +4,14 @@
 
 ### 修复
 - 修复选中态不生效的持久化 bug：表单初始化使用 `??` 运算符将 `null`（未设置）误回落到 `priority ?? "high"`，导致重新打开抽屉后"未设置"状态丢失。改为 `!== undefined` 检查以保留显式 `null`。
-- 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则 `.df-app button:not(.df-resize-dot)` 强制设置 `border-color: var(--pencil-rule)`，覆盖了选中描边。将 `.df-level-option` 加入所有全局按钮规则的 `:not()` 排除列表，并将选中态改为显式 `data-selected="true"` 属性选择器 + 内联 `--option-color` CSS 变量。
-- 选中态视觉反馈改为真正的按钮自身描边：每个 option 始终保留 `border: 2px solid transparent` 预留空间，选中时 `border-color` 切换为该选项语义色，配 8% 语义色底色；未选中项 `border-color: transparent`。描边不再使用 box-shadow 伪边框，分割线不再使用按钮自身的 `border-right`，改由容器 `gap: 1px` + `background: var(--paper-rule)` 形成，避免覆盖选中描边。
+- 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则强制设置 `border-color` / `box-shadow`，覆盖了选中态。将 `.df-level-option` 加入所有全局按钮规则的 `:not()` 排除列表，选中态改为显式 `data-selected="true"` 属性选择器 + 内联 `--option-color` CSS 变量。
+- 选中态视觉反馈收敛为简洁的内嵌描边：选中段以 `box-shadow: inset 0 0 0 2px` 语义色环 + 6% 语义色底色标识，借容器 `overflow: hidden` + `border-radius: 12px` 让边缘段的描边自然贴合圆角，视觉上与分段控件融为一体，不再像额外贴上的方框。段间分隔由按钮自身 `border-right` 承担，与内嵌描边不冲突。
 
 ### 改进
 - 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为连接式分段图标选择器（segmented control），四段共享外框与圆角，段间以细分隔线划分。
 - 重要程度使用标准 Lucide 风格旗帜图标，紧急程度使用横向文本感叹号，颜色统一为柔和 NavoPath 色板。
 - 新增“未设置”选项，点击可立即清空对应字段。
 - Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵。
-- 任务抽屉每行新增“当前：X”文本徽章，实时显示当前重要程度/紧急程度值，点击后立即更新，关闭重开抽屉仍保持一致。
 - 任务卡片复选框边框反映重要程度（高=珊瑚红 #C96F5B、中=琥珀 #C49A32、低=静蓝 #6E8DA6、未设置=中性墨色），完成后仍保留语义边框色。
 - 复选框右上角显示小型紧急程度“!”标记（高=珊瑚红、中=琥珀、低=静蓝），未设置时不显示，完成后隐藏，且不阻挡复选框点击。
 
@@ -38,15 +37,14 @@
 
 ### Fixes
 - Fixed selected-state persistence bug: form initialization used `??` operator which treated `null` (unset) as falsy and fell through to `priority ?? "high"`, causing "unset" state to be lost on drawer reopen. Changed to `!== undefined` check to preserve explicit `null`.
-- Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: the global button rule `.df-app button:not(.df-resize-dot)` forced `border-color: var(--pencil-rule)`, overriding the selected border. Added `.df-level-option` to every global button rule's `:not()` exclusion list, and switched the selected state to an explicit `data-selected="true"` attribute selector with an inline `--option-color` CSS variable.
-- Selected-state visual feedback is now a real border on the button itself: every option keeps `border: 2px solid transparent` reserved, and the selected option switches `border-color` to its semantic color with an 8% semantic tint; unselected options use `border-color: transparent`. The border is no longer a box-shadow ring, and segment dividers no longer use the button's own `border-right` — they come from the container's `gap: 1px` + `background: var(--paper-rule)` so they never overwrite the selected border.
+- Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: global button rules forced `border-color` / `box-shadow` on all buttons, overriding the selected state. Added `.df-level-option` to every global button rule's `:not()` exclusion list, and switched the selected state to an explicit `data-selected="true"` attribute selector with an inline `--option-color` CSS variable.
+- Selected-state visual feedback is now a crisp inset ring: the selected segment uses `box-shadow: inset 0 0 0 2px` in its semantic color with a 6% semantic tint; the container's `overflow: hidden` + `border-radius: 12px` lets the ring follow the rounded corners at the edges so it feels integrated, not like a patched-on box. Segment dividers use the button's own `border-right`, which does not conflict with the inset ring.
 
 ### Improvements
 - Refactored the task drawer's "Importance / Urgency" controls from plain text buttons into a connected segmented icon strip sharing one outer border and rounded corners, with thin dividers between segments.
 - Importance uses standard Lucide-style flag icons, urgency uses horizontal text exclamation marks, colors unified to muted NavoPath palette.
 - Added an "unset" option; clicking it immediately clears the field.
 - Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced.
-- Each drawer row now shows a "Current: X" text badge reflecting the live importance/urgency value; it updates immediately on click and stays consistent after closing and reopening the drawer.
 - Task card checkboxes now reflect importance via border color (high=coral #C96F5B, medium=amber #C49A32, low=muted blue #6E8DA6, unset=neutral ink); the semantic border color is retained after completion.
 - A small urgency "!" marker appears at the checkbox top-right (high=coral, medium=amber, low=muted blue); it is hidden when unset or completed, and never blocks the checkbox click target.
 
