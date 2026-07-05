@@ -195,6 +195,20 @@ Records how `importance` and `urgency` are surfaced across the drawer, task card
 - `src/PlanningView.tsx` — planning tree task, kanban task, matrix task, list task
 - Drag overlay (`TaskDragLayer`) is visual-only and does not pass importance/urgency.
 
+## Importance / Urgency Selected Border Debug
+
+- Component: `EditDrawer` in `src/main.tsx` (lines ~10312-10350)
+- Option class: `df-level-option df-level-{value}` (e.g. `df-level-high`)
+- Selected class present: YES — `.active` is applied when `f.importance === option.value` (or `f.urgency`)
+- aria-pressed present: YES — set to `true` on the selected button
+- `--df-option-color` value: correctly set via `.df-level-importance .df-level-high { --df-option-color: #C96F5B }` (and medium/low/unset, plus urgency variants)
+- Computed border: `border: 0` (from `.df-level-option` rule) — border width is always 0, so `border-color` has no visual effect
+- Computed box-shadow on selected: `inset 0 0 0 1px color-mix(...)` — comes from the GLOBAL button rule, NOT from the `.active` rule
+- Overriding CSS selector: `.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot)` at line ~1575, specificity (0, 5, 1)
+- Selected-state rule specificity: `.df-app .df-level-selector .df-level-option.active` = (0, 4, 0) — LOWER than the global rule
+- Root cause: The global button rule at line ~1575 has 4 `:not()` exclusions giving it specificity (0, 5, 1), which beats the `.active` rule at (0, 4, 0). Both use `!important`, so higher specificity wins. The global rule sets `box-shadow: inset 0 0 0 1px ...` which overrides the selected `box-shadow: inset 0 0 0 2px var(--df-option-color)`. The same global `:hover` and `:active` variants at lines ~1582 and ~1587 also override the level-option hover/active styles.
+- Fix: Add `:not(.df-level-option)` to the 3 global button rules so they stop matching level-option buttons. This lets the `.df-level-selector`-scoped rules (which already set border, background, box-shadow, color) handle all level-option styling without global interference.
+
 ## Known Limitations
 
 - Planning Tree no longer uses a DOM-cloned overlay for task/subtask/project drags; it uses a React-rendered `TaskBlock` overlay from `TaskDragLayer`.
