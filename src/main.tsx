@@ -10117,6 +10117,12 @@ function EditDrawer(props: {
     { value: "low", zh: "低", en: "Low" },
     { value: "unset", zh: "未设置", en: "Unset" },
   ];
+  const levelColors: Record<TaskLevel, string> = {
+    high: "#C96F5B",
+    medium: "#C49A32",
+    low: "#6E8DA6",
+    unset: "#8E8478",
+  };
   function commitTaskMeta(kind: "importance" | "urgency", value: TaskLevel) {
     set(kind, value === "unset" ? null : value);
     if (!props.editing || props.type !== "task" || !props.task) return;
@@ -10310,41 +10316,53 @@ function EditDrawer(props: {
           <div className="df-detail-meta-setting">
             <span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>
             <div className="df-level-selector df-level-importance" role="group" aria-label={props.lang === "zh" ? "重要程度" : "Importance"}>
-              {importanceOptions.map((option) => (
-                <button
-                  key={`importance-${option.value}`}
-                  type="button"
-                  className={`df-level-option df-level-${option.value}` + (f.importance === option.value || (option.value === "unset" && !f.importance) ? " active" : "")}
-                  aria-pressed={f.importance === option.value || (option.value === "unset" && !f.importance)}
-                  onClick={() => commitTaskMeta("importance", option.value)}
-                  title={props.lang === "zh" ? option.zh : option.en}
-                >
-                  {option.value === "unset"
-                    ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>}
-                </button>
-              ))}
+              {importanceOptions.map((option) => {
+                const selectedImportance = (f.importance ?? "unset") as TaskLevel;
+                const isSelected = selectedImportance === option.value;
+                return (
+                  <button
+                    key={`importance-${option.value}`}
+                    type="button"
+                    className={`df-level-option df-level-${option.value}`}
+                    data-selected={isSelected ? "true" : "false"}
+                    aria-pressed={isSelected}
+                    onClick={() => commitTaskMeta("importance", option.value)}
+                    title={props.lang === "zh" ? option.zh : option.en}
+                    style={{ "--option-color": levelColors[option.value] } as React.CSSProperties}
+                  >
+                    {option.value === "unset"
+                      ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                      : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>}
+                  </button>
+                );
+              })}
             </div>
             <span className="df-level-current">{props.lang === "zh" ? "当前" : "Current"}：{importanceOptions.find((o) => o.value === (f.importance || "unset"))?.[props.lang === "zh" ? "zh" : "en"] ?? (props.lang === "zh" ? "未设置" : "Unset")}</span>
           </div>
           <div className="df-detail-meta-setting">
             <span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>
             <div className="df-level-selector df-level-urgency" role="group" aria-label={props.lang === "zh" ? "紧急程度" : "Urgency"}>
-              {urgencyOptions.map((option) => (
-                <button
-                  key={`urgency-${option.value}`}
-                  type="button"
-                  className={`df-level-option df-level-${option.value}` + (f.urgency === option.value || (option.value === "unset" && !f.urgency) ? " active" : "")}
-                  aria-pressed={f.urgency === option.value || (option.value === "unset" && !f.urgency)}
-                  onClick={() => commitTaskMeta("urgency", option.value)}
-                  title={props.lang === "zh" ? option.zh : option.en}
-                >
-                  {option.value === "high" && <span className="df-urgency-mark">!!!</span>}
-                  {option.value === "medium" && <span className="df-urgency-mark">!!</span>}
-                  {option.value === "low" && <span className="df-urgency-mark">!</span>}
-                  {option.value === "unset" && <span className="df-urgency-mark df-urgency-dash">—</span>}
-                </button>
-              ))}
+              {urgencyOptions.map((option) => {
+                const selectedUrgency = (f.urgency ?? "unset") as TaskLevel;
+                const isSelected = selectedUrgency === option.value;
+                return (
+                  <button
+                    key={`urgency-${option.value}`}
+                    type="button"
+                    className={`df-level-option df-level-${option.value}`}
+                    data-selected={isSelected ? "true" : "false"}
+                    aria-pressed={isSelected}
+                    onClick={() => commitTaskMeta("urgency", option.value)}
+                    title={props.lang === "zh" ? option.zh : option.en}
+                    style={{ "--option-color": levelColors[option.value] } as React.CSSProperties}
+                  >
+                    {option.value === "high" && <span className="df-urgency-mark">!!!</span>}
+                    {option.value === "medium" && <span className="df-urgency-mark">!!</span>}
+                    {option.value === "low" && <span className="df-urgency-mark">!</span>}
+                    {option.value === "unset" && <span className="df-urgency-mark df-urgency-dash">—</span>}
+                  </button>
+                );
+              })}
             </div>
             <span className="df-level-current">{props.lang === "zh" ? "当前" : "Current"}：{urgencyOptions.find((o) => o.value === (f.urgency || "unset"))?.[props.lang === "zh" ? "zh" : "en"] ?? (props.lang === "zh" ? "未设置" : "Unset")}</span>
           </div>

@@ -491,7 +491,7 @@
   background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
-  color: var(--df-option-color, #8E8478) !important;
+  color: var(--option-color, var(--df-option-color, #8E8478)) !important;
   cursor: pointer;
   padding: 0;
   filter: none !important;
@@ -502,15 +502,13 @@
   border-right: 0 !important;
 }
 .df-app .df-level-selector .df-level-option:hover {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 6%, var(--paper-bg)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
   background-image: none !important;
-  box-shadow: none !important;
 }
 .df-app .df-level-selector .df-level-option:active {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 10%, var(--paper-bg)) !important;
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 10%, var(--paper-bg)) !important;
   background-image: none !important;
   transform: none !important;
-  box-shadow: none !important;
 }
 .df-app .df-level-selector .df-level-option:focus-visible {
   outline: 2px solid var(--accent-active);
@@ -518,10 +516,21 @@
   position: relative;
   z-index: 1;
 }
-.df-app .df-level-selector .df-level-option.active {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 8%, var(--paper-bg)) !important;
+/* Selected option: 2px semantic inset ring + subtle tint.
+   --option-color is set via inline style on each button. */
+.df-app .df-level-selector .df-level-option[data-selected="true"] {
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 10%, var(--paper-bg)) !important;
   background-image: none !important;
-  box-shadow: inset 0 0 0 2px var(--df-option-color, #8E8478) !important;
+  box-shadow: inset 0 0 0 2px var(--option-color, var(--df-option-color, #8E8478)) !important;
+}
+/* Unselected option: ensure no ring, clean paper background. */
+.df-app .df-level-selector .df-level-option[data-selected="false"] {
+  box-shadow: none !important;
+  background: transparent !important;
+  background-image: none !important;
+}
+.df-app .df-level-selector .df-level-option[data-selected="false"]:hover {
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
 }
 .df-app .df-level-selector .df-level-icon {
   width: 19px;
@@ -546,7 +555,7 @@
   letter-spacing: -0.04em;
   text-align: center;
   display: block;
-  color: var(--df-option-color, #8E8478) !important;
+  color: var(--option-color, var(--df-option-color, #8E8478)) !important;
 }
 .df-app .df-level-selector .df-urgency-dash {
   font-size: 20px;

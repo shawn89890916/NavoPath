@@ -4,8 +4,8 @@
 
 ### 修复
 - 修复选中态不生效的持久化 bug：表单初始化使用 `??` 运算符将 `null`（未设置）误回落到 `priority ?? "high"`，导致重新打开抽屉后"未设置"状态丢失。改为 `!== undefined` 检查以保留显式 `null`。
-- 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则 `.df-app button:not(.df-block-check)...` 特异性 (0,5,1) 高于选中态规则 (0,4,0)，导致 2px 语义色内边框被 1px 全局内阴影覆盖。将 `.df-level-option` 加入全局按钮规则的 `:not()` 排除列表，使分段控件自身规则生效。
-- 简化选中态视觉反馈：选中项以 2px 语义色内边框（inset box-shadow）标识，配 8% 语义色底色；移除底部规则线与多余阴影，选择时无布局跳动。
+- 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则特异性 (0,5,1) 高于旧选中态规则 (0,4,0)，导致 2px 语义色内边框被覆盖。将 `.df-level-option` 加入全局按钮规则的 `:not()` 排除列表，并将选中态改为显式 `data-selected="true"` 属性选择器 + 内联 `--option-color` CSS 变量，确保选中环不被任何全局规则压制。
+- 选中态视觉反馈改为：选中项以 2px 语义色 inset box-shadow 环 + 10% 语义色底色标识，未选中项明确清除环与底色；移除底部规则线、外阴影、缩放与发光，选择时无布局跳动。
 
 ### 改进
 - 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为连接式分段图标选择器（segmented control），四段共享外框与圆角，段间以细分隔线划分。
@@ -38,8 +38,8 @@
 
 ### Fixes
 - Fixed selected-state persistence bug: form initialization used `??` operator which treated `null` (unset) as falsy and fell through to `priority ?? "high"`, causing "unset" state to be lost on drawer reopen. Changed to `!== undefined` check to preserve explicit `null`.
-- Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: the global button rule `.df-app button:not(.df-block-check)...` had specificity (0,5,1) which beat the selected-state rule (0,4,0), causing the 2px semantic inset border to be hidden behind a 1px global inner shadow. Added `.df-level-option` to the global button rule's `:not()` exclusion list so the segmented control's own rules take effect.
-- Simplified selected-state visual feedback: selected option is marked by a 2px semantic inset border (box-shadow) with an 8% semantic tint; removed the bottom rule and extra shadows so selection never causes layout shift.
+- Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: the global button rule had specificity (0,5,1) which beat the old selected-state rule (0,4,0), hiding the 2px semantic inset border. Added `.df-level-option` to the global button rule's `:not()` exclusion list, and switched the selected state to an explicit `data-selected="true"` attribute selector with an inline `--option-color` CSS variable so the selected ring is never suppressed by any global rule.
+- Selected-state visual feedback is now: a 2px semantic inset box-shadow ring + 10% semantic tint on the selected option, with unselected options explicitly clearing ring and tint; removed bottom rule, outer shadows, scale, and glow so selection never causes layout shift.
 
 ### Improvements
 - Refactored the task drawer's "Importance / Urgency" controls from plain text buttons into a connected segmented icon strip sharing one outer border and rounded corners, with thin dividers between segments.
