@@ -157,27 +157,33 @@
 
 ### Short event
 - Component: `TimeBlock` using `TaskBlock` with variant="scheduled", appearance="calm"
-- Class names: `df-task-block df-task-block--scheduled df-task-block--appearance-calm df-time-block priority-* short-block`
-- Data attributes: `data-task-appearance="calm"`, `data-task-variant="scheduled"`
+- Class names: `df-task-block df-task-block--scheduled df-task-block--appearance-calm df-time-block priority-*`
+- Data attributes: `data-task-appearance="calm"`, `data-task-variant="scheduled"`, `data-schedule-size="short"`
 - Height: ~40px (15m task) to ~55px (30m task)
-- align-items: center (inherited from --task-align-items default)
-- justify-content: center (from .df-task-block-content)
-- padding: 6px 10px (from --task-padding-y/x)
+- align-items: center (from [data-schedule-size="short"] override)
+- justify-content: flex-start (from row override)
+- padding: 3px 6px (from --task-padding-y/x)
 - min-height: unset (from scheduled override)
-- checkbox size: ~18px (inherited from normal candidate styles)
-- Root cause: `.df-task-block-content` has `align-self: stretch` + `justify-content: center`, causing content to be vertically centered in a tall container
+- checkbox size: 14px (from [data-schedule-size="short"] override)
+- Root cause: `.df-task-block-content` had `align-self: stretch` + `justify-content: center`, causing content to be vertically centered in a tall container
 
 ### Ultra-long event
 - Component: `TimeBlock` using `TaskBlock` with variant="scheduled", appearance="calm"
-- Class names: `df-task-block df-task-block--scheduled df-task-block--appearance-calm df-time-block priority-* tall-block`
-- Data attributes: `data-task-appearance="calm"`, `data-task-variant="scheduled"`
-- Height: >= 96px (multi-hour tasks)
-- align-items: flex-start (from tall-block override)
-- justify-content: center (from .df-task-block-content — still centered!)
-- padding: 8px 10px (from tall-block --task-padding-y/x)
+- Class names: `df-task-block df-task-block--scheduled df-task-block--appearance-calm df-time-block priority-*`
+- Data attributes: `data-task-appearance="calm"`, `data-task-variant="scheduled"`, `data-schedule-size="tall"`
+- Height: >= 120px (multi-hour tasks)
+- align-items: flex-start (from [data-schedule-size="tall"] override)
+- justify-content: flex-start (from row override)
+- padding: 8px 10px (from --task-padding-y/x)
 - min-height: 0 (from tall-block override)
-- content vertical position: middle of block (due to .df-task-block-content justify-content: center)
-- Root cause: `.df-task-block-content` has `align-self: stretch` + `justify-content: center`, overriding the tall-block row's `align-items: flex-start`. The content stretches to fill the full height, then centers vertically within itself.
+- content vertical position: top of block (fixed by content override)
+- Root cause: `.df-task-block-content` had `align-self: stretch` + `justify-content: center`, overriding the tall-block row's `align-items: flex-start`. The content stretches to fill the full height, then centers vertically within itself.
+
+### Size classification rules
+- short: rendered height < 56px
+- normal: 56px <= rendered height < 120px  
+- tall: rendered height >= 120px
+- Implemented via `data-schedule-size` attribute on TaskBlock element
 
 ## Importance / Urgency Display Mapping
 
