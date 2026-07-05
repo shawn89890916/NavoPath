@@ -1962,16 +1962,3 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   opacity: 1 !important;
   background: var(--task-bg) !important;
 }
-
-.df-app .df-task-block[data-debug-timeline-event="true"] .df-timeline-debug-label,
-.navo-demo-app .df-task-block[data-debug-timeline-event="true"] .df-timeline-debug-label {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 20;
-  padding: 2px 4px;
-  background: red;
-  color: white;
-  font: 700 10px/1.1 var(--paper-mono, monospace);
-  pointer-events: none;
-}

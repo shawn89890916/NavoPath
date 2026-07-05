@@ -9725,31 +9725,6 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const durationMinutes = calculatedDurationMinutes;
   const startMinutes = startMinutesValue;
   const endMinutes = timeToMinutes(end);
-  const hourHeight = 120;
-  
-  if (durationMinutes <= 30 && height > (90 / 60) * hourHeight) {
-    console.error("[timeline geometry bug] short task too tall", {
-      taskId: task.id,
-      title: task.title,
-      durationMinutes,
-      heightPx: height,
-      startMinutes,
-      endMinutes,
-      scheduledStart: task.scheduledStart,
-      scheduledEnd: task.scheduledEnd,
-    });
-  }
-  
-  if (endMinutes <= startMinutes) {
-    console.warn("[timeline] endMinutes <= startMinutes, fixing", {
-      taskId: task.id,
-      title: task.title,
-      startMinutes,
-      endMinutes,
-      scheduledStart: task.scheduledStart,
-      scheduledEnd: task.scheduledEnd,
-    });
-  }
   const next = extractNextAction(task.notes);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   const isEvent = isEventDisplayTask(task);
@@ -9781,49 +9756,10 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const eventId = task.id;
   const sizeClass = height < 56 ? "short" : height >= 120 ? "tall" : "normal";
   
-  if (task.title && task.title.includes("更新作品集首页文案")) {
-    console.table({
-      taskId: task.id,
-      title: task.title,
-      durationMinutes,
-      scheduledStart: task.scheduledStart,
-      scheduledEnd: task.scheduledEnd,
-      startMinutes,
-      endMinutes,
-      endMinusStart: endMinutes - startMinutes,
-      hourHeight,
-      topPx: top,
-      heightPx: height,
-      inlineTop: `${top}px`,
-      inlineHeight: `${height}px`,
-      inlineBottom: undefined,
-      sizeClass,
-    });
-    
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-timeline-event-id="${eventId}"]`);
-      if (el) {
-        const cs = getComputedStyle(el);
-        console.table({
-          eventId,
-          domHeight: el.getBoundingClientRect().height,
-          computedHeight: cs.height,
-          computedTop: cs.top,
-          computedBottom: cs.bottom,
-          computedPosition: cs.position,
-          computedDisplay: cs.display,
-          computedAlignItems: cs.alignItems,
-          computedMinHeight: cs.minHeight,
-        });
-      }
-    });
-  }
-  
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragging={Boolean(isPreview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id, "debug-timeline-event": "true", "task-title": task.title, "duration-minutes": String(durationMinutes), "start-minutes": String(startMinutes), "end-minutes": String(endMinutes), "height-px": String(height) }} style={{ top, height, bottom: "auto", outline: "3px solid red", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragging={Boolean(isPreview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ top, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
-      <span className="df-timeline-debug-label">{`DEBUG: ${durationMinutes}m / ${height}px`}</span>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
       {canResize && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
