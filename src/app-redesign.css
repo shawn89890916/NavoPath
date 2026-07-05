@@ -519,10 +519,9 @@
   z-index: 1;
 }
 .df-app .df-level-selector .df-level-option.active {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 18%, var(--paper-bg)) !important;
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 8%, var(--paper-bg)) !important;
   background-image: none !important;
-  box-shadow: inset 0 -3px 0 var(--df-option-color, #8E8478) !important;
-  border-color: var(--df-option-color, #8E8478) !important;
+  box-shadow: inset 0 0 0 2px var(--df-option-color, #8E8478) !important;
 }
 .df-app .df-level-selector .df-level-icon {
   width: 19px;
