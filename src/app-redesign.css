@@ -445,7 +445,7 @@
 
 .df-detail-meta-settings {
   display: grid;
-  gap: 17px;
+  gap: 14px;
   padding: 12px 0;
 }
 .df-detail-meta-setting {
@@ -462,51 +462,58 @@
 }
 .df-level-selector {
   display: inline-flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  border: 1px solid var(--paper-rule);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--paper-bg);
 }
 .df-level-option {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--paper-rule) 60%, transparent);
-  border-radius: 8px;
-  background: var(--paper-bg);
+  border: 0;
+  border-right: 1px solid var(--paper-rule);
+  border-radius: 0;
+  background: transparent;
   color: var(--df-option-color, var(--text-faint));
   cursor: pointer;
   padding: 0;
-  opacity: 0.72;
-  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+  opacity: 0.65;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
   --df-option-color: var(--text-faint);
 }
+.df-level-option:last-child {
+  border-right: 0;
+}
 .df-level-option:hover {
-  border-color: color-mix(in srgb, var(--paper-rule) 90%, transparent);
-  background: color-mix(in srgb, var(--paper-bg) 94%, var(--ink, #333) 6%);
-  opacity: 0.9;
+  background: color-mix(in srgb, var(--df-option-color) 6%, var(--paper-bg));
+  opacity: 0.85;
 }
 .df-level-option:active {
-  border-color: var(--df-option-color);
+  background: color-mix(in srgb, var(--df-option-color) 10%, var(--paper-bg));
 }
 .df-level-option:focus-visible {
   outline: 2px solid var(--accent-active);
-  outline-offset: 2px;
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
 }
 .df-level-option.active {
   opacity: 1;
-  border-color: var(--df-option-color);
-  background: color-mix(in srgb, var(--paper-bg) 90%, var(--df-option-color) 10%);
+  background: color-mix(in srgb, var(--df-option-color) 12%, var(--paper-bg));
   box-shadow: inset 0 -2px 0 var(--df-option-color);
 }
 .df-level-icon {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   display: block;
 }
 .df-urgency-mark {
   font-family: var(--paper-sans, system-ui, -apple-system, sans-serif);
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
@@ -514,7 +521,7 @@
   display: block;
 }
 .df-urgency-dash {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 400;
   letter-spacing: 0;
 }
