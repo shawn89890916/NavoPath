@@ -460,58 +460,77 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.df-level-selector {
+.df-app .df-level-selector {
   display: inline-flex;
   width: max-content;
   flex: 0 0 auto;
   align-items: stretch;
-  border: 1px solid var(--paper-rule);
-  border-radius: 8px;
+  border: 1px solid var(--paper-rule) !important;
+  border-radius: 8px !important;
   overflow: hidden;
-  background: var(--paper-bg);
+  background: var(--paper-bg) !important;
+  box-shadow: none !important;
 }
-.df-level-option {
+.df-app .df-level-selector .df-level-option {
   width: 42px;
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-right: 1px solid var(--paper-rule);
-  border-radius: 0;
-  background: transparent;
-  color: var(--df-option-color, #8E8478);
+  border: 0 !important;
+  border-right: 1px solid var(--paper-rule) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--df-option-color, #8E8478) !important;
   cursor: pointer;
   padding: 0;
+  filter: none !important;
+  text-shadow: none !important;
   transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
-.df-level-option:last-child {
-  border-right: 0;
+.df-app .df-level-selector .df-level-option:last-child {
+  border-right: 0 !important;
 }
-.df-level-option:hover {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 6%, var(--paper-bg));
+.df-app .df-level-selector .df-level-option:hover {
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 6%, var(--paper-bg)) !important;
+  background-image: none !important;
+  box-shadow: none !important;
 }
-.df-level-option:active {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 10%, var(--paper-bg));
+.df-app .df-level-selector .df-level-option:active {
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 10%, var(--paper-bg)) !important;
+  background-image: none !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
-.df-level-option:focus-visible {
+.df-app .df-level-selector .df-level-option:focus-visible {
   outline: 2px solid var(--accent-active);
   outline-offset: -2px;
   position: relative;
   z-index: 1;
 }
-.df-level-option.active {
-  background: color-mix(in srgb, var(--df-option-color, #8E8478) 12%, var(--paper-bg));
-  box-shadow: inset 0 -2px 0 var(--df-option-color, #8E8478);
+.df-app .df-level-selector .df-level-option.active {
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 12%, var(--paper-bg)) !important;
+  background-image: none !important;
+  box-shadow: inset 0 -2px 0 var(--df-option-color, #8E8478) !important;
 }
-.df-level-icon {
+.df-app .df-level-selector .df-level-icon {
   width: 19px;
   height: 19px;
   display: block;
-  fill: currentColor;
-  stroke: currentColor;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
-.df-urgency-mark {
+.df-app .df-level-selector .df-level-icon path,
+.df-app .df-level-selector .df-level-icon line {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+.df-app .df-level-selector .df-level-icon path[fill="none"] {
+  fill: none !important;
+}
+.df-app .df-level-selector .df-urgency-mark {
   font-family: var(--paper-sans, system-ui, -apple-system, sans-serif);
   font-size: 18px;
   font-weight: 800;
@@ -519,9 +538,9 @@
   letter-spacing: -0.04em;
   text-align: center;
   display: block;
-  color: inherit;
+  color: var(--df-option-color, #8E8478) !important;
 }
-.df-urgency-dash {
+.df-app .df-level-selector .df-urgency-dash {
   font-size: 20px;
   font-weight: 400;
   letter-spacing: 0;
