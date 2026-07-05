@@ -3,6 +3,7 @@
 ## 2026-07-05 · 时间轴短任务渲染与选择器优化
 
 ### 修复
+- 修复时间轴短任务与长任务块被拉伸到整天高度的问题：15m/30m 等日程现在严格使用时间轴计算出的像素高度，不再被 scheduled 根样式的 `height: 100%` 撑满整张时间画布。
 - 修复选中态不生效的持久化 bug：表单初始化使用 `??` 运算符将 `null`（未设置）误回落到 `priority ?? "high"`，导致重新打开抽屉后"未设置"状态丢失。改为 `!== undefined` 检查以保留显式 `null`。
 - 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则强制设置 `border-color` / `box-shadow`，覆盖了选中态。将 `.df-level-option` 加入所有全局按钮规则的 `:not()` 排除列表，选中态改为显式 `data-selected="true"` 属性选择器 + 内联 `--option-color` CSS 变量。
 - 选中态视觉反馈改为伪元素覆盖整个分段：选中段使用 `::after` 伪元素覆盖整块按钮区域（inset: 0），2px 语义色实线描边 + 6% 语义色底色。首段选中时左上/左下圆角 11px，末段选中时右上/右下圆角 11px，中间段无圆角，与外层容器 12px 圆角自然贴合。伪元素不受全局 `.df-app button` 的 `box-shadow: none !important` 压制，彻底解决了之前选中态被覆盖的问题。
@@ -39,6 +40,7 @@
 ## 2026-07-05 · Timeline short tasks & selector improvements
 
 ### Fixes
+- Fixed short and tall timeline scheduled blocks stretching to the full-day canvas height: 15m/30m tasks and longer scheduled blocks now respect the timeline-calculated pixel height instead of inheriting `height: 100%` from the scheduled root style.
 - Fixed selected-state persistence bug: form initialization used `??` operator which treated `null` (unset) as falsy and fell through to `priority ?? "high"`, causing "unset" state to be lost on drawer reopen. Changed to `!== undefined` check to preserve explicit `null`.
 - Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: global button rules forced `border-color` / `box-shadow` on all buttons, overriding the selected state. Added `.df-level-option` to every global button rule's `:not()` exclusion list, and switched the selected state to an explicit `data-selected="true"` attribute selector with an inline `--option-color` CSS variable.
 - Selected-state visual feedback now covers the entire segment: the selected segment uses a `::after` pseudo-element spanning the full button area (inset: 0) with a 2px semantic-color solid border and 6% semantic tint. First-child segments get 11px top-left/bottom-left corners, last-child segments get 11px top-right/bottom-right corners, and middle segments have no rounding — all matching the container's 12px outer radius. Pseudo-elements are NOT affected by global `.df-app button` `box-shadow: none !important` rules, completely solving the previous override issue.

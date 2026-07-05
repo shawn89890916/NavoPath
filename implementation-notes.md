@@ -284,3 +284,14 @@ Records how `importance` and `urgency` are surfaced across the drawer, task card
 - Planning Tree no longer uses a DOM-cloned overlay for task/subtask/project drags; it uses a React-rendered `TaskBlock` overlay from `TaskDragLayer`.
 - Kanban and Matrix same-container reordering updates task order on drop; moving between columns/quadrants updates the task status or importance/urgency.
 - Cross-view drag between Tree, Kanban, Matrix, and List is intentionally unsupported because they are separate Planning surfaces.
+# Timeline Short Event Debug Proof
+
+For broken short task:
+- task title: DEBUG short 30m repro
+- durationMinutes: 30
+- startMinutes: 960
+- endMinutes: 990
+- heightPx: 40
+- DOM getBoundingClientRect height: 1920
+- red outline wraps correct wrong block: yes
+- root cause is data / wrapper style / parent CSS / wrong component: wrapper style. The positioned scheduled TaskBlock is the real outer timeline event wrapper; its inline `height: 40px` is being overridden by the scheduled short/tall root CSS rule `height: 100% !important`, so the absolute event fills the 1920px `.df-timeline-canvas`.

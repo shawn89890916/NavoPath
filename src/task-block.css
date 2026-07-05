@@ -550,7 +550,6 @@
   --task-min-height: unset;
   --task-align-items: center;
   min-height: unset !important;
-  height: 100% !important;
 }
 
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"][data-schedule-size="short"] .df-task-block-row,
@@ -608,7 +607,6 @@
   --task-padding-x: 10px;
   --task-padding-y: 8px;
   --task-align-items: flex-start;
-  height: 100% !important;
   min-height: 0 !important;
 }
 
@@ -1963,4 +1961,17 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-app .df-task-block[data-task-appearance].is-checked {
   opacity: 1 !important;
   background: var(--task-bg) !important;
+}
+
+.df-app .df-task-block[data-debug-timeline-event="true"] .df-timeline-debug-label,
+.navo-demo-app .df-task-block[data-debug-timeline-event="true"] .df-timeline-debug-label {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  padding: 2px 4px;
+  background: red;
+  color: white;
+  font: 700 10px/1.1 var(--paper-mono, monospace);
+  pointer-events: none;
 }
