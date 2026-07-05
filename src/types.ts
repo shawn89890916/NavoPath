@@ -1,6 +1,7 @@
 export type Category = "exam" | "uk" | "us" | "essay" | "materials" | "project" | "personal";
 export type Priority = "high" | "medium" | "low";
 export type NullablePriority = Priority | null;
+export type TaskLevel = Priority | "unset";
 export type WorkflowStatus = "backlog" | "next" | "doing" | "waiting" | "done";
 
 export interface Goal {

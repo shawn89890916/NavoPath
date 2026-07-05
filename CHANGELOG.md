@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 2026-07-05 · 重要程度/紧急程度图标选择器
+
+### 改进
+- 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为图标分段选择器。
+- 重要程度使用旗帜图标：高=珊瑚红、中=琥珀黄、低=鼠尾草绿、未设置=中性描边。
+- 紧急程度使用感叹号图标：高=三道珊瑚红、中=两道琥珀黄、低=单道灰蓝、未设置=中性破折号。
+- 选中态采用更强的边框 + 轻量纸色底 + 底部细规则线，符合 NavoPath 纸张编辑风格，不依赖颜色单独表达状态。
+- 新增“未设置”选项，点击可立即清空对应字段。
+- Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵；medium/low 仍保留在任务上作为元数据。
+
 ## 2026-07-04 · 统一拖拽体验
 
 ### 改进
@@ -17,6 +27,16 @@
 - 修复不同视图拖拽反馈样式各自为政、CSS 重复堆叠的问题，收敛为共享类驱动。
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
+
+## 2026-07-05 · Importance / Urgency icon selectors
+
+### Improvements
+- Refactored the task drawer's "Importance / Urgency" controls from plain text buttons ("High / Medium / Low") into icon-based segmented selectors.
+- Importance uses flag icons: high = coral red, medium = amber yellow, low = sage green, unset = neutral outline.
+- Urgency uses exclamation icons: high = three coral marks, medium = two amber marks, low = single muted mark, unset = neutral dash.
+- The selected state uses a stronger border + subtle paper tint + a fine bottom rule, following the NavoPath editorial paper style and never relying on color alone.
+- Added an "unset" option; clicking it immediately clears the field.
+- Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced. Medium and low values are still preserved on the task as metadata.
 
 ## 2026-07-04 · Unified drag experience
 

@@ -1,4 +1,4 @@
-import type { NullablePriority, Priority, Task, WorkflowStatus } from "../types";
+import type { NullablePriority, Priority, Task, TaskLevel, WorkflowStatus } from "../types";
 
 export type NullableLevel = Priority | null | undefined;
 export type StateFilterValue = "all" | "empty" | Priority;
@@ -14,7 +14,7 @@ export type NormalizedTaskState = {
 const LEVELS: Priority[] = ["high", "medium", "low"];
 
 export function normalizeNullableLevel(value: unknown, fallback: NullableLevel = null): NullablePriority {
-  if (value === null || value === undefined || value === "") return fallback ?? null;
+  if (value === null || value === undefined || value === "" || value === "unset") return fallback ?? null;
   return LEVELS.includes(value as Priority) ? (value as Priority) : fallback ?? null;
 }
 

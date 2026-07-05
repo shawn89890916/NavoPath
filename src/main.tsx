@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -41,7 +41,7 @@ import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
-import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup } from "./components/TaskBlock";
+import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
@@ -181,8 +181,35 @@ type DragState = {
   duration: number;
   offsetMinutes?: number;
   pointer?: { x: number; y: number };
+  sourceRect?: { width: number; height: number };
+  offset?: { x: number; y: number };
   outsideTimeline?: boolean;
 } | null;
+
+type DragSource = "candidate" | "tree" | "kanban" | "matrix" | "list" | "timeline";
+type DropIntent =
+  | "reorder-before"
+  | "reorder-after"
+  | "drop-into-container"
+  | "schedule-at-time"
+  | "invalid";
+type ActiveDragItem = {
+  dragId: string;
+  taskId: string;
+  source: DragSource;
+  sourceContainerId: string;
+  sourceIndex: number;
+  sourceVariant: "candidate" | "allDay" | "scheduled";
+  taskSnapshot: Task;
+};
+type CandidateDropTarget = {
+  taskId: string;
+  position: "before" | "after";
+  intent: Extract<DropIntent, "reorder-before" | "reorder-after">;
+} | null;
+
+const DRAG_START_THRESHOLD_PX = 5;
+const SUPPRESS_CLICK_AFTER_DRAG_MS = 220;
 
 function isEventDisplayTask(taskOrId: Task | string) {
   const id = typeof taskOrId === "string" ? taskOrId : taskOrId.id;
@@ -421,8 +448,8 @@ type FormState = {
   endTime: string;
   category: Category;
   priority: Priority;
-  importance: Priority;
-  urgency: Priority;
+  importance: NullablePriority;
+  urgency: NullablePriority;
   estimatedHours: number;
   details: string;
   recurrence?: TaskRecurrence;
@@ -1523,6 +1550,7 @@ function App() {
   const [dragOverlay, setDragOverlay] = useState<UnifiedDragSnapshot | null>(null);
   const [dragOverlayTask, setDragOverlayTask] = useState<{ task: Task; variant: "candidate" | "allDay" | "scheduled" } | null>(null);
   const [dragOverlayPointer, setDragOverlayPointer] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [activeDragItem, setActiveDragItem] = useState<ActiveDragItem | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview>(null);
   const [hoverSlot, setHoverSlot] = useState<string>("");
   const [hoveredBlock, setHoveredBlock] = useState("");
@@ -1578,6 +1606,7 @@ function App() {
   const [allDayDragOver, setAllDayDragOver] = useState(false);
   const [allDayDragDate, setAllDayDragDate] = useState("");
   const [candidateDropActive, setCandidateDropActive] = useState(false);
+  const [candidateDropTarget, setCandidateDropTarget] = useState<CandidateDropTarget>(null);
   const [floatingTimeAdd, setFloatingTimeAdd] = useState<FloatingTimeAdd>(null);
   // Persist the last-used project across quick-add sessions so the next
   // panel can pre-select it without keeping the panel open after save.
@@ -1741,6 +1770,17 @@ function App() {
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
   const suppressBlockClickRef = useRef(false);
+  const suppressBlockClickTimerRef = useRef<number | null>(null);
+  const suppressClickAfterDrag = useCallback(() => {
+    suppressBlockClickRef.current = true;
+    if (suppressBlockClickTimerRef.current !== null) {
+      window.clearTimeout(suppressBlockClickTimerRef.current);
+    }
+    suppressBlockClickTimerRef.current = window.setTimeout(() => {
+      suppressBlockClickRef.current = false;
+      suppressBlockClickTimerRef.current = null;
+    }, SUPPRESS_CLICK_AFTER_DRAG_MS);
+  }, []);
   const crossDayWheelRef = useRef<{ key: string; at: number } | null>(null);
   const crossDayTouchRef = useRef<{ y: number; atTop: boolean; atBottom: boolean } | null>(null);
 
@@ -3320,6 +3360,29 @@ function App() {
     beginShelfDrag(event, plannedTask, "candidate");
   }
 
+  function reorderTodayCandidate(dragId: string, targetId: string, position: "before" | "after") {
+    if (!dragId || !targetId || dragId === targetId) return;
+    const current = dataRef.current;
+    if (!current) return;
+    const rendered = visibleCandidates.filter((task) => !isEventDisplayTask(task));
+    const dragged = rendered.find((task) => task.id === dragId);
+    if (!dragged) return;
+    const without = rendered.filter((task) => task.id !== dragId);
+    const targetIndex = without.findIndex((task) => task.id === targetId);
+    if (targetIndex < 0) return;
+    without.splice(position === "before" ? targetIndex : targetIndex + 1, 0, dragged);
+    const nextOrder = new Map(without.map((task, index) => [task.id, index * 10]));
+    const now = new Date().toISOString();
+    void saveData({
+      ...current,
+      tasks: current.tasks.map((task) => (
+        nextOrder.has(task.id)
+          ? { ...task, order: nextOrder.get(task.id), updatedAt: now }
+          : task
+      )),
+    });
+  }
+
   function deleteSubtaskById(subtaskId: string) {
     const current = dataRef.current;
     if (!current) return;
@@ -4402,7 +4465,12 @@ function App() {
       if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < 8) return;
       if (!active) {
         active = true;
-        dragElement.setPointerCapture(pointerId);
+        try {
+          dragElement.setPointerCapture(pointerId);
+        } catch {
+          // Synthetic and interrupted pointer streams may not have an active
+          // pointer capture target; drag rendering must still continue.
+        }
         document.body.classList.add("df-timeline-pointer-drag");
         dragElement.classList.add("is-dragging-source");
         suppressBlockClickRef.current = true;
@@ -4642,8 +4710,17 @@ function App() {
         const blockRect = rect;
         const offX = Math.min(Math.max(event.clientX - blockRect.left, 0), blockRect.width);
         const offY = Math.min(Math.max(event.clientY - blockRect.top, 0), blockRect.height);
-        setDragOverlay({ taskId: task.id, sourceElement: target, sourceRect: blockRect, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "block" } });
-        setDrag({ taskId: task.id, kind: "block", duration, offsetMinutes, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline: pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY) });
+        setDrag({
+          taskId: task.id,
+          kind: "block",
+          source: "timeline",
+          duration,
+          offsetMinutes,
+          pointer: { x: moveEvent.clientX, y: moveEvent.clientY },
+          sourceRect: { width: blockRect.width, height: blockRect.height },
+          offset: { x: offX, y: offY },
+          outsideTimeline: pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY),
+        });
       }
       setDragOverlayPointer({ x: moveEvent.clientX, y: moveEvent.clientY });
       const outsideTimeline = pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY);
@@ -4707,7 +4784,7 @@ function App() {
             target.classList.remove("is-dragging");
             target.classList.remove("is-dragging-source");
             document.body.classList.remove("df-timeline-pointer-drag");
-            window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
+            suppressClickAfterDrag();
             return;
           }
         }
@@ -4756,9 +4833,7 @@ function App() {
       target.classList.remove("is-dragging");
       target.classList.remove("is-dragging-source");
       document.body.classList.remove("df-timeline-pointer-drag");
-      window.setTimeout(() => {
-        suppressBlockClickRef.current = false;
-      }, 0);
+      if (active) suppressClickAfterDrag();
     };
     const cancel = (cancelEvent: PointerEvent) => {
       if (cancelEvent.pointerId !== pointerId) return;
@@ -4902,6 +4977,7 @@ function App() {
   }
 
   function openTaskEdit(task: Task) {
+    if (suppressBlockClickRef.current) return;
     const event = occurrenceToEventMap.get(task.id) || events.find((item) => task.id.startsWith(`event_occ_${item.id}_`));
     if (event) {
       openEventEdit(event);
@@ -5542,6 +5618,7 @@ function App() {
     const duration = taskDuration(task);
     let active = false;
     let dropTime = "";
+    let candidateTarget: CandidateDropTarget = null;
     const cleanup = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -5552,16 +5629,44 @@ function App() {
       setDrag(null);
       setDragOverlay(null);
       setDragOverlayTask(null);
+      setActiveDragItem(null);
       setHoverSlot("");
       setAllDayDragOver(false);
       setAllDayDragDate("");
       setCandidateDropActive(false);
+      setCandidateDropTarget(null);
       dragTargetDateRef.current = "";
       if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
-      if (active) window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
+      if (active) suppressClickAfterDrag();
     };
     const updateTarget = (pointerEvent: PointerEvent) => {
       const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
+      const candidateRow = source === "candidate" ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
+      if (candidateRow) {
+        const targetTaskId = candidateRow.dataset.candidateTaskId || "";
+        if (targetTaskId && targetTaskId !== task.id) {
+          const rect = candidateRow.getBoundingClientRect();
+          const position = (pointerEvent.clientY - rect.top) < rect.height / 2 ? "before" : "after";
+          candidateTarget = {
+            taskId: targetTaskId,
+            position,
+            intent: position === "before" ? "reorder-before" : "reorder-after",
+          };
+          setCandidateDropTarget(candidateTarget);
+        } else {
+          candidateTarget = null;
+          setCandidateDropTarget(null);
+        }
+        setCandidateDropActive(false);
+        setAllDayDragOver(false);
+        setAllDayDragDate("");
+        dropTime = "";
+        setHoverSlot("");
+        dragTargetDateRef.current = "";
+        return;
+      }
+      candidateTarget = null;
+      setCandidateDropTarget(null);
       const candidatePanel = source === "allDay" ? pointedElement?.closest<HTMLElement>(".df-candidate-panel") : null;
       setCandidateDropActive(Boolean(candidatePanel));
       if (candidatePanel) {
@@ -5597,7 +5702,7 @@ function App() {
     };
     const move = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
-      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < 8) return;
+      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < DRAG_START_THRESHOLD_PX) return;
       if (!active) {
         active = true;
         dragElement.setPointerCapture(pointerId);
@@ -5610,6 +5715,15 @@ function App() {
         const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
         setDragOverlay({ taskId: task.id, sourceElement: dragElement, sourceRect: rect, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "candidate", source } });
         setDragOverlayTask({ task, variant: source === "candidate" ? "candidate" : "allDay" });
+        setActiveDragItem({
+          dragId: `${source}:${task.id}`,
+          taskId: task.id,
+          source: source === "candidate" ? "candidate" : "timeline",
+          sourceContainerId: source,
+          sourceIndex: visibleCandidates.findIndex((item) => item.id === task.id),
+          sourceVariant: source === "candidate" ? "candidate" : "allDay",
+          taskSnapshot: task,
+        });
         if (compactLayout && source === "candidate") {
           setCompactExecuteView("schedule");
           if (timelineView === "month") setTimelineView("daily");
@@ -5618,13 +5732,38 @@ function App() {
       }
       pointerEvent.preventDefault();
       setDragOverlayPointer({ x: pointerEvent.clientX, y: pointerEvent.clientY });
-      setDrag({ taskId: task.id, kind: "candidate", source, duration, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
+      const currentRect = dragElement.getBoundingClientRect();
+      setDrag({
+        taskId: task.id,
+        kind: "candidate",
+        source,
+        duration,
+        pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY },
+        sourceRect: { width: currentRect.width, height: currentRect.height },
+        offset: {
+          x: Math.min(Math.max(startX - currentRect.left, 0), currentRect.width),
+          y: Math.min(Math.max(startY - currentRect.top, 0), currentRect.height),
+        },
+      });
       updateTarget(pointerEvent);
     };
     const up = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
       if (active) {
         const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
+        const candidateRow = source === "candidate" ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
+        if (candidateRow || candidateTarget) {
+          const targetTaskId = candidateRow?.dataset.candidateTaskId || candidateTarget?.taskId || "";
+          if (targetTaskId && targetTaskId !== task.id) {
+            const rect = candidateRow?.getBoundingClientRect();
+            const position = rect
+              ? ((pointerEvent.clientY - rect.top) < rect.height / 2 ? "before" : "after")
+              : candidateTarget?.position || "after";
+            reorderTodayCandidate(task.id, targetTaskId, position);
+          }
+          cleanup();
+          return;
+        }
         const candidatePanel = source === "allDay" ? pointedElement?.closest<HTMLElement>(".df-candidate-panel") : null;
         const allDayCell = pointedElement?.closest<HTMLElement>("[data-all-day-date]");
         if (candidatePanel) {
@@ -6585,15 +6724,32 @@ function App() {
                           <span className="df-project-group-name">{projectTitle}</span>
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
-                        {tasks.map((task) => (
-                          <TaskCard key={task.id} task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} lang={lang} />
-                        ))}
+                        {tasks.map((task) => {
+                          const dropHere = candidateDropTarget?.taskId === task.id;
+                          return (
+                            <div
+                              key={task.id}
+                              className={`df-candidate-task-row${dropHere ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                              data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
+                            >
+                              {dropHere && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                              <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />
+                              {dropHere && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })
               ) : visibleCandidates.map((task) => (
-                <div key={task.id} className="df-candidate-task-row">
-                  <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} lang={lang} />
+                <div
+                  key={task.id}
+                  className={`df-candidate-task-row${candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                  data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
+                >
+                  {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />
+                  {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
                 </div>
               ))}
               <HabitCandidateCard
@@ -7013,7 +7169,7 @@ function App() {
                               </div>
                               {/* Layer 3: Event blocks — absolutely positioned on the time-grid */}
                               <div className="df-event-blocks-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
-                                {multiColWidth > 0 && multiDayScheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => {
+                                {multiColWidth > 0 && multiDayScheduledTasks.map((task) => {
                                   const dayIndex = threeDates.indexOf(task.scheduledDate || "");
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
@@ -7042,6 +7198,7 @@ function App() {
                                       viewMode={timelineView}
                                       lang={lang}
                                       dayStartHour={dayStartHour}
+                                      dragState={drag?.kind === "block" && drag.taskId === task.id ? "source-placeholder" : undefined}
                                     />
                                   );
                                 })}
@@ -7460,7 +7617,7 @@ function App() {
                             dayStartHour={dayStartHour}
                           />
                         )}
-                        {scheduledTasks.filter((task) => !(drag?.kind === "block" && drag.taskId === task.id)).map((task) => {
+                        {scheduledTasks.map((task) => {
                           // Use dailyCanvasWidth from ResizeObserver if available,
                           // otherwise fall back to synchronously reading the DOM ref.
                           const liveEl = timelineCanvasRef.current;
@@ -7486,6 +7643,7 @@ function App() {
                               viewMode="daily"
                               lang={lang}
                               dayStartHour={dayStartHour}
+                              dragState={drag?.kind === "block" && drag.taskId === task.id ? "source-placeholder" : undefined}
                             />
                           );
                         })}
@@ -7610,36 +7768,95 @@ function App() {
           onClose={() => setScheduleTemplateOpen(false)}
         />
       )}
-      {drag?.kind === "block" && drag.outsideTimeline && drag.pointer && !dragOverlay && <FloatingUnschedulePreview task={(() => { const t = tasks.find((task) => task.id === drag.taskId); if (t) return t; const r = recordToTaskMap.get(drag.taskId); return r || undefined; })()} pointer={drag.pointer} lang={lang} />}
-      {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && !dragOverlay && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
-      {dragOverlay && dragOverlayTask && (
-        <TaskDragLayer pointer={dragOverlayPointer} sourceRect={{ width: dragOverlay.sourceRect.width, height: dragOverlay.sourceRect.height }} offset={dragOverlay.offset}>
-          <TaskBlock
-            as="article"
-            variant={dragOverlayTask.variant}
-            appearance="calm"
-            priority={taskBlockPriorityFor(dragOverlayTask.task.importance, dragOverlayTask.task.urgency)}
-            checked={dragOverlayTask.task.completed}
+      {drag?.kind === "block" && drag.pointer && draggedTask && (
+        <TaskDragLayer
+          pointer={drag.pointer}
+          sourceRect={{ width: Math.max(drag.sourceRect?.width || 220, drag.outsideTimeline ? 220 : 0), height: drag.sourceRect?.height || Math.max(timeBlockHeight(draggedTask.scheduledStart || "09:00", draggedTask.scheduledEnd || addMinutes(draggedTask.scheduledStart || "09:00", drag.duration)), SLOT_HEIGHT) }}
+          offset={drag.offset || { x: 24, y: Math.min((drag.sourceRect?.height || SLOT_HEIGHT) / 2, 32) }}
+        >
+          <TimeBlock
+            task={draggedTask}
+            preview={null}
+            projectName={projectName(draggedTask)}
+            projects={projects}
+            hovered={false}
+            onHover={() => {}}
+            onEdit={() => {}}
+            onToggleDone={() => {}}
+            onTaskUpdate={() => {}}
+            onProjectChange={() => {}}
+            onProjectColorChange={() => {}}
+            onCreateProject={() => {}}
+            onDragStart={() => {}}
+            onResizeStart={() => {}}
+            extraStyle={{ position: "relative", top: 0, left: 0, width: "100%", height: "100%" }}
+            viewMode={timelineView === "month" ? "daily" : timelineView}
+            lang={lang}
+            dayStartHour={dayStartHour}
             dragState="overlay"
-            projectColor={projects.find((p) => String(p.id) === String(dragOverlayTask.task.projectId || ""))?.color || "var(--accent-active)"}
-            className="df-task-card"
-          >
-            <TaskBlockRow className="df-candidate-row">
-              <TaskCheckbox
-                checked={dragOverlayTask.task.completed}
-                tone="muted"
-              >
-                {dragOverlayTask.task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : ""}
-              </TaskCheckbox>
-              <TaskBlockContent className="df-candidate-main" title={dragOverlayTask.task.title.trimStart()} />
-              <TaskBlockDuration>
-                <span className="df-duration-pill">{formatDuration(dragOverlayTask.task.estimatedHours || 0.5)}</span>
-              </TaskBlockDuration>
-            </TaskBlockRow>
-          </TaskBlock>
+          />
         </TaskDragLayer>
       )}
-      {dragOverlay && !dragOverlayTask && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
+      {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && !dragOverlay && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
+      {drag?.source === "candidate" && drag.pointer && draggedTask && (
+        <TaskDragLayer pointer={drag.pointer} sourceRect={drag.sourceRect || { width: 360, height: 44 }} offset={drag.offset || { x: 24, y: 22 }}>
+          <TaskCard
+            task={draggedTask}
+            projects={projects}
+            focusDate={today}
+            placementPreview={null}
+            onQuickDuration={() => {}}
+            onProjectChange={() => {}}
+            onSaveNote={() => {}}
+            onDelete={() => {}}
+            onStartPlacementPreview={() => {}}
+            onCancelPlacementPreview={() => {}}
+            onConfirmPlacementPreview={() => {}}
+            onApplyTimeSettings={() => {}}
+            onSaveDueDate={() => {}}
+            onSaveRecurrence={() => {}}
+            onClick={() => {}}
+            onPointerDragStart={() => {}}
+            onToggleDone={() => {}}
+            onToggleSubtask={() => {}}
+            onSubtaskDragStart={() => {}}
+            onMoveToPlanning={() => {}}
+            onMetaUpdate={() => {}}
+            dragState="overlay"
+            lang={lang}
+          />
+        </TaskDragLayer>
+      )}
+      {dragOverlay && dragOverlayTask && drag?.source !== "candidate" && (
+        <TaskDragLayer pointer={dragOverlayPointer} sourceRect={{ width: dragOverlay.sourceRect.width, height: dragOverlay.sourceRect.height }} offset={dragOverlay.offset}>
+          <TaskCard
+            task={activeDragItem?.taskSnapshot || dragOverlayTask.task}
+            projects={projects}
+            focusDate={today}
+            placementPreview={null}
+            onQuickDuration={() => {}}
+            onProjectChange={() => {}}
+            onSaveNote={() => {}}
+            onDelete={() => {}}
+            onStartPlacementPreview={() => {}}
+            onCancelPlacementPreview={() => {}}
+            onConfirmPlacementPreview={() => {}}
+            onApplyTimeSettings={() => {}}
+            onSaveDueDate={() => {}}
+            onSaveRecurrence={() => {}}
+            onClick={() => {}}
+            onPointerDragStart={() => {}}
+            onToggleDone={() => {}}
+            onToggleSubtask={() => {}}
+            onSubtaskDragStart={() => {}}
+            onMoveToPlanning={() => {}}
+            onMetaUpdate={() => {}}
+            dragState="overlay"
+            lang={lang}
+          />
+        </TaskDragLayer>
+      )}
+      {dragOverlay && !dragOverlayTask && drag?.kind !== "block" && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
@@ -7651,11 +7868,6 @@ function App() {
       )}
     </div>
   );
-}
-
-function FloatingUnschedulePreview({ task, pointer, lang }: { task?: Task; pointer: { x: number; y: number }; lang: Language }) {
-  if (!task) return null;
-  return <div className="df-floating-unschedule" style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>{t(lang, "toast.draggedBackToCandidates")}</span></div>;
 }
 
 function FloatingShelfDragPreview({ task, pointer, candidateTarget, lang }: { task?: Task; pointer: { x: number; y: number }; candidateTarget: boolean; lang: Language }) {
@@ -8899,6 +9111,7 @@ function TaskCard({
   onMoveToPlanning,
   onToggleSubtask,
   onSubtaskDragStart,
+  dragState,
   lang,
 }: {
   task: Task;
@@ -8922,6 +9135,7 @@ function TaskCard({
   onMoveToPlanning?: () => void;
   onToggleSubtask?: (subtaskId: string) => void;
   onSubtaskDragStart?: (event: React.PointerEvent, subtaskId: string) => void;
+  dragState?: TaskBlockDragState;
   lang: Language;
 }) {
   const [openPanel, setOpenPanel] = useState<"more" | null>(null);
@@ -8980,6 +9194,7 @@ function TaskCard({
         priority={taskBlockPriorityFor(task.importance, task.urgency)}
         checked={task.completed && !isEvent}
         selected={Boolean(openPanel || isPlacementArmed)}
+        dragState={dragState}
         disabled={!isEvent && recurringLocked}
         projectColor={cardAccentColor}
         className={`df-task-card ${overdue > 0 && !isEvent ? "overdue" : ""} ${task.completed && !isEvent ? "completed" : ""} ${openPanel ? "expanded" : ""} ${isMoreOpen ? "more-open" : ""} ${isPlacementArmed ? "placement-armed" : ""} ${recurringLocked && !isEvent ? "recurring-locked" : ""} ${isEvent ? "is-event" : ""}`}
@@ -9443,7 +9658,7 @@ function ReturnedToPlanIcon({ color }: { color?: string }) {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0 }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; dragState?: TaskBlockDragState }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
@@ -9481,7 +9696,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
   const canResize = !isReturnedUnfinished && (isEvent || !recurringLocked);
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 48 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragging={Boolean(isPreview)} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode }} style={{ top, height, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 48 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragging={Boolean(isPreview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${height < 48 ? "short-block" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode }} style={{ top, height, "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
@@ -9888,13 +10103,20 @@ function EditDrawer(props: {
     if (task.dueDate) return `${task.dueDate} · ${formatDuration(f.estimatedHours || 0.5)}`;
     return t(props.lang, "drawer.unscheduled");
   }
-  const taskLevelOptions: Array<{ value: Priority; zh: string; en: string }> = [
+  const importanceOptions: Array<{ value: TaskLevel; zh: string; en: string }> = [
     { value: "high", zh: "高", en: "High" },
     { value: "medium", zh: "中", en: "Medium" },
     { value: "low", zh: "低", en: "Low" },
+    { value: "unset", zh: "未设置", en: "Unset" },
   ];
-  function commitTaskMeta(kind: "importance" | "urgency", value: Priority) {
-    set(kind, value);
+  const urgencyOptions: Array<{ value: TaskLevel; zh: string; en: string }> = [
+    { value: "high", zh: "高", en: "High" },
+    { value: "medium", zh: "中", en: "Medium" },
+    { value: "low", zh: "低", en: "Low" },
+    { value: "unset", zh: "未设置", en: "Unset" },
+  ];
+  function commitTaskMeta(kind: "importance" | "urgency", value: TaskLevel) {
+    set(kind, value === "unset" ? null : value);
     if (!props.editing || props.type !== "task" || !props.task) return;
     props.onTaskUpdate(props.task.id, taskMetaPatch(kind, value));
   }
@@ -10085,29 +10307,41 @@ function EditDrawer(props: {
         <section className="df-detail-meta-settings" aria-label={props.lang === "zh" ? "任务程度设置" : "Task level settings"}>
           <div className="df-detail-meta-setting">
             <span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>
-            <div className="df-detail-level-buttons" role="group" aria-label={props.lang === "zh" ? "重要程度" : "Importance"}>
-              {taskLevelOptions.map((option) => (
+            <div className="df-level-selector df-level-importance" role="group" aria-label={props.lang === "zh" ? "重要程度" : "Importance"}>
+              {importanceOptions.map((option) => (
                 <button
                   key={`importance-${option.value}`}
                   type="button"
-                  className={f.importance === option.value ? "active" : ""}
-                  aria-pressed={f.importance === option.value}
+                  className={`df-level-option df-level-${option.value}` + (f.importance === option.value || (option.value === "unset" && !f.importance) ? " active" : "")}
+                  aria-pressed={f.importance === option.value || (option.value === "unset" && !f.importance)}
                   onClick={() => commitTaskMeta("importance", option.value)}
-                >{props.lang === "zh" ? option.zh : option.en}</button>
+                  title={props.lang === "zh" ? option.zh : option.en}
+                >
+                  {option.value === "high" && <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
+                  {option.value === "medium" && <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
+                  {option.value === "low" && <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
+                  {option.value === "unset" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 2h3l2 5 2-5h3v10H8l-2-5-2 5H2V2z" /></svg>}
+                </button>
               ))}
             </div>
           </div>
           <div className="df-detail-meta-setting">
             <span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>
-            <div className="df-detail-level-buttons" role="group" aria-label={props.lang === "zh" ? "紧急程度" : "Urgency"}>
-              {taskLevelOptions.map((option) => (
+            <div className="df-level-selector df-level-urgency" role="group" aria-label={props.lang === "zh" ? "紧急程度" : "Urgency"}>
+              {urgencyOptions.map((option) => (
                 <button
                   key={`urgency-${option.value}`}
                   type="button"
-                  className={f.urgency === option.value ? "active" : ""}
-                  aria-pressed={f.urgency === option.value}
+                  className={`df-level-option df-level-${option.value}` + (f.urgency === option.value || (option.value === "unset" && !f.urgency) ? " active" : "")}
+                  aria-pressed={f.urgency === option.value || (option.value === "unset" && !f.urgency)}
                   onClick={() => commitTaskMeta("urgency", option.value)}
-                >{props.lang === "zh" ? option.zh : option.en}</button>
+                  title={props.lang === "zh" ? option.zh : option.en}
+                >
+                  {option.value === "high" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v6m0 4v2M6 5h.01M6 13h.01M9 2v6m0 4v2M9 5h.01M9 13h.01M12 2v6m0 4v2M12 5h.01M12 13h.01" /></svg>}
+                  {option.value === "medium" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 2v6m0 4v2M5 5h.01M5 13h.01M10 2v6m0 4v2M10 5h.01M10 13h.01" /></svg>}
+                  {option.value === "low" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 2v6m0 4v2M8 5h.01M8 13h.01" /></svg>}
+                  {option.value === "unset" && <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 8h8" /></svg>}
+                </button>
               ))}
             </div>
           </div>
