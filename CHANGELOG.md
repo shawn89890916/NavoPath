@@ -1,5 +1,79 @@
 # NavoPath 更新日志
 
+## 2026-07-05 · 时间轴短任务渲染与选择器优化
+
+### 修复
+- 修复时间轴短任务与长任务块被拉伸到整天高度的问题：15m/30m 等日程现在严格使用时间轴计算出的像素高度，不再被 scheduled 根样式的 `height: 100%` 撑满整张时间画布。
+- 修复选中态不生效的持久化 bug：表单初始化使用 `??` 运算符将 `null`（未设置）误回落到 `priority ?? "high"`，导致重新打开抽屉后"未设置"状态丢失。改为 `!== undefined` 检查以保留显式 `null`。
+- 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则强制设置 `border-color` / `box-shadow`，覆盖了选中态。将 `.df-level-option` 加入所有全局按钮规则的 `:not()` 排除列表，选中态改为显式 `data-selected="true"` 属性选择器 + 内联 `--option-color` CSS 变量。
+- 选中态视觉反馈改为伪元素覆盖整个分段：选中段使用 `::after` 伪元素覆盖整块按钮区域（inset: 0），2px 语义色实线描边 + 6% 语义色底色。首段选中时左上/左下圆角 11px，末段选中时右上/右下圆角 11px，中间段无圆角，与外层容器 12px 圆角自然贴合。伪元素不受全局 `.df-app button` 的 `box-shadow: none !important` 压制，彻底解决了之前选中态被覆盖的问题。
+- 修复时间轴短任务布局问题：15m/30m 短时程任务不再继承普通任务块的 min-height、大 padding 和大字号，改为紧凑渲染。短任务（高度 < 56px）使用 14px 小复选框、12px 单行长标题（溢出时省略号）、最小内边距，隐藏 next step、event kind 等次要信息，内容垂直居中对齐。
+- 修复时间轴拖拽/调整时长 bug：调整任务时长后，任务块变成巨大空白区域且标题变为"已调整时长"。根因是调整时长时只更新了 `scheduledStart` 或 `scheduledEnd` 其中一个字段，导致 `taskDuration` 计算出错，进而 `timeBlockHeight` 生成错误的像素高度。修复：调整时长时同时更新两个时间字段和 `estimatedHours`，确保数据一致性。
+- 修复超长时间轴任务渲染：多小时任务的标题和复选框不再垂直居中漂浮在巨大空白块中间，改为顶部对齐布局，内容紧贴块顶部显示。
+
+### 改进
+- 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为连接式分段图标选择器（segmented control），四段共享外框与圆角，段间以细分隔线划分。
+- 重要程度使用标准 Lucide 风格旗帜图标，紧急程度使用横向文本感叹号，颜色统一为柔和 NavoPath 色板。
+- 新增“未设置”选项，点击可立即清空对应字段。
+- Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵。
+- 任务卡片复选框边框反映重要程度（高=珊瑚红 #C96F5B、中=琥珀 #C49A32、低=静蓝 #6E8DA6、未设置=中性墨色），完成后仍保留语义边框色。
+- 复选框右上角显示小型紧急程度“!”标记（高=珊瑚红、中=琥珀、低=静蓝），未设置时不显示，完成后隐藏，且不阻挡复选框点击。
+
+## 2026-07-04 · 统一拖拽体验
+
+### 改进
+- 拖动任务时，整张完整卡片跟随指针移动，不再仅以半透明残影呈现，手感对齐 TickTick。
+- 拖动源原位置变为克制的虚线占位槽，保留布局空间，不再消失或仅做透明化处理。
+- 在列表/候选/Tree 之间排序时显示清晰的插入线（带轻微脉动），落点一目了然。
+- 拖入看板列、Matrix 象限或 Tree 节点时，整个目标容器显示统一的外描边高亮，而非局部灰底。
+- 今日候选、全天日程栏、习惯子任务、Planning 的 Tree / Kanban / Matrix / List 与时间轴任务统一使用同一套指针事件拖拽系统与视觉语言，跨视图行为一致。
+- Planning 页面全面切换到指针事件拖拽，移除旧的 HTML5 原生拖拽与蓝色/灰色自定义预览，所有视图拖拽预览均为完整 TaskBlock。
+- 清理旧的透明幽灵预览与仅靠 opacity 表达拖拽状态的样式，统一为完整卡片跟随 + 占位槽 + 插入线 + 容器描边四件套。
+
+### 修复
+- 修复拖动预览因继承源元素拖拽态类而导致克隆卡片呈现为虚化占位的问题。
+- 修复 Planning 页面拖拽预览呈现为蓝灰浮卡而非原始任务块的问题。
+- 修复不同视图拖拽反馈样式各自为政、CSS 重复堆叠的问题，收敛为共享类驱动。
+- 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
+- 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
+
+## 2026-07-05 · Timeline short tasks & selector improvements
+
+### Fixes
+- Fixed short and tall timeline scheduled blocks stretching to the full-day canvas height: 15m/30m tasks and longer scheduled blocks now respect the timeline-calculated pixel height instead of inheriting `height: 100%` from the scheduled root style.
+- Fixed selected-state persistence bug: form initialization used `??` operator which treated `null` (unset) as falsy and fell through to `priority ?? "high"`, causing "unset" state to be lost on drawer reopen. Changed to `!== undefined` check to preserve explicit `null`.
+- Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: global button rules forced `border-color` / `box-shadow` on all buttons, overriding the selected state. Added `.df-level-option` to every global button rule's `:not()` exclusion list, and switched the selected state to an explicit `data-selected="true"` attribute selector with an inline `--option-color` CSS variable.
+- Selected-state visual feedback now covers the entire segment: the selected segment uses a `::after` pseudo-element spanning the full button area (inset: 0) with a 2px semantic-color solid border and 6% semantic tint. First-child segments get 11px top-left/bottom-left corners, last-child segments get 11px top-right/bottom-right corners, and middle segments have no rounding — all matching the container's 12px outer radius. Pseudo-elements are NOT affected by global `.df-app button` `box-shadow: none !important` rules, completely solving the previous override issue.
+- Fixed short-duration timeline task layout: 15m/30m short events no longer inherit full-size candidate task styles (min-height, large padding, large fonts). Short tasks (height < 56px) now render compactly with 14px checkbox, 12px single-line title (ellipsis when overflow), minimal padding, hidden metadata/actions, and vertically centered content.
+- Fixed timeline drag/resize bug: After resizing a task, the task block becomes a huge blank area and the title shows "Duration Adjusted". Root cause: when resizing, only one of `scheduledStart` or `scheduledEnd` was updated, causing `taskDuration` to calculate incorrectly, which then produced wrong pixel heights via `timeBlockHeight`. Fix: update both time fields and `estimatedHours` together during resize to ensure data consistency.
+- Fixed ultra-long timeline task rendering: Multi-hour tasks no longer have their title and checkbox floating in the vertical middle of a huge blank block; they now use top-aligned layout with content pinned near the top of the event block.
+
+### Improvements
+- Refactored the task drawer's "Importance / Urgency" controls from plain text buttons into a connected segmented icon strip sharing one outer border and rounded corners, with thin dividers between segments.
+- Importance uses standard Lucide-style flag icons, urgency uses horizontal text exclamation marks, colors unified to muted NavoPath palette.
+- Added an "unset" option; clicking it immediately clears the field.
+- Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced.
+- Task card checkboxes now reflect importance via border color (high=coral #C96F5B, medium=amber #C49A32, low=muted blue #6E8DA6, unset=neutral ink); the semantic border color is retained after completion.
+- A small urgency "!" marker appears at the checkbox top-right (high=coral, medium=amber, low=muted blue); it is hidden when unset or completed, and never blocks the checkbox click target.
+
+## 2026-07-04 · Unified drag experience
+
+### Improvements
+- Dragging a task now moves a complete intact card that follows the pointer, replacing the old opacity-only ghost and matching TickTick's feel.
+- The source slot becomes a restrained dashed placeholder that preserves layout space, instead of vanishing or only going transparent.
+- Reordering inside lists, candidates, and the tree shows a clear insertion line (with a subtle pulse) so the drop target is unambiguous.
+- Dropping into a Kanban column, Matrix quadrant, or tree node outlines the whole target container with a unified accent border, rather than a partial gray fill.
+- Today candidates, the all-day shelf, habit child rows, and Planning's Tree / Kanban / Matrix / List views plus the timeline now share one pointer-event drag system and visual language, so behavior is consistent across surfaces.
+- The Planning page has been fully migrated to the pointer-event drag system; the legacy HTML5 native drag and blue/gray custom preview are gone, and every drag overlay is a complete TaskBlock.
+- Removed the legacy transparent ghost and opacity-only drag-state styling in favor of a single quartet: intact card follows pointer, placeholder slot, insertion line, and container outline.
+
+### Fixes
+- Fixed the drag preview inheriting the source's drag-state class, which made the cloned card render as a dimmed placeholder.
+- Fixed the Planning page drag preview rendering as a blue-gray floating card instead of the original task block.
+- Fixed per-view drag feedback styles diverging and duplicating CSS; consolidated onto shared class-driven feedback.
+- Fixed page text being accidentally selected while dragging a task; text selection is now disabled during drags (inputs, textareas, and editable regions are unaffected).
+- Fixed the drag source placeholder showing a purple tint; it is now a neutral gray dashed slot, staying gray in dark mode too.
+
 ## 2026-07-03 · 统一任务块与精简顶栏
 
 ### 改进
@@ -13,7 +87,16 @@
 - 候选任务、时间轴任务、习惯子项和 Planning 各视图任务统一使用项目色左侧细描边，保持同一任务块语言。
 - Planning 的 Tree、Kanban、Matrix、List 任务块回到今日候选任务块的纸面视觉：干净背景、6px 圆角、项目色左侧细描边、同一套 padding、无灰底、无发光、无悬浮抬升。
 - Tree 任务节点新增左侧状态框，与今日候选和 Planning 其它视图保持同一任务块解剖结构。
-- Planning 页面新增左侧工具栏，筛选入口与 Tree / Kanban / Matrix / List 视图切换收纳到侧栏顶部；Tree 视图行距更紧凑，任务行不再显示项目色左侧色条。
+- Planning 页面新增左侧工具栏，筛选入口与 Tree / Kanban / Matrix / List 视图切换收纳到侧栏顶部；Tree 视图行距更紧凑，所有 Planning 视图任务块不再显示项目色左侧色条。
+- 重构 Planning 工作区为结构化任务面板：左侧 44px 紧凑竖向轨道（视图切换 + 筛选），右侧为可滚动的视图容器，移除原本大留白浮动画布，任务不再悬空。
+- 修复筛选系统：之前状态 / 重要度 / 紧急度筛选选项被代码过滤掉无法显示，现恢复全部筛选类型，可在面板中组合勾选。
+- 新增 Linear 风格的活动筛选片栏：当前生效的筛选条件以小尺寸可移除片显示在视图上方，支持单独删除与一键清除全部。
+- 拖拽体验增强：Kanban 与 Matrix 拖动时在目标列/象限内显示占位插槽与虚线高亮，拖动源以轻微淡化表示，无灰色蒙层、无发光。
+- 清理已完成任务的旧版灰色蒙层与整体透明度，统一为干净的删除线 + 弱化文字 + 优先级色复选框。
+- 筛选面板重构为 Linear 风格悬停级联弹出层：顶部"添加筛选"输入框，下方为双列布局——左侧类别列表（图标 / 标签 / 活动数 / 摘要 / 箭头）始终可见，鼠标悬停即展开右侧对应选项，无需点击切换；新增搜索文本、截止日期（逾期 / 本周 / 无日期）、是否已排程三类筛选。
+- 视图切换器改为图标 + 短标签的紧凑竖向按钮，活动项以左侧细线标记，不再像悬挂标签。
+- List 视图新增拖拽排序：行间显示插入线（带轻微脉动），拖动源淡化，松开后按新顺序写入 order 字段。
+- Kanban 列头与 Matrix 象限头新增任务总数与预估总时长（仅当时长 > 0 时显示）。
 
 ### 修复
 - 修复长标题挤出时长与操作按钮、复选框与下拉图标堆叠错位、习惯卡片布局不一致等问题。
@@ -22,6 +105,8 @@
 - 搜索入口改为 Cmd/Ctrl+K 命令面板触发，主 Chrome 不再显示显眼的搜索按钮。
 - 修复今日候选任务标题纵向不居中的问题；短标题居中，多行标题作为整体居中，文字仍保持左对齐。
 - 修复长任务名换行时挤出时长、操作按钮或 checkbox 的布局问题。
+- 修复 Planning 侧边栏以绝对定位覆盖树状图等视图的问题，侧栏现归位到网格首列，视图区域不再被遮挡。
+- 修复设置图标未贴齐顶栏右侧边缘的问题。
 
 ## 2026-07-03 · Unified task blocks and minimal header
 
@@ -36,7 +121,16 @@
 - Candidate tasks, timeline tasks, habit child rows, and Planning task views now share a project-color left rule for a consistent task-block language.
 - Planning Tree, Kanban, Matrix, and List task blocks now reuse the Today Candidate paper-card visual language: clean background, 6px radius, project-color left rule, matching padding, no gray fill, no glow, and no hover lift.
 - Tree task nodes now include the same left status checkbox anatomy used by Today Candidate and the other Planning views.
-- Planning now has a left-side tool rail that places Filter and the Tree / Kanban / Matrix / List view switcher at the top; Tree spacing is tighter, and task rows no longer show a project-color left strip.
+- Planning now has a left-side tool rail that places Filter and the Tree / Kanban / Matrix / List view switcher at the top; Tree spacing is tighter, and all Planning view task blocks no longer show a project-color left strip.
+- Rebuilt the Planning workspace into a structured task surface: a 44px compact vertical rail (view switcher + filter) on the left and a scrollable view container on the right, replacing the large empty floating canvas so tasks no longer drift in blank space.
+- Fixed the filter system: Status / Importance / Urgency options were previously stripped out by code and never rendered; all filter types are now available and composable in the panel.
+- Added a Linear-style active-filter chip bar: active filters appear as small removable chips above the views, with per-chip removal and a clear-all action.
+- Drag/drop feel: Kanban and Matrix now show a placeholder slot and dashed highlight inside the target column/quadrant while dragging, with the drag source subtly dimmed; no gray film, no glow.
+- Cleaned up legacy gray overlay and whole-card opacity on completed tasks, standardizing on strikethrough + muted text + priority-colored checkbox.
+- Rebuilt the filter panel as a Linear-style hover cascading popover: an "Add filter" input on top, below it a two-column body — the left category list (icon / label / active count / summary / chevron) is always visible, hovering a category immediately reveals its options on the right without a click or back button. Added Search text, Due date (overdue / this week / no date), and Scheduled (scheduled / unscheduled) filter types.
+- View switcher is now compact vertical buttons with icon + short label; the active view is marked by a left rule instead of a hanging tag.
+- List view now supports drag-to-reorder: an insertion line (with a subtle pulse) appears between rows, the drag source dims, and the new order is written to the task's order field on drop.
+- Kanban column headers and Matrix quadrant headers now show total task count and total estimated hours (only when hours > 0).
 
 ### Fixes
 - Removed the remaining legacy timeline task-card, habit child mini-card, and Planning CSS-only task-card visual implementations, leaving TaskBlock variants to own candidate, Planning, scheduled, and habit-child rows.
@@ -47,6 +141,8 @@
 - Search is now triggered through the Cmd/Ctrl+K command palette; the main chrome no longer shows a prominent search button.
 - Fixed Today Candidate task title vertical alignment; short titles center normally, and wrapped multiline titles stay centered as a block while the text remains left-aligned.
 - Fixed long task names pushing duration, action icons, or checkbox controls out of alignment.
+- Fixed the Planning sidebar overlapping the tree and other views due to legacy absolute positioning; the sidebar now sits in the grid's first column and the view area is no longer covered.
+- Fixed the settings icon not being flush with the right edge of the header.
 
 ## 2026-07-02 · Execute & Planning Redesign
 

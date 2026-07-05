@@ -4,6 +4,7 @@ export type TaskBlockVariant = "candidate" | "planning" | "scheduled" | "allDay"
 export type TaskBlockDensity = "normal" | "compact" | "dense";
 export type TaskBlockAppearance = "calm" | "medium" | "custom";
 export type TaskBlockPriority = "low" | "normal" | "high" | "urgent";
+export type TaskBlockDragState = "overlay" | "source-placeholder";
 
 export type TaskBlockClassOptions = {
   variant?: TaskBlockVariant;
@@ -12,6 +13,7 @@ export type TaskBlockClassOptions = {
   checked?: boolean;
   selected?: boolean;
   dragging?: boolean;
+  dragState?: TaskBlockDragState;
   disabled?: boolean;
   className?: string;
 };
@@ -55,6 +57,7 @@ export function taskBlockDataAttrs(options: TaskBlockClassOptions): Record<strin
     "data-task-priority": options.priority,
     "data-task-checked": options.checked ? "true" : undefined,
     "data-task-selected": options.selected ? "true" : undefined,
+    "data-drag-state": options.dragState,
   };
 }
 
@@ -73,6 +76,7 @@ type TaskBlockProps = TaskBlockClassOptions & TaskBlockStyleOptions & {
   dataAttrs?: Record<string, string | undefined>;
   ariaLabel?: string;
   ariaPressed?: boolean;
+  ariaGrabbed?: boolean;
   onClick?: React.MouseEventHandler<HTMLElement>;
   onDoubleClick?: React.MouseEventHandler<HTMLElement>;
   onMouseEnter?: React.MouseEventHandler<HTMLElement>;
@@ -117,6 +121,7 @@ export const TaskBlock = React.forwardRef<HTMLElement, TaskBlockProps>(function 
       draggable={props.draggable}
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
+      aria-grabbed={props.ariaGrabbed}
       onClick={props.onClick}
       onDoubleClick={props.onDoubleClick}
       onMouseEnter={props.onMouseEnter}
@@ -250,6 +255,8 @@ export function TaskCheckbox({
   checked,
   tone = "muted",
   returned,
+  importance,
+  urgency,
   children,
   className,
   title,
@@ -261,6 +268,8 @@ export function TaskCheckbox({
   checked?: boolean;
   tone?: string;
   returned?: boolean;
+  importance?: "high" | "medium" | "low" | null;
+  urgency?: "high" | "medium" | "low" | null;
   children?: ReactNode;
   className?: string;
   title?: string;
@@ -269,25 +278,32 @@ export function TaskCheckbox({
   onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
   onPointerDown?: React.PointerEventHandler<HTMLButtonElement>;
 }) {
+  const imp = importance || "unset";
+  const urg = urgency || "unset";
   return (
-    <button
-      type="button"
-      className={[
-        "df-block-check",
-        "df-task-block-check",
-        `check-${tone}`,
-        checked ? "completed" : "",
-        returned ? "returned-unfinished" : "",
-        className || "",
-      ].filter(Boolean).join(" ")}
-      title={title}
-      aria-label={ariaLabel}
-      aria-pressed={checked}
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      onPointerDown={onPointerDown}
-    >
-      {children}
-    </button>
+    <span className="df-task-checkbox-wrap" data-importance={imp} data-urgency={urg}>
+      <button
+        type="button"
+        className={[
+          "df-block-check",
+          "df-task-block-check",
+          `check-${tone}`,
+          checked ? "completed" : "",
+          returned ? "returned-unfinished" : "",
+          className || "",
+        ].filter(Boolean).join(" ")}
+        title={title}
+        aria-label={ariaLabel}
+        aria-pressed={checked}
+        onClick={onClick}
+        onMouseDown={onMouseDown}
+        onPointerDown={onPointerDown}
+      >
+        {children}
+      </button>
+      {urg !== "unset" && !checked && (
+        <span className="df-task-urgency-mark" data-urgency={urg} aria-hidden="true">!</span>
+      )}
+    </span>
   );
 }

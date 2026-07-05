@@ -442,6 +442,157 @@
   border-radius: var(--paper-radius) !important; background: transparent !important; box-shadow: none !important;
 }
 .df-detail-pill-trevor:hover, .df-detail-pill-trevor.active, .df-detail-pill-trevor.action.active, .df-detail-pill-trevor.action.green { color: var(--accent-active) !important; border-color: var(--paper-accent-rule) !important; background: var(--paper-note) !important; box-shadow: none !important; }
+
+.df-detail-meta-settings {
+  display: grid;
+  gap: 14px;
+  padding: 12px 0;
+}
+.df-detail-meta-setting {
+  display: grid;
+  grid-template-columns: 72px max-content;
+  align-items: center;
+  column-gap: 16px;
+}
+.df-detail-meta-setting > span {
+  color: var(--text-muted);
+  font: 600 11px/1.4 var(--paper-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.df-app .df-level-selector {
+  display: inline-flex;
+  width: max-content;
+  flex: 0 0 auto;
+  align-items: stretch;
+  border: 1px solid var(--paper-rule) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  background: var(--paper-bg) !important;   /* warm clean paper, no gray fill */
+  box-shadow: none !important;
+}
+.df-app .df-level-selector .df-level-option {
+  position: relative;
+  box-sizing: border-box;
+  width: 42px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  border-right: 1px solid var(--paper-rule) !important;  /* segment separator */
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--option-color, var(--df-option-color, #8E8478)) !important;
+  cursor: pointer;
+  padding: 0;
+  filter: none !important;
+  text-shadow: none !important;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.df-app .df-level-selector .df-level-option:last-child {
+  border-right: none !important;
+}
+.df-app .df-level-selector .df-level-option:hover {
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 5%, var(--paper-bg)) !important;
+  background-image: none !important;
+}
+.df-app .df-level-selector .df-level-option:active {
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 8%, var(--paper-bg)) !important;
+  background-image: none !important;
+  transform: none !important;
+}
+.df-app .df-level-selector .df-level-option:focus-visible {
+  outline: 2px solid var(--accent-active);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
+}
+/* Selected option: pseudo-element covers entire segment + 2px semantic border.
+   The ::after pseudo-element is NOT targeted by global .df-app button
+   rules, so it avoids the specificity war entirely. */
+.df-app .df-level-selector .df-level-option::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 160ms ease;
+}
+.df-app .df-level-selector .df-level-option[data-selected="true"]::after,
+.df-app .df-level-selector .df-level-option[aria-pressed="true"]::after {
+  opacity: 1;
+  border: 2px solid var(--option-color, var(--df-option-color, #8E8478));
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg));
+}
+.df-app .df-level-selector .df-level-option:first-child[data-selected="true"]::after {
+  border-top-left-radius: 11px;
+  border-bottom-left-radius: 11px;
+}
+.df-app .df-level-selector .df-level-option:last-child[data-selected="true"]::after {
+  border-top-right-radius: 11px;
+  border-bottom-right-radius: 11px;
+}
+.df-app .df-level-selector .df-level-option:first-child:last-child[data-selected="true"]::after {
+  border-radius: 11px;
+}
+/* Unselected option: quiet paper background. */
+.df-app .df-level-selector .df-level-option[data-selected="false"] {
+  background: transparent !important;
+  background-image: none !important;
+}
+.df-app .df-level-selector .df-level-option[data-selected="false"]:hover {
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 5%, var(--paper-bg)) !important;
+}
+/* Ensure icon and urgency-mark stay above the pseudo-element border. */
+.df-app .df-level-selector .df-level-option .df-level-icon,
+.df-app .df-level-selector .df-level-option .df-urgency-mark {
+  position: relative;
+  z-index: 1;
+}
+.df-app .df-level-selector .df-level-icon {
+  width: 19px;
+  height: 19px;
+  display: block;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+.df-app .df-level-selector .df-level-icon path,
+.df-app .df-level-selector .df-level-icon line {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+.df-app .df-level-selector .df-level-icon path[fill="none"] {
+  fill: none !important;
+}
+.df-app .df-level-selector .df-urgency-mark {
+  font-family: var(--paper-sans, system-ui, -apple-system, sans-serif);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-align: center;
+  display: block;
+  color: var(--option-color, var(--df-option-color, #8E8478)) !important;
+}
+.df-app .df-level-selector .df-urgency-dash {
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.df-level-importance .df-level-high { --df-option-color: #C96F5B; }
+.df-level-importance .df-level-medium { --df-option-color: #C49A32; }
+.df-level-importance .df-level-low { --df-option-color: #6E8DA6; }
+.df-level-importance .df-level-unset { --df-option-color: #8E8478; }
+
+.df-level-urgency .df-level-high { --df-option-color: #C96F5B; }
+.df-level-urgency .df-level-medium { --df-option-color: #C49A32; }
+.df-level-urgency .df-level-low { --df-option-color: #6E8DA6; }
+.df-level-urgency .df-level-unset { --df-option-color: #8E8478; }
 .df-toast { border: 1px solid var(--paper-rule-strong) !important; border-radius: var(--paper-radius) !important; background: var(--surface-raised) !important; box-shadow: var(--paper-float-shadow) !important; backdrop-filter: none !important; }
 
 /* Restrained floating actions */
@@ -1189,6 +1340,74 @@
   transform: translateY(calc(-50% + 1px)) !important;
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 18%, transparent) !important;
 }
+
+/* ============================================================
+ * Task checkbox importance / urgency visual mapping.
+ * Wrapper .df-task-checkbox-wrap carries data-importance and
+ * data-urgency attributes; the inner .df-block-check keeps its
+ * click behavior. Importance controls border color, urgency
+ * controls a small "!" marker at the top-right corner.
+ * ============================================================ */
+.df-task-checkbox-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Inside the wrap the grid handles vertical centering, so the
+ * legacy translateY(-50%) on .df-block-check is no longer needed
+ * and would misalign the urgency marker. */
+.df-app .df-task-checkbox-wrap .df-block-check {
+  transform: none !important;
+}
+.df-app .df-task-checkbox-wrap .df-block-check:active:not(:disabled) {
+  transform: translateY(1px) !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check {
+  border-color: #C96F5B !important;
+  border-width: 1.5px !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check {
+  border-color: #C49A32 !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check {
+  border-color: #6E8DA6 !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='unset'] .df-block-check {
+  border-color: var(--paper-ink-muted, #8E8478) !important;
+}
+/* Keep importance color when checked so the signal is not lost. */
+.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check.completed,
+.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check[aria-pressed='true'] {
+  border-color: #C96F5B !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check.completed,
+.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check[aria-pressed='true'] {
+  border-color: #C49A32 !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check.completed,
+.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check[aria-pressed='true'] {
+  border-color: #6E8DA6 !important;
+}
+
+/* Urgency marker — small "!" at the checkbox top-right. */
+.df-task-urgency-mark {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 2px var(--paper-bg, #FBF9FF);
+}
+.df-task-urgency-mark[data-urgency='high'] { color: #C96F5B; }
+.df-task-urgency-mark[data-urgency='medium'] { color: #C49A32; }
+.df-task-urgency-mark[data-urgency='low'] { color: #6E8DA6; }
+.theme-dark .df-task-urgency-mark {
+  text-shadow: 0 0 2px var(--paper-bg, #1a1a1a);
+}
 .df-app .df-date-arrow,
 .df-app .df-date-arrow:hover {
   box-shadow: none !important;
@@ -1384,19 +1603,19 @@
 }
 
 /* Rough editorial controls: quiet paper, slightly irregular hand-drawn rules. */
-.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot) {
+.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot):not(.df-level-option) {
   border-color: var(--paper-rule-strong) !important;
   border-radius: 5px 3px 6px 2px !important;
   background-color: color-mix(in srgb, var(--surface-main) 94%, var(--text-main) 6%) !important;
   background-image: none !important;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface-main) 82%, transparent) !important;
 }
-.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot):hover:not(:disabled) {
+.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot):not(.df-level-option):hover:not(:disabled) {
   border-color: var(--paper-accent-rule) !important;
   background-color: var(--paper-note) !important;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface-main) 74%, transparent) !important;
 }
-.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot):active:not(:disabled) {
+.df-app button:not(.df-block-check):not(.df-subtask-check):not(.df-card-check):not(.df-resize-dot):not(.df-level-option):active:not(:disabled) {
   transform: translateY(1px) !important;
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 16%, transparent) !important;
 }
@@ -1506,10 +1725,10 @@
   --pencil-rule-strong: color-mix(in srgb, var(--text-main) 68%, transparent);
   --pencil-press: color-mix(in srgb, var(--text-main) 18%, transparent);
 }
-.df-app button,
-.df-app button:hover:not(:disabled),
-.df-app button:focus-visible,
-.df-app button:disabled,
+.df-app button:not(.df-level-option),
+.df-app button:not(.df-level-option):hover:not(:disabled),
+.df-app button:not(.df-level-option):focus-visible,
+.df-app button:not(.df-level-option):disabled,
 .df-app .df-project-choice,
 .df-app .df-project-choice:hover {
   background-color: transparent !important;
@@ -1518,20 +1737,20 @@
   filter: none !important;
   text-shadow: none !important;
 }
-.df-app button:not(.df-resize-dot) {
+.df-app button:not(.df-resize-dot):not(.df-level-option) {
   border-color: var(--pencil-rule) !important;
   border-radius: 5px 2px 6px 3px !important;
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
 }
-.df-app button:not(.df-resize-dot):hover:not(:disabled),
-.df-app button:not(.df-resize-dot):focus-visible {
+.df-app button:not(.df-resize-dot):not(.df-level-option):hover:not(:disabled),
+.df-app button:not(.df-resize-dot):not(.df-level-option):focus-visible {
   border-color: var(--pencil-rule-strong) !important;
   background-color: transparent !important;
   box-shadow: none !important;
 }
-.df-app button:not(.df-resize-dot):active:not(:disabled) {
+.df-app button:not(.df-resize-dot):not(.df-level-option):active:not(:disabled) {
   background: transparent !important;
   transform: translateY(1px) !important;
   box-shadow:
@@ -6829,7 +7048,9 @@ body.df-timeline-pointer-drag * {
   display: flex !important;
 }
 .df-app .df-header-right {
+  grid-column: -2 !important;
   justify-self: end !important;
+  margin-left: auto !important;
   margin-right: 0 !important;
 }
 .df-app .df-tabs-right {
@@ -7066,12 +7287,12 @@ body.df-timeline-pointer-drag * {
 .df-app.mode-planning .df-plan-project-node {
   min-height: 54px !important;
 }
-.df-app.mode-planning .df-tree .df-task-block[data-task-variant="planning"] {
+.df-app.mode-planning .df-task-block[data-task-variant="planning"] {
   --task-project-accent-size: 0px;
   border-left-width: 1px !important;
   border-left-color: var(--task-border) !important;
 }
-.df-app.mode-planning .df-tree .df-task-block[data-task-variant="planning"] > .df-task-block-accent {
+.df-app.mode-planning .df-task-block[data-task-variant="planning"] > .df-task-block-accent {
   display: none !important;
 }
 
@@ -7197,3 +7418,432 @@ body.df-timeline-pointer-drag * {
   color: #B6423C !important;
   background: transparent !important;
 }
+
+/* =========================================================================
+   Planning workspace rebuild — structured task surface, Linear-style filters,
+   clean drag/drop placeholders. Follows NavoPath paper rules: no glow, no scale,
+   no dirty gray surfaces, no hover lift.
+   ========================================================================= */
+
+/* Tighter, structured canvas: less floating empty space, predictable grid. */
+.df-app .df-planning .df-mindmap.no-root {
+  padding: 14px 18px !important;
+  border-radius: 10px !important;
+}
+.df-app .df-planning .df-planning-body {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+.df-app .df-planning .df-mindmap {
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+/* Sidebar becomes a compact vertical rail (view switcher + filter trigger).
+   Override the legacy absolute-positioned 58px sidebar so it sits in the
+   grid column 1 (44px) and does not overlap the tree-wrap. */
+.df-app .df-planning .df-planning-sidebar {
+  position: relative !important;
+  position: static !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: 44px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 10px 4px !important;
+  border-right: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+  pointer-events: auto !important;
+  z-index: auto !important;
+}
+.df-app .df-planning .df-planning-filter-bar {
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 0 !important;
+}
+.df-app .df-planning .df-planning-filter-menu {
+  position: relative !important;
+}
+.df-app .df-planning .df-planning-view-switch {
+  position: static !important;
+  display: grid !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.df-app .df-planning .df-view-btn {
+  width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-right: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  writing-mode: vertical-rl !important;
+  text-orientation: mixed !important;
+  letter-spacing: 1px !important;
+  font: 650 10px/1 var(--paper-sans) !important;
+  display: inline-grid !important;
+  place-items: center !important;
+}
+.df-app .df-planning .df-view-btn:hover,
+.df-app .df-planning .df-view-btn:focus-visible {
+  color: var(--text-main) !important;
+  border-right-color: var(--paper-rule-strong) !important;
+  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
+}
+.df-app .df-planning .df-view-btn.active {
+  color: var(--accent-active) !important;
+  border-right-color: var(--accent-active) !important;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%) !important;
+}
+.df-app .df-planning .df-filter-trigger {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  border: 0 !important;
+  border-right: 2px solid transparent !important;
+  border-radius: 0 !important;
+}
+.df-app .df-planning .df-filter-trigger:hover,
+.df-app .df-planning .df-filter-trigger.active {
+  border-right-color: var(--accent-active) !important;
+}
+.df-app .df-planning .df-filter-panel {
+  left: calc(100% + 8px) !important;
+  top: 0 !important;
+}
+
+/* View area: structured surface, predictable alignment, no floating cards. */
+.df-app .df-planning .df-tree-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  padding: 14px 18px 18px !important;
+  overflow: auto !important;
+}
+.df-app .df-planning .df-kanban-board,
+.df-app .df-planning .df-eisenhower-grid,
+.df-app .df-planning .df-planning-list,
+.df-app .df-planning .df-tree {
+  padding-right: 6px !important;
+}
+.df-app .df-planning .df-kanban-board {
+  padding-top: 4px !important;
+  padding-left: 0 !important;
+}
+.df-app .df-planning .df-eisenhower-grid {
+  padding-top: 4px !important;
+  padding-left: 0 !important;
+}
+.df-app .df-planning .df-planning-list {
+  padding-top: 4px !important;
+  padding-left: 0 !important;
+}
+
+/* Linear-style active filter chips bar — small text chips, thin borders. */
+.df-active-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+.df-active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) 32%, var(--paper-rule));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%);
+  color: var(--text-main);
+  font: 500 11px/1.3 var(--paper-sans);
+  cursor: pointer;
+  transition: border-color .14s ease, color .14s ease, background .14s ease;
+}
+.df-active-filter-chip:hover {
+  border-color: color-mix(in srgb, var(--accent-active) 56%, var(--paper-rule));
+  color: var(--accent-active);
+}
+.df-active-filter-chip-label {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.df-active-filter-chip svg {
+  width: 8px;
+  height: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: .7;
+}
+.df-active-filter-chip:hover svg { opacity: 1; }
+.df-active-filter-clear {
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  padding: 2px 4px !important;
+  font: 500 11px/1.3 var(--paper-sans) !important;
+  cursor: pointer;
+  transition: color .14s ease, border-color .14s ease;
+}
+.df-active-filter-clear:hover {
+  color: var(--text-main) !important;
+  border-bottom-color: var(--paper-rule-strong) !important;
+}
+
+/* Filter panel section heads visible now that all chips render. */
+.df-app .df-planning .df-filter-panel header,
+.df-app .df-planning .df-filter-section-head {
+  display: flex !important;
+}
+
+/* Drag/drop placeholder + insertion line — clean, no glow, no gray fill. */
+.df-kanban-drop-placeholder {
+  height: 44px;
+  min-height: 44px;
+  border: 1px dashed color-mix(in srgb, var(--accent-active) 48%, var(--paper-rule));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%);
+  pointer-events: none;
+}
+/* Stronger (but still clean) border on drop targets, no shadow. */
+.df-kanban-column.is-drop-target,
+.df-eisenhower-quadrant.is-drop-target {
+  border-color: var(--accent-active) !important;
+  border-style: dashed !important;
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important;
+}
+
+/* =========================================================================
+   Linear-style cascading filter popover — hover to open categories.
+   Two-column body: categories list (left) + options panel (right), both
+   visible simultaneously. Hovering a category row immediately reveals its
+   options on the right, mirroring Linear's filter menu.
+   ========================================================================= */
+.df-filter-panel {
+  width: min(520px, calc(100vw - 42px)) !important;
+  max-height: min(560px, calc(100vh - 150px)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding: 10px !important;
+}
+.df-filter-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%);
+  margin-bottom: 4px;
+}
+.df-filter-search svg { width: 13px; height: 13px; color: var(--text-muted); flex-shrink: 0; }
+.df-filter-search input {
+  width: 100%; border: 0; background: transparent; color: var(--text-main);
+  font: 500 12px/1.3 var(--paper-sans); outline: none;
+}
+.df-filter-search input::placeholder { color: var(--text-muted); }
+
+.df-filter-body {
+  display: grid !important;
+  grid-template-columns: minmax(150px, 1fr) minmax(200px, 1.25fr) !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+.df-filter-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-right: 1px solid var(--paper-rule);
+  padding-right: 4px;
+  overflow-y: auto;
+  max-height: min(380px, calc(100vh - 220px));
+}
+.df-filter-cat-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-main);
+  font: 500 12px/1.3 var(--paper-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s ease;
+}
+.df-filter-cat-row:hover,
+.df-filter-cat-row.active {
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--text-main) 6%);
+}
+.df-filter-cat-row.active {
+  color: var(--accent-active);
+  background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%);
+}
+.df-filter-cat-row.has-active { color: var(--accent-active); }
+.df-filter-cat-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.df-filter-cat-row.has-active .df-filter-cat-icon,
+.df-filter-cat-row.active .df-filter-cat-icon { color: var(--accent-active); }
+.df-filter-cat-icon svg { width: 14px; height: 14px; }
+.df-filter-cat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-filter-cat-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-active) 22%, transparent);
+  color: var(--accent-active); font: 600 10px/1 var(--paper-sans);
+}
+.df-filter-cat-summary {
+  max-width: 90px; overflow: hidden; color: var(--text-muted);
+  font: 10px/1.2 var(--paper-mono); text-overflow: ellipsis; white-space: nowrap;
+}
+.df-filter-cat-chevron { width: 7px; height: 11px; color: var(--text-muted); opacity: .6; }
+.df-filter-cat-row:hover .df-filter-cat-chevron,
+.df-filter-cat-row.active .df-filter-cat-chevron { opacity: 1; }
+
+.df-filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+  overflow-y: auto;
+  max-height: min(380px, calc(100vh - 220px));
+}
+.df-filter-options-view { display: flex; flex-direction: column; gap: 2px; }
+.df-filter-options-title {
+  padding: 6px 4px 8px;
+  border-bottom: 1px solid var(--paper-rule);
+  margin-bottom: 4px;
+  color: var(--text-main);
+  font: 650 12px/1.3 var(--paper-sans);
+}
+.df-filter-back { display: none !important; }
+
+.df-filter-option {
+  min-width: 0; min-height: 30px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border: 1px solid transparent; border-radius: 5px;
+  color: var(--text-muted); font: 500 12px/1.3 var(--paper-sans);
+  cursor: pointer; transition: background .12s ease, color .12s ease;
+}
+.df-filter-option:hover,
+.df-filter-option.checked {
+  color: var(--text-main);
+  background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%);
+  border-color: transparent;
+}
+.df-filter-option.checked { color: var(--accent-active); }
+.df-filter-option input { width: 13px; height: 13px; accent-color: var(--accent-active); flex-shrink: 0; }
+.df-filter-option-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.df-filter-option > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-filter-text-input {
+  width: 100%; margin-top: 4px; padding: 7px 9px;
+  border: 1px solid var(--paper-rule); border-radius: 5px;
+  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%);
+  color: var(--text-main); font: 500 12px/1.3 var(--paper-sans); outline: none;
+}
+.df-filter-text-input:focus { border-color: var(--accent-active); }
+.df-filter-clear-text {
+  align-self: flex-start; margin-top: 6px; padding: 3px 8px;
+  border: 0; border-bottom: 1px solid var(--paper-rule); border-radius: 0;
+  background: transparent; color: var(--text-muted);
+  font: 500 11px/1.3 var(--paper-sans); cursor: pointer;
+}
+.df-filter-clear-text:hover { color: var(--text-main); border-bottom-color: var(--paper-rule-strong); }
+.df-filter-reset {
+  margin-top: 6px; padding: 6px 8px; border: 0;
+  border-top: 1px solid var(--paper-rule); border-radius: 0;
+  background: transparent; color: var(--text-muted);
+  font: 500 11px/1.3 var(--paper-sans); cursor: pointer; text-align: left;
+}
+.df-filter-reset:hover { color: var(--text-main); }
+.df-filter-empty {
+  padding: 12px 8px; color: var(--text-muted);
+  font: 500 11px/1.4 var(--paper-sans); text-align: center;
+}
+
+/* View switcher: icons + short labels, clean active marker (left rule). */
+.df-app .df-planning .df-view-btn {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  width: 40px !important;
+  min-height: 44px !important;
+  padding: 4px 0 !important;
+  font: 600 9px/1 var(--paper-sans) !important;
+  letter-spacing: .2px !important;
+}
+.df-app .df-planning .df-view-btn svg {
+  width: 15px; height: 15px; flex-shrink: 0;
+}
+.df-app .df-planning .df-view-btn.active {
+  border-right-color: var(--accent-active) !important;
+  color: var(--accent-active) !important;
+}
+
+/* List view drag/drop: insertion line. */
+.df-planning-list-row-wrap {
+  position: relative;
+}
+.df-list-insertion-line {
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background: var(--accent-active);
+  pointer-events: none;
+  animation: df-list-insertion-pulse 1.2s ease-in-out infinite;
+}
+@keyframes df-list-insertion-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-list-insertion-line { animation: none; }
+}
+
+/* Kanban column + Matrix quadrant duration summary. */
+.df-kanban-column-duration,
+.df-eisenhower-quadrant-duration {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-main) 90%, var(--text-main) 10%);
+  color: var(--text-muted);
+  font: 500 10px/1.4 var(--paper-mono);
+  font-style: normal;
+}
+

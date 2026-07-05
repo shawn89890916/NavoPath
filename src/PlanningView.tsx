@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PlannerData, Project, Subtask, Task, WorkflowStatus } from "./types";
 import { t, type Language } from "./i18n";
@@ -8,14 +8,18 @@ import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { kanbanGroups, WORKFLOW_LABELS } from "./utils/productivity";
 import { normalizeTaskCheckTone, normalizeWorkflowStatus, workflowStatusForPatch, type UiWorkflowStatus, type StateFilterValue } from "./utils/productivityModel";
 import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
-import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox } from "./components/TaskBlock";
+import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox, type TaskBlockVariant } from "./components/TaskBlock";
+import { TaskDragLayer } from "./unifiedDrag";
 
 type TreeNodeKind = "project" | "task" | "subtask";
 type TreeDragNode = { kind: TreeNodeKind; id: string };
 type TreeDropTarget = TreeDragNode & { position: "before" | "inside" | "after"; top: number; left: number; width: number };
+type PlanningDropContainer = string;
 
 const DEFAULT_PROJECT_COLOR = "var(--accent-plan, #CAFF72)";
 const UNASSIGNED_COLOR = "#7B8191";
+const DRAG_START_THRESHOLD_PX = 5;
+const SUPPRESS_CLICK_AFTER_DRAG_MS = 220;
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -189,6 +193,7 @@ function PlanningSubtaskNode(props: {
   onMoveProject: (subtaskId: string) => void;
   onDelete: (subtaskId: string) => void;
   onAddSubtask: (parentId: string) => void;
+  dragging?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
@@ -202,10 +207,10 @@ function PlanningSubtaskNode(props: {
     <>
       {tooltipEl}
       <div
-        draggable
         className={`df-plan-subtask-node ${done ? "done" : ""}${hasChildren ? " has-children" : ""}`}
         data-node-id={props.subtask.id}
         data-node-type="subtask"
+        aria-grabbed={props.dragging}
         style={{ "--project-color": props.projectColor, "--task-project-color": props.projectColor } as React.CSSProperties}
       >
         <TaskBlock
@@ -215,6 +220,9 @@ function PlanningSubtaskNode(props: {
           checked={done}
           projectColor={props.projectColor}
           className="df-subtask-inner"
+          dragState={props.dragging ? "source-placeholder" : undefined}
+          dataAttrs={{ "planning-drag-card": props.subtask.id }}
+          ariaGrabbed={props.dragging}
         >
           <TaskBlockRow>
             <TaskCheckbox
@@ -332,6 +340,7 @@ function PlanningTaskNode(props: {
   onDelete: () => void;
   onToggleComplete: () => void;
   onToggleSubtask: (subtaskId: string) => void;
+  dragging?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { tooltipEl, showTip, hideTip } = useTooltip();
@@ -346,10 +355,10 @@ function PlanningTaskNode(props: {
     <>
       {tooltipEl}
       <div
-        draggable
         className={`df-plan-task-node${props.addedToToday ? " added-to-today" : ""}`}
         data-node-id={props.task.id}
         data-node-type="task"
+        aria-grabbed={props.dragging}
         style={{ "--project-color": props.projectColor, "--task-project-color": props.projectColor } as React.CSSProperties}
       >
         <TaskBlock
@@ -361,12 +370,17 @@ function PlanningTaskNode(props: {
           selected={props.addedToToday}
           projectColor={props.projectColor}
           className="df-task-node-inner"
+          dragState={props.dragging ? "source-placeholder" : undefined}
+          dataAttrs={{ "planning-drag-card": props.task.id }}
+          ariaGrabbed={props.dragging}
           onClick={props.onOpen}
         >
           <TaskBlockRow>
             <TaskCheckbox
               checked={done}
               tone={normalizeTaskCheckTone(props.task)}
+              importance={props.task.importance}
+              urgency={props.task.urgency}
               className="df-list-status-toggle df-planning-task-check"
               ariaLabel={done ? "Mark open" : "Mark done"}
               onClick={(event) => {
@@ -465,6 +479,7 @@ function PlanningProjectNode(props: {
   onOpen: () => void;
   onAddTask: () => void;
   onComplete?: () => void;
+  dragging?: boolean;
 }) {
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
@@ -474,10 +489,11 @@ function PlanningProjectNode(props: {
     <>
       {tooltipEl}
       <div
-        draggable
-        className={`df-plan-project-node ${props.collapsed ? "collapsed" : ""}`}
+        className={`df-plan-project-node ${props.collapsed ? "collapsed" : ""}${props.dragging ? " is-dragging-source" : ""}`}
         data-node-id={props.project.id}
         data-node-type="project"
+        data-planning-drag-card={props.project.id}
+        aria-grabbed={props.dragging}
         style={{
           "--project-color": color,
           "--project-color-soft": alphaColor(color, 0.16),
@@ -557,7 +573,7 @@ function useTreeLines(
         );
         if (projectTaskList.length === 0) return;
 
-        // 鈹€鈹€ Simplified tree lines: subtle, minimal 鈹€鈹€
+        // Simplified tree lines: subtle, minimal.
         // Collect task positions
         const taskPositions: Array<{
           id: string;
@@ -584,7 +600,7 @@ function useTreeLines(
 
         if (taskPositions.length === 0) return;
 
-        // Trunk x-position (relative to tree) 鈥?28px indent from project left
+        // Trunk x-position relative to tree: 28px indent from project left.
         const trunkX = 28;
         const projBottom = projectRect.bottom - treeRect.top;
 
@@ -594,7 +610,7 @@ function useTreeLines(
         const colMain = alphaColor(projectColor, 0.08);
         const colBranch = alphaColor(projectColor, 0.05);
 
-        // 1. Trunk: short vertical from project bottom 鈫?first task
+        // 1. Trunk: short vertical from project bottom to first task.
         paths.push(
           <path
             key={`trunk-${project.id}`}
@@ -760,12 +776,61 @@ export default function PlanningView(props: {
   const [filterImportances, setFilterImportances] = useState<StateFilterValue[]>([]);
   const [filterUrgencies, setFilterUrgencies] = useState<StateFilterValue[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [filterExpandedCategory, setFilterExpandedCategory] = useState<string | null>(null);
+  const [filterDueDate, setFilterDueDate] = useState<"overdue" | "this-week" | "no-date" | null>(null);
+  const [filterScheduled, setFilterScheduled] = useState<"scheduled" | "unscheduled" | null>(null);
   const [kanbanDragTaskId, setKanbanDragTaskId] = useState<string | null>(null);
   const [kanbanDropStatus, setKanbanDropStatus] = useState<UiWorkflowStatus | null>(null);
+  const [listDragTaskId, setListDragTaskId] = useState<string | null>(null);
+  const [listDropTargetId, setListDropTargetId] = useState<string | null>(null);
+  const [listDropPosition, setListDropPosition] = useState<"before" | "after">("before");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [planningDragTask, setPlanningDragTask] = useState<{
+    task: Task;
+    variant: TaskBlockVariant;
+    sourceRect: { width: number; height: number };
+    offset: { x: number; y: number };
+    pointer: { x: number; y: number };
+  } | null>(null);
+  const dragNodeRef = useRef<TreeDragNode | null>(null);
+  const dropTargetRef = useRef<TreeDropTarget | null>(null);
+  const planningDropTargetRef = useRef<{ taskId: string; position: "before" | "after"; container: PlanningDropContainer } | null>(null);
+  const suppressClickUntilRef = useRef(0);
+
+  const suppressPostDragClick = useCallback(() => {
+    suppressClickUntilRef.current = Date.now() + SUPPRESS_CLICK_AFTER_DRAG_MS;
+  }, []);
+
+  const shouldSuppressTaskClick = useCallback(() => Date.now() < suppressClickUntilRef.current, []);
+
+  const openTaskFromPlanning = useCallback((task: Task) => {
+    if (shouldSuppressTaskClick()) return;
+    props.onTaskEdit(task);
+  }, [props, shouldSuppressTaskClick]);
+
+  const setTreeDragNode = useCallback((node: TreeDragNode | null) => {
+    dragNodeRef.current = node;
+    setDragNode(node);
+  }, []);
+
+  const setTreeDropTarget = useCallback((target: TreeDropTarget | null) => {
+    dropTargetRef.current = target;
+    setDropTarget(target);
+  }, []);
+
+  function clearPlanningDragState() {
+    document.body.classList.remove("df-planning-native-dragging");
+    document.body.classList.remove("df-unified-dragging");
+    setTreeDragNode(null);
+    setTreeDropTarget(null);
+    setKanbanDragTaskId(null);
+    setKanbanDropStatus(null);
+    setListDragTaskId(null);
+    setListDropTargetId(null);
+    setPlanningDragTask(null);
+  }
 
   const today = todayIso();
-
-  const unassigned = safeTasks.filter((task) => task && !task.projectId && !task.completed && (showAddedTasks || task.plannedForDate !== today));
 
   const renameTask = useCallback(async (task: Task) => {
     const title = await dialog.prompt(t(props.lang, "planning.editName"), task.title);
@@ -869,7 +934,7 @@ export default function PlanningView(props: {
         const options = safeProjects.map((p, i) => `${i + 1}. ${p.title}`).join("\n");
         const choice = await dialog.prompt(
           props.lang === "zh"
-            ? "绉诲姩鐖朵换鍔″埌椤圭洰"
+            ? "\u5c06\u7236\u4efb\u52a1\u79fb\u5230\u54ea\u4e2a\u9879\u76ee\uff1f"
             : "Move parent task to project",
           "0",
           { message: `0. ${t(props.lang, "planning.unassigned")}${options ? `\n${options}` : ""}` },
@@ -1015,36 +1080,6 @@ export default function PlanningView(props: {
     persistTree(projects, tasks);
   }, [dialog, persistTree, projectFromItem, props.lang, safeProjects, safeTasks, subtaskOwner, taskFromSubtask]);
 
-  const handleTreeDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    if (!dragNode) return;
-    const node = (event.target as HTMLElement).closest<HTMLElement>("[data-node-type][data-node-id]");
-    const tree = treeRef.current;
-    if (!node || !tree) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    const rect = node.getBoundingClientRect();
-    const ratio = (event.clientY - rect.top) / Math.max(rect.height, 1);
-    const position = ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
-    const treeRect = tree.getBoundingClientRect();
-    setDropTarget({
-      kind: node.dataset.nodeType as TreeNodeKind,
-      id: node.dataset.nodeId || "",
-      position,
-      top: rect.top - treeRect.top + tree.scrollTop + (position === "before" ? -16 : position === "after" ? rect.height - 2 : rect.height / 2 - 16),
-      left: rect.left - treeRect.left + tree.scrollLeft + (position === "inside" ? 22 : 0),
-      width: Math.max(160, rect.width - (position === "inside" ? 22 : 0)),
-    });
-  }, [dragNode]);
-
-  const visibleProjects = useMemo(
-    () => safeProjects.map((project) => ({
-      project,
-      tasks: safeTasks.filter((task) => String(task.projectId || "") === String(project.id) && !task.completed && (showAddedTasks || task.plannedForDate !== today)),
-    })),
-    [safeProjects, safeTasks, showAddedTasks],
-  );
-
-  const svgLines = useTreeLines(treeRef, safeProjects, safeTasks, props.collapsed, collapsedSubtasks);
 
   const viewFilteredTasks = useMemo(() => {
     return safeTasks.filter((task) => {
@@ -1063,9 +1098,52 @@ export default function PlanningView(props: {
         const matches = filterUrgencies.some((f) => f === "empty" ? !urg : urg === f);
         if (!matches) return false;
       }
+      if (filterDueDate) {
+        const due = task.dueDate;
+        if (filterDueDate === "no-date") { if (due) return false; }
+        else if (filterDueDate === "overdue") { if (!due || due >= today) return false; }
+        else if (filterDueDate === "this-week") {
+          if (!due) return false;
+          const dueTime = new Date(due + "T00:00:00").getTime();
+          const now = new Date(today + "T00:00:00").getTime();
+          if (dueTime < now || dueTime > now + 6 * 86400000) return false;
+        }
+      }
+      if (filterScheduled) {
+        const hasSchedule = !!(task.timelineRecords && task.timelineRecords.length > 0) || !!task.plannedForDate;
+        if (filterScheduled === "scheduled" && !hasSchedule) return false;
+        if (filterScheduled === "unscheduled" && hasSchedule) return false;
+      }
       return true;
     });
-  }, [safeTasks, showCompleted, showAddedTasks, today, filterProjects, filterWorkflows, filterImportances, filterUrgencies]);
+  }, [safeTasks, showCompleted, showAddedTasks, today, filterProjects, filterWorkflows, filterImportances, filterUrgencies, filterDueDate, filterScheduled]);
+  const orderPlanningTasks = useCallback((items: Task[]) => {
+    return [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt.localeCompare(b.createdAt));
+  }, []);
+
+  const hasTreeFilters = filterProjects.length > 0
+    || filterWorkflows.length > 0
+    || filterImportances.length > 0
+    || filterUrgencies.length > 0
+    || !!filterDueDate
+    || !!filterScheduled
+    || showCompleted
+    || showAddedTasks;
+  const visibleProjects = useMemo(
+    () => safeProjects
+      .map((project) => ({
+        project,
+        tasks: viewFilteredTasks.filter((task) => String(task.projectId || "") === String(project.id)),
+      }))
+      .filter((item) => !hasTreeFilters || item.tasks.length > 0),
+    [safeProjects, viewFilteredTasks, hasTreeFilters],
+  );
+  const unassigned = useMemo(
+    () => viewFilteredTasks.filter((task) => task && !task.projectId),
+    [viewFilteredTasks],
+  );
+
+  const svgLines = useTreeLines(treeRef, safeProjects, viewFilteredTasks, props.collapsed, collapsedSubtasks);
 
   const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
 
@@ -1097,7 +1175,364 @@ export default function PlanningView(props: {
     setKanbanDropStatus(null);
   }, [kanbanDragTaskId, props]);
 
-  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0;
+  const reorderPlanningTasks = useCallback((dragId: string, targetTaskId: string, position: "before" | "after", sequence: Task[]) => {
+    if (!dragId || dragId === targetTaskId) {
+      return;
+    }
+    const ordered = [...sequence].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt.localeCompare(b.createdAt));
+    const dragged = ordered.find((t) => t.id === dragId);
+    if (!dragged) return;
+    const without = ordered.filter((t) => t.id !== dragId);
+    const targetIdx = without.findIndex((t) => t.id === targetTaskId);
+    if (targetIdx < 0) {
+      return;
+    }
+    const insertAt = position === "before" ? targetIdx : targetIdx + 1;
+    without.splice(insertAt, 0, dragged);
+    const nextOrder = new Map(without.map((task, idx) => [task.id, idx * 10]));
+    const now = new Date().toISOString();
+    props.onDataChange({
+      ...props.data,
+      tasks: props.data.tasks.map((task) => (
+        nextOrder.has(task.id)
+          ? { ...task, order: nextOrder.get(task.id), updatedAt: now }
+          : task
+      )),
+    });
+  }, [props]);
+
+  const handleListDrop = useCallback((targetTaskId: string, position: "before" | "after", taskId?: string) => {
+    const dragId = taskId || listDragTaskId;
+    reorderPlanningTasks(dragId || "", targetTaskId, position, viewFilteredTasks);
+    setListDragTaskId(null);
+    setListDropTargetId(null);
+  }, [listDragTaskId, reorderPlanningTasks, viewFilteredTasks]);
+
+  const planningContainerTasks = useCallback((container: PlanningDropContainer) => {
+    if (container === "list") return orderPlanningTasks(viewFilteredTasks);
+    if (container.startsWith("kanban:")) {
+      const status = container.slice("kanban:".length) as UiWorkflowStatus;
+      return orderPlanningTasks(kanbanTasks.filter((task) => status === "done" ? normalizeWorkflowStatus(task) === "done" : normalizeWorkflowStatus(task) !== "done"));
+    }
+    if (container.startsWith("matrix:")) {
+      const key = container.slice("matrix:".length);
+      return orderPlanningTasks(viewFilteredTasks.filter((task) => {
+        const imp = task.importance || "medium";
+        const urg = task.urgency || "medium";
+        if (key === "q1") return imp === "high" && urg === "high";
+        if (key === "q2") return imp === "high" && urg !== "high";
+        if (key === "q3") return imp !== "high" && urg === "high";
+        return imp !== "high" && urg !== "high";
+      }));
+    }
+    return orderPlanningTasks(viewFilteredTasks);
+  }, [kanbanTasks, orderPlanningTasks, viewFilteredTasks]);
+
+  /**
+   * Shared pointer-event drag for Kanban / Matrix / List views.
+   * Renders a real TaskBlock in TaskDragLayer (not a blue-gray custom card).
+   * The source element gets is-dragging-source (clean placeholder).
+   * Drop feedback: insertion line for list reorder, container outline for
+   * kanban column / matrix quadrant.
+   */
+  const beginPlanningDrag = useCallback((event: React.PointerEvent, task: Task, variant: TaskBlockVariant) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,textarea,select,a,[contenteditable='true']")) return;
+    const dragElement = event.currentTarget as HTMLElement;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let active = false;
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", keydown);
+      document.body.classList.remove("df-unified-dragging");
+      dragElement.classList.remove("is-dragging-source");
+      setPlanningDragTask(null);
+      setKanbanDropStatus(null);
+      setListDropTargetId(null);
+      planningDropTargetRef.current = null;
+      if (dragElement.hasPointerCapture(pointerId)) {
+        try { dragElement.releasePointerCapture(pointerId); } catch { /* ignore */ }
+      }
+    };
+
+    const detectDropTarget = (clientX: number, clientY: number) => {
+      const pointedElement = document.elementFromPoint(clientX, clientY);
+      const planningTask = pointedElement?.closest<HTMLElement>("[data-planning-task-id]");
+      if (planningTask) {
+        const targetTaskId = planningTask.dataset.planningTaskId;
+        if (targetTaskId && targetTaskId !== task.id) {
+          const rect = planningTask.getBoundingClientRect();
+          const isBefore = (clientY - rect.top) < rect.height / 2;
+          setListDropTargetId(targetTaskId);
+          setListDropPosition(isBefore ? "before" : "after");
+          planningDropTargetRef.current = {
+            taskId: targetTaskId,
+            position: isBefore ? "before" : "after",
+            container: (planningTask.dataset.planningContainer || "") as PlanningDropContainer,
+          };
+        } else {
+          setListDropTargetId(null);
+          planningDropTargetRef.current = null;
+        }
+        setKanbanDropStatus(null);
+        return;
+      }
+      const kanbanColumn = pointedElement?.closest<HTMLElement>("[data-kanban-status]");
+      if (kanbanColumn) {
+        setKanbanDropStatus(kanbanColumn.dataset.kanbanStatus as UiWorkflowStatus);
+        setListDropTargetId(null);
+        planningDropTargetRef.current = null;
+        return;
+      }
+      const quadrant = pointedElement?.closest<HTMLElement>("[data-quadrant]");
+      if (quadrant) {
+        setKanbanDropStatus(("q-" + quadrant.dataset.quadrant) as unknown as UiWorkflowStatus);
+        setListDropTargetId(null);
+        planningDropTargetRef.current = null;
+        return;
+      }
+      const listRow = pointedElement?.closest<HTMLElement>("[data-list-task-id]");
+      if (listRow) {
+        const targetTaskId = listRow.dataset.listTaskId;
+        if (targetTaskId && targetTaskId !== task.id) {
+          const rect = listRow.getBoundingClientRect();
+          const isBefore = (clientY - rect.top) < rect.height / 2;
+          setListDropTargetId(targetTaskId);
+          setListDropPosition(isBefore ? "before" : "after");
+          planningDropTargetRef.current = {
+            taskId: targetTaskId,
+            position: isBefore ? "before" : "after",
+            container: "list",
+          };
+        } else {
+          setListDropTargetId(null);
+          planningDropTargetRef.current = null;
+        }
+        setKanbanDropStatus(null);
+        return;
+      }
+      setKanbanDropStatus(null);
+      setListDropTargetId(null);
+      planningDropTargetRef.current = null;
+    };
+
+    const move = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < DRAG_START_THRESHOLD_PX) return;
+      if (!active) {
+        active = true;
+        pointerEvent.preventDefault();
+        try { dragElement.setPointerCapture(pointerId); } catch { /* ignore */ }
+        document.body.classList.add("df-unified-dragging");
+        dragElement.classList.add("is-dragging-source");
+        setListDragTaskId(task.id);
+        setKanbanDragTaskId(task.id);
+        const rect = dragElement.getBoundingClientRect();
+        const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+        const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+        setPlanningDragTask({ task, variant, sourceRect: { width: rect.width, height: rect.height }, offset: { x: offX, y: offY }, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
+      }
+      pointerEvent.preventDefault();
+      setPlanningDragTask((current) => current ? { ...current, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } } : current);
+      detectDropTarget(pointerEvent.clientX, pointerEvent.clientY);
+    };
+
+    const up = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      if (active) {
+        suppressPostDragClick();
+        const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
+        const planningTask = pointedElement?.closest<HTMLElement>("[data-planning-task-id]");
+        const kanbanColumn = pointedElement?.closest<HTMLElement>("[data-kanban-status]");
+        const quadrant = pointedElement?.closest<HTMLElement>("[data-quadrant]");
+        const listRow = pointedElement?.closest<HTMLElement>("[data-list-task-id]");
+        const fallback = planningDropTargetRef.current;
+        const sourceContainer = (dragElement.dataset.planningContainer || "") as PlanningDropContainer;
+        if (fallback && fallback.taskId !== task.id && sourceContainer && sourceContainer === fallback.container) {
+          reorderPlanningTasks(task.id, fallback.taskId, fallback.position, planningContainerTasks(sourceContainer));
+          cleanup();
+          return;
+        }
+        if (planningTask) {
+          const targetTaskId = planningTask.dataset.planningTaskId;
+          const targetContainer = (planningTask.dataset.planningContainer || "") as PlanningDropContainer;
+          if (targetTaskId && targetTaskId !== task.id && sourceContainer && sourceContainer === targetContainer) {
+            const rect = planningTask.getBoundingClientRect();
+            const isBefore = (pointerEvent.clientY - rect.top) < rect.height / 2;
+            reorderPlanningTasks(task.id, targetTaskId, isBefore ? "before" : "after", planningContainerTasks(sourceContainer));
+          } else if (kanbanColumn) {
+            handleKanbanDrop(kanbanColumn.dataset.kanbanStatus as UiWorkflowStatus, task.id);
+          } else if (quadrant) {
+            const q = quadrant.dataset.quadrant || "";
+            const importance = (q === "q1" || q === "q2") ? "high" : "low";
+            const urgency = (q === "q1" || q === "q3") ? "high" : "low";
+            handleQuadrantDrop(importance as "high" | "low", urgency as "high" | "low", task.id);
+          }
+        } else if (kanbanColumn) {
+          handleKanbanDrop(kanbanColumn.dataset.kanbanStatus as UiWorkflowStatus, task.id);
+        } else if (quadrant) {
+          const q = quadrant.dataset.quadrant || "";
+          const importance = (q === "q1" || q === "q2") ? "high" : "low";
+          const urgency = (q === "q1" || q === "q3") ? "high" : "low";
+          handleQuadrantDrop(importance as "high" | "low", urgency as "high" | "low", task.id);
+        } else if (listRow) {
+          const targetTaskId = listRow.dataset.listTaskId;
+          if (targetTaskId && targetTaskId !== task.id) {
+            const rect = listRow.getBoundingClientRect();
+            const isBefore = (pointerEvent.clientY - rect.top) < rect.height / 2;
+            handleListDrop(targetTaskId, isBefore ? "before" : "after", task.id);
+          }
+        }
+      }
+      cleanup();
+    };
+
+    const cancel = () => cleanup();
+    const keydown = (kb: KeyboardEvent) => { if (kb.key === "Escape") cancel(); };
+
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", keydown);
+  }, [handleKanbanDrop, handleQuadrantDrop, handleListDrop, planningContainerTasks, reorderPlanningTasks, suppressPostDragClick]);
+
+  /**
+   * Shared pointer-event drag for Tree view.
+   * Uses the same React-rendered TaskDragLayer overlay as other Planning
+   * surfaces, then keeps the tree-specific drop target detection.
+   */
+  const beginTreeDrag = useCallback((event: React.PointerEvent, node: TreeDragNode) => {
+    if (event.button !== 0) return;
+    if (props.compact) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,textarea,select,a,[contenteditable='true']")) return;
+    const sourceNodeEl = target.closest<HTMLElement>("[data-node-type][data-node-id]");
+    if (!sourceNodeEl) return;
+    const sourceNode: TreeDragNode = {
+      kind: sourceNodeEl.dataset.nodeType as TreeNodeKind,
+      id: sourceNodeEl.dataset.nodeId || node.id,
+    };
+    const dragElement = event.currentTarget as HTMLElement;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let active = false;
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", keydown);
+      document.body.classList.remove("df-unified-dragging");
+      dragElement.classList.remove("is-dragging-source");
+      setTreeDragNode(null);
+      setTreeDropTarget(null);
+      setPlanningDragTask(null);
+      if (dragElement.hasPointerCapture(pointerId)) {
+        try { dragElement.releasePointerCapture(pointerId); } catch { /* ignore */ }
+      }
+    };
+
+    const detectTreeDropTarget = (clientX: number, clientY: number) => {
+      const tree = treeRef.current;
+      if (!tree) return;
+      const pointedElement = document.elementFromPoint(clientX, clientY);
+      const node = pointedElement?.closest<HTMLElement>("[data-node-type][data-node-id]");
+      if (!node) { setTreeDropTarget(null); return; }
+      const rect = node.getBoundingClientRect();
+      const ratio = (clientY - rect.top) / Math.max(rect.height, 1);
+      const position = ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
+      const treeRect = tree.getBoundingClientRect();
+      setTreeDropTarget({
+        kind: node.dataset.nodeType as TreeNodeKind,
+        id: node.dataset.nodeId || "",
+        position,
+        top: rect.top - treeRect.top + tree.scrollTop + (position === "before" ? -16 : position === "after" ? rect.height - 2 : rect.height / 2 - 16),
+        left: rect.left - treeRect.left + tree.scrollLeft + (position === "inside" ? 22 : 0),
+        width: Math.max(160, rect.width - (position === "inside" ? 22 : 0)),
+      });
+    };
+
+    const move = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < DRAG_START_THRESHOLD_PX) return;
+      if (!active) {
+        active = true;
+        pointerEvent.preventDefault();
+        try { dragElement.setPointerCapture(pointerId); } catch { /* ignore */ }
+        document.body.classList.add("df-unified-dragging");
+        dragElement.classList.add("is-dragging-source");
+        setTreeDragNode(sourceNode);
+        const sourceCard = sourceNodeEl.querySelector<HTMLElement>("[data-planning-drag-card]") || sourceNodeEl;
+        const rect = sourceCard.getBoundingClientRect();
+        const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+        const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+        let overlayTask: Task | undefined;
+        if (sourceNode.kind === "task") {
+          overlayTask = safeTasks.find((task) => task.id === sourceNode.id);
+        } else if (sourceNode.kind === "subtask") {
+          const owner = subtaskOwner(sourceNode.id);
+          const subtask = owner ? findSubtaskInTree(owner.subtasks || [], sourceNode.id) : undefined;
+          overlayTask = subtask ? taskFromSubtask(subtask, owner?.projectId) : undefined;
+        } else {
+          const project = safeProjects.find((item) => item.id === sourceNode.id) || (sourceNode.id === "__unassigned__" ? createProjectShell(props.lang === "zh" ? "Unassigned Tasks" : "Unassigned Tasks") : undefined);
+          overlayTask = project ? {
+            id: project.id,
+            title: project.title,
+            category: "personal",
+            priority: null,
+            notes: project.notes || "",
+            goalId: "",
+            completed: Boolean(project.completed),
+            dueDate: "",
+            projectId: project.id === "__unassigned__" ? undefined : project.id,
+            estimatedHours: 0,
+            createdAt: project.createdAt || "",
+            updatedAt: project.updatedAt || "",
+          } : undefined;
+        }
+        if (overlayTask) {
+          setPlanningDragTask({
+            task: overlayTask,
+            variant: "planning",
+            sourceRect: { width: rect.width, height: rect.height },
+            offset: { x: offX, y: offY },
+            pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY },
+          });
+        }
+      }
+      pointerEvent.preventDefault();
+      setPlanningDragTask((current) => current ? { ...current, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } } : current);
+      detectTreeDropTarget(pointerEvent.clientX, pointerEvent.clientY);
+    };
+
+    const up = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      if (active) {
+        suppressPostDragClick();
+        const source = dragNodeRef.current;
+        const target = dropTargetRef.current;
+        if (source && target) void handleTreeDrop(source, target);
+      }
+      cleanup();
+    };
+
+    const cancel = () => cleanup();
+    const keydown = (kb: KeyboardEvent) => { if (kb.key === "Escape") cancel(); };
+
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", keydown);
+  }, [props.compact, props.lang, handleTreeDrop, safeProjects, safeTasks, setTreeDragNode, setTreeDropTarget, subtaskOwner, suppressPostDragClick, taskFromSubtask]);
+
+  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0 || !!filterDueDate || !!filterScheduled || showCompleted || showAddedTasks;
 
   const toggleArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, value: T) => {
     setter((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]);
@@ -1165,89 +1600,322 @@ export default function PlanningView(props: {
         onToggle: () => toggleArray(setFilterUrgencies, u),
       })),
     },
-  ].filter((chip) => chip.key === "project" || chip.key === "display");
+  ];
+
+  // Linear-style active filter chips: each active filter becomes a removable chip.
+  type ActiveChip = { key: string; label: string; onClear: () => void };
+  const stateLabel = (v: StateFilterValue) =>
+    v === "high" ? (props.lang === "zh" ? "High" : "High")
+    : v === "medium" ? (props.lang === "zh" ? "Medium" : "Medium")
+    : v === "low" ? (props.lang === "zh" ? "Low" : "Low")
+    : (props.lang === "zh" ? "Unset" : "Unset");
+  const workflowLabel = (s: UiWorkflowStatus) =>
+    s === "backlog" ? (props.lang === "zh" ? "To do" : "To do")
+    : s === "doing" ? (props.lang === "zh" ? "Doing" : "Doing")
+    : (props.lang === "zh" ? "Done" : "Done");
+
+  const activeFilterChips: ActiveChip[] = [
+    ...filterProjects.map((id) => ({
+      key: `project-${id}`,
+      label: `${props.lang === "zh" ? "Project" : "Project"}: ${safeProjects.find((p) => String(p.id) === id)?.title || id}`,
+      onClear: () => toggleArray(setFilterProjects, id),
+    })),
+    ...filterWorkflows.map((s) => ({
+      key: `status-${s}`,
+      label: `${props.lang === "zh" ? "Status" : "Status"}: ${workflowLabel(s)}`,
+      onClear: () => toggleArray(setFilterWorkflows, s),
+    })),
+    ...filterImportances.map((v) => ({
+      key: `importance-${v}`,
+      label: `${props.lang === "zh" ? "Priority" : "Priority"}: ${stateLabel(v)}`,
+      onClear: () => toggleArray(setFilterImportances, v),
+    })),
+    ...filterUrgencies.map((v) => ({
+      key: `urgency-${v}`,
+      label: `${props.lang === "zh" ? "Urgency" : "Urgency"}: ${stateLabel(v)}`,
+      onClear: () => toggleArray(setFilterUrgencies, v),
+    })),
+    ...(filterDueDate ? [{
+      key: `due-${filterDueDate}`,
+      label: `${props.lang === "zh" ? "Due" : "Due"}: ${filterDueDate === "overdue" ? (props.lang === "zh" ? "Overdue" : "Overdue") : filterDueDate === "this-week" ? (props.lang === "zh" ? "This week" : "This week") : (props.lang === "zh" ? "No date" : "No date")}`,
+      onClear: () => setFilterDueDate(null),
+    }] : []),
+    ...(filterScheduled ? [{
+      key: `scheduled-${filterScheduled}`,
+      label: `${props.lang === "zh" ? "Scheduled" : "Scheduled"}: ${filterScheduled === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")}`,
+      onClear: () => setFilterScheduled(null),
+    }] : []),
+  ];
+
+  const clearAllFilters = () => {
+    setFilterProjects([]);
+    setFilterWorkflows([]);
+    setFilterImportances([]);
+    setFilterUrgencies([]);
+    setFilterDueDate(null);
+    setFilterScheduled(null);
+  };
+
+  // Linear-style nested filter categories. Level 1 = category list, Level 2 = options.
+  const dueDateLabel = (d: "overdue" | "this-week" | "no-date") =>
+    d === "overdue" ? (props.lang === "zh" ? "Overdue" : "Overdue")
+    : d === "this-week" ? (props.lang === "zh" ? "This week" : "This week")
+    : (props.lang === "zh" ? "No date" : "No date");
+
+  type FilterCategory = {
+    key: string;
+    label: string;
+    icon: string;
+    activeCount: number;
+    summary: string;
+  };
+  type FilterOption = {
+    value: string;
+    label: string;
+    checked: boolean;
+    inputType?: "checkbox" | "radio";
+    dotColor?: string;
+    onToggle: () => void;
+  };
+  const filterHasSchedule = (task: Task) => Boolean((task.timelineRecords && task.timelineRecords.length > 0) || task.plannedForDate);
+  const filterDueMatches = (task: Task, value: "overdue" | "this-week" | "no-date") => {
+    const due = task.dueDate;
+    if (value === "no-date") return !due;
+    if (!due) return false;
+    if (value === "overdue") return due < today;
+    const dueTime = new Date(due + "T00:00:00").getTime();
+    const now = new Date(today + "T00:00:00").getTime();
+    return dueTime >= now && dueTime <= now + 6 * 86400000;
+  };
+  const filterOptionsByCategory: Record<string, FilterOption[]> = {
+    status: (["backlog", "done"] as UiWorkflowStatus[])
+      .filter((s) => filterWorkflows.includes(s) || safeTasks.some((task) => normalizeWorkflowStatus(task) === s))
+      .map((s) => ({
+        value: s,
+        label: workflowLabel(s),
+        checked: filterWorkflows.includes(s),
+        onToggle: () => toggleArray(setFilterWorkflows, s),
+      })),
+    importance: (["high", "medium", "low", "empty"] as StateFilterValue[])
+      .filter((v) => filterImportances.includes(v) || safeTasks.some((task) => v === "empty" ? !task.importance : task.importance === v))
+      .map((v) => ({
+        value: v,
+        label: stateLabel(v),
+        checked: filterImportances.includes(v),
+        onToggle: () => toggleArray(setFilterImportances, v),
+      })),
+    urgency: (["high", "medium", "low", "empty"] as StateFilterValue[])
+      .filter((v) => filterUrgencies.includes(v) || safeTasks.some((task) => v === "empty" ? !task.urgency : task.urgency === v))
+      .map((v) => ({
+        value: v,
+        label: stateLabel(v),
+        checked: filterUrgencies.includes(v),
+        onToggle: () => toggleArray(setFilterUrgencies, v),
+      })),
+    project: safeProjects
+      .filter((project) => filterProjects.includes(String(project.id)) || safeTasks.some((task) => String(task.projectId || "") === String(project.id)))
+      .map((project) => ({
+        value: String(project.id),
+        label: project.title,
+        checked: filterProjects.includes(String(project.id)),
+        dotColor: project.color || DEFAULT_PROJECT_COLOR,
+        onToggle: () => toggleArray(setFilterProjects, String(project.id)),
+      })),
+    due: (["overdue", "this-week", "no-date"] as const)
+      .filter((d) => filterDueDate === d || safeTasks.some((task) => filterDueMatches(task, d)))
+      .map((d) => ({
+        value: d,
+        label: dueDateLabel(d),
+        checked: filterDueDate === d,
+        inputType: "radio" as const,
+        onToggle: () => setFilterDueDate(filterDueDate === d ? null : d),
+      })),
+    scheduled: (["scheduled", "unscheduled"] as const)
+      .filter((s) => filterScheduled === s || safeTasks.some((task) => s === "scheduled" ? filterHasSchedule(task) : !filterHasSchedule(task)))
+      .map((s) => ({
+        value: s,
+        label: s === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled"),
+        checked: filterScheduled === s,
+        inputType: "radio" as const,
+        onToggle: () => setFilterScheduled(filterScheduled === s ? null : s),
+      })),
+    completed: [
+      ...(showCompleted || safeTasks.some((task) => task.completed) ? [{
+        value: "completed",
+        label: props.lang === "zh" ? "Show done" : "Show done",
+        checked: showCompleted,
+        onToggle: () => setShowCompleted((v) => !v),
+      }] : []),
+      ...(showAddedTasks || safeTasks.some((task) => task.plannedForDate === today) ? [{
+        value: "added",
+        label: props.lang === "zh" ? "Show added" : "Show added",
+        checked: showAddedTasks,
+        onToggle: () => setShowAddedTasks((v) => !v),
+      }] : []),
+    ],
+  };
+  const filterCategories: FilterCategory[] = [
+    { key: "status", label: props.lang === "zh" ? "Status" : "Status", icon: "circle", activeCount: filterWorkflows.length, summary: filterWorkflows.length > 0 ? filterWorkflows.map(workflowLabel).join(", ") : "" },
+    { key: "importance", label: props.lang === "zh" ? "Priority" : "Priority", icon: "flag", activeCount: filterImportances.length, summary: filterImportances.length > 0 ? filterImportances.map(stateLabel).join(", ") : "" },
+    { key: "urgency", label: props.lang === "zh" ? "Urgency" : "Urgency", icon: "clock", activeCount: filterUrgencies.length, summary: filterUrgencies.length > 0 ? filterUrgencies.map(stateLabel).join(", ") : "" },
+    { key: "project", label: props.lang === "zh" ? "Project" : "Project", icon: "folder", activeCount: filterProjects.length, summary: filterProjects.length > 0 ? filterProjects.map((id) => safeProjects.find((p) => String(p.id) === id)?.title || id).join(", ") : "" },
+    { key: "due", label: props.lang === "zh" ? "Due date" : "Due date", icon: "calendar", activeCount: filterDueDate ? 1 : 0, summary: filterDueDate ? dueDateLabel(filterDueDate) : "" },
+    { key: "scheduled", label: props.lang === "zh" ? "Scheduled" : "Scheduled", icon: "layers", activeCount: filterScheduled ? 1 : 0, summary: filterScheduled ? (filterScheduled === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")) : "" },
+    { key: "completed", label: props.lang === "zh" ? "Completed" : "Completed", icon: "check", activeCount: (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0), summary: [showCompleted ? (props.lang === "zh" ? "Show done" : "Show done") : "", showAddedTasks ? (props.lang === "zh" ? "Show added" : "Show added") : ""].filter(Boolean).join(", ") },
+  ];
+  const effectiveFilterCategories = filterCategories.filter((cat) => (filterOptionsByCategory[cat.key] || []).length > 0);
+  const activeFilterCategory = filterExpandedCategory && effectiveFilterCategories.some((cat) => cat.key === filterExpandedCategory)
+    ? filterExpandedCategory
+    : null;
+  const activeFilterCategoryIndex = activeFilterCategory
+    ? Math.max(0, effectiveFilterCategories.findIndex((cat) => cat.key === activeFilterCategory))
+    : 0;
 
   return (
-    <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
+    <main className={`df-planning${props.compact ? " compact-layout" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {dialog.host}
       <div className="df-planning-body">
         <section className="df-mindmap no-root">
-          <aside className="df-planning-sidebar" aria-label={props.lang === "zh" ? "规划工具" : "Planning tools"}>
-            <div className="df-planning-filter-bar">
-              <div className="df-planning-filter-menu">
+          <aside className="df-planning-sidebar" aria-label={props.lang === "zh" ? "\u89c4\u5212\u5de5\u5177" : "Planning tools"}>
+            <button
+              type="button"
+              className="df-planning-sidebar-collapse"
+              aria-label={sidebarCollapsed ? "Expand planning tools" : "Collapse planning tools"}
+              aria-pressed={sidebarCollapsed}
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            >
+              <ChevronIcon open={!sidebarCollapsed} />
+            </button>
+              {availableModes.length > 1 && (
+                <div className="df-planning-view-switch">
+                  {availableModes.map((m) => (
+                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={m === "tree" ? (props.lang === "zh" ? "\u6811" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "\u77e9\u9635" : "Matrix") : (props.lang === "zh" ? "\u5217\u8868" : "List")}>
+                      {m === "tree" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M3 5h4M3 9h6M3 13h5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                      {m === "kanban" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="3.5" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="6.5" y="3" width="3.5" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="11" y="3" width="3.5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
+                      {m === "eisenhower" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="2" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
+                      {m === "list" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                      <span>{m === "tree" ? (props.lang === "zh" ? "\u6811" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "\u77e9\u9635" : "Matrix") : (props.lang === "zh" ? "\u5217\u8868" : "List")}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+          </aside>
+          <div className="df-tree-wrap">
+            <div className="df-planning-filter-corner">
+              <div className="df-filter-popover-anchor">
                 <button
                   type="button"
                   className={`df-filter-trigger${filterOpen ? " active" : ""}${hasActiveFilters ? " has-active" : ""}`}
                   aria-expanded={filterOpen}
                   aria-label={props.lang === "zh" ? "Filter" : "Filter"}
                   title={props.lang === "zh" ? "Filter" : "Filter"}
-                  onClick={() => setFilterOpen((open) => !open)}
+                  onClick={() => { setFilterOpen((open) => !open); setFilterExpandedCategory(null); }}
                 >
                   <svg viewBox="0 0 18 18" aria-hidden="true">
                     <path d="M3 4h12M5 9h8M7 14h4" />
                   </svg>
-                  {hasActiveFilters && <b>{filterProjects.length + filterWorkflows.length + filterImportances.length + filterUrgencies.length + (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0)}</b>}
+                  {hasActiveFilters && <b>{activeFilterChips.length}</b>}
                 </button>
                 {filterOpen && (
-                  <div className="df-filter-panel" onClick={(e) => e.stopPropagation()}>
-                    <header>
-                      <strong>{props.lang === "zh" ? "Task filters" : "Task filters"}</strong>
+                  <>
+                    <div className="df-filter-panel" onClick={(e) => e.stopPropagation()}>
+                      <div className="df-filter-categories">
+                        {effectiveFilterCategories.map((cat) => (
+                          <button
+                            key={cat.key}
+                            type="button"
+                            className={`df-filter-cat-row${activeFilterCategory === cat.key ? " active" : ""}${cat.activeCount > 0 ? " has-active" : ""}`}
+                            onMouseEnter={() => setFilterExpandedCategory(cat.key)}
+                            onFocus={() => setFilterExpandedCategory(cat.key)}
+                          >
+                            <span className="df-filter-cat-icon" aria-hidden="true">
+                              {cat.icon === "circle" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>}
+                              {cat.icon === "flag" && <svg viewBox="0 0 14 14"><path d="M3 2v10M3 3h8l-1.5 2.5L11 8H3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
+                              {cat.icon === "clock" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M7 4v3l2 1.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                              {cat.icon === "folder" && <svg viewBox="0 0 14 14"><path d="M2 4v7h10V5H7L5.5 3.5H2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
+                              {cat.icon === "calendar" && <svg viewBox="0 0 14 14"><rect x="2" y="3" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M2 6h10M5 2v2M9 2v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                              {cat.icon === "layers" && <svg viewBox="0 0 14 14"><path d="M7 2l5 2.5-5 2.5-5-2.5L7 2zM2 7l5 2.5L12 7M2 9.5L7 12l5-2.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>}
+                              {cat.icon === "check" && <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M4.5 7l1.8 1.8L9.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                            </span>
+                            <span className="df-filter-cat-label">{cat.label}</span>
+                            {cat.activeCount > 0 && <span className="df-filter-cat-count">{cat.activeCount}</span>}
+                            <svg className="df-filter-cat-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M2 2l4 5-4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                        ))}
+                        {effectiveFilterCategories.length === 0 && <div className="df-filter-empty">{props.lang === "zh" ? "\u6682\u65e0\u53ef\u7528\u7b5b\u9009" : "No filters available"}</div>}
+                      </div>
                       {hasActiveFilters && (
-                        <button type="button" onClick={() => { setFilterProjects([]); setFilterWorkflows([]); setFilterImportances([]); setFilterUrgencies([]); }}>
-                          {props.lang === "zh" ? "Reset" : "Reset"}
+                        <button type="button" className="df-filter-reset" onClick={clearAllFilters}>
+                          {props.lang === "zh" ? "\u6e05\u9664\u5168\u90e8" : "Clear all"}
                         </button>
                       )}
-                    </header>
-                    {filterChips.map((chip) => (
-                      <section key={chip.key} className="df-filter-section">
-                        <div className="df-filter-section-head">
-                          <span>{chip.label}</span>
-                          <small>{chip.selected.length > 0 ? chip.selected.join(", ") : (props.lang === "zh" ? "All" : "All")}</small>
-                        </div>
-                        <div className="df-filter-options">
-                          {chip.options.map((opt) => (
-                            <label key={opt.value} className={`df-filter-option${opt.checked ? " checked" : ""}`}>
-                              <input type="checkbox" checked={opt.checked} onChange={opt.onToggle} />
-                              <span>{opt.label}</span>
+                    </div>
+                    {activeFilterCategory && (
+                      <div
+                        className="df-filter-flyout-panel"
+                        style={{ top: `calc(100% + 6px + ${activeFilterCategoryIndex * 31}px)` }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="df-filter-options-view">
+                          <div className="df-filter-options-title">{effectiveFilterCategories.find((cat) => cat.key === activeFilterCategory)?.label}</div>
+                          {(filterOptionsByCategory[activeFilterCategory] || []).map((option) => (
+                            <label key={option.value} className={`df-filter-option${option.checked ? " checked" : ""}`}>
+                              <input type={option.inputType || "checkbox"} checked={option.checked} onChange={option.onToggle} />
+                              {option.dotColor && <span className="df-filter-option-dot" style={{ background: option.dotColor }} />}
+                              <span>{option.label}</span>
                             </label>
                           ))}
                         </div>
-                      </section>
-                    ))}
-                  </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-              {availableModes.length > 1 && (
-                <div className="df-planning-view-switch">
-                  {availableModes.map((m) => (
-                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)}>
-                      {m === "tree" ? (props.lang === "zh" ? "Tree" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "Matrix" : "Matrix") : (props.lang === "zh" ? "List" : "List")}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-          </aside>
-          <div className="df-tree-wrap">
+
+          {activeFilterChips.length > 0 && (
+            <div className="df-active-filter-bar" role="region" aria-label={props.lang === "zh" ? "Active filters" : "Active filters"}>
+              {activeFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className="df-active-filter-chip"
+                  onClick={chip.onClear}
+                  title={props.lang === "zh" ? "\u79fb\u9664\u7b5b\u9009" : "Remove filter"}
+                >
+                  <span className="df-active-filter-chip-label">{chip.label}</span>
+                  <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" /></svg>
+                </button>
+              ))}
+              <button type="button" className="df-active-filter-clear" onClick={clearAllFilters}>
+                {props.lang === "zh" ? "\u6e05\u9664\u5168\u90e8" : "Clear all"}
+              </button>
+            </div>
+          )}
 
           {viewMode === "kanban" && (
             <div className="df-kanban-board">
               {(["backlog", "done"] as UiWorkflowStatus[]).map((status) => {
-                const columnTasks = kanbanTasks.filter((task) => status === "done" ? normalizeWorkflowStatus(task) === "done" : normalizeWorkflowStatus(task) !== "done");
+                const columnTasks = orderPlanningTasks(kanbanTasks.filter((task) => status === "done" ? normalizeWorkflowStatus(task) === "done" : normalizeWorkflowStatus(task) !== "done"));
                 return (
                   <div
                     key={status}
-                    className={`df-kanban-column${kanbanDropStatus === status ? " is-drop-target" : ""}`}
-                    onDragOver={(e) => { e.preventDefault(); setKanbanDropStatus(status); }}
-                    onDragLeave={() => setKanbanDropStatus(null)}
-                    onDrop={(e) => { e.preventDefault(); handleKanbanDrop(status); }}
+                    className={`df-kanban-column${kanbanDropStatus === status ? " is-drop-target drop-container-active" : ""}`}
+                    data-kanban-status={status}
                   >
                     <div className="df-kanban-column-header">
                       <span>{status === "done" ? (props.lang === "zh" ? "Done" : "Done") : (props.lang === "zh" ? "Tasks" : "Tasks")}</span>
                       <small>{columnTasks.length}</small>
+                      {columnTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0) > 0 && (
+                        <em className="df-kanban-column-duration">{columnTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0)}h</em>
+                      )}
                     </div>
                     <div className="df-kanban-card-list">
-                      {columnTasks.map((task) => (
+                      {columnTasks.map((task) => {
+                        const isDropTarget = listDropTargetId === task.id;
+                        return (
+                        <React.Fragment key={task.id}>
+                        {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
                         <TaskBlock
                           key={task.id}
                           as="div"
@@ -1257,15 +1925,16 @@ export default function PlanningView(props: {
                           checked={normalizeWorkflowStatus(task) === "done"}
                           projectColor={projectColor(task.projectId)}
                           className={`df-kanban-card${normalizeWorkflowStatus(task) === "done" ? " completed" : ""}`}
-                          draggable
-                          onDragStart={() => setKanbanDragTaskId(task.id)}
-                          onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
-                          onClick={() => props.onTaskEdit(task)}
+                          dataAttrs={{ "planning-task-id": task.id, "planning-container": `kanban:${status}` }}
+                          onPointerDown={(event) => beginPlanningDrag(event, task, "planning")}
+                          onClick={() => openTaskFromPlanning(task)}
                         >
                           <TaskBlockRow>
                             <TaskCheckbox
                               checked={normalizeWorkflowStatus(task) === "done"}
                               tone={normalizeTaskCheckTone(task)}
+                              importance={task.importance}
+                              urgency={task.urgency}
                               className="df-list-status-toggle"
                               ariaLabel={normalizeWorkflowStatus(task) === "done" ? "Mark open" : "Mark done"}
                               onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done")); }}
@@ -1278,8 +1947,14 @@ export default function PlanningView(props: {
                             </TaskBlockContent>
                           </TaskBlockRow>
                         </TaskBlock>
-                      ))}
-                      {columnTasks.length === 0 && <div className="df-kanban-empty">{props.lang === "zh" ? "Drop tasks here" : "Drop tasks here"}</div>}
+                        {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                        </React.Fragment>
+                        );
+                      })}
+                      {planningDragTask && kanbanDropStatus === status && (
+                        <div className="df-kanban-drop-placeholder" aria-hidden="true" />
+                      )}
+                      {columnTasks.length === 0 && !planningDragTask && <div className="df-kanban-empty">{props.lang === "zh" ? "Drop tasks here" : "Drop tasks here"}</div>}
                     </div>
                   </div>
                 );
@@ -1295,26 +1970,33 @@ export default function PlanningView(props: {
                 { key: "q3", label: "Handle soon", importance: "low" as const, urgency: "high" as const },
                 { key: "q4", label: "Later", importance: "low" as const, urgency: "low" as const },
               ]).map((quad) => {
-                const quadTasks = viewFilteredTasks.filter((task) => {
+                const quadTasks = orderPlanningTasks(viewFilteredTasks.filter((task) => {
                   const imp = task.importance || "medium";
                   const urg = task.urgency || "medium";
                   const matchImp = quad.importance === "high" ? imp === "high" : imp !== "high";
                   const matchUrg = quad.urgency === "high" ? urg === "high" : urg !== "high";
                   return matchImp && matchUrg;
-                });
+                }));
                 return (
                   <div
                     key={quad.key}
-                    className={`df-eisenhower-quadrant${kanbanDropStatus === ("q-" + quad.key) as unknown as UiWorkflowStatus ? " is-drop-target" : ""}`}
-                    onDragOver={(e) => { e.preventDefault(); setKanbanDropStatus(("q-" + quad.key) as unknown as UiWorkflowStatus); }}
-                    onDragLeave={() => setKanbanDropStatus(null)}
-                    onDrop={(e) => { e.preventDefault(); handleQuadrantDrop(quad.importance, quad.urgency); }}
+                    className={`df-eisenhower-quadrant${kanbanDropStatus === ("q-" + quad.key) as unknown as UiWorkflowStatus ? " is-drop-target drop-container-active" : ""}`}
+                    data-quadrant={quad.key}
                   >
-                    <div className="df-eisenhower-quadrant-header"><span>{quad.label}</span><small>{quadTasks.length}</small></div>
+                    <div className="df-eisenhower-quadrant-header">
+                      <span>{quad.label}</span>
+                      <small>{quadTasks.length}</small>
+                      {quadTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0) > 0 && (
+                        <em className="df-eisenhower-quadrant-duration">{quadTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0)}h</em>
+                      )}
+                    </div>
                     <div className="df-eisenhower-task-list">
                       {quadTasks.map((task) => {
                         const taskDone = normalizeWorkflowStatus(task) === "done";
+                        const isDropTarget = listDropTargetId === task.id;
                         return (
+                          <React.Fragment key={task.id}>
+                          {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
                           <TaskBlock
                             key={task.id}
                             as="div"
@@ -1324,15 +2006,16 @@ export default function PlanningView(props: {
                             checked={taskDone}
                             projectColor={projectColor(task.projectId)}
                             className={`df-eisenhower-task${taskDone ? " completed" : ""}`}
-                            draggable
-                            onDragStart={() => setKanbanDragTaskId(task.id)}
-                            onDragEnd={() => { setKanbanDragTaskId(null); setKanbanDropStatus(null); }}
-                            onClick={() => props.onTaskEdit(task)}
+                            dataAttrs={{ "planning-task-id": task.id, "planning-container": `matrix:${quad.key}` }}
+                            onPointerDown={(event) => beginPlanningDrag(event, task, "planning")}
+                            onClick={() => openTaskFromPlanning(task)}
                           >
                             <TaskBlockRow>
                               <TaskCheckbox
                                 checked={taskDone}
                                 tone={normalizeTaskCheckTone(task)}
+                                importance={task.importance}
+                                urgency={task.urgency}
                                 className="df-list-status-toggle"
                                 ariaLabel={taskDone ? "Mark open" : "Mark done"}
                                 onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(taskDone ? "backlog" : "done")); }}
@@ -1345,9 +2028,14 @@ export default function PlanningView(props: {
                               </TaskBlockContent>
                             </TaskBlockRow>
                           </TaskBlock>
+                          {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                          </React.Fragment>
                         );
                       })}
-                      {quadTasks.length === 0 && <div className="df-eisenhower-empty">Drop tasks here</div>}
+                      {planningDragTask && kanbanDropStatus === (("q-" + quad.key) as unknown as UiWorkflowStatus) && (
+                        <div className="df-kanban-drop-placeholder" aria-hidden="true" />
+                      )}
+                      {quadTasks.length === 0 && !planningDragTask && <div className="df-eisenhower-empty">Drop tasks here</div>}
                     </div>
                   </div>
                 );
@@ -1356,37 +2044,49 @@ export default function PlanningView(props: {
           )}
           {viewMode === "list" && (
             <div className="df-planning-list">
-              {viewFilteredTasks.length === 0 && <div className="df-planning-list-empty">{props.lang === "zh" ? "暂无任务" : "No tasks"}</div>}
-              {viewFilteredTasks.map((task) => {
+              {viewFilteredTasks.length === 0 && <div className="df-planning-list-empty">{props.lang === "zh" ? "\u6682\u65e0\u4efb\u52a1" : "No tasks"}</div>}
+              {orderPlanningTasks(viewFilteredTasks).map((task) => {
                 const uiStatus = normalizeWorkflowStatus(task);
+                const isDropTarget = listDropTargetId === task.id;
                 return (
-                  <TaskBlock
+                  <div
                     key={task.id}
-                    as="div"
-                    variant="compact"
-                    appearance="calm"
-                    priority={planningTaskPriority(task)}
-                    checked={uiStatus === "done"}
-                    projectColor={projectColor(task.projectId)}
-                    className="df-planning-list-row"
+                    className={`df-planning-list-row-wrap${isDropTarget ? ` is-list-drop is-${listDropPosition}` : ""}`}
+                    data-list-task-id={task.id}
                   >
-                    <TaskBlockRow>
-                      <TaskCheckbox
-                        checked={uiStatus === "done"}
-                        tone={normalizeTaskCheckTone(task)}
-                        className="df-list-status-toggle"
-                        ariaLabel={uiStatus === "done" ? "Mark open" : "Mark done"}
-                        onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}
-                      />
-                      <TaskBlockContent title={<span className="df-list-title" onClick={() => props.onTaskEdit(task)}>{task.title}</span>} />
-                      <TaskBlockDuration>
-                        <span className="df-list-project">{projectName(task.projectId)}</span>
-                      </TaskBlockDuration>
-                      <TaskActions>
-                        {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "截止" : "Due"}>{task.dueDate.slice(5)}</span>}
-                      </TaskActions>
-                    </TaskBlockRow>
-                  </TaskBlock>
+                    {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                    <TaskBlock
+                      as="div"
+                      variant="compact"
+                      appearance="calm"
+                      priority={planningTaskPriority(task)}
+                      checked={uiStatus === "done"}
+                      projectColor={projectColor(task.projectId)}
+                      className="df-planning-list-row"
+                      dataAttrs={{ "planning-task-id": task.id, "planning-container": "list" }}
+                      onPointerDown={(event) => beginPlanningDrag(event, task, "compact")}
+                    >
+                      <TaskBlockRow>
+                        <TaskCheckbox
+                          checked={uiStatus === "done"}
+                          tone={normalizeTaskCheckTone(task)}
+                          importance={task.importance}
+                          urgency={task.urgency}
+                          className="df-list-status-toggle"
+                          ariaLabel={uiStatus === "done" ? "Mark open" : "Mark done"}
+                          onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}
+                        />
+                        <TaskBlockContent title={<span className="df-list-title" onClick={() => openTaskFromPlanning(task)}>{task.title}</span>} />
+                        <TaskBlockDuration>
+                          <span className="df-list-project">{projectName(task.projectId)}</span>
+                        </TaskBlockDuration>
+                        <TaskActions>
+                          {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "\u622a\u6b62\u65e5\u671f" : "Due"}>{task.dueDate.slice(5)}</span>}
+                        </TaskActions>
+                      </TaskBlockRow>
+                    </TaskBlock>
+                    {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  </div>
                 );
               })}
             </div>
@@ -1396,33 +2096,14 @@ export default function PlanningView(props: {
           <div
             className={`df-tree${dragNode ? " is-tree-dragging" : ""}`}
             ref={treeRef}
-            onDragStartCapture={(event) => {
-              if (props.compact) {
-                event.preventDefault();
-                return;
-              }
+            onPointerDown={(event) => {
+              if (props.compact) return;
               const origin = event.target as HTMLElement;
-              if (origin.closest("button, input, textarea, select, [contenteditable='true']")) {
-                event.preventDefault();
-                return;
-              }
+              if (origin.closest("button, input, textarea, select, [contenteditable='true']")) return;
               const node = origin.closest<HTMLElement>("[data-node-type][data-node-id]");
               if (!node) return;
               const source = { kind: node.dataset.nodeType as TreeNodeKind, id: node.dataset.nodeId || "" };
-              setDragNode(source);
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("application/x-navopath-tree", JSON.stringify(source));
-            }}
-            onDragOver={handleTreeDragOver}
-            onDrop={(event) => {
-              event.preventDefault();
-              if (dragNode && dropTarget) void handleTreeDrop(dragNode, dropTarget);
-              setDragNode(null);
-              setDropTarget(null);
-            }}
-            onDragEnd={() => {
-              setDragNode(null);
-              setDropTarget(null);
+              beginTreeDrag(event, source);
             }}
           >
             {svgLines}
@@ -1445,6 +2126,7 @@ export default function PlanningView(props: {
                   onOpen={() => props.onProjectEdit(project)}
                   onAddTask={() => props.onTaskCreate(project.id)}
                   onComplete={() => props.onProjectComplete?.(project.id)}
+                  dragging={dragNode?.kind === "project" && dragNode.id === project.id}
                 />
                 {!props.collapsed[project.id] && (
                   <div className="df-project-tasks">
@@ -1457,7 +2139,7 @@ export default function PlanningView(props: {
                           projectColor={project.color || DEFAULT_PROJECT_COLOR}
                           collapsed={Boolean(collapsedSubtasks[task.id])}
                           onToggleCollapse={() => setCollapsedSubtasks((current) => ({ ...current, [task.id]: !current[task.id] }))}
-                          onOpen={() => props.onTaskEdit(task)}
+                          onOpen={() => openTaskFromPlanning(task)}
                           onToggleTodayCandidate={() => props.onToggleTodayCandidate(task.id)}
                           onRename={() => renameTask(task)}
                           onAddSubtask={() => addSubtask(task)}
@@ -1466,6 +2148,7 @@ export default function PlanningView(props: {
                           onDelete={() => props.onTaskDelete(task.id)}
                           onToggleComplete={() => props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done"))}
                           onToggleSubtask={(subtaskId) => toggleSubtask(task.id, subtaskId)}
+                          dragging={dragNode?.kind === "task" && dragNode.id === task.id}
                         />
                         {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
                           <div className="df-subtask-list" data-parent-id={task.id}>
@@ -1481,7 +2164,8 @@ export default function PlanningView(props: {
                                 onSetDate={setSubtaskDate}
                                 onMoveProject={moveSubtaskProject}
                                 onDelete={deleteSubtask}
-                              onAddSubtask={(parentId) => addSubtask(task, parentId)}
+                                onAddSubtask={(parentId) => addSubtask(task, parentId)}
+                                dragging={dragNode?.kind === "subtask" && dragNode.id === subtask.id}
                               />
                             ))}
                           </div>
@@ -1503,6 +2187,7 @@ export default function PlanningView(props: {
                   onToggleCollapse={() => props.setCollapsed((current) => ({ ...current, unassigned: !current.unassigned }))}
                   onOpen={() => {}}
                   onAddTask={() => props.onTaskCreate("")}
+                  dragging={dragNode?.kind === "project" && dragNode.id === "__unassigned__"}
                 />
                 {!props.collapsed.unassigned && (
                   <div className="df-project-tasks">
@@ -1515,7 +2200,7 @@ export default function PlanningView(props: {
                           projectColor={UNASSIGNED_COLOR}
                           collapsed={Boolean(collapsedSubtasks[task.id])}
                           onToggleCollapse={() => setCollapsedSubtasks((current) => ({ ...current, [task.id]: !current[task.id] }))}
-                          onOpen={() => props.onTaskEdit(task)}
+                          onOpen={() => openTaskFromPlanning(task)}
                           onToggleTodayCandidate={() => props.onToggleTodayCandidate(task.id)}
                           onRename={() => renameTask(task)}
                           onAddSubtask={() => addSubtask(task)}
@@ -1524,6 +2209,7 @@ export default function PlanningView(props: {
                           onDelete={() => props.onTaskDelete(task.id)}
                           onToggleComplete={() => props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done"))}
                           onToggleSubtask={(subtaskId) => toggleSubtask(task.id, subtaskId)}
+                          dragging={dragNode?.kind === "task" && dragNode.id === task.id}
                         />
                         {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
                           <div className="df-subtask-list" data-parent-id={task.id}>
@@ -1539,7 +2225,8 @@ export default function PlanningView(props: {
                                 onSetDate={setSubtaskDate}
                                 onMoveProject={moveSubtaskProject}
                                 onDelete={deleteSubtask}
-                              onAddSubtask={(parentId) => addSubtask(task, parentId)}
+                                onAddSubtask={(parentId) => addSubtask(task, parentId)}
+                                dragging={dragNode?.kind === "subtask" && dragNode.id === subtask.id}
                               />
                             ))}
                           </div>
@@ -1555,6 +2242,40 @@ export default function PlanningView(props: {
         </div>
       </section>
 
+      {planningDragTask && (
+        <TaskDragLayer
+          pointer={planningDragTask.pointer}
+          sourceRect={planningDragTask.sourceRect}
+          offset={planningDragTask.offset}
+        >
+          <TaskBlock
+            as="article"
+            variant={planningDragTask.variant}
+            appearance="calm"
+            priority={planningTaskPriority(planningDragTask.task)}
+            checked={normalizeWorkflowStatus(planningDragTask.task) === "done"}
+            dragState="overlay"
+            projectColor={projectColor(planningDragTask.task.projectId)}
+            className="df-task-card"
+            style={{ width: "100%", height: "100%", minHeight: 0 }}
+          >
+            <TaskBlockRow>
+              <TaskCheckbox
+                checked={normalizeWorkflowStatus(planningDragTask.task) === "done"}
+                tone={normalizeTaskCheckTone(planningDragTask.task)}
+              />
+              <TaskBlockContent
+                title={<span>{planningDragTask.task.title}</span>}
+              />
+              {planningDragTask.task.estimatedHours ? (
+                <TaskBlockDuration>
+                  <span className="df-duration-pill">{planningDragTask.task.estimatedHours}h</span>
+                </TaskBlockDuration>
+              ) : null}
+            </TaskBlockRow>
+          </TaskBlock>
+        </TaskDragLayer>
+      )}
       </div>
     </main>
   );
