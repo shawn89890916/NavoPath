@@ -5,7 +5,7 @@
 ### 修复
 - 修复选中态不生效的持久化 bug：表单初始化使用 `??` 运算符将 `null`（未设置）误回落到 `priority ?? "high"`，导致重新打开抽屉后"未设置"状态丢失。改为 `!== undefined` 检查以保留显式 `null`。
 - 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：全局按钮规则强制设置 `border-color` / `box-shadow`，覆盖了选中态。将 `.df-level-option` 加入所有全局按钮规则的 `:not()` 排除列表，选中态改为显式 `data-selected="true"` 属性选择器 + 内联 `--option-color` CSS 变量。
-- 选中态视觉反馈收敛为简洁的内嵌描边：选中段以 `box-shadow: inset 0 0 0 2px` 语义色环 + 6% 语义色底色标识，借容器 `overflow: hidden` + `border-radius: 12px` 让边缘段的描边自然贴合圆角，视觉上与分段控件融为一体，不再像额外贴上的方框。段间分隔由按钮自身 `border-right` 承担，与内嵌描边不冲突。
+- 选中态视觉反馈改为伪元素内嵌环：选中段使用 `::after` 伪元素实现 2px 语义色内嵌环 + 6% 语义色底色，环位于按钮内部（inset: 3px），边缘段的环圆角与容器 12px 圆角匹配，视觉上无缝融入分段控件。伪元素不受全局 `.df-app button` 的 `box-shadow: none !important` 压制，彻底解决了之前选中态被覆盖的问题。
 
 ### 改进
 - 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为连接式分段图标选择器（segmented control），四段共享外框与圆角，段间以细分隔线划分。
@@ -38,7 +38,7 @@
 ### Fixes
 - Fixed selected-state persistence bug: form initialization used `??` operator which treated `null` (unset) as falsy and fell through to `priority ?? "high"`, causing "unset" state to be lost on drawer reopen. Changed to `!== undefined` check to preserve explicit `null`.
 - Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: global button rules forced `border-color` / `box-shadow` on all buttons, overriding the selected state. Added `.df-level-option` to every global button rule's `:not()` exclusion list, and switched the selected state to an explicit `data-selected="true"` attribute selector with an inline `--option-color` CSS variable.
-- Selected-state visual feedback is now a crisp inset ring: the selected segment uses `box-shadow: inset 0 0 0 2px` in its semantic color with a 6% semantic tint; the container's `overflow: hidden` + `border-radius: 12px` lets the ring follow the rounded corners at the edges so it feels integrated, not like a patched-on box. Segment dividers use the button's own `border-right`, which does not conflict with the inset ring.
+- Selected-state visual feedback is now a pseudo-element inset ring: the selected segment uses a `::after` pseudo-element for a 2px semantic-color inset ring with a 6% semantic tint, positioned inside the button (inset: 3px), with matching rounded corners at the edges that blend seamlessly into the segmented control. Pseudo-elements are NOT affected by the global `.df-app button` `box-shadow: none !important` rules, completely solving the previous override issue.
 
 ### Improvements
 - Refactored the task drawer's "Importance / Urgency" controls from plain text buttons into a connected segmented icon strip sharing one outer border and rounded corners, with thin dividers between segments.

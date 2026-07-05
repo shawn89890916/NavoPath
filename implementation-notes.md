@@ -133,13 +133,12 @@
 ## Importance / Urgency Selected State Debug
 
 - Component: `EditDrawer` in `src/main.tsx`
-- Click handler: `commitTaskMeta(kind, value)` — calls `set(kind, null-or-value)` to update form state, then `props.onTaskUpdate()` to persist
-- Data field updated: `form.importance` / `form.urgency` (form state) and `task.importance` / `task.urgency` (task data)
-- Selected class applied to: `<button class="df-level-option df-level-{value} active">`
-- CSS selector: `.df-app .df-level-selector .df-level-option.active` (specificity 0,4,0 + `!important`)
-- Root cause 1 (persistence): Form initialization used `??` operator which treats `null` as falsy, falling through to `priority ?? "high"`. Fixed with `!== undefined` check to preserve explicit `null`.
-- Root cause 2 (visibility): CSS selected state at 12% tint + 2px bottom rule was too subtle. Strengthened to 18% tint + 3px bottom rule + border-color.
-- Root cause 3 (CSS override): Global `.df-app button:not(...)` rules with `!important` overrode border, background, and box-shadow. Fixed with higher specificity selectors + `!important`.
+- Selected value source: `(f.importance ?? "unset")` / `(f.urgency ?? "unset")` — derived from form state, maps `null` to `"unset"`
+- Selected button has data-selected: `<button data-selected="true">` when matching current value, `data-selected="false"` otherwise
+- Selected button has aria-pressed: `<button aria-pressed="true">` when matching current value, `aria-pressed="false"` otherwise
+- CSS selector used: `.df-app .df-level-selector .df-level-option[data-selected="true"]` (specificity 0,4,1)
+- Root cause: Global button rules at lines 1702-1713 of app-redesign.css — `.df-app button, .df-app button:hover:not(:disabled), .df-app button:focus-visible, .df-app button:disabled` — set `box-shadow: none !important` on ALL buttons WITHOUT excluding `.df-level-option`. This overrides the selected state's inset ring on the button element itself.
+- Solution: Use `::after` pseudo-element for the selected ring instead of `box-shadow` on the button, since pseudo-elements are NOT targeted by `.df-app button` selectors and thus avoid the specificity war entirely.
 
 ## Importance / Urgency Display Mapping
 

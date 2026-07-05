@@ -510,23 +510,47 @@
   position: relative;
   z-index: 1;
 }
-/* Selected option: crisp 2px semantic inset ring + very subtle tint.
-   The inset ring hugs the inside of the segment and, thanks to the
-   container's overflow:hidden + border-radius, follows the rounded
-   corners at the edges so it looks integrated, not patched on. */
-.df-app .df-level-selector .df-level-option[data-selected="true"] {
-  box-shadow: inset 0 0 0 2px var(--option-color, var(--df-option-color, #8E8478)) !important;
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg)) !important;
-  background-image: none !important;
+/* Selected option: pseudo-element inner ring + subtle tint.
+   The ::after pseudo-element is NOT targeted by global .df-app button
+   rules, so it avoids the specificity war entirely. */
+.df-app .df-level-selector .df-level-option::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 160ms ease;
+}
+.df-app .df-level-selector .df-level-option[data-selected="true"]::after,
+.df-app .df-level-selector .df-level-option[aria-pressed="true"]::after {
+  opacity: 1;
+  box-shadow: inset 0 0 0 2px var(--option-color, var(--df-option-color, #8E8478));
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, transparent);
+}
+.df-app .df-level-selector .df-level-option:first-child::after {
+  border-radius: 9px 8px 8px 9px;
+}
+.df-app .df-level-selector .df-level-option:last-child::after {
+  border-radius: 8px 9px 9px 8px;
+}
+.df-app .df-level-selector .df-level-option:first-child:last-child::after {
+  border-radius: 9px;
 }
 /* Unselected option: quiet paper background, no ring. */
 .df-app .df-level-selector .df-level-option[data-selected="false"] {
-  box-shadow: none !important;
   background: transparent !important;
   background-image: none !important;
 }
 .df-app .df-level-selector .df-level-option[data-selected="false"]:hover {
   background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 5%, var(--paper-bg)) !important;
+}
+/* Ensure icon and urgency-mark stay above the pseudo-element ring. */
+.df-app .df-level-selector .df-level-option .df-level-icon,
+.df-app .df-level-selector .df-level-option .df-urgency-mark {
+  position: relative;
+  z-index: 1;
 }
 .df-app .df-level-selector .df-level-icon {
   width: 19px;
@@ -1699,10 +1723,10 @@
   --pencil-rule-strong: color-mix(in srgb, var(--text-main) 68%, transparent);
   --pencil-press: color-mix(in srgb, var(--text-main) 18%, transparent);
 }
-.df-app button,
-.df-app button:hover:not(:disabled),
-.df-app button:focus-visible,
-.df-app button:disabled,
+.df-app button:not(.df-level-option),
+.df-app button:not(.df-level-option):hover:not(:disabled),
+.df-app button:not(.df-level-option):focus-visible,
+.df-app button:not(.df-level-option):disabled,
 .df-app .df-project-choice,
 .df-app .df-project-choice:hover {
   background-color: transparent !important;
