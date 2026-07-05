@@ -9703,11 +9703,27 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const isWeekView = viewMode === "weekly";
   const start = preview?.start || task.scheduledStart || "09:00";
-  const end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task));
+  const computedDuration = taskDuration(task);
+  let end = preview?.end || task.scheduledEnd || addMinutes(start, computedDuration);
+  
+  const endMinutesValue = timeToMinutes(end);
+  const startMinutesValue = timeToMinutes(start);
+  let calculatedDurationMinutes = endMinutesValue - startMinutesValue;
+  
+  if (calculatedDurationMinutes <= 0) {
+    end = addMinutes(start, computedDuration);
+    calculatedDurationMinutes = computedDuration;
+  }
+  
+  if (calculatedDurationMinutes > 24 * 60) {
+    end = addMinutes(start, computedDuration);
+    calculatedDurationMinutes = computedDuration;
+  }
+  
   const top = timeBlockTop(start, dayStartHour);
   const height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT);
-  const durationMinutes = timeToMinutes(end) - timeToMinutes(start);
-  const startMinutes = timeToMinutes(start);
+  const durationMinutes = calculatedDurationMinutes;
+  const startMinutes = startMinutesValue;
   const endMinutes = timeToMinutes(end);
   const hourHeight = 120;
   

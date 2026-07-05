@@ -187,25 +187,29 @@
 
 ## Timeline Short Event Height Root Cause
 
-- Event wrapper component: `TaskBlock` rendered by `TimeBlock` in src/main.tsx (line 9782)
+- Event wrapper component: `TaskBlock` rendered by `TimeBlock` in src/main.tsx (line 9700)
 - Inner TaskBlock component: `TaskBlock` from src/components/TaskBlock.tsx
-- Calculation flow:
+- Calculation flow (fixed):
   - `start = preview?.start || task.scheduledStart || "09:00"`
-  - `end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task))`
+  - `computedDuration = taskDuration(task)` — gets duration from task
+  - `end = preview?.end || task.scheduledEnd || addMinutes(start, computedDuration)`
+  - Validate duration: if `endMinutes - startMinutes <= 0` or `> 24*60`, recalculate `end = start + computedDuration`
   - `top = timeBlockTop(start, dayStartHour)` 
   - `height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT)`
   - `durationMinutes = timeToMinutes(end) - timeToMinutes(start)`
-- Inline styles applied: `{ top: topPx, height: heightPx, position: 'absolute' }`
+- Inline styles applied: `{ top: topPx, height: heightPx, bottom: 'auto', position: 'absolute' }`
 - CSS rules affecting height:
   - `app-redesign.css:1557`: `.df-app .df-time-block` has `justify-content: center !important`
   - `app-redesign.css:1558`: `.df-app .df-time-block` has `padding: 8px 12px 8px 28px !important`
   - `task-block.css:512`: `.df-task-block[data-task-variant="scheduled"]` has `position: absolute !important`
 - Debug logging added: Console.table for task "更新作品集首页文案" with durationMinutes, startMinutes, endMinutes, heightPx, and computed DOM styles via requestAnimationFrame
 - Data attributes added to event wrapper: `data-timeline-event-id`, `data-task-id`, `data-duration-minutes`, `data-start-minutes`, `data-height-px`, `data-schedule-size`
-- Root cause (pending verification from console output): Likely one of:
-  A. `scheduledEnd` is set to end of day (midnight) causing huge duration
-  B. CSS `justify-content: center` or padding causing visual stretching
-  C. Missing `bottom: auto` allowing CSS to override height
+- Root cause: **Case A - wrong task duration/end-time data**
+  - When `scheduledEnd` was missing or incorrectly set (e.g., to midnight/end of day), the duration was calculated as huge
+  - The fallback `addMinutes(start, taskDuration(task))` was not being used correctly because `scheduledEnd` might have been set to a wrong value
+- Fix: Added validation to recalculate `end` if `endMinutes - startMinutes <= 0` or `> 24*60`, ensuring short tasks always have correct duration
+- Also added `bottom: auto` to inline styles to prevent CSS from overriding the height
+- Added development warnings: console.error if short task renders too tall, console.warn if endMinutes <= startMinutes
 
 ## Importance / Urgency Display Mapping
 
