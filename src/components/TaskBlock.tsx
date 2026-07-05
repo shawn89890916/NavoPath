@@ -255,6 +255,8 @@ export function TaskCheckbox({
   checked,
   tone = "muted",
   returned,
+  importance,
+  urgency,
   children,
   className,
   title,
@@ -266,6 +268,8 @@ export function TaskCheckbox({
   checked?: boolean;
   tone?: string;
   returned?: boolean;
+  importance?: "high" | "medium" | "low" | null;
+  urgency?: "high" | "medium" | "low" | null;
   children?: ReactNode;
   className?: string;
   title?: string;
@@ -274,25 +278,32 @@ export function TaskCheckbox({
   onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
   onPointerDown?: React.PointerEventHandler<HTMLButtonElement>;
 }) {
+  const imp = importance || "unset";
+  const urg = urgency || "unset";
   return (
-    <button
-      type="button"
-      className={[
-        "df-block-check",
-        "df-task-block-check",
-        `check-${tone}`,
-        checked ? "completed" : "",
-        returned ? "returned-unfinished" : "",
-        className || "",
-      ].filter(Boolean).join(" ")}
-      title={title}
-      aria-label={ariaLabel}
-      aria-pressed={checked}
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      onPointerDown={onPointerDown}
-    >
-      {children}
-    </button>
+    <span className="df-task-checkbox-wrap" data-importance={imp} data-urgency={urg}>
+      <button
+        type="button"
+        className={[
+          "df-block-check",
+          "df-task-block-check",
+          `check-${tone}`,
+          checked ? "completed" : "",
+          returned ? "returned-unfinished" : "",
+          className || "",
+        ].filter(Boolean).join(" ")}
+        title={title}
+        aria-label={ariaLabel}
+        aria-pressed={checked}
+        onClick={onClick}
+        onMouseDown={onMouseDown}
+        onPointerDown={onPointerDown}
+      >
+        {children}
+      </button>
+      {urg !== "unset" && !checked && (
+        <span className="df-task-urgency-mark" data-urgency={urg} aria-hidden="true">!</span>
+      )}
+    </span>
   );
 }

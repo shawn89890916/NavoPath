@@ -12,6 +12,9 @@
 - 重要程度使用标准 Lucide 风格旗帜图标，紧急程度使用横向文本感叹号，颜色统一为柔和 NavoPath 色板。
 - 新增“未设置”选项，点击可立即清空对应字段。
 - Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵。
+- 任务抽屉每行新增“当前：X”文本徽章，实时显示当前重要程度/紧急程度值，点击后立即更新，关闭重开抽屉仍保持一致。
+- 任务卡片复选框边框反映重要程度（高=珊瑚红 #C96F5B、中=琥珀 #C49A32、低=静蓝 #6E8DA6、未设置=中性墨色），完成后仍保留语义边框色。
+- 复选框右上角显示小型紧急程度“!”标记（高=珊瑚红、中=琥珀、低=静蓝），未设置时不显示，完成后隐藏，且不阻挡复选框点击。
 
 ## 2026-07-04 · 统一拖拽体验
 
@@ -43,6 +46,9 @@
 - Importance uses standard Lucide-style flag icons, urgency uses horizontal text exclamation marks, colors unified to muted NavoPath palette.
 - Added an "unset" option; clicking it immediately clears the field.
 - Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced.
+- Each drawer row now shows a "Current: X" text badge reflecting the live importance/urgency value; it updates immediately on click and stays consistent after closing and reopening the drawer.
+- Task card checkboxes now reflect importance via border color (high=coral #C96F5B, medium=amber #C49A32, low=muted blue #6E8DA6, unset=neutral ink); the semantic border color is retained after completion.
+- A small urgency "!" marker appears at the checkbox top-right (high=coral, medium=amber, low=muted blue); it is hidden when unset or completed, and never blocks the checkbox click target.
 
 ## 2026-07-04 · Unified drag experience
 

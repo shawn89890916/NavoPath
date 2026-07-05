@@ -141,6 +141,60 @@
 - Root cause 2 (visibility): CSS selected state at 12% tint + 2px bottom rule was too subtle. Strengthened to 18% tint + 3px bottom rule + border-color.
 - Root cause 3 (CSS override): Global `.df-app button:not(...)` rules with `!important` overrode border, background, and box-shadow. Fixed with higher specificity selectors + `!important`.
 
+## Importance / Urgency Display Mapping
+
+Records how `importance` and `urgency` are surfaced across the drawer, task cards, and Matrix.
+
+### Fields
+
+- `task.importance: NullablePriority` — `"high" | "medium" | "low" | null`
+- `task.urgency: NullablePriority` — `"high" | "medium" | "low" | null`
+- Missing / null / undefined values are treated as `"unset"` for display.
+
+### Drawer selected-state display
+
+- Each row in `EditDrawer` (`src/main.tsx`) shows: label, segmented icon selector, and a current-value text badge (`.df-level-current`) on the right.
+- Badge text: `当前：{value}` (zh) / `Current: {value}` (en). Unset maps to `未设置` / `Unset`.
+- Badge value is computed from `form.importance` / `form.urgency` on every render, so it updates immediately after click and survives close/reopen.
+- Selected option uses 18% semantic tint + semantic border + 3px bottom rule (see "Selected State Debug" above).
+
+### Task checkbox importance mapping
+
+- `TaskCheckbox` (`src/components/TaskBlock.tsx`) wraps the button in `<span class="df-task-checkbox-wrap" data-importance={imp} data-urgency={urg}>`.
+- `imp` / `urg` fall back to `"unset"` when the prop is null/undefined.
+- CSS in `src/app-redesign.css` maps `data-importance` to checkbox border color:
+  - `high` → `#C96F5B` (coral), border-width 1.5px
+  - `medium` → `#C49A32` (amber)
+  - `low` → `#6E8DA6` (muted blue)
+  - `unset` → `var(--paper-ink-muted, #8E8478)` (neutral)
+- Border color is preserved when the checkbox is checked (`.completed` / `[aria-pressed='true']`).
+
+### Task checkbox urgency marker
+
+- When `urgency !== "unset"` and the task is not completed, a small `!` marker (`.df-task-urgency-mark`) is rendered at the top-right of the checkbox wrap.
+- Marker color follows `data-urgency`: high `#C96F5B`, medium `#C49A32`, low `#6E8DA6`.
+- Marker is `pointer-events: none` so it never blocks the checkbox click target.
+- Marker has a thin paper-colored text-shadow so it stays readable against any background.
+
+### Completed checkbox behavior
+
+- Completed tasks still show the checkmark clearly; the card is not covered by a gray overlay and overall opacity is not reduced.
+- Importance border color is retained on the checked checkbox so the signal is not lost.
+- Urgency marker is hidden when the task is completed (the `!` is only rendered when `!checked`).
+
+### Matrix high/non-high mapping
+
+- Matrix remains 4 quadrants (not 3x3).
+- `importance === 'high'` → important axis; all other values (medium, low, unset) → non-high.
+- `urgency === 'high'` → urgent axis; all other values → non-high.
+- Quadrants: 紧急且重要, 不紧急但重要, 紧急但不重要, 不重要且不紧急.
+
+### Callers passing importance/urgency to TaskCheckbox
+
+- `src/main.tsx` — today candidate task card
+- `src/PlanningView.tsx` — planning tree task, kanban task, matrix task, list task
+- Drag overlay (`TaskDragLayer`) is visual-only and does not pass importance/urgency.
+
 ## Known Limitations
 
 - Planning Tree no longer uses a DOM-cloned overlay for task/subtask/project drags; it uses a React-rendered `TaskBlock` overlay from `TaskDragLayer`.

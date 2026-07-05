@@ -309,6 +309,7 @@ export function TaskDragLayer({ children, pointer, sourceRect, offset }: {
         left: `${pointer.x - offset.x}px`,
         top: `${pointer.y - offset.y}px`,
         width: `${sourceRect.width}px`,
+        height: `${sourceRect.height}px`,
         pointerEvents: "none",
         zIndex: 99999,
       }}

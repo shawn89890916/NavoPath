@@ -450,7 +450,7 @@
 }
 .df-detail-meta-setting {
   display: grid;
-  grid-template-columns: 72px max-content;
+  grid-template-columns: 72px max-content auto;
   align-items: center;
   column-gap: 16px;
 }
@@ -459,6 +459,14 @@
   font: 600 11px/1.4 var(--paper-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+.df-level-current {
+  justify-self: end;
+  color: var(--text-muted);
+  font: 500 11px/1.4 var(--paper-mono);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
 }
 .df-app .df-level-selector {
   display: inline-flex;
@@ -1301,6 +1309,74 @@
 .df-app .df-all-day-block .df-block-check:active:not(:disabled) {
   transform: translateY(calc(-50% + 1px)) !important;
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 18%, transparent) !important;
+}
+
+/* ============================================================
+ * Task checkbox importance / urgency visual mapping.
+ * Wrapper .df-task-checkbox-wrap carries data-importance and
+ * data-urgency attributes; the inner .df-block-check keeps its
+ * click behavior. Importance controls border color, urgency
+ * controls a small "!" marker at the top-right corner.
+ * ============================================================ */
+.df-task-checkbox-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Inside the wrap the grid handles vertical centering, so the
+ * legacy translateY(-50%) on .df-block-check is no longer needed
+ * and would misalign the urgency marker. */
+.df-app .df-task-checkbox-wrap .df-block-check {
+  transform: none !important;
+}
+.df-app .df-task-checkbox-wrap .df-block-check:active:not(:disabled) {
+  transform: translateY(1px) !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check {
+  border-color: #C96F5B !important;
+  border-width: 1.5px !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check {
+  border-color: #C49A32 !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check {
+  border-color: #6E8DA6 !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='unset'] .df-block-check {
+  border-color: var(--paper-ink-muted, #8E8478) !important;
+}
+/* Keep importance color when checked so the signal is not lost. */
+.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check.completed,
+.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check[aria-pressed='true'] {
+  border-color: #C96F5B !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check.completed,
+.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check[aria-pressed='true'] {
+  border-color: #C49A32 !important;
+}
+.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check.completed,
+.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check[aria-pressed='true'] {
+  border-color: #6E8DA6 !important;
+}
+
+/* Urgency marker — small "!" at the checkbox top-right. */
+.df-task-urgency-mark {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 2px var(--paper-bg, #FBF9FF);
+}
+.df-task-urgency-mark[data-urgency='high'] { color: #C96F5B; }
+.df-task-urgency-mark[data-urgency='medium'] { color: #C49A32; }
+.df-task-urgency-mark[data-urgency='low'] { color: #6E8DA6; }
+.theme-dark .df-task-urgency-mark {
+  text-shadow: 0 0 2px var(--paper-bg, #1a1a1a);
 }
 .df-app .df-date-arrow,
 .df-app .df-date-arrow:hover {
