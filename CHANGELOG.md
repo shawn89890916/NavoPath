@@ -4,9 +4,10 @@
 
 ### 改进
 - 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为图标分段选择器。
-- 重要程度使用标准 Lucide 风格旗帜图标（波浪旗面 + 旗杆），高=#B86F5F、中=#B47A2C、低=#5E718B、未设置=描边 #8B8173，图标 22px，tile 44×44px。
-- 紧急程度使用横向文本感叹号：高=!!! / 中=!! / 低=! / 未设置=—，字号 19px、字重 800、sans-serif 字体，不再像断裂的竖排标点。
-- 选中态采用 CSS 变量 `--df-option-color` 驱动：选项色边框 + 8% 选项色纸色底 + inset 底部 2px 规则线，选中状态一目了然。
+- 重要程度使用标准 Lucide 风格旗帜图标（波浪旗面 + 旗杆），高=#C96F5B、中=#C49A32、低=#6E8DA6、未设置=描边 #8E8478，图标 18px。
+- 紧急程度使用横向文本感叹号：高=!!! / 中=!! / 低=! / 未设置=—，字号 19px、字重 800、sans-serif 字体。
+- 选项 tile 改为轻盈 chip 风格（38×38px、8px 圆角、近隐形边框），不再像笨重的 debug 方框。
+- 未选中图标保留语义色但 opacity 0.72 略微减弱；选中时 opacity 1 + 语义色边框 + 10% 语义色纸色底 + inset 2px 底部规则线，点击即时反馈。
 - 颜色统一为柔和 NavoPath 色板（柔陶红 / 赭石黄 / 雾蓝灰 / 暖灰），无霓虹红/亮黄/亮蓝。
 - 新增“未设置”选项，点击可立即清空对应字段。
 - Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵；medium/low 仍保留在任务上作为元数据。
@@ -33,9 +34,10 @@
 
 ### Improvements
 - Refactored the task drawer's "Importance / Urgency" controls from plain text buttons ("High / Medium / Low") into icon-based segmented selectors.
-- Importance uses standard Lucide-style flag icons (wavy flag + pole): high = #B86F5F, medium = #B47A2C, low = #5E718B, unset = outlined #8B8173, at 22px with 44×44px tiles.
-- Urgency uses horizontal text exclamation marks: high = !!! / medium = !! / low = ! / unset = —, at 19px / weight 800 / sans-serif, no longer looking like broken vertical punctuation.
-- Selected state is driven by a CSS custom property `--df-option-color`: option-colored border + 8% option-tinted paper background + inset 2px bottom rule, making the selection obvious.
+- Importance uses standard Lucide-style flag icons (wavy flag + pole): high = #C96F5B, medium = #C49A32, low = #6E8DA6, unset = outlined #8E8478, at 18px.
+- Urgency uses horizontal text exclamation marks: high = !!! / medium = !! / low = ! / unset = —, at 19px / weight 800 / sans-serif.
+- Option tiles refined to light chip style (38×38px, 8px radius, near-invisible idle border), no longer looking like clunky debug boxes.
+- Unselected icons keep their semantic color at opacity 0.72; selected state shows opacity 1 + semantic-colored border + 10% semantic-tinted paper background + inset 2px bottom rule for immediate click feedback.
 - Colors unified to muted NavoPath palette (muted terracotta / ochre / slate blue / warm gray), no neon red, bright yellow, or bright blue.
 - Added an "unset" option; clicking it immediately clears the field.
 - Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced. Medium and low values are still preserved on the task as metadata.
