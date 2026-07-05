@@ -583,11 +583,44 @@
   font-size: 9px;
 }
 
-/* Tall scheduled block — can show more content. */
+/* Tall scheduled block — content stays at top, no vertical centering. */
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block,
 .navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block {
   --task-padding-x: 10px;
   --task-padding-y: 8px;
+  --task-align-items: flex-start;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-task-block-row,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-time-card-row,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-task-block-row {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  height: auto !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-block-check,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-task-block-check {
+  align-self: flex-start !important;
+  margin-top: 2px !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-time-card-main,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-time-card-main {
+  align-self: flex-start !important;
+  justify-content: flex-start !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-task-block-title,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-time-card-title,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block .df-task-block-title {
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* All-day block — inline, compact. */

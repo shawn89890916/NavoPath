@@ -140,6 +140,19 @@
 - Root cause: Global button rules at lines 1702-1713 of app-redesign.css — `.df-app button, .df-app button:hover:not(:disabled), .df-app button:focus-visible, .df-app button:disabled` — set `box-shadow: none !important` on ALL buttons WITHOUT excluding `.df-level-option`. This overrides the selected state's inset ring on the button element itself.
 - Solution: Use `::after` pseudo-element for the selected ring instead of `box-shadow` on the button, since pseudo-elements are NOT targeted by `.df-app button` selectors and thus avoid the specificity war entirely.
 
+## Timeline Resize Bug Debug
+
+- Component rendering timeline event: `TimeBlock` in `src/main.tsx` (line 9663)
+- Drag start handler: `beginBlockDrag` (line 4664)
+- Drag move handler: inline `move` function in `beginBlockDrag` (line 4689)
+- Drag end handler: inline `up` function in `beginBlockDrag` (line 4749), calls `moveTimelineRecord`
+- Resize start handler: `beginBlockResize` (line 4864)
+- Resize end handler: inline `up` function in `beginBlockResize` (line 4884)
+- Where duration is calculated: `taskDuration` (line 682) — uses `scheduledStart/End` or `estimatedHours`
+- Where event height is calculated: `timeBlockHeight` from `src/timelineGeometry.ts` (line 241) — converts duration minutes to pixels
+- Where "已调整时长" is generated: `showToast(t(lang, "toast.durationAdjusted"))` (lines 4661, 4931, 4952) — this is a toast notification, NOT rendered inside task block
+- Root cause: In `beginBlockResize`, when resizing a task with `timelineRecords`, only the record's `scheduledEnd` is updated, but the `estimatedHours` calculation uses `nextEnd - nextStart` without ensuring both are consistently updated on the same object. Additionally, some tasks may have `scheduledEnd` missing or mismatched with `scheduledStart`, causing `taskDuration` to fall back to `estimatedHours` which may be incorrect.
+
 ## Importance / Urgency Display Mapping
 
 Records how `importance` and `urgency` are surfaced across the drawer, task cards, and Matrix.

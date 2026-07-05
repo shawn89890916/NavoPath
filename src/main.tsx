@@ -4911,44 +4911,42 @@ function App() {
       if (edge === "start") {
         const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
         const nextEnd = task.scheduledEnd || minutesToTime(end);
+        const durationHours = (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60;
         nextData = {
           ...data,
           tasks: data.tasks.map((t) => {
             const records = t.timelineRecords;
             if ((!records || records.length === 0) && t.id === task.id) {
-              return { ...t, scheduledStart: nextStart, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60, updatedAt: now };
+              return { ...t, scheduledStart: nextStart, scheduledEnd: nextEnd, estimatedHours: durationHours, updatedAt: now };
             }
             if (!records) return t;
             const idx = records.findIndex((r) => r.id === task.id);
             if (idx === -1) return t;
             const updated = [...records];
-            updated[idx] = { ...updated[idx], scheduledStart: nextStart };
-            return { ...t, timelineRecords: updated, updatedAt: now };
+            updated[idx] = { ...updated[idx], scheduledStart: nextStart, scheduledEnd: nextEnd };
+            return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
           }),
         };
-        const realTask = recordToTaskMap.get(task.id);
-        if (realTask) nextData = { ...nextData, tasks: nextData.tasks.map((t) => t.id === realTask.id ? { ...t, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 } : t) };
         showToast(t(lang, "toast.durationAdjusted"));
       } else {
         const nextStart = task.scheduledStart || minutesToTime(start);
         const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
+        const durationHours = (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60;
         nextData = {
           ...data,
           tasks: data.tasks.map((t) => {
             const records = t.timelineRecords;
             if ((!records || records.length === 0) && t.id === task.id) {
-              return { ...t, scheduledEnd: nextEnd, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60, updatedAt: now };
+              return { ...t, scheduledStart: nextStart, scheduledEnd: nextEnd, estimatedHours: durationHours, updatedAt: now };
             }
             if (!records) return t;
             const idx = records.findIndex((r) => r.id === task.id);
             if (idx === -1) return t;
             const updated = [...records];
-            updated[idx] = { ...updated[idx], scheduledEnd: nextEnd };
-            return { ...t, timelineRecords: updated, updatedAt: now };
+            updated[idx] = { ...updated[idx], scheduledStart: nextStart, scheduledEnd: nextEnd };
+            return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
           }),
         };
-        const realTask2 = recordToTaskMap.get(task.id);
-        if (realTask2) nextData = { ...nextData, tasks: nextData.tasks.map((t) => t.id === realTask2.id ? { ...t, estimatedHours: (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60 } : t) };
         showToast(t(lang, "toast.durationAdjusted"));
       }
       // Direct setData for immediate visual update, saveData for persistence
