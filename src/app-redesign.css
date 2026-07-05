@@ -510,14 +510,14 @@
   position: relative;
   z-index: 1;
 }
-/* Selected option: pseudo-element inner ring + subtle tint.
+/* Selected option: pseudo-element covers entire segment + 2px semantic border.
    The ::after pseudo-element is NOT targeted by global .df-app button
    rules, so it avoids the specificity war entirely. */
 .df-app .df-level-selector .df-level-option::after {
   content: "";
   position: absolute;
-  inset: 3px;
-  border-radius: 8px;
+  inset: 0;
+  border-radius: 0;
   pointer-events: none;
   opacity: 0;
   z-index: 0;
@@ -526,19 +526,21 @@
 .df-app .df-level-selector .df-level-option[data-selected="true"]::after,
 .df-app .df-level-selector .df-level-option[aria-pressed="true"]::after {
   opacity: 1;
-  box-shadow: inset 0 0 0 2px var(--option-color, var(--df-option-color, #8E8478));
-  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, transparent);
+  border: 2px solid var(--option-color, var(--df-option-color, #8E8478));
+  background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 6%, var(--paper-bg));
 }
-.df-app .df-level-selector .df-level-option:first-child::after {
-  border-radius: 9px 8px 8px 9px;
+.df-app .df-level-selector .df-level-option:first-child[data-selected="true"]::after {
+  border-top-left-radius: 11px;
+  border-bottom-left-radius: 11px;
 }
-.df-app .df-level-selector .df-level-option:last-child::after {
-  border-radius: 8px 9px 9px 8px;
+.df-app .df-level-selector .df-level-option:last-child[data-selected="true"]::after {
+  border-top-right-radius: 11px;
+  border-bottom-right-radius: 11px;
 }
-.df-app .df-level-selector .df-level-option:first-child:last-child::after {
-  border-radius: 9px;
+.df-app .df-level-selector .df-level-option:first-child:last-child[data-selected="true"]::after {
+  border-radius: 11px;
 }
-/* Unselected option: quiet paper background, no ring. */
+/* Unselected option: quiet paper background. */
 .df-app .df-level-selector .df-level-option[data-selected="false"] {
   background: transparent !important;
   background-image: none !important;
@@ -546,7 +548,7 @@
 .df-app .df-level-selector .df-level-option[data-selected="false"]:hover {
   background: color-mix(in srgb, var(--option-color, var(--df-option-color, #8E8478)) 5%, var(--paper-bg)) !important;
 }
-/* Ensure icon and urgency-mark stay above the pseudo-element ring. */
+/* Ensure icon and urgency-mark stay above the pseudo-element border. */
 .df-app .df-level-selector .df-level-option .df-level-icon,
 .df-app .df-level-selector .df-level-option .df-urgency-mark {
   position: relative;
