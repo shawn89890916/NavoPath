@@ -4,9 +4,10 @@
 
 ### 改进
 - 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为图标分段选择器。
-- 重要程度使用清晰的“旗杆 + 三角旗”图标：高=珊瑚红、中=琥珀黄、低=鼠尾草绿、未设置=中性描边，尺寸 22px，tile 44×44px。
-- 紧急程度使用可读的文本感叹号：高=!!! 珊瑚红、中=!! 琥珀黄、低=! 灰蓝、未设置=— 中性破折号，字号 20px、字重 800。
-- 选中态采用更强边框 + 8% 主题色纸色底 + inset 底部 2px 规则线，符合 NavoPath 纸张编辑风格，不依赖颜色单独表达状态。
+- 重要程度使用标准 Lucide 风格旗帜图标（波浪旗面 + 旗杆），高=#B86F5F、中=#B47A2C、低=#5E718B、未设置=描边 #8B8173，图标 22px，tile 44×44px。
+- 紧急程度使用横向文本感叹号：高=!!! / 中=!! / 低=! / 未设置=—，字号 19px、字重 800、sans-serif 字体，不再像断裂的竖排标点。
+- 选中态采用 CSS 变量 `--df-option-color` 驱动：选项色边框 + 8% 选项色纸色底 + inset 底部 2px 规则线，选中状态一目了然。
+- 颜色统一为柔和 NavoPath 色板（柔陶红 / 赭石黄 / 雾蓝灰 / 暖灰），无霓虹红/亮黄/亮蓝。
 - 新增“未设置”选项，点击可立即清空对应字段。
 - Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵；medium/low 仍保留在任务上作为元数据。
 
@@ -32,9 +33,10 @@
 
 ### Improvements
 - Refactored the task drawer's "Importance / Urgency" controls from plain text buttons ("High / Medium / Low") into icon-based segmented selectors.
-- Importance uses clear "pole + triangular flag" icons: high = coral red, medium = amber yellow, low = sage green, unset = neutral outline, at 22px with 44×44px tiles.
-- Urgency uses readable text exclamation marks: high = !!! coral red, medium = !! amber, low = ! muted, unset = — neutral dash, at 20px / weight 800.
-- The selected state uses a stronger border + 8% themed paper tint + inset 2px bottom rule, following the NavoPath editorial paper style and never relying on color alone.
+- Importance uses standard Lucide-style flag icons (wavy flag + pole): high = #B86F5F, medium = #B47A2C, low = #5E718B, unset = outlined #8B8173, at 22px with 44×44px tiles.
+- Urgency uses horizontal text exclamation marks: high = !!! / medium = !! / low = ! / unset = —, at 19px / weight 800 / sans-serif, no longer looking like broken vertical punctuation.
+- Selected state is driven by a CSS custom property `--df-option-color`: option-colored border + 8% option-tinted paper background + inset 2px bottom rule, making the selection obvious.
+- Colors unified to muted NavoPath palette (muted terracotta / ochre / slate blue / warm gray), no neon red, bright yellow, or bright blue.
 - Added an "unset" option; clicking it immediately clears the field.
 - Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced. Medium and low values are still preserved on the task as metadata.
 

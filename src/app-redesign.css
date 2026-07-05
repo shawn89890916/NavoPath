@@ -445,43 +445,43 @@
 
 .df-detail-meta-settings {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 12px 0;
 }
 .df-detail-meta-setting {
-  display: flex;
+  display: grid;
+  grid-template-columns: 72px auto;
   align-items: center;
-  gap: 12px;
+  column-gap: 16px;
 }
 .df-detail-meta-setting > span {
-  min-width: 72px;
   color: var(--text-muted);
   font: 600 11px/1.4 var(--paper-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .df-level-selector {
-  display: flex;
-  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .df-level-option {
-  position: relative;
   width: 44px;
   height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--paper-rule);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--paper-bg);
-  color: var(--text-faint);
+  color: var(--df-option-color, var(--text-faint));
   cursor: pointer;
   padding: 0;
   transition: color var(--paper-motion), border-color var(--paper-motion), background-color var(--paper-motion), box-shadow var(--paper-motion);
+  --df-option-color: var(--text-faint);
 }
 .df-level-option:hover {
   border-color: var(--paper-rule-strong);
-  color: var(--text-muted);
 }
 .df-level-option:active {
   transform: translateY(1px);
@@ -491,10 +491,9 @@
   outline-offset: 2px;
 }
 .df-level-option.active {
-  border-width: 1.5px;
-  border-color: var(--paper-rule-strong);
-  background: color-mix(in srgb, var(--text-main) 5%, var(--paper-bg));
-  box-shadow: inset 0 -2px 0 var(--accent-active);
+  border-color: var(--df-option-color);
+  background: color-mix(in srgb, var(--df-option-color) 8%, var(--paper-bg));
+  box-shadow: inset 0 -2px 0 var(--df-option-color);
 }
 .df-level-icon {
   width: 22px;
@@ -502,33 +501,28 @@
   display: block;
 }
 .df-urgency-mark {
-  font-size: 20px;
+  font-family: var(--paper-sans, system-ui, -apple-system, sans-serif);
+  font-size: 19px;
   font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
+  text-align: center;
   display: block;
 }
 .df-urgency-dash {
   font-size: 22px;
   font-weight: 400;
+  letter-spacing: 0;
 }
-.df-level-importance .df-level-high { color: var(--navo-coral); }
-.df-level-importance .df-level-high.active { border-color: var(--navo-coral); background: color-mix(in srgb, var(--navo-coral) 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--navo-coral); }
-.df-level-importance .df-level-medium { color: #c4a038; }
-.df-level-importance .df-level-medium.active { border-color: #c4a038; background: color-mix(in srgb, #c4a038 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 #c4a038; }
-.df-level-importance .df-level-low { color: var(--navo-sage); }
-.df-level-importance .df-level-low.active { border-color: var(--navo-sage); background: color-mix(in srgb, var(--navo-sage) 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--navo-sage); }
-.df-level-importance .df-level-unset { color: var(--text-faint); }
-.df-level-importance .df-level-unset.active { border-color: var(--paper-rule-strong); color: var(--text-muted); box-shadow: inset 0 -2px 0 var(--text-faint); }
+.df-level-importance .df-level-high { --df-option-color: #B86F5F; }
+.df-level-importance .df-level-medium { --df-option-color: #B47A2C; }
+.df-level-importance .df-level-low { --df-option-color: #5E718B; }
+.df-level-importance .df-level-unset { --df-option-color: #8B8173; }
 
-.df-level-urgency .df-level-high { color: var(--navo-coral); }
-.df-level-urgency .df-level-high.active { border-color: var(--navo-coral); background: color-mix(in srgb, var(--navo-coral) 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--navo-coral); }
-.df-level-urgency .df-level-medium { color: #c4a038; }
-.df-level-urgency .df-level-medium.active { border-color: #c4a038; background: color-mix(in srgb, #c4a038 8%, var(--paper-bg)); box-shadow: inset 0 -2px 0 #c4a038; }
-.df-level-urgency .df-level-low { color: var(--text-muted); }
-.df-level-urgency .df-level-low.active { border-color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 6%, var(--paper-bg)); box-shadow: inset 0 -2px 0 var(--text-muted); }
-.df-level-urgency .df-level-unset { color: var(--text-faint); }
-.df-level-urgency .df-level-unset.active { border-color: var(--paper-rule-strong); color: var(--text-muted); box-shadow: inset 0 -2px 0 var(--text-faint); }
+.df-level-urgency .df-level-high { --df-option-color: #B86F5F; }
+.df-level-urgency .df-level-medium { --df-option-color: #B47A2C; }
+.df-level-urgency .df-level-low { --df-option-color: #5E718B; }
+.df-level-urgency .df-level-unset { --df-option-color: #8B8173; }
 .df-toast { border: 1px solid var(--paper-rule-strong) !important; border-radius: var(--paper-radius) !important; background: var(--surface-raised) !important; box-shadow: var(--paper-float-shadow) !important; backdrop-filter: none !important; }
 
 /* Restrained floating actions */

@@ -10317,10 +10317,9 @@ function EditDrawer(props: {
                   onClick={() => commitTaskMeta("importance", option.value)}
                   title={props.lang === "zh" ? option.zh : option.en}
                 >
-                  {option.value === "high" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="currentColor"/></svg>}
-                  {option.value === "medium" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="currentColor"/></svg>}
-                  {option.value === "low" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="currentColor"/></svg>}
-                  {option.value === "unset" && <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M5 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 3l13 4-13 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>}
+                  {option.value === "unset"
+                    ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>}
                 </button>
               ))}
             </div>
