@@ -185,20 +185,27 @@
 - tall: rendered height >= 120px
 - Implemented via `data-schedule-size` attribute on TaskBlock element
 
-## Timeline Short Event Height Debug
+## Timeline Short Event Height Root Cause
 
-- Component rendering timeline event: `TimeBlock` in src/main.tsx (line 9661)
-- Geometry helper used: `timeBlockTop()` and `timeBlockHeight()` from src/timelineGeometry.ts
+- Event wrapper component: `TaskBlock` rendered by `TimeBlock` in src/main.tsx (line 9782)
+- Inner TaskBlock component: `TaskBlock` from src/components/TaskBlock.tsx
 - Calculation flow:
-  1. `start = preview?.start || task.scheduledStart || "09:00"`
-  2. `end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task))`
-  3. `top = timeBlockTop(start, dayStartHour)`
-  4. `height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT)`
-- `taskDuration(task)` logic:
-  - If both `scheduledStart` and `scheduledEnd` exist: returns `timeToMinutes(end) - timeToMinutes(start)`
-  - Otherwise: returns `(estimatedHours || 0.5) * 60`
-- Potential bug: If `scheduledEnd` is missing or invalid, `taskDuration` falls back to `estimatedHours`. If `estimatedHours` is undefined, it defaults to 30 minutes (0.5 hours).
-- Another potential bug: The `expandTimelineRecords` function copies `scheduledEnd` from `timelineRecords`, but if the record's `scheduledEnd` is wrong or missing, the virtual task will have wrong duration.
+  - `start = preview?.start || task.scheduledStart || "09:00"`
+  - `end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task))`
+  - `top = timeBlockTop(start, dayStartHour)` 
+  - `height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT)`
+  - `durationMinutes = timeToMinutes(end) - timeToMinutes(start)`
+- Inline styles applied: `{ top: topPx, height: heightPx, position: 'absolute' }`
+- CSS rules affecting height:
+  - `app-redesign.css:1557`: `.df-app .df-time-block` has `justify-content: center !important`
+  - `app-redesign.css:1558`: `.df-app .df-time-block` has `padding: 8px 12px 8px 28px !important`
+  - `task-block.css:512`: `.df-task-block[data-task-variant="scheduled"]` has `position: absolute !important`
+- Debug logging added: Console.table for task "更新作品集首页文案" with durationMinutes, startMinutes, endMinutes, heightPx, and computed DOM styles via requestAnimationFrame
+- Data attributes added to event wrapper: `data-timeline-event-id`, `data-task-id`, `data-duration-minutes`, `data-start-minutes`, `data-height-px`, `data-schedule-size`
+- Root cause (pending verification from console output): Likely one of:
+  A. `scheduledEnd` is set to end of day (midnight) causing huge duration
+  B. CSS `justify-content: center` or padding causing visual stretching
+  C. Missing `bottom: auto` allowing CSS to override height
 
 ## Importance / Urgency Display Mapping
 
