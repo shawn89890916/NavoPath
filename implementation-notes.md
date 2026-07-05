@@ -153,6 +153,32 @@
 - Where "已调整时长" is generated: `showToast(t(lang, "toast.durationAdjusted"))` (lines 4661, 4931, 4952) — this is a toast notification, NOT rendered inside task block
 - Root cause: In `beginBlockResize`, when resizing a task with `timelineRecords`, only the record's `scheduledEnd` is updated, but the `estimatedHours` calculation uses `nextEnd - nextStart` without ensuring both are consistently updated on the same object. Additionally, some tasks may have `scheduledEnd` missing or mismatched with `scheduledStart`, causing `taskDuration` to fall back to `estimatedHours` which may be incorrect.
 
+## Timeline Scheduled Task Rendering Debug
+
+### Short event
+- Component: `TimeBlock` using `TaskBlock` with variant="scheduled", appearance="calm"
+- Class names: `df-task-block df-task-block--scheduled df-task-block--appearance-calm df-time-block priority-* short-block`
+- Data attributes: `data-task-appearance="calm"`, `data-task-variant="scheduled"`
+- Height: ~40px (15m task) to ~55px (30m task)
+- align-items: center (inherited from --task-align-items default)
+- justify-content: center (from .df-task-block-content)
+- padding: 6px 10px (from --task-padding-y/x)
+- min-height: unset (from scheduled override)
+- checkbox size: ~18px (inherited from normal candidate styles)
+- Root cause: `.df-task-block-content` has `align-self: stretch` + `justify-content: center`, causing content to be vertically centered in a tall container
+
+### Ultra-long event
+- Component: `TimeBlock` using `TaskBlock` with variant="scheduled", appearance="calm"
+- Class names: `df-task-block df-task-block--scheduled df-task-block--appearance-calm df-time-block priority-* tall-block`
+- Data attributes: `data-task-appearance="calm"`, `data-task-variant="scheduled"`
+- Height: >= 96px (multi-hour tasks)
+- align-items: flex-start (from tall-block override)
+- justify-content: center (from .df-task-block-content — still centered!)
+- padding: 8px 10px (from tall-block --task-padding-y/x)
+- min-height: 0 (from tall-block override)
+- content vertical position: middle of block (due to .df-task-block-content justify-content: center)
+- Root cause: `.df-task-block-content` has `align-self: stretch` + `justify-content: center`, overriding the tall-block row's `align-items: flex-start`. The content stretches to fill the full height, then centers vertically within itself.
+
 ## Importance / Urgency Display Mapping
 
 Records how `importance` and `urgency` are surfaced across the drawer, task cards, and Matrix.

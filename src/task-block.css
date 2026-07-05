@@ -300,6 +300,25 @@
   text-align: left;
 }
 
+/* Scheduled timeline task content — no stretching, no centering.
+   This fixes both short and tall tasks. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-content,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-time-card-main,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] .df-task-block-content {
+  align-self: flex-start !important;
+  justify-content: flex-start !important;
+  height: auto !important;
+  flex: none !important;
+}
+
+/* Short scheduled block — content vertically centered. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-content,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-main,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-content {
+  align-self: center !important;
+  justify-content: center !important;
+}
+
 /* Duration — right aligned, nowrap. */
 .df-app .df-task-block[data-task-appearance] .df-task-block-duration,
 .df-app .df-task-block[data-task-appearance] .df-duration-pill,
