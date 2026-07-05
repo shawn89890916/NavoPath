@@ -450,7 +450,7 @@
 }
 .df-detail-meta-setting {
   display: grid;
-  grid-template-columns: 72px auto;
+  grid-template-columns: 72px max-content;
   align-items: center;
   column-gap: 16px;
 }
@@ -462,6 +462,8 @@
 }
 .df-level-selector {
   display: inline-flex;
+  width: max-content;
+  flex: 0 0 auto;
   align-items: stretch;
   border: 1px solid var(--paper-rule);
   border-radius: 8px;
@@ -478,22 +480,19 @@
   border-right: 1px solid var(--paper-rule);
   border-radius: 0;
   background: transparent;
-  color: var(--df-option-color, var(--text-faint));
+  color: var(--df-option-color, #8E8478);
   cursor: pointer;
   padding: 0;
-  opacity: 0.65;
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
-  --df-option-color: var(--text-faint);
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 .df-level-option:last-child {
   border-right: 0;
 }
 .df-level-option:hover {
-  background: color-mix(in srgb, var(--df-option-color) 6%, var(--paper-bg));
-  opacity: 0.85;
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 6%, var(--paper-bg));
 }
 .df-level-option:active {
-  background: color-mix(in srgb, var(--df-option-color) 10%, var(--paper-bg));
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 10%, var(--paper-bg));
 }
 .df-level-option:focus-visible {
   outline: 2px solid var(--accent-active);
@@ -502,14 +501,15 @@
   z-index: 1;
 }
 .df-level-option.active {
-  opacity: 1;
-  background: color-mix(in srgb, var(--df-option-color) 12%, var(--paper-bg));
-  box-shadow: inset 0 -2px 0 var(--df-option-color);
+  background: color-mix(in srgb, var(--df-option-color, #8E8478) 12%, var(--paper-bg));
+  box-shadow: inset 0 -2px 0 var(--df-option-color, #8E8478);
 }
 .df-level-icon {
   width: 19px;
   height: 19px;
   display: block;
+  fill: currentColor;
+  stroke: currentColor;
 }
 .df-urgency-mark {
   font-family: var(--paper-sans, system-ui, -apple-system, sans-serif);
@@ -519,6 +519,7 @@
   letter-spacing: -0.04em;
   text-align: center;
   display: block;
+  color: inherit;
 }
 .df-urgency-dash {
   font-size: 20px;
