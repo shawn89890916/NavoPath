@@ -3017,21 +3017,60 @@ function App() {
       for (const record of (task.timelineRecords || [])) {
         if (!dates.has(record.scheduledDate)) continue;
         if (record.executionStatus === "cancelled") continue;
+        let { scheduledStart, scheduledEnd } = record;
+        if (!scheduledStart) scheduledStart = "09:00";
+        const durationMinutes = taskDuration({ ...task, scheduledStart, scheduledEnd });
+        if (!scheduledEnd || timeToMinutes(scheduledEnd) <= timeToMinutes(scheduledStart)) {
+          scheduledEnd = addMinutes(scheduledStart, durationMinutes);
+        }
+        const computedEndMinutes = timeToMinutes(scheduledEnd);
+        const computedStartMinutes = timeToMinutes(scheduledStart);
+        const actualDuration = computedEndMinutes - computedStartMinutes;
+        if (durationMinutes > 0 && actualDuration > durationMinutes * 3) {
+          console.warn("[timeline] short task rendered too tall", {
+            taskId: record.id,
+            title: task.title,
+            durationMinutes,
+            actualDuration,
+            scheduledStart,
+            scheduledEnd,
+          });
+          scheduledEnd = addMinutes(scheduledStart, durationMinutes);
+        }
         result.push({
           ...task,
           id: record.id,
           scheduledDate: record.scheduledDate,
-          scheduledStart: record.scheduledStart,
-          scheduledEnd: record.scheduledEnd,
+          scheduledStart,
+          scheduledEnd,
           executionStatus: record.executionStatus,
         } as Task);
       }
       if ((!task.timelineRecords || task.timelineRecords.length === 0) && task.scheduledDate && task.scheduledStart && dates.has(task.scheduledDate)) {
+        let { scheduledStart, scheduledEnd } = task;
+        const durationMinutes = taskDuration(task);
+        if (!scheduledEnd || timeToMinutes(scheduledEnd) <= timeToMinutes(scheduledStart)) {
+          scheduledEnd = addMinutes(scheduledStart, durationMinutes);
+        }
+        const computedEndMinutes = timeToMinutes(scheduledEnd);
+        const computedStartMinutes = timeToMinutes(scheduledStart);
+        const actualDuration = computedEndMinutes - computedStartMinutes;
+        if (durationMinutes > 0 && actualDuration > durationMinutes * 3) {
+          console.warn("[timeline] short task rendered too tall", {
+            taskId: task.id,
+            title: task.title,
+            durationMinutes,
+            actualDuration,
+            scheduledStart,
+            scheduledEnd,
+          });
+          scheduledEnd = addMinutes(scheduledStart, durationMinutes);
+        }
         result.push({
           ...task,
           scheduledDate: task.scheduledDate,
-          scheduledStart: task.scheduledStart,
-          scheduledEnd: task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)),
+          scheduledStart,
+          scheduledEnd,
           executionStatus: task.executionStatus || "scheduled",
         } as Task);
       }

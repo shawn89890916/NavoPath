@@ -185,6 +185,21 @@
 - tall: rendered height >= 120px
 - Implemented via `data-schedule-size` attribute on TaskBlock element
 
+## Timeline Short Event Height Debug
+
+- Component rendering timeline event: `TimeBlock` in src/main.tsx (line 9661)
+- Geometry helper used: `timeBlockTop()` and `timeBlockHeight()` from src/timelineGeometry.ts
+- Calculation flow:
+  1. `start = preview?.start || task.scheduledStart || "09:00"`
+  2. `end = preview?.end || task.scheduledEnd || addMinutes(start, taskDuration(task))`
+  3. `top = timeBlockTop(start, dayStartHour)`
+  4. `height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT)`
+- `taskDuration(task)` logic:
+  - If both `scheduledStart` and `scheduledEnd` exist: returns `timeToMinutes(end) - timeToMinutes(start)`
+  - Otherwise: returns `(estimatedHours || 0.5) * 60`
+- Potential bug: If `scheduledEnd` is missing or invalid, `taskDuration` falls back to `estimatedHours`. If `estimatedHours` is undefined, it defaults to 30 minutes (0.5 hours).
+- Another potential bug: The `expandTimelineRecords` function copies `scheduledEnd` from `timelineRecords`, but if the record's `scheduledEnd` is wrong or missing, the virtual task will have wrong duration.
+
 ## Importance / Urgency Display Mapping
 
 Records how `importance` and `urgency` are surfaced across the drawer, task cards, and Matrix.
