@@ -2,15 +2,16 @@
 
 ## 2026-07-05 · 重要程度/紧急程度图标选择器
 
+### 修复
+- 修复选中态不生效的持久化 bug：表单初始化使用 `??` 运算符将 `null`（未设置）误回落到 `priority ?? "high"`，导致重新打开抽屉后"未设置"状态丢失。改为 `!== undefined` 检查以保留显式 `null`。
+- 修复选中态 CSS 被全局 `.df-app button` 的 `!important` 规则覆盖的问题：分段控件规则升级为 `.df-app .df-level-selector .df-level-option`（特异性 0,3,0+）+ `!important`，确保选中态背景、底部规则线、边框色正确生效。
+- 加强选中态视觉反馈：背景色调从 12% 提升至 18%，底部规则线从 2px 加粗到 3px，新增语义色边框，选中状态一目了然。
+
 ### 改进
-- 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为连接式分段图标选择器（segmented control），四段共享外框与圆角，段间以细分隔线划分，不再像四个孤立方框。
-- 重要程度使用标准 Lucide 风格旗帜图标（波浪旗面 + 旗杆），高=#C96F5B、中=#C49A32、低=#6E8DA6、未设置=描边 #8E8478，图标 19px。
-- 紧急程度使用横向文本感叹号：高=!!! / 中=!! / 低=! / 未设置=—，字号 18px、字重 800、sans-serif 字体。
-- 段宽 42px、高 36px，总宽约 170px，紧凑整齐，标签与分段组左对齐。
-- 未选中段 opacity 0.65 保持安静；hover 6% 语义色微染；选中段 opacity 1 + 12% 语义色纸色底 + inset 2px 底部规则线，点击即时反馈。
-- 颜色统一为柔和 NavoPath 色板（柔陶红 / 赭石黄 / 雾蓝灰 / 暖灰），无霓虹红/亮黄/亮蓝。
+- 任务抽屉的“重要程度/紧急程度”控件从纯文字按钮“高/中/低”重构为连接式分段图标选择器（segmented control），四段共享外框与圆角，段间以细分隔线划分。
+- 重要程度使用标准 Lucide 风格旗帜图标，紧急程度使用横向文本感叹号，颜色统一为柔和 NavoPath 色板。
 - 新增“未设置”选项，点击可立即清空对应字段。
-- Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵；medium/low 仍保留在任务上作为元数据。
+- Matrix 四象限映射保持 high/non-high 逻辑，未引入 3x3 矩阵。
 
 ## 2026-07-04 · 统一拖拽体验
 
@@ -32,15 +33,16 @@
 
 ## 2026-07-05 · Importance / Urgency icon selectors
 
+### Fixes
+- Fixed selected-state persistence bug: form initialization used `??` operator which treated `null` (unset) as falsy and fell through to `priority ?? "high"`, causing "unset" state to be lost on drawer reopen. Changed to `!== undefined` check to preserve explicit `null`.
+- Fixed selected-state CSS being overridden by global `.df-app button` `!important` rules: segmented control rules upgraded to `.df-app .df-level-selector .df-level-option` (specificity 0,3,0+) + `!important`, ensuring selected background, bottom rule, and border color take effect.
+- Strengthened selected-state visual feedback: background tint increased from 12% to 18%, bottom rule from 2px to 3px, added semantic-colored border for obvious selection.
+
 ### Improvements
-- Refactored the task drawer's "Importance / Urgency" controls from plain text buttons into a connected segmented icon strip sharing one outer border and rounded corners, with thin dividers between segments — no longer four isolated boxes.
-- Importance uses standard Lucide-style flag icons (wavy flag + pole): high = #C96F5B, medium = #C49A32, low = #6E8DA6, unset = outlined #8E8478, at 19px.
-- Urgency uses horizontal text exclamation marks: high = !!! / medium = !! / low = ! / unset = —, at 18px / weight 800 / sans-serif.
-- Segments are 42px wide × 36px tall (~170px total), compact and aligned with the left label.
-- Unselected segments at opacity 0.65 stay quiet; hover adds 6% semantic tint; selected segment shows opacity 1 + 12% semantic-tinted paper background + inset 2px bottom rule for immediate click feedback.
-- Colors unified to muted NavoPath palette (muted terracotta / ochre / slate blue / warm gray), no neon red, bright yellow, or bright blue.
+- Refactored the task drawer's "Importance / Urgency" controls from plain text buttons into a connected segmented icon strip sharing one outer border and rounded corners, with thin dividers between segments.
+- Importance uses standard Lucide-style flag icons, urgency uses horizontal text exclamation marks, colors unified to muted NavoPath palette.
 - Added an "unset" option; clicking it immediately clears the field.
-- Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced. Medium and low values are still preserved on the task as metadata.
+- Matrix quadrant mapping keeps the high/non-high logic; no 3x3 matrix was introduced.
 
 ## 2026-07-04 · Unified drag experience
 

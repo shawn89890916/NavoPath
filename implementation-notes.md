@@ -110,23 +110,36 @@
 
 - Fields used: `task.importance` and `task.urgency`, each stored as `'high' | 'medium' | 'low' | null`.
 - Icon mapping:
-  - Importance high: red filled flag (`#D7816A`)
-  - Importance medium: amber/yellow filled flag (`#c4a038`)
-  - Importance low: sage green filled flag (`#7EA172`)
-  - Importance unset: neutral outline flag (`--text-faint`)
-  - Urgency high: red three-exclamation icons (`#D7816A`)
-  - Urgency medium: amber two-exclamation icons (`#c4a038`)
-  - Urgency low: muted blue/gray single-exclamation icon (`--text-muted`)
-  - Urgency unset: neutral dash (`--text-faint`)
-- Selected-state behavior: selected tile shows stronger border matching icon color + subtle paper tint background (`color-mix(in srgb, var(--text-main) 4%, transparent)`) + small bottom rule matching icon color. Unselected tiles remain quiet with faint icon color and thin paper border.
-- Unset behavior: clicking "unset" clears the field (sets to `null`). The unset option is auto-selected when no value exists.
+  - Importance high: coral red filled flag (`#C96F5B`)
+  - Importance medium: amber filled flag (`#C49A32`)
+  - Importance low: muted blue filled flag (`#6E8DA6`)
+  - Importance unset: neutral outline flag (`#8E8478`)
+  - Urgency high: coral three-exclamation marks (`#C96F5B`)
+  - Urgency medium: amber two-exclamation marks (`#C49A32`)
+  - Urgency low: muted blue single-exclamation mark (`#6E8DA6`)
+  - Urgency unset: neutral dash (`#8E8478`)
+- Selected-state behavior: selected segment shows 18% semantic-tinted background + 3px inset bottom rule in semantic color + semantic-colored border. Unselected segments remain quiet with transparent background.
+- Unset behavior: clicking "unset" clears the field (sets to `null` in form state, persists as `null` to task data). The unset option is auto-selected when no value exists.
+- Form initialization: `importance` and `urgency` are loaded from task data using `!== undefined` check to preserve explicit `null` (unset) values. Old tasks without the field fall through to `priority` (importance only) or `null`.
+- CSS specificity: All level-selector rules are prefixed with `.df-app .df-level-selector` (specificity 0,3,0+) and use `!important` to beat global `.df-app button:not(...)` overrides (specificity 0,2,1-0,2,2) that force `background: transparent`, `box-shadow: none`, and `border-color` on all buttons.
 - Matrix mapping: Uses four-quadrant high/non-high logic:
   - Q1 (紧急且重要): `importance === 'high' && urgency === 'high'`
   - Q2 (不紧急但重要): `importance === 'high' && urgency !== 'high'` (medium/low/unset treated as non-high)
   - Q3 (紧急但不重要): `importance !== 'high' && urgency === 'high'` (medium/low/unset treated as non-high)
   - Q4 (不重要且不紧急): `importance !== 'high' && urgency !== 'high'`
 - No 3x3 matrix introduced; medium and low values are preserved on the task and may be shown as small metadata/icons but do not create extra quadrants.
-- Migration: No migration from old fields needed; existing `importance` and `urgency` fields are used directly.
+- Migration: Old tasks without `importance` fall through to `priority` field. Old tasks without `urgency` default to `null` (unset).
+
+## Importance / Urgency Selected State Debug
+
+- Component: `EditDrawer` in `src/main.tsx`
+- Click handler: `commitTaskMeta(kind, value)` — calls `set(kind, null-or-value)` to update form state, then `props.onTaskUpdate()` to persist
+- Data field updated: `form.importance` / `form.urgency` (form state) and `task.importance` / `task.urgency` (task data)
+- Selected class applied to: `<button class="df-level-option df-level-{value} active">`
+- CSS selector: `.df-app .df-level-selector .df-level-option.active` (specificity 0,4,0 + `!important`)
+- Root cause 1 (persistence): Form initialization used `??` operator which treats `null` as falsy, falling through to `priority ?? "high"`. Fixed with `!== undefined` check to preserve explicit `null`.
+- Root cause 2 (visibility): CSS selected state at 12% tint + 2px bottom rule was too subtle. Strengthened to 18% tint + 3px bottom rule + border-color.
+- Root cause 3 (CSS override): Global `.df-app button:not(...)` rules with `!important` overrode border, background, and box-shadow. Fixed with higher specificity selectors + `!important`.
 
 ## Known Limitations
 

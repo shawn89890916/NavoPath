@@ -5004,8 +5004,8 @@ function App() {
       endTime: task.scheduledEnd || "",
       category: realTask.category,
       priority: realTask.priority ?? "medium",
-      importance: realTask.importance ?? realTask.priority ?? "high",
-      urgency: realTask.urgency || "low",
+      importance: realTask.importance !== undefined ? realTask.importance : (realTask.priority ?? null),
+      urgency: realTask.urgency !== undefined ? realTask.urgency : null,
       estimatedHours: realTask.estimatedHours || 0.5,
       details: realTask.notes || ""
     });
@@ -5017,7 +5017,7 @@ function App() {
     setEditingId(project.id);
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
-    setForm({ ...defaultForm("project"), title: project.title, category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance || "high", urgency: project.urgency || "low" });
+    setForm({ ...defaultForm("project"), title: project.title, category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance !== undefined ? project.importance : null, urgency: project.urgency !== undefined ? project.urgency : null });
     setDrawerOpen(true);
   }
 
@@ -5236,8 +5236,8 @@ function App() {
       endTime: task.scheduledEnd || "",
       category: task.category,
       priority: task.priority ?? "medium",
-      importance: task.importance ?? task.priority ?? "high",
-      urgency: task.urgency || "low",
+      importance: task.importance !== undefined ? task.importance : (task.priority ?? null),
+      urgency: task.urgency !== undefined ? task.urgency : null,
       estimatedHours: task.estimatedHours || 0.5,
       details: task.notes || "",
       recurrence: task.recurrence,
