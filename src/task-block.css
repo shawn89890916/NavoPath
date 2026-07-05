@@ -523,19 +523,71 @@
   margin-top: 1px !important;
 }
 
-/* Short scheduled block — tighter. */
+/* Short scheduled block — compact, centered, minimal content. */
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block,
 .navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block {
-  --task-padding-x: 10px;
-  --task-padding-y: 6px;
+  --task-padding-x: 6px;
+  --task-padding-y: 3px;
   --task-min-height: unset;
+  --task-align-items: center;
   min-height: unset !important;
+  height: 100% !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-row,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-row,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-row {
+  align-items: center !important;
+  justify-content: start !important;
+  height: 100% !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-block-check,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-check {
+  flex: 0 0 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+  margin-top: 0 !important;
+  border-width: 1.5px !important;
 }
 
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-title,
 .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-title,
 .navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-block-title {
   font-size: 12px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-main,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-main {
+  align-self: center !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-next,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-time-card-next,
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-event-kind-label,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-next {
+  display: none !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-urgency-mark,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].short-block .df-task-urgency-mark {
+  font-size: 9px;
+}
+
+/* Tall scheduled block — can show more content. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block,
+.navo-demo-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].tall-block {
+  --task-padding-x: 10px;
+  --task-padding-y: 8px;
 }
 
 /* All-day block — inline, compact. */
