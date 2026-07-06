@@ -5839,14 +5839,20 @@ function App() {
         return;
       }
       setAllDayDragDate("");
-      const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-      if (!gridEl || !scrollEl) return;
-      const rect = scrollEl.getBoundingClientRect();
-      const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
-      if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
-      if (pointerEvent.clientY < rect.top + 48) scrollEl.scrollTop -= 18;
-      else if (pointerEvent.clientY > rect.bottom - 48) scrollEl.scrollTop += 18;
-      const target = getDropTargetFromPointer({ clientX: pointerEvent.clientX, clientY: pointerEvent.clientY, gridElement: gridEl, scrollElement: scrollEl, visibleDays: visDays, startHour: dayStartHour });
+      // Candidate -> timeline drag must NOT mutate timeline scroll position or
+      // change the current date. The continuous cross-day canvas spans 7 days
+      // of vertical space already; `resolveDropTarget` re-reads the grid rect
+      // on every move so manual wheel-scroll during a drag still maps correctly.
+      // Use the continuous-aware resolver (date-from-Y band) instead of the
+      // single-day `getDropTargetFromPointer`, matching `beginBlockDrag`.
+      const scrollEl = timelineRef.current;
+      if (scrollEl) {
+        const rect = scrollEl.getBoundingClientRect();
+        const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
+        if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
+      }
+      const target = resolveDropTarget(pointerEvent.clientX, pointerEvent.clientY);
+      if (!target) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
       dragTargetDateRef.current = target.date;
       dropTime = target.startTime;
       setHoverSlot(target.startTime);
