@@ -369,3 +369,67 @@ For broken short task:
 - DOM getBoundingClientRect height: 1920
 - red outline wraps correct wrong block: yes
 - root cause is data / wrapper style / parent CSS / wrong component: wrapper style. The positioned scheduled TaskBlock is the real outer timeline event wrapper; its inline `height: 40px` is being overridden by the scheduled short/tall root CSS rule `height: 100% !important`, so the absolute event fills the 1920px `.df-timeline-canvas`.
+
+## Infinite Cross-day Drag Resize Debug
+
+- Timeline scroll container: `.df-timeline-canvas` / `timelineCanvasRef.current` (daily) and `.df-time-grid` / `timeGridRef.current` (3day/weekly), wrapped by `timelineRef.current` scroll viewport.
+- Rendered range start: `continuousTimelineStartDate` (= `continuousTimelineDates[0]`, derived from `continuousAnchorDate` which tracks the visible window). Days are produced by `buildDailyContinuousDates` (centered window of `DAILY_CONTINUOUS_DAY_COUNT` = 7 for daily, or N columns × bands for 3day/weekly).
+- Rendered range end: `continuousTimelineStartDate + (continuousTimelineBandCount * timelineColumnCount) - 1`.
+- Event render top/height formula:
+  - Continuous mode top: `continuousTimedTop(scheduledDate, scheduledStart)` = `bandIndex * DAY_HEIGHT_PX + minutesFromDayStart * pxPerMinute` (band index derived from `continuousDateOffset`).
+  - Non-continuous top: `timeBlockTop(start, dayStartHour)` (single-day coordinate).
+  - Height: `timeBlockHeight(start, end)` = `max((endMin - startMin) / 60 * HOUR_HEIGHT, SLOT_HEIGHT)`. **Breaks for cross-midnight because `endMin - startMin` is negative.**
+- Drag start handler: `beginBlockDrag` (src/main.tsx). Stores `duration`, `offsetMinutes` (pointer offset inside block, rounded to slot), `offset` px. Activates after 5px movement.
+- Drag move handler: inline `move` in `beginBlockDrag`. Calls `getDropTargetFromPointer` (single-day `pointerToDateTime`) which uses `visibleDays` + X column to derive date. **In daily continuous mode `visibleDays` is the 7-day range but `pointerToDateTime` still picks the date by X (only 1 column), so the date is always `visibleDays[0]` regardless of Y.** This is the root cause: the Y position is never mapped to the correct band/day.
+- Drag end handler: inline `up` in `beginBlockDrag`. Same `getDropTargetFromPointer` bug; passes `target.date` + `nextStart` to `moveTimelineRecord` / `moveEventOccurrence`.
+- Resize start handler: `beginBlockResize`. Calls `slotFromPointer(clientY, 0, clientX)` which in continuous mode delegates to `dailyTargetFromPointer` → returns only `.minutes` (time-of-day), **dropping the date**. So resize can never move the end across midnight.
+- Resize move handler: inline `move` in `beginBlockResize`. Computes `start = timeToMinutes(task.scheduledStart)`, `end = timeToMinutes(task.scheduledEnd)`. For a 23:30→00:30 task this gives `start=1410, end=30`; `Math.max(slotMin, start + SLOT_MINUTES)` clamps `nextEnd` to ≥1425, making cross-midnight resize impossible.
+- Resize end handler: inline `up` in `beginBlockResize`. Same broken duration math; `durationHours = (nextEndMin - nextStartMin) / 60` is negative for cross-midnight.
+- Current code using currentDate/focusedDate: `getDropTargetFromPointer` uses `visibleDays` (derived from `timelineDate`/`dailyTimelineDates`) but resolves date by X column only. `dragTargetDateRef.current` is set from this broken date. `slotFromPointer` falls back to `timelineDate` when no grid.
+- Current code ignoring scrollTop: `pointerToDateTime` in `timelineGeometry.ts` uses `clientY - gridRect.top`; this is correct **only because `gridElement` is the full-height canvas** (so `gridRect.top` already shifts with scroll). It is NOT a bug for the grid element itself — the bug is that the resolved date is wrong in continuous daily mode because date is derived from X, not Y/band.
+- Root cause:
+  1. `beginBlockDrag` and `beginBlockResize` do not branch on `continuousTimelineEnabled`. They use `getDropTargetFromPointer` / `slotFromPointer` which resolve the date from the X column. In daily continuous mode there is only one column, so every Y maps to `visibleDays[0]` — drag/resize can never target a different day.
+  2. The existing continuous helper `continuousPointerTarget` (which correctly derives date from Y band index) is used by click-to-create and slot label code paths, but NOT by drag/resize.
+  3. `taskDuration`, `timeBlockHeight`, `moveTimelineRecord`, and the resize math all compute duration as `timeToMinutes(end) - timeToMinutes(start)`, which is negative for cross-midnight tasks (e.g. 23:30→00:30 → -1380). This collapses 60-minute cross-midnight blocks to 15px and breaks resize duration math.
+  4. `moveTimelineRecord` recomputes `newEnd = minutesToTime(timeToMinutes(newStart) + duration)` with the same negative-duration bug.
+- Fix plan:
+  - Add `durationMinutes(start, end)` cross-midnight-aware helper to `timelineGeometry.ts`; use it in `taskDuration`, `timeBlockHeight`, `moveTimelineRecord`, `TimeBlock`, and resize math.
+  - Make `beginBlockDrag` and `beginBlockResize` use `continuousPointerTarget` (date-from-Y) when `continuousTimelineEnabled`, and `getDropTargetFromPointer` otherwise. Pass the resolved `date` through to `moveTimelineRecord` / `moveEventOccurrence`.
+  - Handle drag offset across midnight: when `timeToMinutes(target.startTime) - offsetMinutes < 0`, roll the start time forward by 24h and decrement the target date.
+  - Handle resize across midnight: compute pointer absolute minutes relative to `continuousTimelineStartDate`; `newDuration = max(MIN, snap(pointerAbs - startAbs))`; `newEnd = addMinutes(start, newDuration)` (wraps mod 24h). For start-edge resize, mirror with `endAbs` fixed.
+  - Keep `resizePreview` as `{taskId, start, end}` (time strings) — start date stays fixed for end-edge resize, which is the documented acceptance case; `timeBlockHeight` fix makes the preview height correct for cross-midnight.
+
+### Resolution (implemented)
+
+- Geometry helpers added to `src/timelineGeometry.ts`:
+  - `durationMinutes(startTime, endTime)` — cross-midnight-aware: when `end - start <= 0`, wraps by `+24*60`. So `23:30→00:30` returns `60`, not `-1380`.
+  - `dateTimeToAbsoluteMinutes(date, time, anchorDate)` — `dayIndex * 1440 + minutesOfDay`, where `dayIndex` is the calendar-day delta from `anchorDate`.
+  - `absoluteMinutesToDateTime(absoluteMinutes, anchorDate)` — inverse of the above; `minutesOfDay` is taken mod `1440` so negative absolute minutes roll back to the previous day correctly.
+  - `snapMinutes(minutes, snap = SLOT_MINUTES)` — `Math.round(minutes / snap) * snap`.
+  - `timeBlockHeight` now uses `durationMinutes(start, end)` so cross-midnight blocks render at full pixel height instead of collapsing to `SLOT_HEIGHT`.
+- `src/main.tsx`:
+  - Module-level `spanDurationMinutes(start, end)` mirrors `durationMinutes` (renamed to avoid colliding with `TimeBlock`'s local `const durationMinutes`).
+  - `taskDuration`, `moveTimelineRecord`, and `TimeBlock`'s `calculatedDurationMinutes` all use `spanDurationMinutes` instead of raw `timeToMinutes(end) - timeToMinutes(start)`.
+  - New component-scoped helpers:
+    - `resolveDropTarget(clientX, clientY)` — branches on `continuousTimelineEnabled`: uses `continuousPointerTarget` (date from Y band) in continuous mode, `getDropTargetFromPointer` (date from X column) otherwise. Returns `{ date, startTime, minutes }`.
+    - `subtractOffsetFromDateTime(date, time, offsetMinutes)` — subtracts the drag pointer offset in absolute time and rolls the date backwards when the subtraction crosses midnight.
+    - `dateTimeToContinuousAbs(date, time)` — `continuousDateOffset(date) * 1440 + timeToMinutes(time)`, the continuous absolute minutes used by resize.
+  - `beginBlockDrag` `move` and `up` handlers now use `resolveDropTarget` + `subtractOffsetFromDateTime` to derive both the drop date and the drop time, so dragging a 23:30 task down past midnight moves it to the next day with the same duration. `moveTimelineRecord` / `moveEventOccurrence` receive the resolved `adjusted.date`.
+  - `beginBlockResize` rewritten around a `computeResize(clientX, clientY)` closure that works in continuous absolute minutes: `startAbs = dateTimeToContinuousAbs(taskAnchorDate, origStart)`, `endAbs = startAbs + origDuration`. End-edge: `newEndAbs = max(pointerAbs, startAbs + SLOT_MINUTES)`, `newDuration = newEndAbs - startAbs`, `nextEnd = addMinutes(origStart, newDuration)` (wraps mod 24h). Start-edge: `newStartAbs = min(pointerAbs, endAbs - SLOT_MINUTES)`, day-shift computed so `scheduledDate` moves back when the start crosses midnight backwards. This makes the acceptance case 4 (23:30/30m → next day 00:30 = 60m) work instead of breaking.
+  - `TimeBlock` `calculatedDurationMinutes` uses `spanDurationMinutes(start, end)` and only falls back to `> 24*60` clamping for genuinely bad data, so short 15m/30m tasks still render as short blocks.
+
+### Auto-scroll / day-prepend during drag (acceptance cases 5 & 6)
+
+- The current timeline architecture does NOT auto-scroll during a drag and does NOT prepend days while dragging. The rendered range is fixed for the lifetime of a drag:
+  - `continuousAnchorDate` is a `useMemo` derived purely from `selectedDate` (== `timelineDate`) and `timelineView`. It only changes when the user navigates dates (prev/next/today buttons, calendar picker), not when scrolling.
+  - `continuousTimelineStartDate` = `continuousTimelineDates[0]`, derived from `continuousAnchorDate`. It is stable during a drag.
+  - The only `onScroll` handler (line ~4085) toggles a CSS `.is-scrolling` class for scrollbar visibility; it does not call `setSelectedDate` or extend the date range.
+  - `setSelectedDate` is invoked only by explicit date-navigation actions (prev/next day, today button, month cell click, pending focus from other views), never by a scroll listener.
+- Therefore the premises of acceptance cases 5 ("drag while auto-scroll happens") and 6 ("prepend days while dragging upward") do not arise in this codebase. The directive's sections 5–7 are conditional ("If … triggers auto-scroll") and do not require changes here.
+- Even so, the drag/resize handlers do not cache `scrollTop` or the grid `getBoundingClientRect()` at drag start: `resolveDropTarget` → `continuousPointerTarget` re-reads `gridElement.getBoundingClientRect()` on every `pointermove`, so if the user manually scrolls the timeline while dragging, `clientY - rect.top` still yields the correct content Y and the drop target keeps following the pointer.
+- If a future change introduces true infinite scroll (extending the rendered range near viewport edges), the fix is to read `continuousTimelineStartDate` through a ref updated on each render (e.g. `continuousTimelineStartDateRef.current`) inside `resolveDropTarget` / `dateTimeToContinuousAbs`, and compensate `scrollTop` when the anchor shifts so existing event tops stay visually stable. The current closure-stable anchor is correct for the current fixed-range architecture.
+
+### Verification
+
+- `npm run test`: 16 files, 93 tests, all passing. Includes new `src/timelineGeometry.test.ts` (14 cases covering `durationMinutes` cross-midnight, `dateTimeToAbsoluteMinutes` / `absoluteMinutesToDateTime` round-trips, `snapMinutes`, `timeBlockHeight` cross-midnight, and acceptance scenarios for cases 2 and 4).
+- `npm run build`: succeeds (`built in 3.95s`).

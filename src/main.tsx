@@ -688,9 +688,24 @@ function dateDiff(a: string, b: string) {
   return Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
 }
 
+/**
+ * Duration in minutes between two HH:MM time strings, treating the end as
+ * strictly later than the start. When `end` is numerically ≤ `start` the end
+ * is assumed to fall on the following day (cross-midnight), so a 23:30→00:30
+ * span yields 60 minutes instead of -1380. Mirrors the helper in
+ * `timelineGeometry.ts` so cross-midnight blocks render and resize correctly.
+ */
+function spanDurationMinutes(startTime: string, endTime: string) {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  let diff = end - start;
+  if (diff <= 0) diff += 24 * 60;
+  return diff;
+}
+
 function taskDuration(task: Task) {
   if (task.scheduledStart && task.scheduledEnd) {
-    return Math.max(timeToMinutes(task.scheduledEnd) - timeToMinutes(task.scheduledStart), SLOT_MINUTES);
+    return Math.max(spanDurationMinutes(task.scheduledStart, task.scheduledEnd), SLOT_MINUTES);
   }
   return Math.max(Math.round((task.estimatedHours || 0.5) * 60), SLOT_MINUTES);
 }
@@ -4143,6 +4158,59 @@ function App() {
     return minutesToTime(clampSlot(target.minutes - offsetMinutes));
   }
 
+  /**
+   * Unified pointer → {date, startTime} resolver for timeline drag/drop/resize.
+   *
+   * In continuous cross-day mode the date MUST come from the Y band index
+   * (via `continuousPointerTarget`), never from `currentDate`/`timelineDate`.
+   * In non-continuous mode the date comes from the X column via
+   * `getDropTargetFromPointer`. Both paths return the snapped slot time.
+   */
+  function resolveDropTarget(clientX: number, clientY: number): { date: string; startTime: string; minutes: number } | null {
+    const { gridEl, scrollEl, visDays } = getDropGridAndDays();
+    if (!gridEl) return null;
+    if (continuousTimelineEnabled) {
+      const target = continuousPointerTarget(clientX, clientY, gridEl);
+      return { date: target.date, startTime: target.startTime, minutes: target.minutes };
+    }
+    if (!scrollEl) return null;
+    const target = getDropTargetFromPointer({
+      clientX,
+      clientY,
+      gridElement: gridEl,
+      scrollElement: scrollEl,
+      visibleDays: visDays,
+      startHour: dayStartHour,
+    });
+    return { date: target.date, startTime: target.startTime, minutes: target.minutes };
+  }
+
+  /**
+   * Subtract a pointer offset (in minutes) from a {date, time} pair, rolling
+   * the date backwards when the subtraction crosses midnight. Used by drag to
+   * keep the grabbed point under the cursor when the pointer sits near 00:00.
+   */
+  function subtractOffsetFromDateTime(date: string, time: string, offsetMinutes: number): { date: string; startTime: string } {
+    let total = timeToMinutes(time) - offsetMinutes;
+    let dayShift = 0;
+    while (total < 0) {
+      total += 24 * 60;
+      dayShift -= 1;
+    }
+    const snapped = clampSlot(total);
+    return { date: addDays(date, dayShift), startTime: minutesToTime(snapped) };
+  }
+
+  /**
+   * Continuous absolute minutes (from `continuousTimelineStartDate`) for a
+   * `{date, time}` point. Used by resize to compute durations across midnight
+   * without the `end - start` negative-wrap bug.
+   */
+  function dateTimeToContinuousAbs(date: string, time: string): number {
+    const offset = continuousDateOffset(date);
+    return offset * 24 * 60 + timeToMinutes(time);
+  }
+
   function pointerOutsideTimeline(clientX: number, clientY: number) {
     const rect = (timelineView === "3day" || timelineView === "weekly")
       ? timelineRef.current?.getBoundingClientRect()
@@ -4714,7 +4782,9 @@ function App() {
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
         if ((!records || records.length === 0) && task.id === recordId && task.scheduledStart) {
-          const duration = timeToMinutes(task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task))) - timeToMinutes(task.scheduledStart);
+          // Cross-midnight spans (e.g. 23:30→00:30) must keep their 60m duration
+          // instead of collapsing to a negative / wrap-broken value.
+          const duration = spanDurationMinutes(task.scheduledStart, task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)));
           return {
             ...task,
             scheduledDate: newDate || task.scheduledDate,
@@ -4729,8 +4799,8 @@ function App() {
         const updated = [...records];
         const oldEnd = updated[idx].scheduledEnd;
         const oldStart = updated[idx].scheduledStart;
-        const duration = timeToMinutes(oldEnd) - timeToMinutes(oldStart);
-        const newEnd = minutesToTime(timeToMinutes(newStart) + duration);
+        const duration = spanDurationMinutes(oldStart, oldEnd);
+        const newEnd = addMinutes(newStart, duration);
         updated[idx] = {
           ...updated[idx],
           scheduledStart: newStart,
@@ -4882,20 +4952,15 @@ function App() {
       const outsideTimeline = pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY);
       setDrag((current) => current && current.taskId === task.id ? { ...current, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline } : current);
       if (!outsideTimeline) {
-        const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-        if (gridEl && scrollEl) {
-          const target = getDropTargetFromPointer({
-            clientX: moveEvent.clientX,
-            clientY: moveEvent.clientY,
-            gridElement: gridEl,
-            scrollElement: scrollEl,
-            visibleDays: visDays,
-            startHour: dayStartHour,
-            debugLabel: `block-move-${timelineView}`,
-          });
-          const adjustedTime = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
-          dragTargetDateRef.current = target.date;
-          setHoverSlot(adjustedTime);
+        // Continuous cross-day mode MUST derive the date from the Y band index
+        // (continuousPointerTarget), not from currentDate/X column. The offset
+        // is subtracted in absolute time so dragging across midnight keeps the
+        // grabbed point under the cursor instead of snapping back to day 0.
+        const pointerTarget = resolveDropTarget(moveEvent.clientX, moveEvent.clientY);
+        if (pointerTarget) {
+          const adjusted = subtractOffsetFromDateTime(pointerTarget.date, pointerTarget.startTime, offsetMinutes);
+          dragTargetDateRef.current = adjusted.date;
+          setHoverSlot(adjusted.startTime);
         }
       } else {
         setHoverSlot("");
@@ -4954,21 +5019,14 @@ function App() {
         } else if (isEvent && droppedOutsideTimeline) {
           // Outside the timeline but not over the candidate shelf: cancel the move.
         } else {
-          const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-          if (gridEl && scrollEl) {
-            const target = getDropTargetFromPointer({
-              clientX: upEvent.clientX,
-              clientY: upEvent.clientY,
-              gridElement: gridEl,
-              scrollElement: scrollEl,
-              visibleDays: visDays,
-              startHour: dayStartHour,
-              debugLabel: `block-up-${timelineView}`,
-            });
-            dragTargetDateRef.current = target.date;
-            const nextStart = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
-            if (isEvent) moveEventOccurrence(task.id, nextStart, target.date);
-            else moveTimelineRecord(task.id, nextStart, target.date);
+          // Same continuous-aware resolution as the move handler: date comes
+          // from Y band in cross-day mode, offset subtracted in absolute time.
+          const pointerTarget = resolveDropTarget(upEvent.clientX, upEvent.clientY);
+          if (pointerTarget) {
+            const adjusted = subtractOffsetFromDateTime(pointerTarget.date, pointerTarget.startTime, offsetMinutes);
+            dragTargetDateRef.current = adjusted.date;
+            if (isEvent) moveEventOccurrence(task.id, adjusted.startTime, adjusted.date);
+            else moveTimelineRecord(task.id, adjusted.startTime, adjusted.date);
           } else {
             const nextStart = slotFromPointer(upEvent.clientY, offsetMinutes, upEvent.clientX);
             if (isEvent) moveEventOccurrence(task.id, nextStart);
@@ -5024,37 +5082,51 @@ function App() {
     setDragCreate(null);
     document.body.classList.add("df-resizing");
     setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)) });
-    const move = (moveEvent: MouseEvent) => {
-      const slot = slotFromPointer(moveEvent.clientY, 0, moveEvent.clientX);
-      const slotMin = timeToMinutes(slot);
-      const start = timeToMinutes(task.scheduledStart);
-      const end = timeToMinutes(task.scheduledEnd);
+
+    // Resize works in continuous absolute minutes (relative to
+    // `continuousTimelineStartDate`) so that dragging the bottom handle past
+    // midnight yields a 60m duration instead of clamping to the end of day.
+    // The same math also works in non-continuous mode because the absolute
+    // coordinate reduces to within-day minutes when the anchor == visible date.
+    const taskAnchorDate = task.scheduledDate || timelineWindowAnchorDate;
+    const origStart = task.scheduledStart || "09:00";
+    const origDuration = taskDuration(task);
+    const startAbs = dateTimeToContinuousAbs(taskAnchorDate, origStart);
+    const endAbs = startAbs + origDuration;
+
+    const computeResize = (clientX: number, clientY: number): { nextStart: string; nextEnd: string; nextDuration: number; nextStartDate: string } => {
+      const pointerTarget = resolveDropTarget(clientX, clientY);
+      const fallbackSlot = slotFromPointer(clientY, 0, clientX);
+      const pointerAbs = pointerTarget
+        ? dateTimeToContinuousAbs(pointerTarget.date, pointerTarget.startTime)
+        : startAbs + timeToMinutes(fallbackSlot) - timeToMinutes(origStart);
       if (edge === "start") {
-        const nextStart = Math.min(slotMin, end - SLOT_MINUTES);
-        setResizePreview({ taskId: task.id, start: minutesToTime(nextStart), end: task.scheduledEnd || minutesToTime(end) });
-      } else {
-        const nextEnd = Math.max(slotMin, start + SLOT_MINUTES);
-        setResizePreview({ taskId: task.id, start: task.scheduledStart || minutesToTime(start), end: minutesToTime(nextEnd) });
+        const newStartAbs = Math.min(pointerAbs, endAbs - SLOT_MINUTES);
+        const newDuration = Math.max(SLOT_MINUTES, endAbs - newStartAbs);
+        // addMinutes wraps mod 24h; if start moved backwards across midnight,
+        // roll the scheduled date back by the number of crossed days.
+        const dayShift = Math.floor((timeToMinutes(origStart) + (newStartAbs - startAbs)) / (24 * 60));
+        const nextStart = addMinutes(origStart, newStartAbs - startAbs);
+        const nextEnd = addMinutes(nextStart, newDuration);
+        return { nextStart, nextEnd, nextDuration: newDuration, nextStartDate: addDays(taskAnchorDate, dayShift) };
       }
+      const newEndAbs = Math.max(pointerAbs, startAbs + SLOT_MINUTES);
+      const newDuration = Math.max(SLOT_MINUTES, newEndAbs - startAbs);
+      const nextEnd = addMinutes(origStart, newDuration);
+      return { nextStart: origStart, nextEnd, nextDuration: newDuration, nextStartDate: taskAnchorDate };
+    };
+
+    const move = (moveEvent: MouseEvent) => {
+      const { nextStart, nextEnd } = computeResize(moveEvent.clientX, moveEvent.clientY);
+      setResizePreview({ taskId: task.id, start: nextStart, end: nextEnd });
     };
     const up = (upEvent: MouseEvent) => {
       if (!data) return;
-      const slot = slotFromPointer(upEvent.clientY, 0, upEvent.clientX);
-      const slotMin = timeToMinutes(slot);
-      const start = timeToMinutes(task.scheduledStart);
-      const end = timeToMinutes(task.scheduledEnd);
+      const { nextStart, nextEnd, nextDuration, nextStartDate } = computeResize(upEvent.clientX, upEvent.clientY);
+      const durationHours = nextDuration / 60;
       const now = new Date().toISOString();
-      let nextData = data;
       if (isEventDisplayTask(task)) {
-        if (edge === "start") {
-          const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
-          const nextEnd = task.scheduledEnd || minutesToTime(end);
-          resizeEventOccurrence(task.id, nextStart, nextEnd);
-        } else {
-          const nextStart = task.scheduledStart || minutesToTime(start);
-          const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
-          resizeEventOccurrence(task.id, nextStart, nextEnd);
-        }
+        resizeEventOccurrence(task.id, nextStart, nextEnd);
         setResizePreview(null);
         document.body.classList.remove("df-resizing");
         window.removeEventListener("mousemove", move);
@@ -5064,47 +5136,38 @@ function App() {
         }, 0);
         return;
       }
-      if (edge === "start") {
-        const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
-        const nextEnd = task.scheduledEnd || minutesToTime(end);
-        const durationHours = (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60;
-        nextData = {
-          ...data,
-          tasks: data.tasks.map((t) => {
-            const records = t.timelineRecords;
-            if ((!records || records.length === 0) && t.id === task.id) {
-              return { ...t, scheduledStart: nextStart, scheduledEnd: nextEnd, estimatedHours: durationHours, updatedAt: now };
-            }
-            if (!records) return t;
-            const idx = records.findIndex((r) => r.id === task.id);
-            if (idx === -1) return t;
-            const updated = [...records];
-            updated[idx] = { ...updated[idx], scheduledStart: nextStart, scheduledEnd: nextEnd };
-            return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
-          }),
-        };
-        showToast(t(lang, "toast.durationAdjusted"));
-      } else {
-        const nextStart = task.scheduledStart || minutesToTime(start);
-        const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
-        const durationHours = (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60;
-        nextData = {
-          ...data,
-          tasks: data.tasks.map((t) => {
-            const records = t.timelineRecords;
-            if ((!records || records.length === 0) && t.id === task.id) {
-              return { ...t, scheduledStart: nextStart, scheduledEnd: nextEnd, estimatedHours: durationHours, updatedAt: now };
-            }
-            if (!records) return t;
-            const idx = records.findIndex((r) => r.id === task.id);
-            if (idx === -1) return t;
-            const updated = [...records];
-            updated[idx] = { ...updated[idx], scheduledStart: nextStart, scheduledEnd: nextEnd };
-            return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
-          }),
-        };
-        showToast(t(lang, "toast.durationAdjusted"));
-      }
+      // Start-edge resize may shift the scheduled date when the new start
+      // crosses midnight backwards; end-edge resize keeps the start (and
+      // therefore the date) fixed.
+      const moveStartDate = edge === "start";
+      const nextData = {
+        ...data,
+        tasks: data.tasks.map((t) => {
+          const records = t.timelineRecords;
+          if ((!records || records.length === 0) && t.id === task.id) {
+            return {
+              ...t,
+              scheduledStart: nextStart,
+              scheduledEnd: nextEnd,
+              scheduledDate: moveStartDate ? nextStartDate : t.scheduledDate,
+              estimatedHours: durationHours,
+              updatedAt: now,
+            };
+          }
+          if (!records) return t;
+          const idx = records.findIndex((r) => r.id === task.id);
+          if (idx === -1) return t;
+          const updated = [...records];
+          updated[idx] = {
+            ...updated[idx],
+            scheduledStart: nextStart,
+            scheduledEnd: nextEnd,
+            scheduledDate: moveStartDate ? nextStartDate : updated[idx].scheduledDate,
+          };
+          return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
+        }),
+      };
+      showToast(t(lang, "toast.durationAdjusted"));
       // Direct setData for immediate visual update, saveData for persistence
       dataRef.current = nextData;
       setData(nextData);
@@ -9812,16 +9875,14 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const start = preview?.start || task.scheduledStart || "09:00";
   const computedDuration = taskDuration(task);
   let end = preview?.end || task.scheduledEnd || addMinutes(start, computedDuration);
-  
+
   const endMinutesValue = timeToMinutes(end);
   const startMinutesValue = timeToMinutes(start);
-  let calculatedDurationMinutes = endMinutesValue - startMinutesValue;
-  
-  if (calculatedDurationMinutes <= 0) {
-    end = addMinutes(start, computedDuration);
-    calculatedDurationMinutes = computedDuration;
-  }
-  
+  // Cross-midnight spans (e.g. 23:30→00:30) must read as 60m, not -1380.
+  // `spanDurationMinutes` treats end ≤ start as next-day; we only fall back to the
+  // task's estimated duration when the stored end is missing or >24h (bad data).
+  let calculatedDurationMinutes = spanDurationMinutes(start, end);
+
   if (calculatedDurationMinutes > 24 * 60) {
     end = addMinutes(start, computedDuration);
     calculatedDurationMinutes = computedDuration;

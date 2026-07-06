@@ -4,6 +4,7 @@
 
 ### 修复
 - 修复开启无限跨天滚动时日时间轴在一天底部强制切换日期并重置滚动位置的问题；日、3 天和周视图现在按连续垂直画布呈现前后日期，可继续向上滚动，顶部日期跟随当前时间轴窗口更新，跨天边界统一显示为 `0:00`，不再出现 `24:00` 或翻页式跳转；“回到现在”会在跨日滚动离开今天时出现，并把当前时间线居中。
+- 修复无限跨天滚动后时间轴任务拖放与调整时长失效的问题：拖动/调整现在使用连续绝对分钟坐标（指针 Y + 当前画布几何 → 日期 + 时间），不再按单日 X 列推断日期。跨午夜拖动（如 23:30 拖到次日 00:30）会正确切换到第二天且保持原时长；跨午夜向下拉长（23:30/30m 拉到次日 00:30）会得到 60m 时长而非崩溃。短任务（15m/30m）仍按原像素高度渲染，标题/项目/完成状态在拖动与调整时长过程中保持不变。
 
 ### 改进
 - 重做“习惯总览”面板：从一堆带边框的小方块改为结构化周视图表格，左列习惯名 + 右侧七天圆形完成单元，行与表头严格对齐，更像一张干净的纸面周表。
@@ -56,6 +57,7 @@
 
 ### Fixes
 - Fixed continuous cross-day timeline scrolling across day, 3-day, and week views: the timeline can scroll upward into previous dates and downward into following dates without forced date switches or page-like snapping. Header dates now follow the visible timeline window, cross-day boundaries use `0:00` instead of `24:00`, and Back to now appears after cross-day scrolling away from today and recenters the current time.
+- Fixed timeline task drag and resize breaking after infinite cross-day scrolling was enabled: drag/resize now use continuous absolute-minute coordinates (pointer Y + current canvas geometry → date + time) instead of inferring the date from the single-day X column. Dragging across midnight (e.g. 23:30 → next day 00:30) correctly switches to the next day while preserving the original duration; resizing the bottom edge across midnight (23:30/30m → next day 00:30) yields a 60m duration instead of breaking. Short tasks (15m/30m) still render at their original pixel height, and title/project/completion stay unchanged throughout drag and resize.
 
 ### Improvements
 - Rebuilt the Habits Overview panel: replaced the cluttered bordered-box grid with a structured week table — habit name column on the left, seven circular day-completion units on the right, with rows strictly aligned to the header for a clean paper-table feel.

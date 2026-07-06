@@ -206,10 +206,13 @@ describe("TaskBlock shared component contract", () => {
     const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
     const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
 
-    expect(main).toContain("df-habit-week-toolbar");
+    // Habit overview was refactored from `df-habit-week-*` to the borderless
+    // `df-habit-overview-*` table layout. Assert the new class names so this
+    // test tracks the post-refactor contract instead of the removed CSS.
+    expect(main).toContain("df-habit-overview-toolbar");
     expect(main).toContain("df-habit-overview-add");
     expect(main).toContain("df-habit-candidate-settings");
-    expect(css).toContain(".df-habit-week-table");
+    expect(css).toContain(".df-habit-overview-table");
   });
 
   it("renders continuous cross-day scroll as one vertical daily timeline", () => {
