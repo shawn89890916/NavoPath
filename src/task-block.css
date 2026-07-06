@@ -2506,11 +2506,13 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   pointer-events: none;
 }
 
-/* Hit layer: transparent pie sectors (innerRadius = 0) that cover the full
-   angular range of each segment, including the center hole. These receive
-   all pointer events so hovering near the center activates the correct
-   project by angle. */
-.df-app .df-planning .df-metrics-donut-hit {
+/* Single transparent hit disk on top of the donut. It is the ONLY element
+   that receives pointer events — visual arcs, leader lines, labels, the
+   decorative rule circle, and the center overlay are all pointer-events
+   none. This prevents cursor flicker between SVG elements. Hover is
+   computed by angle from the pointer position, so the disk covers the
+   donut band AND the center hole. */
+.df-app .df-planning .df-metrics-donut-hit-disk {
   fill: transparent;
   stroke: none;
   cursor: pointer;
@@ -2518,15 +2520,15 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   pointer-events: all;
 }
 
-.df-app .df-planning .df-metrics-donut-hit:focus-visible {
+.df-app .df-planning .df-metrics-donut-hit-disk:focus-visible {
   outline: 1px solid color-mix(in srgb, var(--accent-active, var(--accent)) 62%, transparent);
   outline-offset: -1px;
 }
 
 /* Visual layer: the actual donut arcs. pointer-events disabled so all
-   hover/click passes through to the hit layer below. */
+   hover/click passes through to the hit disk on top. */
 .df-app .df-planning .df-metrics-donut-segment {
-  cursor: pointer;
+  cursor: default;
   outline: none;
   pointer-events: none;
   stroke: var(--paper, var(--paper-bg));

@@ -75,27 +75,6 @@ function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadi
   ].join(" ");
 }
 
-/**
- * Build a full pie-sector path (slice from center, innerRadius = 0) used as
- * the transparent hit area for a donut segment. Because the slice reaches
- * all the way to the center, the pointer can hover anywhere within the
- * segment's angular range — including the center hole — and still activate
- * the correct project by angle. The visual donut arc is drawn separately on
- * top with pointer-events disabled.
- */
-function pieSectorPath(cx: number, cy: number, outerRadius: number, startAngle: number, endAngle: number) {
-  const safeEndAngle = Math.min(endAngle, startAngle + 359.99);
-  const outerStart = polarPoint(cx, cy, outerRadius, startAngle);
-  const outerEnd = polarPoint(cx, cy, outerRadius, safeEndAngle);
-  const largeArc = safeEndAngle - startAngle > 180 ? 1 : 0;
-  return [
-    `M ${cx} ${cy}`,
-    `L ${outerStart.x} ${outerStart.y}`,
-    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
-    "Z",
-  ].join(" ");
-}
-
 interface DonutLeaderLine {
   /** SVG path for the polyline from segment edge to label anchor. */
   path: string;
@@ -108,39 +87,37 @@ interface DonutLeaderLine {
 }
 
 /**
- * Build a two-segment leader line from the outer edge of a donut segment to
- * a horizontal label anchor. The line starts at `outerRadius`, extends to
- * `elbowRadius` along the mid-angle (radial segment p0→p1), then bends
- * horizontally outward to `cx ± labelDistance` (horizontal segment p1→p2).
- * The label is centered ABOVE the midpoint of the horizontal segment
- * (between p1/elbow and p2/end), using text-anchor "middle", so it reads
- * as annotation text sitting on top of the horizontal line — not as a tag
- * stuck to the line's endpoint.
+ * Build a two-segment leader line using three key points:
+ *   p0 — donut outer edge (visualOuter + 4)
+ *   p1 — elbow / bend point (visualOuter + 52), end of the radial diagonal
+ *   p2 — horizontal segment end (p1.x ± horizontalLength)
+ *
+ * The horizontal segment length is driven by the project name length so the
+ * line always underlines the text. The label is anchored at the MIDPOINT of
+ * the horizontal segment (p1→p2) with text-anchor "middle", sitting 8px
+ * above the line like annotation text on top of it.
  */
 function donutLeaderLine(
   cx: number,
   cy: number,
-  outerRadius: number,
-  elbowRadius: number,
+  visualOuter: number,
   startAngle: number,
   endAngle: number,
-  labelDistance: number,
+  label: string,
 ): DonutLeaderLine {
   const mid = (startAngle + endAngle) / 2;
-  const start = polarPoint(cx, cy, outerRadius, mid);
-  const elbow = polarPoint(cx, cy, elbowRadius, mid);
   const radians = (mid - 90) * Math.PI / 180;
   const onRight = Math.cos(radians) >= 0;
-  const endX = onRight ? cx + labelDistance : cx - labelDistance;
-  // p1 = elbow, p2 = (endX, elbow.y). Label anchor = midpoint of p1→p2,
-  // so the project name sits centered above the horizontal segment itself.
-  const midX = (elbow.x + endX) / 2;
-  // p1.y == p2.y == elbow.y (horizontal segment). Place label 8px above the
-  // horizontal segment so it reads as annotation sitting on top of the line.
+  const p0 = polarPoint(cx, cy, visualOuter + 4, mid);
+  const p1 = polarPoint(cx, cy, visualOuter + 52, mid);
+  const horizontalLength = Math.max(128, label.length * 16);
+  const p2x = p1.x + (onRight ? horizontalLength : -horizontalLength);
+  const labelX = (p1.x + p2x) / 2;
+  const labelY = p1.y - 8;
   return {
-    path: `M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${endX} ${elbow.y}`,
-    labelX: midX,
-    labelY: elbow.y - 8,
+    path: `M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} L ${p2x} ${p1.y}`,
+    labelX,
+    labelY,
     textAnchor: "middle",
   };
 }
@@ -886,6 +863,7 @@ export default function PlanningView(props: {
   const [dragNode, setDragNode] = useState<TreeDragNode | null>(null);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
+  const donutSvgRef = useRef<SVGSVGElement>(null);
   const dialog = useInAppDialog(props.lang);
 
   const enableKanban = props.featureKanban !== false;
@@ -1973,6 +1951,34 @@ export default function PlanningView(props: {
     segments.push({ group, startAngle, endAngle });
     return segments;
   }, []);
+
+  /**
+   * Convert a pointer position to a donut segment by angle. The SVG viewBox
+   * is mapped to the rendered element via getBoundingClientRect, so this
+   * works regardless of CSS size. Distance from center must be within
+   * hitRadius (hoveredOuterRadius + 4) or the hover is cleared. Inside that
+   * radius, the angle determines which segment is hovered — including the
+   * center hole area, so hovering near the center still picks the correct
+   * project by angle.
+   */
+  const computeHoveredSegment = (clientX: number, clientY: number): string | null => {
+    const svg = donutSvgRef.current;
+    if (!svg || donutSegments.length === 0) return null;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const vb = svg.viewBox.baseVal;
+    if (!vb || vb.width === 0) return null;
+    const x = (clientX - rect.left) * (vb.width / rect.width) + vb.x;
+    const y = (clientY - rect.top) * (vb.height / rect.height) + vb.y;
+    const dx = x - 120;
+    const dy = y - 120;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const hitRadius = 98;
+    if (distance > hitRadius) return null;
+    const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+    const segment = donutSegments.find((s) => angle >= s.startAngle && angle < s.endAngle);
+    return segment?.group.id ?? null;
+  };
   const rangeOptions: Array<{ value: MetricRangePreset; label: string }> = [
     { value: "all", label: props.lang === "zh" ? "\u5168\u90e8" : "All" },
     { value: "today", label: props.lang === "zh" ? "今天" : "Today" },
@@ -2277,32 +2283,10 @@ export default function PlanningView(props: {
                         <span>{metricsResult.range.label}</span>
                       </div>
                       <div className="df-metrics-donut-wrap">
-                        <svg className="df-metrics-donut" viewBox="-70 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
+                        <svg ref={donutSvgRef} className="df-metrics-donut" viewBox="-70 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
                           <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
-                          {/* Hit layer: transparent pie sectors (innerRadius=0) so the
-                              pointer can hover anywhere within a segment's angular
-                              range — including the center hole — and activate the
-                              correct project by angle. */}
-                          <g className="df-metrics-donut-hit-layer">
-                            {donutSegments.map(({ group, startAngle, endAngle }) => (
-                              <path
-                                key={`hit-${group.id}`}
-                                className="df-metrics-donut-hit"
-                                d={pieSectorPath(120, 120, 96, startAngle, endAngle)}
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
-                                onMouseEnter={() => setHoveredMetricGroupId(group.id)}
-                                onMouseMove={() => setHoveredMetricGroupId(group.id)}
-                                onMouseLeave={() => setHoveredMetricGroupId(null)}
-                                onFocus={() => setHoveredMetricGroupId(group.id)}
-                                onBlur={() => setHoveredMetricGroupId(null)}
-                                onClick={() => setHoveredMetricGroupId(group.id)}
-                              />
-                            ))}
-                          </g>
-                          {/* Visual layer: actual donut arcs. pointer-events disabled
-                              so all hover/click goes through to the hit layer below. */}
+                          {/* Visual layer: actual donut arcs. pointer-events none —
+                              all pointer events are handled by the hit disk on top. */}
                           <g className="df-metrics-donut-visual-layer">
                             {donutSegments.map(({ group, startAngle, endAngle }) => {
                               const isActive = activeDonutGroup?.id === group.id;
@@ -2318,11 +2302,11 @@ export default function PlanningView(props: {
                             })}
                           </g>
                           {/* Label layer: leader lines + project names. pointer-events
-                              none so they never interfere with the hit sectors. */}
+                              none so they never interfere with the hit disk. */}
                           <g className="df-metrics-donut-label-layer">
                             {donutSegments.map(({ group, startAngle, endAngle }) => {
                               const isActive = activeDonutGroup?.id === group.id;
-                              const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 148, startAngle, endAngle, 158);
+                              const leader = donutLeaderLine(120, 120, isActive ? 94 : 88, startAngle, endAngle, group.label);
                               return (
                                 <g key={`label-${group.id}`}>
                                   <path className="df-metrics-donut-leader" d={leader.path} />
@@ -2337,6 +2321,29 @@ export default function PlanningView(props: {
                               );
                             })}
                           </g>
+                          {/* Single hit disk on top: transparent circle that handles
+                              ALL pointer events. Hover is computed by angle from the
+                              pointer position relative to center, so the cursor never
+                              flickers between SVG elements. The disk radius (98) covers
+                              the donut band and center hole but not the label area. */}
+                          <circle
+                            className="df-metrics-donut-hit-disk"
+                            cx={120}
+                            cy={120}
+                            r={98}
+                            tabIndex={0}
+                            role="application"
+                            aria-label={props.lang === "zh" ? "项目时间占比圆环图，移动鼠标查看各项目时长" : "Project time allocation donut, move pointer to explore"}
+                            onPointerMove={(e) => setHoveredMetricGroupId(computeHoveredSegment(e.clientX, e.clientY))}
+                            onPointerLeave={() => setHoveredMetricGroupId(null)}
+                            onClick={(e) => setHoveredMetricGroupId(computeHoveredSegment(e.clientX, e.clientY))}
+                            onFocus={() => {
+                              if (donutSegments.length > 0 && !hoveredMetricGroupId) {
+                                setHoveredMetricGroupId(donutSegments[0].group.id);
+                              }
+                            }}
+                            onBlur={() => setHoveredMetricGroupId(null)}
+                          />
                         </svg>
                         <div className="df-metrics-donut-center">
                           {activeDonutGroup ? (
