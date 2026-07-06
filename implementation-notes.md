@@ -284,6 +284,42 @@ Records how `importance` and `urgency` are surfaced across the drawer, task card
 - Planning Tree no longer uses a DOM-cloned overlay for task/subtask/project drags; it uses a React-rendered `TaskBlock` overlay from `TaskDragLayer`.
 - Kanban and Matrix same-container reordering updates task order on drop; moving between columns/quadrants updates the task status or importance/urgency.
 - Cross-view drag between Tree, Kanban, Matrix, and List is intentionally unsupported because they are separate Planning surfaces.
+
+## Habit Overview Refactor
+
+### Audit (before refactor)
+- `HabitPanel` (src/main.tsx) — outer shell: backdrop + `aside.df-utility-panel.df-habit-panel` + head (title + close) + body that switches between overview and detail modes.
+- `HabitOverviewBody` (old) — overview content: `.df-habit-week-board` toolbar + `.df-habit-week-table` grid + `.df-settings-group.df-habit-list-group` archived list.
+- `HabitDetailBody` — edit form (NOT touched in this refactor).
+- Data sources preserved: `buildHabitMetrics(props.data, props.today)` for per-habit metrics, `props.data.habitDailyStates` for daily completion, `isHabitDueOnDate(habit, date)` for due detection, `weekOffset` state for week navigation, `props.archivedHabits` filtered from `data.habits`.
+- Old CSS: `.df-habit-week-*` in task-block.css (bordered cell boxes + 9px dots) and `.df-habit-overview-list/row/title/dot/meta` + `.df-habit-archive-toggle` in app-redesign.css (legacy archived list).
+
+### Refactored components
+- `HabitOverviewBody` rewritten in place (src/main.tsx) with new class names and structure:
+  - `.df-habit-overview` — section wrapper.
+  - `.df-habit-overview-toolbar` — week range (editorial display) + nav actions (prev / today / next / new habit) split into `.df-habit-overview-range` and `.df-habit-overview-actions`.
+  - `.df-habit-overview-table` — borderless grid table with `.df-habit-overview-thead` (column headers: 习惯 + 7 days) and `.df-habit-overview-trow` (habit name + 7 day cells).
+  - `.df-habit-overview-cell` — day cell with 18px circular `.df-habit-overview-dot` completion unit. States: `is-due` (subtle accent ring), `is-planned` (22% accent tint), `is-done` (solid accent fill + white check via `::after` SVG), `is-today` (5% accent column tint).
+  - `.df-habit-overview-archived` — collapsible disabled-habits section with `.df-habit-overview-archived-toggle` (▸/▾ chevron) and `.df-habit-overview-archived-row` rows. Each row has name + edit/restore icon tools (`.df-habit-overview-tool`).
+
+### Deleted / stopped using
+- `.df-habit-week-board`, `.df-habit-week-toolbar`, `.df-habit-week-actions`, `.df-habit-week-today`, `.df-habit-week-table`, `.df-habit-week-header`, `.df-habit-week-row`, `.df-habit-week-name`, `.df-habit-week-cell`, `.df-habit-week-empty` — removed from task-block.css.
+- `.df-habit-overview-list`, `.df-habit-overview-row`, `.df-habit-overview-title`, `.df-habit-overview-meta`, `.df-habit-archive-toggle` — removed from app-redesign.css.
+- `.df-habit-list-group` / `.df-habit-list-toggle` classes — no longer referenced (leftover `df-habit-list-group` style kept as a no-op for safety since `df-settings-group` still exists on that section elsewhere; will be cleaned up if detail mode is refactored later).
+- Responsive rules for old `.df-habit-overview-row` / `.df-habit-overview-meta` removed from app-redesign.css `@media (max-width: 520px)`.
+
+### Preserved for compatibility
+- `.df-habit-empty` — still used by `HabitPanel` detail fallback ("未找到该习惯").
+- `.df-habit-overview-dot` class name reused with new meaning (18px circular unit, not the old 8px dot). Old `.done`/`.planned` modifier rules on the dot are dead; the new code applies `is-done`/`is-planned` on the parent cell instead.
+- `.df-habit-overview-add` class kept (used on the "+ 新增习惯" button and the empty-state button).
+- `.df-habit-panel` width bumped from 520px to 560px to give the 8-column table breathing room.
+- All data logic untouched: `weekOffset`, `metrics`, `dailyStates`, `onToggleDay`, `onArchive`, `onCreateHabit`, `onEditHabit`, `isHabitDueOnDate`, `addDays`.
+
+### Known remaining edge cases
+- Very long habit titles use ellipsis truncation; full title visible on hover via native `title` only on the archived row. Active habit name row does not have a `title` attribute — could be added later if needed.
+- The check SVG inside the completed dot is a fixed white stroke (`%23FBF9FF`) which matches the light `--surface-main`; in dark mode the contrast may be slightly off but acceptable since the accent fill is still clearly distinct from empty cells.
+- No explicit "delete" action on archived habits (only edit + restore) because the existing `HabitPanel` props do not expose a delete handler. Adding delete would require plumbing a new `onDeleteHabit` callback through `HabitPanel` — out of scope for this layout refactor.
+
 # Timeline Short Event Debug Proof
 
 For broken short task:

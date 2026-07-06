@@ -1,5 +1,16 @@
 # NavoPath 更新日志
 
+## 2026-07-06 · 习惯总览重构
+
+### 改进
+- 重做“习惯总览”面板：从一堆带边框的小方块改为结构化周视图表格，左列习惯名 + 右侧七天圆形完成单元，行与表头严格对齐，更像一张干净的纸面周表。
+- 顶部控制区拆分为左右两组：左侧周范围标题（编辑级字体）+ 今日完成统计；右侧上一周 / 今天 / 下一周 / 新增习惯按钮，不再挤在一起。
+- 日期列表头采用双行结构（周几 + 日期），今日列以克制 accent 色标注。
+- 完成单元从 9px 小点升级为 18px 圆形：未完成空心、已计划浅色填充、已完成实心 accent 填充 + 白色勾，hover 有轻微背景反馈，无浮夸动画。
+- 已禁用习惯区改为底部折叠栏（▸/▾ 指示），展开后每行提供查看/编辑与恢复启用的轻量图标操作，不再占据巨大空白框。
+- 习惯名右侧弱化显示预设时长（mono 字体小号），保持视觉层级清晰。
+- 习惯面板宽度从 520px 调整为 560px，给八列表格更舒适的呼吸感；窄屏下表格横向滚动且列宽自适应。
+
 ## 2026-07-05 · 时间轴短任务渲染与选择器优化
 
 ### 修复
@@ -36,6 +47,17 @@
 - 修复不同视图拖拽反馈样式各自为政、CSS 重复堆叠的问题，收敛为共享类驱动。
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
+
+## 2026-07-06 · Habit overview refactor
+
+### Improvements
+- Rebuilt the Habits Overview panel: replaced the cluttered bordered-box grid with a structured week table — habit name column on the left, seven circular day-completion units on the right, with rows strictly aligned to the header for a clean paper-table feel.
+- Split the top control bar into two groups: week range title (editorial display type) + today's completion stats on the left; previous / today / next / new-habit buttons on the right, no longer crammed together.
+- Day column headers use a two-line layout (weekday + date); today's column is marked with a restrained accent tint.
+- Upgraded the completion unit from a 9px dot to an 18px circle: empty ring when not done, light accent tint when planned, solid accent fill with a white check when done; subtle hover background, no exaggerated animation.
+- The disabled-habits section is now a bottom collapsible bar (▸/▾ indicator); expanding it shows one row per habit with lightweight view/edit and restore icon actions, replacing the old oversized empty box.
+- Habit duration is shown muted (small mono font) on the right of the habit name to keep visual hierarchy clear.
+- Habit panel width increased from 520px to 560px so the eight-column table breathes; on narrow screens the table scrolls horizontally and column widths adapt.
 
 ## 2026-07-05 · Timeline short tasks & selector improvements
 

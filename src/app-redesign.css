@@ -3031,7 +3031,7 @@
 }
 
 /* ===== Habit Panel (overview + detail) ===== */
-.df-habit-panel { width: min(520px, 100vw) !important; }
+.df-habit-panel { width: min(560px, 100vw) !important; }
 .df-habit-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -3061,71 +3061,8 @@
   letter-spacing: .04em;
 }
 .df-habit-list-group { padding-top: 6px; }
-.df-habit-overview-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-.df-habit-overview-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--paper-rule);
-}
-.df-habit-overview-row:last-child { border-bottom: 0; }
-.df-habit-overview-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font-family: var(--paper-task);
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--text-main);
-  cursor: pointer;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.df-habit-overview-title:hover { color: var(--accent-active); }
-.df-habit-overview-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--paper-rule-strong, var(--paper-rule));
-  flex-shrink: 0;
-}
-.df-habit-overview-dot.done { background: var(--accent-active); }
-.df-habit-overview-dot.planned { background: color-mix(in srgb, var(--accent-active) 50%, var(--paper-rule-strong)); }
-.df-habit-overview-meta {
-  font-family: var(--paper-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.df-habit-archive-toggle {
-  border: 1px solid var(--paper-rule-strong, var(--paper-rule));
-  border-radius: 5px;
-  background: transparent;
-  padding: 4px 8px;
-  font-family: var(--paper-sans);
-  font-size: 11px;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color 120ms, border-color 120ms;
-}
-.df-habit-archive-toggle:hover {
-  color: var(--accent-active);
-  border-color: var(--accent-active);
-}
+/* Legacy .df-habit-overview-list/row/title/dot/meta and .df-habit-archive-toggle
+   removed — habit overview now uses .df-habit-overview-* classes in task-block.css. */
 .df-habit-empty {
   color: var(--text-muted);
   font-size: 13px;
@@ -3188,8 +3125,6 @@
 }
 @media (max-width: 520px) {
   .df-habit-stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .df-habit-overview-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .df-habit-overview-meta { display: none; }
 }
 
 .df-search-trigger {

@@ -8776,42 +8776,56 @@ function HabitOverviewBody(props: {
   const mondayOffset = (baseDate.getDay() + 6) % 7;
   const weekStart = addDays(baseDay, -mondayOffset);
   const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  const weekRange = `${weekDays[0].slice(5).replace("-", "/")} - ${weekDays[6].slice(5).replace("-", "/")}`;
+  const fmt = (iso: string) => iso.slice(5).replace("-", "/");
+  const weekRange = `${fmt(weekDays[0])} - ${fmt(weekDays[6])}`;
+  const weekdayShort = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00`);
+    return zh
+      ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][d.getDay()]
+      : d.toLocaleDateString("en-US", { weekday: "short" });
+  };
+  const dayNum = (iso: string) => iso.slice(8);
   return (
     <>
-      <section className="df-habit-week-board" aria-label={zh ? "习惯周视图" : "Habit week view"}>
-        <div className="df-habit-week-toolbar">
-          <div>
+      <section className="df-habit-overview" aria-label={zh ? "习惯周视图" : "Habit week view"}>
+        <header className="df-habit-overview-toolbar">
+          <div className="df-habit-overview-range">
             <strong>{weekRange}</strong>
             <span>{zh ? `${metrics.todayCompleted}/${metrics.active} 今日完成` : `${metrics.todayCompleted}/${metrics.active} complete today`}</span>
           </div>
-          <div className="df-habit-week-actions">
-            <button type="button" aria-label={zh ? "上一周" : "Previous week"} onClick={() => setWeekOffset((value) => value - 1)}>‹</button>
-            <button type="button" className="df-habit-week-today" onClick={() => setWeekOffset(0)}>{zh ? "今天" : "Today"}</button>
-            <button type="button" aria-label={zh ? "下一周" : "Next week"} onClick={() => setWeekOffset((value) => value + 1)}>›</button>
-            <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
+          <div className="df-habit-overview-actions">
+            <button type="button" className="df-habit-nav" aria-label={zh ? "上一周" : "Previous week"} onClick={() => setWeekOffset((value) => value - 1)}>‹</button>
+            <button type="button" className="df-habit-nav" onClick={() => setWeekOffset(0)}>{zh ? "今天" : "Today"}</button>
+            <button type="button" className="df-habit-nav" aria-label={zh ? "下一周" : "Next week"} onClick={() => setWeekOffset((value) => value + 1)}>›</button>
+            <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "+ 新增习惯" : "+ New habit"}</button>
           </div>
-        </div>
-        <div className="df-habit-week-table">
-          <div className="df-habit-week-header">
-            <span>{zh ? "习惯" : "Habit"}</span>
-            {weekDays.map((day) => {
-              const date = new Date(`${day}T00:00:00`);
-              const label = date.toLocaleDateString(zh ? "zh-CN" : "en-US", { weekday: "short" });
-              return <span key={day} className={day === props.today ? "today" : ""}><b>{label}</b><small>{day.slice(8)}</small></span>;
-            })}
+        </header>
+
+        <div className="df-habit-overview-table" role="grid">
+          <div className="df-habit-overview-thead" role="row">
+            <span className="df-habit-overview-th-label" role="columnheader">{zh ? "习惯" : "Habit"}</span>
+            {weekDays.map((day) => (
+              <span
+                key={day}
+                className={`df-habit-overview-th-day${day === props.today ? " is-today" : ""}`}
+                role="columnheader"
+              >
+                <b>{weekdayShort(day)}</b>
+                <small>{dayNum(day)}</small>
+              </span>
+            ))}
           </div>
+
           {metrics.perHabit.length === 0 ? (
-            <div className="df-habit-week-empty">
+            <div className="df-habit-overview-empty">
               <span>{zh ? "还没有启用习惯。" : "No active habits yet."}</span>
-              <button type="button" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
+              <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
             </div>
           ) : metrics.perHabit.map((item) => (
-            <div key={item.habit.id} className="df-habit-week-row">
-              <button type="button" className="df-habit-week-name" onClick={() => props.onEditHabit(item.habit.id)}>
-                <span className={`df-habit-overview-dot${item.completedToday ? " done" : ""}${item.plannedToday ? " planned" : ""}`} />
-                <strong>{item.habit.title}</strong>
-                <small>{item.habit.defaultDurationMinutes || 20}m</small>
+            <div key={item.habit.id} className="df-habit-overview-trow" role="row">
+              <button type="button" className="df-habit-overview-name" onClick={() => props.onEditHabit(item.habit.id)}>
+                <span className="df-habit-overview-name-text">{item.habit.title}</span>
+                <small className="df-habit-overview-duration">{item.habit.defaultDurationMinutes || 20}m</small>
               </button>
               {weekDays.map((day) => {
                 const state = props.dailyStates.find((entry) => entry.habitId === item.habit.id && entry.date === day);
@@ -8822,12 +8836,12 @@ function HabitOverviewBody(props: {
                   <button
                     type="button"
                     key={`${item.habit.id}-${day}`}
-                    className={`df-habit-week-cell${due ? " due" : ""}${completed ? " done" : ""}${planned ? " planned" : ""}`}
+                    className={`df-habit-overview-cell${day === props.today ? " is-today" : ""}${completed ? " is-done" : ""}${planned ? " is-planned" : ""}${due ? " is-due" : ""}`}
                     aria-pressed={completed}
                     aria-label={`${completed ? (zh ? "取消完成" : "Mark incomplete") : (zh ? "完成" : "Mark complete")} ${item.habit.title} ${day}`}
                     onClick={() => props.onToggleDay(item.habit.id, day, !completed)}
                   >
-                    <span aria-hidden="true" />
+                    <span className="df-habit-overview-dot" aria-hidden="true" />
                   </button>
                 );
               })}
@@ -8836,34 +8850,48 @@ function HabitOverviewBody(props: {
         </div>
       </section>
 
-      <section className="df-settings-group df-habit-list-group">
-        <button type="button" className="df-habit-list-toggle" aria-expanded={listOpen} onClick={() => setListOpen((open) => !open)}>
-          <span>{zh ? "已归档习惯" : "Archived Habits"}</span>
+      <section className="df-habit-overview-archived">
+        <button type="button" className="df-habit-overview-archived-toggle" aria-expanded={listOpen} onClick={() => setListOpen((open) => !open)}>
+          <span>{zh ? "已禁用的习惯" : "Disabled Habits"}</span>
           <small>{props.archivedHabits.length}</small>
-          <i aria-hidden="true">{listOpen ? "−" : "+"}</i>
+          <i aria-hidden="true" className="df-habit-overview-chevron">{listOpen ? "▾" : "▸"}</i>
         </button>
-        {props.archivedHabits.length === 0 && listOpen ? (
-          <p className="df-habit-empty">{zh ? "暂无已归档习惯。" : "No archived habits."}</p>
-        ) : listOpen ? (
-          <ul className="df-habit-overview-list">
-            {props.archivedHabits.map((habit) => (
-              <li key={habit.id} className="df-habit-overview-row">
-                <button type="button" className="df-habit-overview-title" onClick={() => props.onEditHabit(habit.id)}>
-                  <span className="df-habit-overview-dot" />
-                  {habit.title}
-                </button>
-                <button
-                  type="button"
-                  className="df-habit-archive-toggle"
-                  onClick={() => props.onArchive(habit.id, false)}
-                  title={zh ? "恢复" : "Restore"}
-                >
-                  {zh ? "恢复" : "Restore"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {listOpen && (
+          props.archivedHabits.length === 0 ? (
+            <p className="df-habit-overview-archived-empty">{zh ? "暂无已禁用习惯。" : "No disabled habits."}</p>
+          ) : (
+            <ul className="df-habit-overview-archived-list">
+              {props.archivedHabits.map((habit) => (
+                <li key={habit.id} className="df-habit-overview-archived-row">
+                  <button type="button" className="df-habit-overview-archived-name" onClick={() => props.onEditHabit(habit.id)} title={zh ? "查看 / 编辑" : "View / Edit"}>
+                    <span className="df-habit-overview-archived-title">{habit.title}</span>
+                    <small>{habit.defaultDurationMinutes || 20}m</small>
+                  </button>
+                  <div className="df-habit-overview-archived-tools">
+                    <button
+                      type="button"
+                      className="df-habit-overview-tool"
+                      onClick={() => props.onEditHabit(habit.id)}
+                      title={zh ? "编辑" : "Edit"}
+                      aria-label={zh ? "编辑" : "Edit"}
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11z"/><path d="M9.5 4l2.5 2.5"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="df-habit-overview-tool"
+                      onClick={() => props.onArchive(habit.id, false)}
+                      title={zh ? "恢复启用" : "Restore"}
+                      aria-label={zh ? "恢复启用" : "Restore"}
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8a5 5 0 1 1 1.5 3.5"/><path d="M3 4v4h4"/></svg>
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )
+        )}
       </section>
     </>
   );

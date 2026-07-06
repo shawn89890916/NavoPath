@@ -1847,112 +1847,426 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   gap: 8px !important;
 }
 
-.df-app .df-habit-week-toolbar {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 12px !important;
-  margin-bottom: 10px !important;
-}
-
-.df-app .df-habit-week-toolbar > div:first-child {
+.df-app .df-habit-overview {
   display: flex !important;
   flex-direction: column !important;
-  gap: 2px !important;
+  gap: 14px !important;
 }
 
-.df-app .df-habit-week-toolbar span {
+/* ===== Toolbar: week range + nav actions ===== */
+.df-app .df-habit-overview-toolbar {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+}
+
+.df-app .df-habit-overview-range {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.df-app .df-habit-overview-range strong {
+  font-family: var(--paper-display) !important;
+  font-size: 18px !important;
+  font-weight: 650 !important;
+  color: var(--paper-ink) !important;
+  letter-spacing: -.005em !important;
+  line-height: 1.2 !important;
+}
+
+.df-app .df-habit-overview-range span {
+  font-family: var(--paper-sans) !important;
+  font-size: 11.5px !important;
   color: var(--paper-muted) !important;
-  font-size: 12px !important;
+  letter-spacing: .02em !important;
 }
 
-.df-app .df-habit-week-actions {
+.df-app .df-habit-overview-actions {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 4px !important;
   flex-wrap: wrap !important;
   justify-content: flex-end !important;
 }
 
-.df-app .df-habit-week-actions button,
+.df-app .df-habit-nav,
 .df-app .df-habit-overview-add {
   min-height: 30px !important;
+  padding: 0 10px !important;
   border: 1px solid var(--paper-rule) !important;
-  border-radius: 4px !important;
-  background: var(--paper-bg) !important;
+  border-radius: 5px !important;
+  background: transparent !important;
   color: var(--paper-ink) !important;
+  font-family: var(--paper-sans) !important;
+  font-size: 12.5px !important;
+  font-weight: 550 !important;
+  cursor: pointer !important;
   box-shadow: none !important;
+  transition: color 150ms, border-color 150ms, background 150ms !important;
 }
 
-.df-app .df-habit-week-table {
-  display: grid !important;
-  gap: 4px !important;
+.df-app .df-habit-nav[aria-label] {
+  width: 30px !important;
+  padding: 0 !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  color: var(--paper-muted) !important;
+}
+
+.df-app .df-habit-nav:hover,
+.df-app .df-habit-overview-add:hover {
+  color: var(--accent-active) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 40%, var(--paper-rule)) !important;
+  background: color-mix(in srgb, var(--accent-active) 6%, transparent) !important;
+}
+
+.df-app .df-habit-overview-add {
+  margin-left: 6px !important;
+  color: var(--accent-active) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 30%, var(--paper-rule)) !important;
+}
+
+/* ===== Week table: editorial borderless grid ===== */
+.df-app .df-habit-overview-table {
+  display: flex !important;
+  flex-direction: column !important;
   overflow-x: auto !important;
 }
 
-.df-app .df-habit-week-header,
-.df-app .df-habit-week-row {
+.df-app .df-habit-overview-thead,
+.df-app .df-habit-overview-trow {
   display: grid !important;
-  grid-template-columns: minmax(126px, 1.4fr) repeat(7, minmax(32px, 1fr)) !important;
+  grid-template-columns: minmax(140px, 1.6fr) repeat(7, minmax(34px, 1fr)) !important;
   align-items: center !important;
-  gap: 4px !important;
+  gap: 2px !important;
 }
 
-.df-app .df-habit-week-header {
-  color: var(--paper-muted) !important;
+.df-app .df-habit-overview-thead {
+  padding: 0 0 8px !important;
+  border-bottom: 1px solid var(--paper-rule-strong, var(--paper-rule)) !important;
+}
+
+.df-app .df-habit-overview-th-label {
+  font-family: var(--paper-sans) !important;
   font-size: 11px !important;
-  font-weight: 650 !important;
+  font-weight: 600 !important;
+  color: var(--paper-muted) !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
 }
 
-.df-app .df-habit-week-header span,
-.df-app .df-habit-week-name,
-.df-app .df-habit-week-cell {
-  min-height: 34px !important;
-  border: 1px solid var(--paper-rule) !important;
-  border-radius: 4px !important;
-  background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-rule) 4%) !important;
-}
-
-.df-app .df-habit-week-name {
-  display: grid !important;
-  grid-template-columns: auto minmax(0, 1fr) auto !important;
+.df-app .df-habit-overview-th-day {
+  display: flex !important;
+  flex-direction: column !important;
   align-items: center !important;
-  gap: 7px !important;
-  padding: 0 8px !important;
-  color: var(--paper-ink) !important;
-  text-align: left !important;
+  gap: 2px !important;
+  padding: 2px 0 !important;
+  font-family: var(--paper-sans) !important;
+  color: var(--paper-muted) !important;
 }
 
-.df-app .df-habit-week-cell {
+.df-app .df-habit-overview-th-day b {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: .02em !important;
+}
+
+.df-app .df-habit-overview-th-day small {
+  font-family: var(--paper-mono) !important;
+  font-size: 12px !important;
+  color: var(--paper-ink) !important;
+  font-weight: 600 !important;
+}
+
+.df-app .df-habit-overview-th-day.is-today b,
+.df-app .df-habit-overview-th-day.is-today small {
+  color: var(--accent-active) !important;
+}
+
+.df-app .df-habit-overview-trow {
+  padding: 6px 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+}
+
+.df-app .df-habit-overview-trow:last-child {
+  border-bottom: 0 !important;
+}
+
+/* Habit name cell */
+.df-app .df-habit-overview-name {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 4px 6px 4px 0 !important;
+  font-family: var(--paper-task) !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-habit-overview-name-text {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--paper-ink) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.df-app .df-habit-overview-duration {
+  flex-shrink: 0 !important;
+  font-family: var(--paper-mono) !important;
+  font-size: 10.5px !important;
+  color: var(--paper-muted) !important;
+  letter-spacing: .02em !important;
+}
+
+.df-app .df-habit-overview-name:hover .df-habit-overview-name-text {
+  color: var(--accent-active) !important;
+}
+
+/* Day cell with circular completion unit */
+.df-app .df-habit-overview-cell {
   display: grid !important;
   place-items: center !important;
+  min-height: 34px !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  transition: background 150ms !important;
 }
 
-.df-app .df-habit-week-cell span {
-  width: 9px !important;
-  height: 9px !important;
+.df-app .df-habit-overview-cell.is-today {
+  background: color-mix(in srgb, var(--accent-active) 5%, transparent) !important;
+}
+
+.df-app .df-habit-overview-cell:hover {
+  background: color-mix(in srgb, var(--accent-active) 9%, transparent) !important;
+}
+
+.df-app .df-habit-overview-cell.is-today:hover {
+  background: color-mix(in srgb, var(--accent-active) 12%, transparent) !important;
+}
+
+/* Circular dot — the completion unit */
+.df-app .df-habit-overview-dot {
+  width: 18px !important;
+  height: 18px !important;
   border-radius: 50% !important;
-  border: 1px solid var(--paper-muted) !important;
+  border: 1.5px solid var(--paper-rule-strong, var(--paper-rule)) !important;
+  background: transparent !important;
+  transition: background 150ms, border-color 150ms !important;
 }
 
-.df-app .df-habit-week-cell.due span {
-  background: color-mix(in srgb, var(--accent-active) 18%, transparent) !important;
+/* Due but not done: subtle ring */
+.df-app .df-habit-overview-cell.is-due .df-habit-overview-dot {
+  border-color: color-mix(in srgb, var(--accent-active) 55%, var(--paper-rule-strong, var(--paper-rule))) !important;
 }
 
-.df-app .df-habit-week-cell.done span {
-  border-color: var(--accent-active) !important;
+/* Planned (has timeline record): light tint fill */
+.df-app .df-habit-overview-cell.is-planned:not(.is-done) .df-habit-overview-dot {
+  background: color-mix(in srgb, var(--accent-active) 22%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 55%, var(--paper-rule-strong, var(--paper-rule))) !important;
+}
+
+/* Completed: solid accent fill */
+.df-app .df-habit-overview-cell.is-done .df-habit-overview-dot {
   background: var(--accent-active) !important;
+  border-color: var(--accent-active) !important;
+  position: relative !important;
 }
 
-.df-app .df-habit-week-empty {
+.df-app .df-habit-overview-cell.is-done .df-habit-overview-dot::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23FBF9FF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5'/%3E%3C/svg%3E") !important;
+  background-size: 11px 11px !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+.df-app .df-habit-overview-cell:hover .df-habit-overview-dot {
+  border-color: var(--accent-active) !important;
+}
+
+/* Empty state */
+.df-app .df-habit-overview-empty {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 10px !important;
-  padding: 12px !important;
+  padding: 18px 12px !important;
   border: 1px dashed var(--paper-rule) !important;
-  border-radius: 4px !important;
+  border-radius: 6px !important;
   color: var(--paper-muted) !important;
+  font-size: 13px !important;
+}
+
+/* ===== Archived / disabled section ===== */
+.df-app .df-habit-overview-archived {
+  margin-top: 6px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--paper-rule) !important;
+}
+
+.df-app .df-habit-overview-archived-toggle {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 6px 2px !important;
+  font-family: var(--paper-sans) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--paper-muted) !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  text-align: left !important;
+  letter-spacing: .02em !important;
+}
+
+.df-app .df-habit-overview-archived-toggle:hover {
+  color: var(--paper-ink) !important;
+}
+
+.df-app .df-habit-overview-archived-toggle small {
+  font-family: var(--paper-mono) !important;
+  font-size: 11px !important;
+  color: var(--paper-muted) !important;
+}
+
+.df-app .df-habit-overview-chevron {
+  margin-left: auto !important;
+  font-style: normal !important;
+  font-size: 11px !important;
+  color: var(--paper-muted) !important;
+}
+
+.df-app .df-habit-overview-archived-empty {
+  padding: 10px 2px !important;
+  color: var(--paper-muted) !important;
+  font-size: 12.5px !important;
+}
+
+.df-app .df-habit-overview-archived-list {
+  list-style: none !important;
+  margin: 4px 0 0 !important;
+  padding: 0 !important;
+}
+
+.df-app .df-habit-overview-archived-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 7px 2px !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+}
+
+.df-app .df-habit-overview-archived-row:last-child {
+  border-bottom: 0 !important;
+}
+
+.df-app .df-habit-overview-archived-name {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.df-app .df-habit-overview-archived-title {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  font-family: var(--paper-task) !important;
+  font-size: 13px !important;
+  font-weight: 550 !important;
+  color: var(--paper-ink) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.df-app .df-habit-overview-archived-name small {
+  flex-shrink: 0 !important;
+  font-family: var(--paper-mono) !important;
+  font-size: 10.5px !important;
+  color: var(--paper-muted) !important;
+}
+
+.df-app .df-habit-overview-archived-name:hover .df-habit-overview-archived-title {
+  color: var(--accent-active) !important;
+}
+
+.df-app .df-habit-overview-archived-tools {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  flex-shrink: 0 !important;
+}
+
+.df-app .df-habit-overview-tool {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--paper-muted) !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  transition: color 150ms, border-color 150ms, background 150ms !important;
+}
+
+.df-app .df-habit-overview-tool:hover {
+  color: var(--accent-active) !important;
+  border-color: color-mix(in srgb, var(--accent-active) 35%, var(--paper-rule)) !important;
+  background: color-mix(in srgb, var(--accent-active) 6%, transparent) !important;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 520px) {
+  .df-app .df-habit-overview-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .df-app .df-habit-overview-actions {
+    justify-content: space-between !important;
+  }
+  .df-app .df-habit-overview-thead,
+  .df-app .df-habit-overview-trow {
+    grid-template-columns: minmax(110px, 1.4fr) repeat(7, minmax(30px, 1fr)) !important;
+  }
+  .df-app .df-habit-overview-name-text {
+    font-size: 12.5px !important;
+  }
+  .df-app .df-habit-overview-dot {
+    width: 16px !important;
+    height: 16px !important;
+  }
 }
 
 .df-app .df-kanban-card.completed,
