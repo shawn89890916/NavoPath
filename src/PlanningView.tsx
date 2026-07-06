@@ -89,8 +89,10 @@ interface DonutLeaderLine {
 /**
  * Build a two-segment leader line from the outer edge of a donut segment to
  * a horizontal label anchor. The line starts at `outerRadius`, extends to
- * `elbowRadius` along the mid-angle, then bends horizontally outward to the
- * label x. Labels on the right half use text-anchor "start", left half "end".
+ * `elbowRadius` along the mid-angle (radial segment), then bends horizontally
+ * outward to the label x (horizontal segment). The label sits ABOVE the
+ * horizontal segment. Labels on the right half use text-anchor "start",
+ * left half "end".
  */
 function donutLeaderLine(
   cx: number,
@@ -2246,12 +2248,12 @@ export default function PlanningView(props: {
                         <h3>{props.lang === "zh" ? "项目时间占比图" : "Allocation chart"}</h3>
                         <span>{metricsResult.range.label}</span>
                       </div>
-                      <div className="df-metrics-donut-wrap" onMouseLeave={() => setHoveredMetricGroupId(null)}>
-                        <svg className="df-metrics-donut" viewBox="-130 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
+                      <div className="df-metrics-donut-wrap">
+                        <svg className="df-metrics-donut" viewBox="-70 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
                           <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
                           {donutSegments.map(({ group, startAngle, endAngle }) => {
                             const isActive = activeDonutGroup?.id === group.id;
-                            const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 108, startAngle, endAngle, 170);
+                            const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 128, startAngle, endAngle, 165);
                             return (
                               <g key={group.id} className={`df-metrics-donut-group${isActive ? " active" : ""}`}>
                                 <path
@@ -2262,6 +2264,7 @@ export default function PlanningView(props: {
                                   tabIndex={0}
                                   aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
                                   onMouseEnter={() => setHoveredMetricGroupId(group.id)}
+                                  onMouseLeave={() => setHoveredMetricGroupId(null)}
                                   onFocus={() => setHoveredMetricGroupId(group.id)}
                                   onBlur={() => setHoveredMetricGroupId(null)}
                                   onClick={() => setHoveredMetricGroupId(group.id)}
@@ -2272,9 +2275,9 @@ export default function PlanningView(props: {
                                 <text
                                   className="df-metrics-donut-label"
                                   x={leader.labelX + (leader.textAnchor === "start" ? 4 : -4)}
-                                  y={leader.labelY}
+                                  y={leader.labelY - 4}
                                   textAnchor={leader.textAnchor}
-                                  dominantBaseline="middle"
+                                  dominantBaseline="auto"
                                 >{group.label}</text>
                               </g>
                             );
