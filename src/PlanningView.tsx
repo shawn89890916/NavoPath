@@ -51,6 +51,30 @@ function alphaColor(color: string, alpha: number) {
   return color;
 }
 
+function polarPoint(cx: number, cy: number, radius: number, angle: number) {
+  const radians = (angle - 90) * Math.PI / 180;
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy + radius * Math.sin(radians),
+  };
+}
+
+function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadius: number, startAngle: number, endAngle: number) {
+  const safeEndAngle = Math.min(endAngle, startAngle + 359.99);
+  const outerStart = polarPoint(cx, cy, outerRadius, safeEndAngle);
+  const outerEnd = polarPoint(cx, cy, outerRadius, startAngle);
+  const innerStart = polarPoint(cx, cy, innerRadius, startAngle);
+  const innerEnd = polarPoint(cx, cy, innerRadius, safeEndAngle);
+  const largeArc = safeEndAngle - startAngle > 180 ? 1 : 0;
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 0 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerStart.x} ${innerStart.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 1 ${innerEnd.x} ${innerEnd.y}`,
+    "Z",
+  ].join(" ");
+}
+
 function formatMinutesZh(minutes: number) {
   const safe = Math.max(0, Math.round(minutes || 0));
   const hours = Math.floor(safe / 60);
@@ -816,7 +840,7 @@ export default function PlanningView(props: {
   const [metricsFilterOpen, setMetricsFilterOpen] = useState(false);
   const [metricsFilterCategory, setMetricsFilterCategory] = useState<"range" | "group" | "habit" | "completion" | "metric" | "project">("range");
   const [metricsProjectFilter, setMetricsProjectFilter] = useState<string[]>([]);
-  const [selectedMetricGroupId, setSelectedMetricGroupId] = useState<string | null>(null);
+  const [hoveredMetricGroupId, setHoveredMetricGroupId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [filterProjects, setFilterProjects] = useState<string[]>([]);
   const [filterWorkflows, setFilterWorkflows] = useState<UiWorkflowStatus[]>([]);
@@ -1837,7 +1861,7 @@ export default function PlanningView(props: {
 
   const setMetricGroup = useCallback((value: MetricGroupBy) => {
     setMetricsGroupBy(value);
-    setSelectedMetricGroupId(null);
+    setHoveredMetricGroupId(null);
     updateMetricsSetting({ metricsGroupBy: value });
   }, [updateMetricsSetting]);
 
@@ -1871,29 +1895,16 @@ export default function PlanningView(props: {
     completion: metricsCompletion,
     projectIds: metricsProjectFilter,
   }), [props.data, metricsRangePreset, today, metricsCustomStart, metricsCustomEnd, dayStartMinutes, metricsGroupBy, metricsHabitMode, metricsCompletion, metricsProjectFilter]);
-  const selectedMetricGroup = metricsResult.groups.find((group) => group.id === selectedMetricGroupId) || metricsResult.groups[0] || null;
-
-  useEffect(() => {
-    if (metricsResult.groups.length === 0) {
-      if (selectedMetricGroupId) setSelectedMetricGroupId(null);
-      return;
-    }
-    if (!selectedMetricGroupId || !metricsResult.groups.some((group) => group.id === selectedMetricGroupId)) {
-      setSelectedMetricGroupId(metricsResult.groups[0].id);
-    }
-  }, [metricsResult.groups, selectedMetricGroupId]);
-
-  const donutGradient = metricsResult.groups.length > 0
-    ? `conic-gradient(${metricsResult.groups.reduce<{ parts: string[]; cursor: number }>((acc, group) => {
-      const start = acc.cursor;
-      const end = acc.cursor + group.percentage;
-      acc.parts.push(`${group.color} ${start}% ${end}%`);
-      acc.cursor = end;
-      return acc;
-    }, { parts: [], cursor: 0 }).parts.join(", ")})`
-    : "conic-gradient(var(--line), var(--line))";
-  const maxHeatmapMinutes = Math.max(1, ...metricsResult.heatmapBuckets.map((bucket) => bucket.minutes));
+  const hoveredMetricGroup = metricsResult.groups.find((group) => group.id === hoveredMetricGroupId) || null;
+  const activeDonutGroup = hoveredMetricGroup;
+  const donutSegments = metricsResult.groups.reduce<Array<{ group: TimeAllocationGroup; startAngle: number; endAngle: number }>>((segments, group) => {
+    const startAngle = segments.length > 0 ? segments[segments.length - 1].endAngle : 0;
+    const endAngle = startAngle + (group.percentage / 100) * 360;
+    segments.push({ group, startAngle, endAngle });
+    return segments;
+  }, []);
   const rangeOptions: Array<{ value: MetricRangePreset; label: string }> = [
+    { value: "all", label: props.lang === "zh" ? "\u5168\u90e8" : "All" },
     { value: "today", label: props.lang === "zh" ? "今天" : "Today" },
     { value: "yesterday", label: props.lang === "zh" ? "昨天" : "Yesterday" },
     { value: "thisWeek", label: props.lang === "zh" ? "本周" : "This week" },
@@ -1911,7 +1922,6 @@ export default function PlanningView(props: {
     { value: "tag", label: props.lang === "zh" ? "标签（未来）" : "Tag (later)", disabled: true },
   ];
   const metricActiveChips = [
-    metricsRangePreset !== "today" ? { key: "range", label: `${props.lang === "zh" ? "时间" : "Range"}: ${rangeOptions.find((item) => item.value === metricsRangePreset)?.label}`, onClear: () => setMetricRange("today") } : null,
     metricsGroupBy !== "project" ? { key: "group", label: `${props.lang === "zh" ? "分组" : "Group"}: ${groupOptions.find((item) => item.value === metricsGroupBy)?.label}`, onClear: () => setMetricGroup("project") } : null,
     metricsHabitMode !== "include" ? { key: "habit", label: `${props.lang === "zh" ? "习惯" : "Habits"}: ${metricsHabitMode === "exclude" ? (props.lang === "zh" ? "排除" : "Exclude") : (props.lang === "zh" ? "仅习惯" : "Only habits")}`, onClear: () => setMetricHabit("include") } : null,
     metricsCompletion !== "all" ? { key: "completion", label: `${props.lang === "zh" ? "完成" : "Completion"}: ${metricsCompletion === "completed" ? (props.lang === "zh" ? "已完成" : "Completed") : (props.lang === "zh" ? "未完成" : "Incomplete")}`, onClear: () => setMetricCompletion("all") } : null,
@@ -2046,20 +2056,7 @@ export default function PlanningView(props: {
           {viewMode === "metrics" && (
             <section className="df-metrics-view" aria-label={props.lang === "zh" ? "时间占比" : "Time allocation metrics"}>
               <header className="df-metrics-header">
-                <div>
-                  <h2>{props.lang === "zh" ? "时间占比" : "Time allocation"}</h2>
-                  <p>{props.lang === "zh" ? "根据时间轴计划安排统计项目投入" : "Planned schedule allocation by project and task."}</p>
-                </div>
                 <div className="df-metrics-toolbar">
-                  <select
-                    className="df-metrics-select"
-                    value={metricsRangePreset}
-                    onChange={(event) => setMetricRange(event.target.value as MetricRangePreset)}
-                    aria-label={props.lang === "zh" ? "时间范围" : "Time range"}
-                  >
-                    {rangeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                  <button type="button" className="df-metrics-text-action" onClick={() => setMetricRange("today")}>{props.lang === "zh" ? "今天" : "Today"}</button>
                   <div className="df-filter-popover-anchor">
                     <button
                       type="button"
@@ -2195,14 +2192,6 @@ export default function PlanningView(props: {
                 </div>
               )}
 
-              <div className="df-metrics-summary">
-                <div><span>{props.lang === "zh" ? "已安排时间" : "Planned"}</span><strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong></div>
-                <div><span>{props.lang === "zh" ? "未安排时间" : "Unplanned"}</span><strong>{formatMinutesZh(metricsResult.summary.unplannedMinutes)}</strong></div>
-                <div><span>{props.lang === "zh" ? "任务数量" : "Tasks"}</span><strong>{metricsResult.summary.taskCount}</strong></div>
-                <div><span>{props.lang === "zh" ? "完成率" : "Done"}</span><strong>{Math.round(metricsResult.summary.completionRate * 100)}%</strong></div>
-                <div><span>{props.lang === "zh" ? "最高投入" : "Top focus"}</span><strong>{metricsResult.summary.topGroup?.label || "—"}</strong></div>
-              </div>
-
               {metricsResult.summary.plannedMinutes === 0 ? (
                 <div className="df-metrics-empty">
                   <h3>{props.lang === "zh" ? "暂无时间安排" : "No scheduled time"}</h3>
@@ -2213,84 +2202,55 @@ export default function PlanningView(props: {
                 <>
                   <div className="df-metrics-main-grid">
                     <section className="df-metrics-panel df-metrics-donut-panel">
-                      <button
-                        type="button"
-                        className="df-metrics-donut"
-                        style={{ "--metrics-donut": donutGradient } as React.CSSProperties}
-                        title={`${formatMinutesZh(metricsResult.summary.plannedMinutes)} · ${metricsResult.range.label}`}
-                        aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}
-                      >
-                        <span>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</span>
-                        <small>{metricsResult.range.label}</small>
-                      </button>
-                    </section>
-                    <section className="df-metrics-panel df-metrics-ranked-panel">
                       <div className="df-metrics-panel-head">
-                        <h3>{props.lang === "zh" ? "项目投入" : "Allocation"}</h3>
-                        <span>{props.lang === "zh" ? "按已安排时间统计" : "Scheduled time only"}</span>
+                        <h3>{props.lang === "zh" ? "项目时间占比图" : "Allocation chart"}</h3>
+                        <span>{metricsResult.range.label}</span>
                       </div>
-                      <div className="df-metrics-ranked-list">
-                        {metricsResult.groups.map((group: TimeAllocationGroup) => (
-                          <button
-                            type="button"
-                            key={group.id}
-                            className={`df-metrics-ranked-row${selectedMetricGroup?.id === group.id ? " active" : ""}`}
-                            onClick={() => setSelectedMetricGroupId(group.id)}
-                            title={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%, ${group.taskCount} tasks`}
-                          >
-                            <span className="df-metrics-color-dot" style={{ background: group.color }} />
-                            <span className="df-metrics-ranked-name">{group.label}</span>
-                            <span className="df-metrics-ranked-bar"><i style={{ width: `${Math.max(2, group.percentage)}%`, background: alphaColor(group.color, 0.42) }} /></span>
-                            <strong>{metricsDisplayMetric === "duration" ? formatMinutesZh(group.durationMinutes) : metricsDisplayMetric === "taskCount" ? String(group.taskCount) : metricsDisplayMetric === "completionRate" ? `${Math.round(group.completionRate * 100)}%` : `${Math.round(group.percentage)}%`}</strong>
-                            <small>{formatMinutesZh(group.durationMinutes)} · {group.taskCount}</small>
-                          </button>
-                        ))}
+                      <div className="df-metrics-donut-wrap" onMouseLeave={() => setHoveredMetricGroupId(null)}>
+                        <svg className="df-metrics-donut" viewBox="0 0 240 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
+                          <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
+                          {donutSegments.map(({ group, startAngle, endAngle }) => {
+                            const isActive = activeDonutGroup?.id === group.id;
+                            return (
+                              <path
+                                key={group.id}
+                                className={`df-metrics-donut-segment${isActive ? " active" : ""}`}
+                                d={donutSegmentPath(120, 120, isActive ? 94 : 88, 50, startAngle, endAngle)}
+                                fill={alphaColor(group.color, 0.58)}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
+                                onMouseEnter={() => setHoveredMetricGroupId(group.id)}
+                                onFocus={() => setHoveredMetricGroupId(group.id)}
+                                onBlur={() => setHoveredMetricGroupId(null)}
+                                onClick={() => setHoveredMetricGroupId(group.id)}
+                              >
+                                <title>{`${group.label}: ${formatMinutesZh(group.durationMinutes)} · ${Math.round(group.percentage)}%`}</title>
+                              </path>
+                            );
+                          })}
+                        </svg>
+                        <div className="df-metrics-donut-center">
+                          <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
+                          <span>{metricsResult.range.label}</span>
+                        </div>
                       </div>
                     </section>
+                    <aside className="df-metrics-summary" aria-label={props.lang === "zh" ? "指标摘要" : "Metrics summary"}>
+                      <div><span>{props.lang === "zh" ? "已安排时间" : "Planned"}</span><strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong></div>
+                      <div><span>{props.lang === "zh" ? "未安排时间" : "Unplanned"}</span><strong>{formatMinutesZh(metricsResult.summary.unplannedMinutes)}</strong></div>
+                      <div><span>{props.lang === "zh" ? "任务数量" : "Tasks"}</span><strong>{metricsResult.summary.taskCount}</strong></div>
+                      <div><span>{props.lang === "zh" ? "完成率" : "Done"}</span><strong>{Math.round(metricsResult.summary.completionRate * 100)}%</strong></div>
+                      <div><span>{props.lang === "zh" ? "最高投入" : "Top focus"}</span><strong>{metricsResult.summary.topGroup?.label || "-"}</strong></div>
+                      {activeDonutGroup && (
+                        <div className="df-metrics-summary-focus">
+                          <span>{props.lang === "zh" ? "当前项目" : "Current"}</span>
+                          <strong>{activeDonutGroup.label}</strong>
+                          <em>{formatMinutesZh(activeDonutGroup.durationMinutes)} · {Math.round(activeDonutGroup.percentage)}%</em>
+                        </div>
+                      )}
+                    </aside>
                   </div>
-                  <section className="df-metrics-panel df-metrics-heatmap-panel">
-                    <div className="df-metrics-panel-head">
-                      <h3>{props.lang === "zh" ? "时间密度" : "Time density"}</h3>
-                      <span>{props.lang === "zh" ? `一天开始 ${props.dayStartTime || "00:00"}` : `Day starts ${props.dayStartTime || "00:00"}`}</span>
-                    </div>
-                    <div className="df-metrics-heatmap">
-                      {metricsResult.heatmapBuckets.map((bucket) => {
-                        const intensity = Math.max(0.08, bucket.minutes / maxHeatmapMinutes);
-                        return (
-                          <button
-                            type="button"
-                            key={bucket.key}
-                            className="df-metrics-heat-cell"
-                            title={`${bucket.date}: ${formatMinutesZh(bucket.minutes)} · ${bucket.taskCount} tasks · ${bucket.topProject || ""}`}
-                            style={{ "--heat-alpha": intensity } as React.CSSProperties}
-                          >
-                            <span>{bucket.label}</span>
-                            <strong>{formatMinutesZh(bucket.minutes)}</strong>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                  <section className="df-metrics-panel df-metrics-detail-panel">
-                    <div className="df-metrics-panel-head">
-                      <h3>{selectedMetricGroup?.label || (props.lang === "zh" ? "任务明细" : "Task details")}</h3>
-                      <span>{selectedMetricGroup ? `${formatMinutesZh(selectedMetricGroup.durationMinutes)} · ${Math.round(selectedMetricGroup.percentage)}%` : ""}</span>
-                    </div>
-                    <div className="df-metrics-task-list">
-                      {(selectedMetricGroup?.tasks || []).map((entry) => (
-                        <button type="button" key={`${entry.recordId}-${entry.scheduledStart.getTime()}`} className="df-metrics-task-row" onClick={() => {
-                          const task = safeTasks.find((item) => item.id === entry.taskId);
-                          if (task) openTaskFromPlanning(task);
-                        }}>
-                          <span className={`df-metrics-status${entry.completed ? " done" : ""}`} aria-hidden="true">{entry.completed ? "✓" : ""}</span>
-                          <span className="df-metrics-task-copy"><strong>{entry.title}</strong><small>{localDateTimeLabel(entry.scheduledStart)} - {localDateTimeLabel(entry.scheduledEnd)}</small></span>
-                          <span className="df-metrics-task-project"><i style={{ background: entry.projectColor }} />{entry.projectLabel}</span>
-                          {entry.isHabit && <span className="df-metrics-habit-mark">{props.lang === "zh" ? "习惯" : "Habit"}</span>}
-                          <em>{formatMinutesZh(entry.durationMinutes)}</em>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
                 </>
               )}
             </section>
