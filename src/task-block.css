@@ -2278,3 +2278,448 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   opacity: 1 !important;
   background: var(--task-bg) !important;
 }
+
+/* ===== Planning Time Allocation Metrics ===== */
+.df-app .df-planning .df-metrics-view {
+  min-height: 100%;
+  padding: 28px clamp(18px, 3vw, 34px) 36px;
+  color: var(--ink, var(--paper-ink));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--paper, var(--paper-bg)) 96%, var(--ink, var(--paper-ink)) 4%), var(--paper, var(--paper-bg)));
+  overflow: auto;
+}
+
+.df-app .df-planning .df-metrics-header,
+.df-app .df-planning .df-metrics-panel-head,
+.df-app .df-planning .df-metrics-toolbar,
+.df-app .df-planning .df-metrics-summary,
+.df-app .df-planning .df-metrics-ranked-row,
+.df-app .df-planning .df-metrics-task-row,
+.df-app .df-planning .df-metrics-task-project {
+  display: flex;
+  align-items: center;
+}
+
+.df-app .df-planning .df-metrics-header {
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line, var(--paper-rule)) 78%, transparent);
+}
+
+.df-app .df-planning .df-metrics-header h2 {
+  margin: 0 0 5px;
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--ink, var(--paper-ink));
+}
+
+.df-app .df-planning .df-metrics-header p,
+.df-app .df-planning .df-metrics-panel-head span,
+.df-app .df-planning .df-metrics-ranked-row small,
+.df-app .df-planning .df-metrics-task-copy small {
+  margin: 0;
+  color: var(--muted, var(--paper-muted));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.df-app .df-planning .df-metrics-toolbar {
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.df-app .df-planning .df-metrics-select,
+.df-app .df-planning .df-metrics-custom-dates input {
+  height: 34px;
+  border: 1px solid var(--line, var(--paper-rule));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--paper, var(--paper-bg)) 96%, var(--ink, var(--paper-ink)) 4%);
+  color: var(--ink, var(--paper-ink));
+  padding: 0 10px;
+  font: inherit;
+}
+
+.df-app .df-planning .df-metrics-text-action {
+  height: 34px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-active) 54%, var(--line, var(--paper-rule)));
+  background: transparent;
+  color: var(--accent-active);
+  padding: 0 8px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.df-app .df-planning .df-metrics-text-action:hover,
+.df-app .df-planning .df-metrics-text-action:focus-visible {
+  background: color-mix(in srgb, var(--accent-active) 8%, transparent);
+  outline: none;
+}
+
+.df-app .df-planning .df-metrics-filter-panel {
+  right: 0;
+  left: auto;
+}
+
+.df-app .df-planning .df-metrics-filter-flyout {
+  right: 174px;
+  left: auto;
+  top: calc(100% + 6px);
+}
+
+.df-app .df-planning .df-metrics-custom-dates {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 8px;
+}
+
+.df-app .df-planning .df-filter-option.disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.df-app .df-planning .df-metrics-chip-bar {
+  position: static;
+  margin: 14px 0 0;
+}
+
+.df-app .df-planning .df-metrics-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(118px, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  border: 1px solid var(--line, var(--paper-rule));
+  background: var(--line, var(--paper-rule));
+}
+
+.df-app .df-planning .df-metrics-summary > div {
+  min-width: 0;
+  padding: 14px;
+  background: color-mix(in srgb, var(--paper, var(--paper-bg)) 97%, var(--ink, var(--paper-ink)) 3%);
+}
+
+.df-app .df-planning .df-metrics-summary span,
+.df-app .df-planning .df-metrics-summary strong {
+  display: block;
+}
+
+.df-app .df-planning .df-metrics-summary span {
+  color: var(--muted, var(--paper-muted));
+  font-size: 11px;
+}
+
+.df-app .df-planning .df-metrics-summary strong {
+  margin-top: 6px;
+  color: var(--ink, var(--paper-ink));
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.df-app .df-planning .df-metrics-main-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.4fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.df-app .df-planning .df-metrics-panel,
+.df-app .df-planning .df-metrics-empty {
+  border: 1px solid color-mix(in srgb, var(--line, var(--paper-rule)) 86%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--paper, var(--paper-bg)) 97%, var(--ink, var(--paper-ink)) 3%);
+}
+
+.df-app .df-planning .df-metrics-panel {
+  padding: 16px;
+}
+
+.df-app .df-planning .df-metrics-panel-head {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line, var(--paper-rule)) 72%, transparent);
+}
+
+.df-app .df-planning .df-metrics-panel-head h3 {
+  margin: 0;
+  color: var(--ink, var(--paper-ink));
+  font-size: 14px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.df-app .df-planning .df-metrics-donut-panel {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+}
+
+.df-app .df-planning .df-metrics-donut {
+  width: min(220px, 62vw);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: var(--metrics-donut) !important;
+  position: relative;
+  color: var(--ink, var(--paper-ink));
+  cursor: pointer;
+}
+
+#root .df-app .df-planning .df-metrics-donut {
+  background: var(--metrics-donut) !important;
+  border-radius: 50% !important;
+}
+
+.df-app .df-planning .df-metrics-donut::after {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: var(--paper, var(--paper-bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line, var(--paper-rule)) 90%, transparent);
+}
+
+.df-app .df-planning .df-metrics-donut span,
+.df-app .df-planning .df-metrics-donut small {
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.df-app .df-planning .df-metrics-donut span {
+  font-size: 22px;
+  font-weight: 750;
+}
+
+.df-app .df-planning .df-metrics-donut small {
+  margin-top: 4px;
+  color: var(--muted, var(--paper-muted));
+  font-size: 12px;
+}
+
+.df-app .df-planning .df-metrics-ranked-list,
+.df-app .df-planning .df-metrics-task-list {
+  display: grid;
+  gap: 6px;
+}
+
+.df-app .df-planning .df-metrics-ranked-row {
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: auto minmax(82px, 1fr) minmax(70px, 1.1fr) auto auto;
+  display: grid;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink, var(--paper-ink));
+  padding: 7px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.df-app .df-planning .df-metrics-ranked-row:hover,
+.df-app .df-planning .df-metrics-ranked-row:focus-visible,
+.df-app .df-planning .df-metrics-ranked-row.active {
+  border-color: color-mix(in srgb, var(--accent-active) 24%, var(--line, var(--paper-rule)));
+  background: color-mix(in srgb, var(--accent-active) 7%, transparent);
+  outline: none;
+}
+
+.df-app .df-planning .df-metrics-color-dot,
+.df-app .df-planning .df-metrics-task-project i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.df-app .df-planning .df-metrics-ranked-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.df-app .df-planning .df-metrics-ranked-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink, var(--paper-ink)) 7%, transparent);
+  overflow: hidden;
+}
+
+.df-app .df-planning .df-metrics-ranked-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.df-app .df-planning .df-metrics-ranked-row strong {
+  font-size: 13px;
+}
+
+.df-app .df-planning .df-metrics-heatmap-panel,
+.df-app .df-planning .df-metrics-detail-panel {
+  margin-top: 16px;
+}
+
+.df-app .df-planning .df-metrics-heatmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 6px;
+}
+
+.df-app .df-planning .df-metrics-heat-cell {
+  min-height: 58px;
+  border: 1px solid color-mix(in srgb, var(--accent-active) calc(var(--heat-alpha) * 24%), var(--line, var(--paper-rule)));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-active) calc(var(--heat-alpha) * 18%), transparent) !important;
+  color: var(--ink, var(--paper-ink));
+  padding: 8px;
+  text-align: left;
+  cursor: default;
+}
+
+#root .df-app .df-planning .df-metrics-heat-cell {
+  background: color-mix(in srgb, var(--accent-active) calc(var(--heat-alpha) * 18%), transparent) !important;
+}
+
+.df-app .df-planning .df-metrics-heat-cell span,
+.df-app .df-planning .df-metrics-heat-cell strong {
+  display: block;
+}
+
+.df-app .df-planning .df-metrics-heat-cell span {
+  color: var(--muted, var(--paper-muted));
+  font-size: 11px;
+}
+
+.df-app .df-planning .df-metrics-heat-cell strong {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.df-app .df-planning .df-metrics-task-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto auto auto;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 6px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line, var(--paper-rule)) 66%, transparent);
+  background: transparent;
+  color: var(--ink, var(--paper-ink));
+  text-align: left;
+  cursor: pointer;
+}
+
+.df-app .df-planning .df-metrics-task-row:hover,
+.df-app .df-planning .df-metrics-task-row:focus-visible {
+  background: color-mix(in srgb, var(--accent-active) 6%, transparent);
+  outline: none;
+}
+
+.df-app .df-planning .df-metrics-status {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line, var(--paper-rule));
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--paper, var(--paper-bg));
+  font-size: 10px;
+}
+
+.df-app .df-planning .df-metrics-status.done {
+  border-color: var(--accent-active);
+  background: var(--accent-active);
+}
+
+.df-app .df-planning .df-metrics-task-copy,
+.df-app .df-planning .df-metrics-task-copy strong,
+.df-app .df-planning .df-metrics-task-copy small {
+  display: block;
+  min-width: 0;
+}
+
+.df-app .df-planning .df-metrics-task-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.df-app .df-planning .df-metrics-task-project {
+  gap: 6px;
+  color: var(--muted, var(--paper-muted));
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.df-app .df-planning .df-metrics-habit-mark {
+  border: 1px solid color-mix(in srgb, var(--accent-active) 28%, var(--line, var(--paper-rule)));
+  border-radius: 5px;
+  color: var(--muted, var(--paper-muted));
+  padding: 2px 5px;
+  font-size: 11px;
+}
+
+.df-app .df-planning .df-metrics-task-row em {
+  color: var(--muted, var(--paper-muted));
+  font-style: normal;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.df-app .df-planning .df-metrics-empty {
+  padding: 42px 24px;
+  text-align: center;
+}
+
+.df-app .df-planning .df-metrics-empty h3 {
+  margin: 0 0 8px;
+  color: var(--ink, var(--paper-ink));
+}
+
+.df-app .df-planning .df-metrics-empty p {
+  max-width: 520px;
+  margin: 0 auto 16px;
+  color: var(--muted, var(--paper-muted));
+}
+
+@media (max-width: 820px) {
+  .df-app .df-planning .df-metrics-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .df-app .df-planning .df-metrics-toolbar {
+    justify-content: flex-start;
+  }
+
+  .df-app .df-planning .df-metrics-summary,
+  .df-app .df-planning .df-metrics-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .df-app .df-planning .df-metrics-task-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .df-app .df-planning .df-metrics-task-project,
+  .df-app .df-planning .df-metrics-habit-mark {
+    grid-column: 2 / -1;
+  }
+}

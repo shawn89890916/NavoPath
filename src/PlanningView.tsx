@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PlannerData, Project, Subtask, Task, WorkflowStatus } from "./types";
+import type { PlannerData, Project, Settings, Subtask, Task, WorkflowStatus } from "./types";
 import { t, type Language } from "./i18n";
 import { useInAppDialog } from "./InAppDialog";
 import { localIsoDate } from "./utils/localDate";
@@ -10,6 +10,7 @@ import { normalizeTaskCheckTone, normalizeWorkflowStatus, workflowStatusForPatch
 import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox, type TaskBlockVariant } from "./components/TaskBlock";
 import { TaskDragLayer } from "./unifiedDrag";
+import { buildTimeAllocationMetrics, parseDayStartMinutes, type MetricCompletionFilter, type MetricDisplayMetric, type MetricGroupBy, type MetricHabitMode, type MetricRangePreset, type TimeAllocationGroup } from "./metrics/timeAllocation";
 
 type TreeNodeKind = "project" | "task" | "subtask";
 type TreeDragNode = { kind: TreeNodeKind; id: string };
@@ -48,6 +49,31 @@ function alphaColor(color: string, alpha: number) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
   return color;
+}
+
+function formatMinutesZh(minutes: number) {
+  const safe = Math.max(0, Math.round(minutes || 0));
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+function localDateTimeLabel(date: Date) {
+  return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function localDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function metricViewLabel(lang: Language, mode: PlanningViewMode) {
+  if (mode === "tree") return lang === "zh" ? "树" : "Tree";
+  if (mode === "kanban") return "Kanban";
+  if (mode === "eisenhower") return lang === "zh" ? "矩阵" : "Matrix";
+  if (mode === "metrics") return lang === "zh" ? "指标" : "Metrics";
+  return lang === "zh" ? "列表" : "List";
 }
 
 function planningTaskPriority(task: Pick<Task, "importance" | "urgency">) {
@@ -726,7 +752,7 @@ function useTreeLines(
   return lines;
 }
 
-type PlanningViewMode = "tree" | "kanban" | "eisenhower" | "list";
+type PlanningViewMode = "tree" | "kanban" | "eisenhower" | "list" | "metrics";
 
 export default function PlanningView(props: {
   lang: Language;
@@ -749,6 +775,15 @@ export default function PlanningView(props: {
   featureKanban?: boolean;
   featureQuadrant?: boolean;
   featureList?: boolean;
+  dayStartTime?: string;
+  metricsRangePreset?: MetricRangePreset;
+  metricsGroupBy?: MetricGroupBy;
+  metricsDisplayMetric?: MetricDisplayMetric;
+  metricsIncludeHabits?: MetricHabitMode;
+  metricsCompletionFilter?: MetricCompletionFilter;
+  metricsCustomStart?: string;
+  metricsCustomEnd?: string;
+  onMetricsSettingsChange?: (patch: Partial<Settings>) => void;
 }) {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
@@ -767,9 +802,21 @@ export default function PlanningView(props: {
     if (enableKanban) modes.push("kanban");
     if (enableQuadrant) modes.push("eisenhower");
     if (enableList) modes.push("list");
+    modes.push("metrics");
     return modes;
   }, [enableKanban, enableQuadrant, enableList]);
   const [viewMode, setViewMode] = useState<PlanningViewMode>("tree");
+  const [metricsRangePreset, setMetricsRangePreset] = useState<MetricRangePreset>(props.metricsRangePreset || "today");
+  const [metricsGroupBy, setMetricsGroupBy] = useState<MetricGroupBy>(props.metricsGroupBy || "project");
+  const [metricsDisplayMetric, setMetricsDisplayMetric] = useState<MetricDisplayMetric>(props.metricsDisplayMetric || "percentage");
+  const [metricsHabitMode, setMetricsHabitMode] = useState<MetricHabitMode>(props.metricsIncludeHabits || "include");
+  const [metricsCompletion, setMetricsCompletion] = useState<MetricCompletionFilter>(props.metricsCompletionFilter || "all");
+  const [metricsCustomStart, setMetricsCustomStart] = useState(props.metricsCustomStart || todayIso());
+  const [metricsCustomEnd, setMetricsCustomEnd] = useState(props.metricsCustomEnd || todayIso());
+  const [metricsFilterOpen, setMetricsFilterOpen] = useState(false);
+  const [metricsFilterCategory, setMetricsFilterCategory] = useState<"range" | "group" | "habit" | "completion" | "metric" | "project">("range");
+  const [metricsProjectFilter, setMetricsProjectFilter] = useState<string[]>([]);
+  const [selectedMetricGroupId, setSelectedMetricGroupId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [filterProjects, setFilterProjects] = useState<string[]>([]);
   const [filterWorkflows, setFilterWorkflows] = useState<UiWorkflowStatus[]>([]);
@@ -831,6 +878,14 @@ export default function PlanningView(props: {
   }
 
   const today = todayIso();
+
+  useEffect(() => setMetricsRangePreset(props.metricsRangePreset || "today"), [props.metricsRangePreset]);
+  useEffect(() => setMetricsGroupBy(props.metricsGroupBy || "project"), [props.metricsGroupBy]);
+  useEffect(() => setMetricsDisplayMetric(props.metricsDisplayMetric || "percentage"), [props.metricsDisplayMetric]);
+  useEffect(() => setMetricsHabitMode(props.metricsIncludeHabits || "include"), [props.metricsIncludeHabits]);
+  useEffect(() => setMetricsCompletion(props.metricsCompletionFilter || "all"), [props.metricsCompletionFilter]);
+  useEffect(() => setMetricsCustomStart(props.metricsCustomStart || todayIso()), [props.metricsCustomStart]);
+  useEffect(() => setMetricsCustomEnd(props.metricsCustomEnd || todayIso()), [props.metricsCustomEnd]);
 
   const renameTask = useCallback(async (task: Task) => {
     const title = await dialog.prompt(t(props.lang, "planning.editName"), task.title);
@@ -1771,6 +1826,98 @@ export default function PlanningView(props: {
     ? Math.max(0, effectiveFilterCategories.findIndex((cat) => cat.key === activeFilterCategory))
     : 0;
 
+  const updateMetricsSetting = useCallback((patch: Partial<Settings>) => {
+    props.onMetricsSettingsChange?.(patch);
+  }, [props]);
+
+  const setMetricRange = useCallback((value: MetricRangePreset) => {
+    setMetricsRangePreset(value);
+    updateMetricsSetting({ metricsRangePreset: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricGroup = useCallback((value: MetricGroupBy) => {
+    setMetricsGroupBy(value);
+    setSelectedMetricGroupId(null);
+    updateMetricsSetting({ metricsGroupBy: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricDisplay = useCallback((value: MetricDisplayMetric) => {
+    setMetricsDisplayMetric(value);
+    updateMetricsSetting({ metricsDisplayMetric: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricHabit = useCallback((value: MetricHabitMode) => {
+    setMetricsHabitMode(value);
+    updateMetricsSetting({ metricsIncludeHabits: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricCompletion = useCallback((value: MetricCompletionFilter) => {
+    setMetricsCompletion(value);
+    updateMetricsSetting({ metricsCompletionFilter: value });
+  }, [updateMetricsSetting]);
+
+  const dayStartMinutes = parseDayStartMinutes(props.dayStartTime || "00:00");
+  const metricsResult = useMemo(() => buildTimeAllocationMetrics({
+    data: props.data,
+    range: {
+      preset: metricsRangePreset,
+      anchorDate: today,
+      customStart: metricsCustomStart,
+      customEnd: metricsCustomEnd,
+    },
+    dayStartMinutes,
+    groupBy: metricsGroupBy,
+    habitMode: metricsHabitMode,
+    completion: metricsCompletion,
+    projectIds: metricsProjectFilter,
+  }), [props.data, metricsRangePreset, today, metricsCustomStart, metricsCustomEnd, dayStartMinutes, metricsGroupBy, metricsHabitMode, metricsCompletion, metricsProjectFilter]);
+  const selectedMetricGroup = metricsResult.groups.find((group) => group.id === selectedMetricGroupId) || metricsResult.groups[0] || null;
+
+  useEffect(() => {
+    if (metricsResult.groups.length === 0) {
+      if (selectedMetricGroupId) setSelectedMetricGroupId(null);
+      return;
+    }
+    if (!selectedMetricGroupId || !metricsResult.groups.some((group) => group.id === selectedMetricGroupId)) {
+      setSelectedMetricGroupId(metricsResult.groups[0].id);
+    }
+  }, [metricsResult.groups, selectedMetricGroupId]);
+
+  const donutGradient = metricsResult.groups.length > 0
+    ? `conic-gradient(${metricsResult.groups.reduce<{ parts: string[]; cursor: number }>((acc, group) => {
+      const start = acc.cursor;
+      const end = acc.cursor + group.percentage;
+      acc.parts.push(`${group.color} ${start}% ${end}%`);
+      acc.cursor = end;
+      return acc;
+    }, { parts: [], cursor: 0 }).parts.join(", ")})`
+    : "conic-gradient(var(--line), var(--line))";
+  const maxHeatmapMinutes = Math.max(1, ...metricsResult.heatmapBuckets.map((bucket) => bucket.minutes));
+  const rangeOptions: Array<{ value: MetricRangePreset; label: string }> = [
+    { value: "today", label: props.lang === "zh" ? "今天" : "Today" },
+    { value: "yesterday", label: props.lang === "zh" ? "昨天" : "Yesterday" },
+    { value: "thisWeek", label: props.lang === "zh" ? "本周" : "This week" },
+    { value: "lastWeek", label: props.lang === "zh" ? "上周" : "Last week" },
+    { value: "thisMonth", label: props.lang === "zh" ? "本月" : "This month" },
+    { value: "custom", label: props.lang === "zh" ? "自定义" : "Custom" },
+  ];
+  const groupOptions: Array<{ value: MetricGroupBy; label: string; disabled?: boolean }> = [
+    { value: "project", label: props.lang === "zh" ? "项目" : "Project" },
+    { value: "importance", label: props.lang === "zh" ? "重要程度" : "Importance" },
+    { value: "urgency", label: props.lang === "zh" ? "紧急程度" : "Urgency" },
+    { value: "completion", label: props.lang === "zh" ? "完成状态" : "Completion" },
+    { value: "taskType", label: props.lang === "zh" ? "任务类型" : "Task type" },
+    { value: "customCategory", label: props.lang === "zh" ? "自定义分类（未来）" : "Custom category (later)", disabled: true },
+    { value: "tag", label: props.lang === "zh" ? "标签（未来）" : "Tag (later)", disabled: true },
+  ];
+  const metricActiveChips = [
+    metricsRangePreset !== "today" ? { key: "range", label: `${props.lang === "zh" ? "时间" : "Range"}: ${rangeOptions.find((item) => item.value === metricsRangePreset)?.label}`, onClear: () => setMetricRange("today") } : null,
+    metricsGroupBy !== "project" ? { key: "group", label: `${props.lang === "zh" ? "分组" : "Group"}: ${groupOptions.find((item) => item.value === metricsGroupBy)?.label}`, onClear: () => setMetricGroup("project") } : null,
+    metricsHabitMode !== "include" ? { key: "habit", label: `${props.lang === "zh" ? "习惯" : "Habits"}: ${metricsHabitMode === "exclude" ? (props.lang === "zh" ? "排除" : "Exclude") : (props.lang === "zh" ? "仅习惯" : "Only habits")}`, onClear: () => setMetricHabit("include") } : null,
+    metricsCompletion !== "all" ? { key: "completion", label: `${props.lang === "zh" ? "完成" : "Completion"}: ${metricsCompletion === "completed" ? (props.lang === "zh" ? "已完成" : "Completed") : (props.lang === "zh" ? "未完成" : "Incomplete")}`, onClear: () => setMetricCompletion("all") } : null,
+    metricsProjectFilter.length > 0 ? { key: "project", label: `${props.lang === "zh" ? "项目" : "Project"}: ${metricsProjectFilter.length}`, onClear: () => setMetricsProjectFilter([]) } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; onClear: () => void }>;
+
   return (
     <main className={`df-planning${props.compact ? " compact-layout" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {dialog.host}
@@ -1789,12 +1936,13 @@ export default function PlanningView(props: {
               {availableModes.length > 1 && (
                 <div className="df-planning-view-switch">
                   {availableModes.map((m) => (
-                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={m === "tree" ? (props.lang === "zh" ? "\u6811" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "\u77e9\u9635" : "Matrix") : (props.lang === "zh" ? "\u5217\u8868" : "List")}>
+                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={metricViewLabel(props.lang, m)}>
                       {m === "tree" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M3 5h4M3 9h6M3 13h5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
                       {m === "kanban" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="3.5" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="6.5" y="3" width="3.5" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="11" y="3" width="3.5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
                       {m === "eisenhower" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="2" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
                       {m === "list" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
-                      <span>{m === "tree" ? (props.lang === "zh" ? "\u6811" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "\u77e9\u9635" : "Matrix") : (props.lang === "zh" ? "\u5217\u8868" : "List")}</span>
+                      {m === "metrics" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12V8M7 12V4M11 12V6M2 13h12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                      <span>{metricViewLabel(props.lang, m)}</span>
                     </button>
                   ))}
                 </div>
@@ -1802,6 +1950,7 @@ export default function PlanningView(props: {
           </aside>
           <div className="df-tree-wrap">
             <div className="df-planning-filter-corner">
+              {viewMode !== "metrics" && (
               <div className="df-filter-popover-anchor">
                 <button
                   type="button"
@@ -1871,9 +2020,10 @@ export default function PlanningView(props: {
                   </>
                 )}
               </div>
+              )}
             </div>
 
-          {activeFilterChips.length > 0 && (
+          {viewMode !== "metrics" && activeFilterChips.length > 0 && (
             <div className="df-active-filter-bar" role="region" aria-label={props.lang === "zh" ? "Active filters" : "Active filters"}>
               {activeFilterChips.map((chip) => (
                 <button
@@ -1891,6 +2041,259 @@ export default function PlanningView(props: {
                 {props.lang === "zh" ? "\u6e05\u9664\u5168\u90e8" : "Clear all"}
               </button>
             </div>
+          )}
+
+          {viewMode === "metrics" && (
+            <section className="df-metrics-view" aria-label={props.lang === "zh" ? "时间占比" : "Time allocation metrics"}>
+              <header className="df-metrics-header">
+                <div>
+                  <h2>{props.lang === "zh" ? "时间占比" : "Time allocation"}</h2>
+                  <p>{props.lang === "zh" ? "根据时间轴计划安排统计项目投入" : "Planned schedule allocation by project and task."}</p>
+                </div>
+                <div className="df-metrics-toolbar">
+                  <select
+                    className="df-metrics-select"
+                    value={metricsRangePreset}
+                    onChange={(event) => setMetricRange(event.target.value as MetricRangePreset)}
+                    aria-label={props.lang === "zh" ? "时间范围" : "Time range"}
+                  >
+                    {rangeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  <button type="button" className="df-metrics-text-action" onClick={() => setMetricRange("today")}>{props.lang === "zh" ? "今天" : "Today"}</button>
+                  <div className="df-filter-popover-anchor">
+                    <button
+                      type="button"
+                      className={`df-filter-trigger${metricsFilterOpen ? " active" : ""}${metricActiveChips.length > 0 ? " has-active" : ""}`}
+                      aria-expanded={metricsFilterOpen}
+                      aria-label={props.lang === "zh" ? "指标筛选" : "Metrics filters"}
+                      title={props.lang === "zh" ? "指标筛选" : "Metrics filters"}
+                      onClick={() => setMetricsFilterOpen((open) => !open)}
+                    >
+                      <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 4h12M5 9h8M7 14h4" /></svg>
+                      {metricActiveChips.length > 0 && <b>{metricActiveChips.length}</b>}
+                    </button>
+                    {metricsFilterOpen && (
+                      <>
+                        <div className="df-filter-panel df-metrics-filter-panel" onClick={(e) => e.stopPropagation()}>
+                          <div className="df-filter-categories">
+                            {([
+                              ["range", props.lang === "zh" ? "时间范围" : "Range"],
+                              ["group", props.lang === "zh" ? "分组方式" : "Group by"],
+                              ["project", props.lang === "zh" ? "项目" : "Projects"],
+                              ["completion", props.lang === "zh" ? "完成状态" : "Completion"],
+                              ["habit", props.lang === "zh" ? "是否包含习惯" : "Habits"],
+                              ["metric", props.lang === "zh" ? "显示指标" : "Metric"],
+                            ] as Array<[typeof metricsFilterCategory, string]>).map(([key, label]) => (
+                              <button
+                                type="button"
+                                key={key}
+                                className={`df-filter-cat-row${metricsFilterCategory === key ? " active" : ""}`}
+                                onMouseEnter={() => setMetricsFilterCategory(key)}
+                                onFocus={() => setMetricsFilterCategory(key)}
+                              >
+                                <span className="df-filter-cat-icon" aria-hidden="true">
+                                  <svg viewBox="0 0 14 14"><path d="M3 4h8M4 7h6M5 10h4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                                </span>
+                                <span className="df-filter-cat-label">{label}</span>
+                                <svg className="df-filter-cat-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M2 2l4 5-4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              </button>
+                            ))}
+                          </div>
+                          {metricActiveChips.length > 0 && (
+                            <button type="button" className="df-filter-reset" onClick={() => {
+                              setMetricRange("today");
+                              setMetricGroup("project");
+                              setMetricHabit("include");
+                              setMetricCompletion("all");
+                              setMetricsProjectFilter([]);
+                            }}>
+                              {props.lang === "zh" ? "清除全部" : "Clear all"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="df-filter-flyout-panel df-metrics-filter-flyout" onClick={(e) => e.stopPropagation()}>
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">
+                              {metricsFilterCategory === "range" ? (props.lang === "zh" ? "时间范围" : "Range")
+                                : metricsFilterCategory === "group" ? (props.lang === "zh" ? "分组方式" : "Group by")
+                                : metricsFilterCategory === "project" ? (props.lang === "zh" ? "项目" : "Projects")
+                                : metricsFilterCategory === "completion" ? (props.lang === "zh" ? "完成状态" : "Completion")
+                                : metricsFilterCategory === "habit" ? (props.lang === "zh" ? "是否包含习惯" : "Habits")
+                                : (props.lang === "zh" ? "显示指标" : "Metric")}
+                            </div>
+                            {metricsFilterCategory === "range" && (
+                              <>
+                                {rangeOptions.map((option) => (
+                                  <label key={option.value} className={`df-filter-option${metricsRangePreset === option.value ? " checked" : ""}`}>
+                                    <input type="radio" checked={metricsRangePreset === option.value} onChange={() => setMetricRange(option.value)} />
+                                    <span>{option.label}</span>
+                                  </label>
+                                ))}
+                                {metricsRangePreset === "custom" && (
+                                  <div className="df-metrics-custom-dates">
+                                    <input type="date" value={metricsCustomStart} onChange={(event) => { setMetricsCustomStart(event.target.value); updateMetricsSetting({ metricsCustomStart: event.target.value }); }} />
+                                    <input type="date" value={metricsCustomEnd} onChange={(event) => { setMetricsCustomEnd(event.target.value); updateMetricsSetting({ metricsCustomEnd: event.target.value }); }} />
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {metricsFilterCategory === "group" && groupOptions.map((option) => (
+                              <label key={option.value} className={`df-filter-option${metricsGroupBy === option.value ? " checked" : ""}${option.disabled ? " disabled" : ""}`}>
+                                <input type="radio" checked={metricsGroupBy === option.value} disabled={option.disabled} onChange={() => !option.disabled && setMetricGroup(option.value)} />
+                                <span>{option.label}</span>
+                              </label>
+                            ))}
+                            {metricsFilterCategory === "project" && (
+                              <>
+                                <label className={`df-filter-option${metricsProjectFilter.length === 0 ? " checked" : ""}`}>
+                                  <input type="checkbox" checked={metricsProjectFilter.length === 0} onChange={() => setMetricsProjectFilter([])} />
+                                  <span>{props.lang === "zh" ? "全部项目" : "All projects"}</span>
+                                </label>
+                                {safeProjects.map((project) => (
+                                  <label key={project.id} className={`df-filter-option${metricsProjectFilter.includes(project.id) ? " checked" : ""}`}>
+                                    <input type="checkbox" checked={metricsProjectFilter.includes(project.id)} onChange={() => toggleArray(setMetricsProjectFilter, project.id)} />
+                                    <span className="df-filter-option-dot" style={{ background: project.color || DEFAULT_PROJECT_COLOR }} />
+                                    <span>{project.title}</span>
+                                  </label>
+                                ))}
+                              </>
+                            )}
+                            {metricsFilterCategory === "completion" && (["all", "completed", "incomplete"] as MetricCompletionFilter[]).map((value) => (
+                              <label key={value} className={`df-filter-option${metricsCompletion === value ? " checked" : ""}`}>
+                                <input type="radio" checked={metricsCompletion === value} onChange={() => setMetricCompletion(value)} />
+                                <span>{value === "all" ? (props.lang === "zh" ? "全部" : "All") : value === "completed" ? (props.lang === "zh" ? "已完成" : "Completed") : (props.lang === "zh" ? "未完成" : "Incomplete")}</span>
+                              </label>
+                            ))}
+                            {metricsFilterCategory === "habit" && (["include", "exclude", "only"] as MetricHabitMode[]).map((value) => (
+                              <label key={value} className={`df-filter-option${metricsHabitMode === value ? " checked" : ""}`}>
+                                <input type="radio" checked={metricsHabitMode === value} onChange={() => setMetricHabit(value)} />
+                                <span>{value === "include" ? (props.lang === "zh" ? "包含习惯" : "Include habits") : value === "exclude" ? (props.lang === "zh" ? "排除习惯" : "Exclude habits") : (props.lang === "zh" ? "仅习惯" : "Only habits")}</span>
+                              </label>
+                            ))}
+                            {metricsFilterCategory === "metric" && (["percentage", "duration", "taskCount", "completionRate"] as MetricDisplayMetric[]).map((value) => (
+                              <label key={value} className={`df-filter-option${metricsDisplayMetric === value ? " checked" : ""}`}>
+                                <input type="radio" checked={metricsDisplayMetric === value} onChange={() => setMetricDisplay(value)} />
+                                <span>{value === "percentage" ? (props.lang === "zh" ? "百分比" : "Percentage") : value === "duration" ? (props.lang === "zh" ? "总时长" : "Duration") : value === "taskCount" ? (props.lang === "zh" ? "任务数量" : "Task count") : (props.lang === "zh" ? "完成率" : "Completion rate")}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </header>
+
+              {metricActiveChips.length > 0 && (
+                <div className="df-active-filter-bar df-metrics-chip-bar" role="region" aria-label={props.lang === "zh" ? "指标筛选" : "Metric filters"}>
+                  {metricActiveChips.map((chip) => (
+                    <button key={chip.key} type="button" className="df-active-filter-chip" onClick={chip.onClear}>
+                      <span className="df-active-filter-chip-label">{chip.label}</span>
+                      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" /></svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="df-metrics-summary">
+                <div><span>{props.lang === "zh" ? "已安排时间" : "Planned"}</span><strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong></div>
+                <div><span>{props.lang === "zh" ? "未安排时间" : "Unplanned"}</span><strong>{formatMinutesZh(metricsResult.summary.unplannedMinutes)}</strong></div>
+                <div><span>{props.lang === "zh" ? "任务数量" : "Tasks"}</span><strong>{metricsResult.summary.taskCount}</strong></div>
+                <div><span>{props.lang === "zh" ? "完成率" : "Done"}</span><strong>{Math.round(metricsResult.summary.completionRate * 100)}%</strong></div>
+                <div><span>{props.lang === "zh" ? "最高投入" : "Top focus"}</span><strong>{metricsResult.summary.topGroup?.label || "—"}</strong></div>
+              </div>
+
+              {metricsResult.summary.plannedMinutes === 0 ? (
+                <div className="df-metrics-empty">
+                  <h3>{props.lang === "zh" ? "暂无时间安排" : "No scheduled time"}</h3>
+                  <p>{props.lang === "zh" ? "这个时间范围内还没有安排任务。把任务拖入时间轴后，这里会显示时间占比。" : "Schedule tasks on the timeline and this report will show allocation."}</p>
+                  <button type="button" className="df-metrics-text-action" onClick={() => setMetricRange("today")}>{props.lang === "zh" ? "调整筛选" : "Adjust filters"}</button>
+                </div>
+              ) : (
+                <>
+                  <div className="df-metrics-main-grid">
+                    <section className="df-metrics-panel df-metrics-donut-panel">
+                      <button
+                        type="button"
+                        className="df-metrics-donut"
+                        style={{ "--metrics-donut": donutGradient } as React.CSSProperties}
+                        title={`${formatMinutesZh(metricsResult.summary.plannedMinutes)} · ${metricsResult.range.label}`}
+                        aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}
+                      >
+                        <span>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</span>
+                        <small>{metricsResult.range.label}</small>
+                      </button>
+                    </section>
+                    <section className="df-metrics-panel df-metrics-ranked-panel">
+                      <div className="df-metrics-panel-head">
+                        <h3>{props.lang === "zh" ? "项目投入" : "Allocation"}</h3>
+                        <span>{props.lang === "zh" ? "按已安排时间统计" : "Scheduled time only"}</span>
+                      </div>
+                      <div className="df-metrics-ranked-list">
+                        {metricsResult.groups.map((group: TimeAllocationGroup) => (
+                          <button
+                            type="button"
+                            key={group.id}
+                            className={`df-metrics-ranked-row${selectedMetricGroup?.id === group.id ? " active" : ""}`}
+                            onClick={() => setSelectedMetricGroupId(group.id)}
+                            title={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%, ${group.taskCount} tasks`}
+                          >
+                            <span className="df-metrics-color-dot" style={{ background: group.color }} />
+                            <span className="df-metrics-ranked-name">{group.label}</span>
+                            <span className="df-metrics-ranked-bar"><i style={{ width: `${Math.max(2, group.percentage)}%`, background: alphaColor(group.color, 0.42) }} /></span>
+                            <strong>{metricsDisplayMetric === "duration" ? formatMinutesZh(group.durationMinutes) : metricsDisplayMetric === "taskCount" ? String(group.taskCount) : metricsDisplayMetric === "completionRate" ? `${Math.round(group.completionRate * 100)}%` : `${Math.round(group.percentage)}%`}</strong>
+                            <small>{formatMinutesZh(group.durationMinutes)} · {group.taskCount}</small>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+                  <section className="df-metrics-panel df-metrics-heatmap-panel">
+                    <div className="df-metrics-panel-head">
+                      <h3>{props.lang === "zh" ? "时间密度" : "Time density"}</h3>
+                      <span>{props.lang === "zh" ? `一天开始 ${props.dayStartTime || "00:00"}` : `Day starts ${props.dayStartTime || "00:00"}`}</span>
+                    </div>
+                    <div className="df-metrics-heatmap">
+                      {metricsResult.heatmapBuckets.map((bucket) => {
+                        const intensity = Math.max(0.08, bucket.minutes / maxHeatmapMinutes);
+                        return (
+                          <button
+                            type="button"
+                            key={bucket.key}
+                            className="df-metrics-heat-cell"
+                            title={`${bucket.date}: ${formatMinutesZh(bucket.minutes)} · ${bucket.taskCount} tasks · ${bucket.topProject || ""}`}
+                            style={{ "--heat-alpha": intensity } as React.CSSProperties}
+                          >
+                            <span>{bucket.label}</span>
+                            <strong>{formatMinutesZh(bucket.minutes)}</strong>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  <section className="df-metrics-panel df-metrics-detail-panel">
+                    <div className="df-metrics-panel-head">
+                      <h3>{selectedMetricGroup?.label || (props.lang === "zh" ? "任务明细" : "Task details")}</h3>
+                      <span>{selectedMetricGroup ? `${formatMinutesZh(selectedMetricGroup.durationMinutes)} · ${Math.round(selectedMetricGroup.percentage)}%` : ""}</span>
+                    </div>
+                    <div className="df-metrics-task-list">
+                      {(selectedMetricGroup?.tasks || []).map((entry) => (
+                        <button type="button" key={`${entry.recordId}-${entry.scheduledStart.getTime()}`} className="df-metrics-task-row" onClick={() => {
+                          const task = safeTasks.find((item) => item.id === entry.taskId);
+                          if (task) openTaskFromPlanning(task);
+                        }}>
+                          <span className={`df-metrics-status${entry.completed ? " done" : ""}`} aria-hidden="true">{entry.completed ? "✓" : ""}</span>
+                          <span className="df-metrics-task-copy"><strong>{entry.title}</strong><small>{localDateTimeLabel(entry.scheduledStart)} - {localDateTimeLabel(entry.scheduledEnd)}</small></span>
+                          <span className="df-metrics-task-project"><i style={{ background: entry.projectColor }} />{entry.projectLabel}</span>
+                          {entry.isHabit && <span className="df-metrics-habit-mark">{props.lang === "zh" ? "习惯" : "Habit"}</span>}
+                          <em>{formatMinutesZh(entry.durationMinutes)}</em>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
+            </section>
           )}
 
           {viewMode === "kanban" && (

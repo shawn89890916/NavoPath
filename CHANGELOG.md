@@ -9,6 +9,7 @@
 - 修复无限跨天滚动后时间轴任务拖放与调整时长失效的问题：拖动/调整现在使用连续绝对分钟坐标（指针 Y + 当前画布几何 → 日期 + 时间），不再按单日 X 列推断日期。跨午夜拖动（如 23:30 拖到次日 00:30）会正确切换到第二天且保持原时长；跨午夜向下拉长（23:30/30m 拉到次日 00:30）会得到 60m 时长而非崩溃。短任务（15m/30m）仍按原像素高度渲染，标题/项目/完成状态在拖动与调整时长过程中保持不变。
 
 ### 改进
+- Planning 页面新增“指标”视图，以已安排/计划时间为分母统计项目时间占比，提供今天/昨天/本周/上周/本月/自定义范围、项目 donut、排名列表、时间密度热力图、任务下钻明细与 Linear 风格筛选；未安排时间作为辅助指标单独显示，习惯默认参与统计，跨天任务按实际重叠切分，并尊重“一天开始时间”设置。
 - 重做“习惯总览”面板：从一堆带边框的小方块改为结构化周视图表格，左列习惯名 + 右侧七天圆形完成单元，行与表头严格对齐，更像一张干净的纸面周表。
 - 顶部控制区拆分为左右两组：左侧周范围标题（编辑级字体）+ 今日完成统计；右侧上一周 / 今天 / 下一周 / 新增习惯按钮，不再挤在一起。
 - 日期列表头采用双行结构（周几 + 日期），今日列以克制 accent 色标注。
@@ -64,6 +65,7 @@
 - Fixed timeline task drag and resize breaking after infinite cross-day scrolling was enabled: drag/resize now use continuous absolute-minute coordinates (pointer Y + current canvas geometry → date + time) instead of inferring the date from the single-day X column. Dragging across midnight (e.g. 23:30 → next day 00:30) correctly switches to the next day while preserving the original duration; resizing the bottom edge across midnight (23:30/30m → next day 00:30) yields a 60m duration instead of breaking. Short tasks (15m/30m) still render at their original pixel height, and title/project/completion stay unchanged throughout drag and resize.
 
 ### Improvements
+- Added a new Metrics view to Planning. It reports project time allocation from scheduled/planned timeline records, with today/yesterday/week/month/custom ranges, a project donut, ranked list, density heatmap, task drill-down, and Linear-style filters. Unplanned time is shown separately, habits are included by default, cross-day tasks are split by actual overlap, and day-start settings are respected.
 - Rebuilt the Habits Overview panel: replaced the cluttered bordered-box grid with a structured week table — habit name column on the left, seven circular day-completion units on the right, with rows strictly aligned to the header for a clean paper-table feel.
 - Split the top control bar into two groups: week range title (editorial display type) + today's completion stats on the left; previous / today / next / new-habit buttons on the right, no longer crammed together.
 - Day column headers use a two-line layout (weekday + date); today's column is marked with a restrained accent tint.

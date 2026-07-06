@@ -292,6 +292,13 @@ export interface Settings {
   continuousCrossDayScroll?: boolean;
   language: Language;
   planningView: "tree" | "matrix" | "split";
+  metricsRangePreset?: "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "custom";
+  metricsGroupBy?: "project" | "customCategory" | "tag" | "importance" | "urgency" | "completion" | "taskType";
+  metricsDisplayMetric?: "percentage" | "duration" | "taskCount" | "completionRate";
+  metricsIncludeHabits?: "include" | "exclude" | "only";
+  metricsCompletionFilter?: "all" | "completed" | "incomplete";
+  metricsCustomStart?: string;
+  metricsCustomEnd?: string;
   aiDockOpen: boolean;
   appTitle: string;
   model: string;
