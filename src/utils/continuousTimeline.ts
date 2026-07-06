@@ -15,7 +15,8 @@ function dayOffset(date: string, anchorDate: string) {
 
 export function buildDailyContinuousDates(anchorDate: string, enabled: boolean, dayCount = DAILY_CONTINUOUS_DAY_COUNT): string[] {
   const count = enabled ? dayCount : 1;
-  return Array.from({ length: count }, (_, index) => addDays(anchorDate, index));
+  const before = enabled ? Math.floor(count / 2) : 0;
+  return Array.from({ length: count }, (_, index) => addDays(anchorDate, index - before));
 }
 
 export function dailyContinuousCanvasHeight(dayCount: number, slotHeight: number): number {
@@ -52,8 +53,12 @@ export function dailyContinuousSlotLabel({
   const minuteOfDay = ((absoluteMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   if (minuteOfDay % 60 !== 0) return "";
   const date = addDays(anchorDate, Math.floor(absoluteMinutes / MINUTES_PER_DAY));
-  if (index > 0 && minuteOfDay === 0) return `24:00 / ${shortDate(date)} 00:00`;
+  if (index > 0 && minuteOfDay === 0) return `${shortDate(date)} 0:00`;
   return `${Math.floor(minuteOfDay / 60)}:00`;
+}
+
+export function getContinuousTimelineDateForOffset(anchorDate: string, offset: number, columnCount: number): string {
+  return addDays(anchorDate, offset * Math.max(1, columnCount));
 }
 
 export function dailyContinuousTargetFromContentY({

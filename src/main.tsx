@@ -42,6 +42,7 @@ import {
   dailyContinuousSlotCount,
   dailyContinuousSlotLabel,
   dailyContinuousTargetFromContentY,
+  getContinuousTimelineDateForOffset,
 } from "./utils/continuousTimeline";
 import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProjectCompletion, workflowStatusForPatch } from "./utils/productivityModel";
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
@@ -1554,6 +1555,7 @@ function App() {
   const [compactViewMenuOpen, setCompactViewMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
+  const [visibleTimelineDate, setVisibleTimelineDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
   const [dragOverlay, setDragOverlay] = useState<UnifiedDragSnapshot | null>(null);
   const [dragOverlayTask, setDragOverlayTask] = useState<{ task: Task; variant: "candidate" | "allDay" | "scheduled" } | null>(null);
@@ -2361,30 +2363,33 @@ function App() {
     if (lastTimelineAutoScrollKeyRef.current === autoScrollKey) return;
     lastTimelineAutoScrollKeyRef.current = autoScrollKey;
 
-    // When no tasks exist for the visible dates, park at the top so
-    // the 0:00 marker sits directly beneath the all-day bar with no
-    // wasted blank area.  Task creation triggers a focus scroll instead.
-    const visibleDays = getVisibleDays(timelineView as TimelineViewMode, selectedDate);
-    const hasVisibleTasks = expandedVisibleTimelineTasks.some(
-      (t) => t.scheduledDate && visibleDays.includes(t.scheduledDate),
-    );
-    if (!hasVisibleTasks) {
-      timelineRef.current.scrollTop = 0;
-      return;
-    }
-
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const fallbackMinutes = 9 * 60;
     const targetMinutes = selectedDate === todayIso() && currentMinutes >= 0 && currentMinutes <= 24 * 60
       ? currentMinutes
       : fallbackMinutes;
-    let diff = targetMinutes - dayStartHour * 60;
-    if (diff < 0) diff += 24 * 60;
-    const targetTop = (diff / SLOT_MINUTES) * SLOT_HEIGHT;
     const container = timelineRef.current;
-    container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
-  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour]);
+    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, 7 * effectColumnCount)[0] || selectedDate;
+    const effectTop = (date: string, time: string) => {
+      const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
+      const bandIndex = Math.floor(offset / effectColumnCount);
+      let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
+      if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+      return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+    };
+    const targetTop = effectEnabled
+      ? effectTop(selectedDate, minutesToTime(targetMinutes))
+      : (() => {
+          let diff = targetMinutes - dayStartHour * 60;
+          if (diff < 0) diff += 24 * 60;
+          return (diff / SLOT_MINUTES) * SLOT_HEIGHT;
+        })();
+    container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
+  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour, settings?.continuousCrossDayScroll]);
 
   // Scroll timeline to day start time when the setting changes
   const prevDayStartRef = useRef<string>("");
@@ -2406,7 +2411,7 @@ function App() {
     prevDayStartRef.current = dayStart;
   }, [settings?.dayStartTime, mode, lang, dayStartHour]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (mode !== "execute" || !pendingTimelineFocus) return;
     const targetDate = pendingTimelineFocus.date;
     const visibleDays = getVisibleDays(timelineView === "weekly" ? "weekly" : (timelineView === "3day" ? "3day" : "daily"), selectedDate);
@@ -2420,13 +2425,52 @@ function App() {
     const targetMinutes = pendingTimelineFocus.startTime
       ? timeToMinutes(pendingTimelineFocus.startTime)
       : Math.max(TIMELINE_START * 60, 9 * 60);
-    const targetTop = ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-    container.scrollTo({
-      top: Math.max(0, targetTop - container.clientHeight * 0.32),
-      behavior: "smooth",
+    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, 7 * effectColumnCount)[0] || selectedDate;
+    const effectTop = (date: string, time: string) => {
+      const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
+      const bandIndex = Math.floor(offset / effectColumnCount);
+      let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
+      if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+      return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+    };
+    const targetTop = effectEnabled
+      ? effectTop(targetDate, minutesToTime(targetMinutes))
+      : ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+    const nextScrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = nextScrollTop;
+      setPendingTimelineFocus(null);
     });
-    setPendingTimelineFocus(null);
-  }, [mode, pendingTimelineFocus, selectedDate, timelineView]);
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, pendingTimelineFocus, selectedDate, timelineView, dayStartHour, settings?.continuousCrossDayScroll]);
+
+  useEffect(() => {
+    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+    if (mode !== "execute" || !effectEnabled) {
+      setVisibleTimelineDate(selectedDate);
+      return;
+    }
+    const scrollElement = timelineRef.current;
+    if (!scrollElement) return;
+    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+    const effectDates = buildDailyContinuousDates(effectAnchorDate, true, 7 * effectColumnCount);
+    const effectStartDate = effectDates[0] || selectedDate;
+    const effectBandCount = Math.max(1, Math.ceil(effectDates.length / effectColumnCount));
+    const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const updateVisibleTimelineDate = () => {
+      const centerY = scrollElement.scrollTop + scrollElement.clientHeight / 2;
+      const bandIndex = Math.max(0, Math.min(effectBandCount - 1, Math.floor(centerY / dayHeight)));
+      const nextDate = getContinuousTimelineDateForOffset(effectStartDate, bandIndex, effectColumnCount);
+      setVisibleTimelineDate((current) => current === nextDate ? current : nextDate);
+    };
+    updateVisibleTimelineDate();
+    scrollElement.addEventListener("scroll", updateVisibleTimelineDate, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", updateVisibleTimelineDate);
+  }, [mode, settings?.continuousCrossDayScroll, timelineView, selectedDate]);
 
   useEffect(() => {
     if (!placementPreview) return;
@@ -2921,8 +2965,11 @@ function App() {
 
   const today = todayIso();
   const timelineDate = selectedDate;
-  const isViewingToday = timelineDate === today;
-  const showBackToNow = timelineDate !== today || timelineView !== "daily";
+  const continuousTimelineEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+  const timelineColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+  const timelineWindowAnchorDate = continuousTimelineEnabled ? visibleTimelineDate : timelineDate;
+  const isViewingToday = timelineWindowAnchorDate === today;
+  const showBackToNow = timelineDate !== today || timelineWindowAnchorDate !== today || timelineView !== "daily";
   const projects = data?.projects || [];
   const tasks = data?.tasks || [];
   const events = data?.events || [];
@@ -3007,19 +3054,24 @@ function App() {
     return m;
   }, [schedulePreviews, tasks]);
 
-  const visibleTimelineDates = useMemo(() => {
-    if (timelineView === "daily") return new Set(buildDailyContinuousDates(timelineDate, settings?.continuousCrossDayScroll !== false));
-    if (timelineView === "3day" || timelineView === "weekly") {
-      return new Set(getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate));
+  const continuousAnchorDate = useMemo(() => {
+    if (timelineView === "weekly") return getVisibleDays("weekly", timelineDate)[0];
+    return timelineDate;
+  }, [timelineDate, timelineView]);
+  const continuousTimelineDates = useMemo(() => {
+    if (!continuousTimelineEnabled) {
+      if (timelineView === "daily") return [timelineDate];
+      if (timelineView === "3day" || timelineView === "weekly") return getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
+      return [];
     }
-    return new Set<string>();
-  }, [timelineDate, timelineView, settings?.continuousCrossDayScroll]);
-  const dailyTimelineDates = useMemo(
-    () => buildDailyContinuousDates(timelineDate, settings?.continuousCrossDayScroll !== false),
-    [timelineDate, settings?.continuousCrossDayScroll],
-  );
-  const dailyTimelineCanvasHeight = dailyContinuousCanvasHeight(dailyTimelineDates.length, SLOT_HEIGHT);
-  const dailyTimelineSlotCount = dailyContinuousSlotCount(dailyTimelineDates.length);
+    return buildDailyContinuousDates(continuousAnchorDate, true, 7 * timelineColumnCount);
+  }, [continuousAnchorDate, continuousTimelineEnabled, timelineColumnCount, timelineDate, timelineView]);
+  const continuousTimelineStartDate = continuousTimelineDates[0] || timelineDate;
+  const continuousTimelineBandCount = Math.max(1, Math.ceil(continuousTimelineDates.length / timelineColumnCount));
+  const visibleTimelineDates = useMemo(() => new Set(continuousTimelineDates), [continuousTimelineDates]);
+  const dailyTimelineDates = continuousTimelineDates;
+  const dailyTimelineCanvasHeight = dailyContinuousCanvasHeight(continuousTimelineBandCount, SLOT_HEIGHT);
+  const dailyTimelineSlotCount = dailyContinuousSlotCount(continuousTimelineBandCount);
 
   function getTimelineRangeFor(view: TimelineView, anchorDate: string) {
     if (view === "daily") return [anchorDate];
@@ -3268,7 +3320,7 @@ function App() {
   // Conflict layout: maps taskId → { index, count } for overlapping tasks
   const conflictLayout = useMemo(() => {
     const map = new Map<string, { index: number; count: number }>();
-    if (timelineView === "daily") {
+    if (timelineView !== "month") {
       const byDate = new Map<string, Task[]>();
       for (const task of scheduledTasks) {
         const date = task.scheduledDate || "";
@@ -3276,22 +3328,9 @@ function App() {
         byDate.get(date)!.push(task);
       }
       for (const [, group] of byDate) computeConflictLayout(group).forEach((v, k) => map.set(k, v));
-    } else {
-      const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
-      const dayTasks: Task[] = expandedVisibleTimelineTasks.filter((task) => threeDates.includes(task.scheduledDate || ""));
-      dayTasks.sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
-      const byDate = new Map<string, Task[]>();
-      for (const t of dayTasks) {
-        const d = t.scheduledDate || "";
-        if (!byDate.has(d)) byDate.set(d, []);
-        byDate.get(d)!.push(t);
-      }
-      for (const [, group] of byDate) {
-        computeConflictLayout(group).forEach((v, k) => map.set(k, v));
-      }
     }
     return map;
-  }, [expandedVisibleTimelineTasks, timelineDate, timelineView, scheduledTasks]);
+  }, [timelineView, scheduledTasks]);
 
   // Debug: conflict layout info
   useEffect(() => {
@@ -4046,10 +4085,44 @@ function App() {
     if (!gridEl) return { date: timelineDate, startTime: "09:00", endTime: "09:15", dayIndex: 0, minutes: 9 * 60 };
     return dailyContinuousTargetFromContentY({
       contentY: clientY - gridEl.getBoundingClientRect().top,
-      anchorDate: timelineDate,
+      anchorDate: continuousTimelineStartDate,
       dayStartHour,
-      dayCount: dailyTimelineDates.length,
+      dayCount: continuousTimelineBandCount,
     });
+  }
+
+  function continuousDateOffset(date: string) {
+    return Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${continuousTimelineStartDate}T00:00:00`).getTime()) / 86400000);
+  }
+
+  function continuousTimedTop(date: string, startTime: string) {
+    const offset = continuousDateOffset(date);
+    const bandIndex = Math.floor(offset / timelineColumnCount);
+    let minutesFromDayStart = timeToMinutes(startTime) - dayStartHour * 60;
+    if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+    return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+  }
+
+  function continuousPointerTarget(clientX: number, clientY: number, gridElement: HTMLElement) {
+    const rect = gridElement.getBoundingClientRect();
+    const columnWidth = rect.width / timelineColumnCount;
+    const columnIndex = Math.min(Math.max(Math.floor((clientX - rect.left) / columnWidth), 0), timelineColumnCount - 1);
+    const pxPerMinute = SLOT_HEIGHT / SLOT_MINUTES;
+    const snappedFromTop = Math.min(
+      continuousTimelineBandCount * 24 * 60 - SLOT_MINUTES,
+      Math.max(0, Math.round(((clientY - rect.top) / pxPerMinute) / SLOT_MINUTES) * SLOT_MINUTES),
+    );
+    const bandIndex = Math.floor(snappedFromTop / (24 * 60));
+    const minutesFromDayStart = snappedFromTop % (24 * 60);
+    const minutes = (dayStartHour * 60 + minutesFromDayStart) % (24 * 60);
+    const startTime = minutesToTime(minutes);
+    return {
+      date: addDays(continuousTimelineStartDate, bandIndex * timelineColumnCount + columnIndex),
+      startTime,
+      endTime: addMinutes(startTime, SLOT_MINUTES),
+      dayIndex: columnIndex,
+      minutes,
+    };
   }
 
   function slotFromPointer(clientY: number, offsetMinutes = 0, clientX?: number) {
@@ -6315,8 +6388,13 @@ function App() {
   }
 
   function goToNow() {
-    setSelectedDate(todayIso());
+    const now = new Date();
+    const nowDate = todayIso();
+    const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setSelectedDate(nowDate);
+    setVisibleTimelineDate(nowDate);
     setTimelineView("daily");
+    setPendingTimelineFocus({ date: nowDate, startTime: nowTime, source: "schedule" });
   }
 
   function openSettingsSection(section: SettingsSection) {
@@ -6889,11 +6967,11 @@ function App() {
                   </button>
                 )}
                 {(timelineView === "3day" || timelineView === "weekly") ? (() => {
-                  const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
+                  const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineWindowAnchorDate);
                   const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                  const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
-                  const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
-                  const multiDayScheduledTasks = [...expandedVisibleTimelineTasks.filter((task) => threeDates.includes(task.scheduledDate || "")), ...previewTasks.filter((task) => threeDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+                  const canvasHeight = continuousTimelineEnabled ? dailyTimelineCanvasHeight : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+                  const slotCount = continuousTimelineEnabled ? dailyTimelineSlotCount : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
+                  const multiDayScheduledTasks = [...expandedVisibleTimelineTasks.filter((task) => continuousTimelineDates.includes(task.scheduledDate || "")), ...previewTasks.filter((task) => continuousTimelineDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
                   return (
                     <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(threeDates.length) } as CSSProperties}>
                       <div className="df-timeline-3day-top">
@@ -6986,9 +7064,10 @@ function App() {
                                 const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                                 const isHour = minutes % 60 === 0;
                                 const isMajor = minutes % (6 * 60) === 0;
+                                const label = continuousTimelineEnabled ? dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour }) : hourLabel(minutes);
                                 return (
                                   <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}>
-                                    {isHour ? <span>{hourLabel(minutes)}</span> : null}
+                                    {isHour ? <span>{label}</span> : null}
                                   </div>
                                 );
                               })}
@@ -7000,7 +7079,7 @@ function App() {
                               const gridEl = colsContainerRef.current;
                               const scrollEl = timelineRef.current;
                               if (gridEl && scrollEl) {
-                                const target = getDropTargetFromPointer({
+                                const target = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : getDropTargetFromPointer({
                                   clientX: event.clientX, clientY: event.clientY,
                                   gridElement: gridEl,
                                   scrollElement: scrollEl,
@@ -7019,7 +7098,7 @@ function App() {
                                 const gridEl = colsContainerRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (gridEl && scrollEl) {
-                                  const target = getDropTargetFromPointer({
+                                  const target = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : getDropTargetFromPointer({
                                     clientX: event.clientX, clientY: event.clientY,
                                     gridElement: gridEl,
                                     scrollElement: scrollEl,
@@ -7056,7 +7135,7 @@ function App() {
                                 const gridEl = timeGridRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (!gridEl || !scrollEl) return;
-                                const startTarget = pointerToDateTime({
+                                const startTarget = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : pointerToDateTime({
                                   clientX: event.clientX, clientY: event.clientY,
                                   gridElement: gridEl, scrollElement: scrollEl,
                                   visibleDays: threeDates,
@@ -7068,11 +7147,12 @@ function App() {
                                 const moveHandler = (moveEvent: MouseEvent) => {
                                   if (Math.abs(moveEvent.clientY - event.clientY) < 6) return;
                                   hasMoved = true;
-                                  const currentTarget = pointerToDateTime({
+                                  const currentTarget = continuousTimelineEnabled ? continuousPointerTarget(moveEvent.clientX, moveEvent.clientY, gridEl) : pointerToDateTime({
                                     clientX: moveEvent.clientX, clientY: moveEvent.clientY,
                                     gridElement: gridEl, scrollElement: scrollEl,
                                     visibleDays: threeDates,
                                   });
+                                  if (currentTarget.date !== startTarget.date) return;
                                   let s = startMinutes, e = currentTarget.minutes;
                                   if (s > e) { const t = s; s = e; e = t; }
                                   s = Math.max(s, TIMELINE_START * 60);
@@ -7081,8 +7161,8 @@ function App() {
                                   const gridRect = gridEl.getBoundingClientRect();
                                   const cw = gridRect.width / threeDates.length;
                                   const gut = timelineView === "weekly" ? 5 : 8;
-                                  const startPx = ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-                                  const endPx = ((e - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+                                  const startPx = continuousTimelineEnabled ? continuousTimedTop(startTarget.date, minutesToTime(s)) : ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+                                  const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
                                   setDragCreate({
                                     date: startTarget.date, dayIndex: startDayIndex,
                                     startMinutes: s, endMinutes: e,
@@ -7122,7 +7202,7 @@ function App() {
                                 const gridEl = timeGridRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (!gridEl || !scrollEl) return;
-                                const target = pointerToDateTime({
+                                const target = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : pointerToDateTime({
                                   clientX: event.clientX,
                                   clientY: event.clientY,
                                   gridElement: gridEl,
@@ -7184,7 +7264,8 @@ function App() {
                               {/* Layer 3: Event blocks — absolutely positioned on the time-grid */}
                               <div className="df-event-blocks-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
                                 {multiColWidth > 0 && multiDayScheduledTasks.map((task) => {
-                                  const dayIndex = threeDates.indexOf(task.scheduledDate || "");
+                                  const dayOffset = continuousDateOffset(task.scheduledDate || "");
+                                  const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(task.scheduledDate || "");
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   const gap = timelineView === "weekly" ? 3 : 4;
@@ -7206,7 +7287,7 @@ function App() {
                                     }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
                                     }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)}
-                                      extraStyle={{ position: "absolute", left, width, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
+                                      extraStyle={{ position: "absolute", left, width, top: continuousTimelineEnabled ? continuousTimedTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00") : undefined, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                                       onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       viewMode={timelineView}
@@ -7219,18 +7300,20 @@ function App() {
                                 {/* Preview block during drag */}
                                 {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && (() => {
                                   const tgtDate = dragTargetDateRef.current || threeDates[0];
-                                  const dayIndex = threeDates.indexOf(tgtDate);
+                                  const dayOffset = continuousDateOffset(tgtDate);
+                                  const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(tgtDate);
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
                                     <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
-                                      extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
+                                      extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, top: continuousTimelineEnabled ? continuousTimedTop(tgtDate, hoverSlot) : undefined }}
                                       dayStartHour={dayStartHour}
                                     />
                                   );
                                 })()}
                                 {multiColWidth > 0 && placementPreviewTask && placementPreview && (() => {
-                                  const dayIndex = threeDates.indexOf(placementPreview.date);
+                                  const dayOffset = continuousDateOffset(placementPreview.date);
+                                  const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(placementPreview.date);
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
@@ -7242,6 +7325,7 @@ function App() {
                                         position: "absolute",
                                         left: dayIndex * multiColWidth + gutter,
                                         width: multiColWidth - gutter * 2,
+                                        top: continuousTimelineEnabled ? continuousTimedTop(placementPreview.date, placementPreview.startTime) : undefined,
                                         ["--df-preview" as any]: "1",
                                       } as CSSProperties}
                                       dayStartHour={dayStartHour}
@@ -7250,9 +7334,11 @@ function App() {
                                 })()}
                                 {/* Now line — only in today's column in multi-day view */}
                                 {(() => {
-                                  const todayIdx = threeDates.indexOf(today);
+                                  const todayOffset = continuousDateOffset(today);
+                                  const todayIdx = continuousTimelineEnabled ? ((todayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(today);
                                   if (todayIdx === -1 || multiColWidth <= 0) return null;
-                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth }} lang={lang} />;
+                                  const now = new Date();
+                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth, top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} lang={lang} />;
                                 })()}
                                 {/* Empty state */}
                                 {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
@@ -7445,14 +7531,20 @@ function App() {
                   );
                 })() : (
                   <div className="df-timeline-daily">
-                    <div className={`df-date-title df-date-title-compact${timelineDate === today ? " today" : ""}`}>
-                      <span className="df-date-num">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.getDate(); })()}</span>
+                    <div className={`df-date-title df-date-title-compact${timelineWindowAnchorDate === today ? " today" : ""}`}>
+                      <span className="df-date-num">{(() => { const d = new Date(`${timelineWindowAnchorDate}T00:00:00`); return d.getDate(); })()}</span>
                       <span className="df-date-sep"></span>
-                      <span className="df-date-wd">{(() => { const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const d = new Date(`${timelineDate}T00:00:00`); return weekdayShort[d.getDay()]; })()}</span>
+                      <span className="df-date-wd">
+                        {(() => {
+                          const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                          const d = new Date(`${timelineWindowAnchorDate}T00:00:00`);
+                          return weekdayShort[d.getDay()];
+                        })()}
+                      </span>
                     </div>
                     <div
-                      className={`df-timeline-allday${allDayDragDate === timelineDate && drag ? " drag-over" : ""}`}
-                      data-all-day-date={timelineDate}
+                      className={`df-timeline-allday${allDayDragDate === timelineWindowAnchorDate && drag ? " drag-over" : ""}`}
+                      data-all-day-date={timelineWindowAnchorDate}
                       onDragEnter={(e) => { e.preventDefault(); setAllDayDragOver(true); }}
                       onDragOver={(e) => { e.preventDefault(); if (!allDayDragOver) setAllDayDragOver(true); }}
                       onDragLeave={(e) => {
@@ -7467,7 +7559,7 @@ function App() {
                         setAllDayDragOver(false);
                         setAllDayDragDate("");
                         const taskId = e.dataTransfer.getData("taskId") || drag?.taskId;
-                        if (taskId) makeAllDay(taskId, timelineDate);
+                        if (taskId) makeAllDay(taskId, timelineWindowAnchorDate);
                       }}
                     >
                       <span className="df-timeline-allday-label">{t(lang, "timeline.allDay")}</span>
@@ -7477,14 +7569,17 @@ function App() {
                           if ((event.target as HTMLElement).closest(".df-all-day-block,.df-all-day-quick")) return;
                           const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
                           const gutter = 6;
-                          setAllDayQuickAdd({ date: timelineDate, left: rect.left + gutter, top: rect.top + 4, width: rect.width - gutter * 2, dayIndex: 0 });
+                          setAllDayQuickAdd({ date: timelineWindowAnchorDate, left: rect.left + gutter, top: rect.top + 4, width: rect.width - gutter * 2, dayIndex: 0 });
                         }}
                       >
                         {allDayQuickAdd && !drag && (
                           <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, allDayQuickAdd.date, null)} onCancel={() => setAllDayQuickAdd(null)} />
                         )}
-                        {allDayDragDate === timelineDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
-                        {[...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineDate), ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineDate)].map((task) => (
+                        {allDayDragDate === timelineWindowAnchorDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
+                        {[
+                          ...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineWindowAnchorDate),
+                          ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineWindowAnchorDate),
+                        ].map((task) => (
                           <AllDayBlock key={task.id} task={task} dragging={drag?.source === "allDay" && drag.taskId === task.id} projectName={projectName(task)} projects={projects} onEdit={() => { if (!suppressBlockClickRef.current) openTaskEdit(task); }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />
                         ))}
                       </div>
@@ -7564,7 +7659,7 @@ function App() {
                             e = Math.min(e, TIMELINE_END * 60 - SLOT_MINUTES);
                             if (e - s < SLOT_MINUTES * 2) e = s + SLOT_MINUTES * 2;
                             const gridRect = gridEl.getBoundingClientRect();
-                            const startPx = dailyContinuousBlockTop(startDate, minutesToTime(s), timelineDate, dayStartHour);
+                            const startPx = continuousTimedTop(startDate, minutesToTime(s));
                             const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
                             const gut = 8;
                             setDragCreate({
@@ -7624,17 +7719,17 @@ function App() {
                           const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                           const isHour = minutes % 60 === 0;
                           const isMajor = minutes % (6 * 60) === 0;
-                          const label = dailyContinuousSlotLabel({ index, anchorDate: timelineDate, dayStartHour });
+                          const label = dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour });
                           return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{label}</span></div>;
                         })}
-                        {isViewingToday && <NowLine lang={lang} dayStartHour={dayStartHour} />}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} />}
-                        {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
+                        {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
                             startTime={placementPreview.startTime}
                             duration={placementPreview.durationMinutes}
-                            extraStyle={{ ["--df-preview" as any]: "1" } as CSSProperties}
+                            extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(placementPreview.date, placementPreview.startTime) : undefined, ["--df-preview" as any]: "1" } as CSSProperties}
                             dayStartHour={dayStartHour}
                           />
                         )}
@@ -7650,7 +7745,7 @@ function App() {
                           const cs = innerW > 0 ? computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap, "daily") : null;
                           const left = cs ? cs.left : baseLeft;
                           const width = cs ? cs.width : innerW;
-                          const top = dailyContinuousBlockTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00", timelineDate, dayStartHour);
+                          const top = continuousTimedTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00");
                           const extraStyle: CSSProperties | undefined = innerW > 0 ? { left, width, top } : { top };
 
                           const isPreview = previewIdByClonedId.has(task.id);

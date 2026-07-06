@@ -3,7 +3,7 @@
 ## 2026-07-06 · 习惯总览重构与功能开关
 
 ### 修复
-- 修复开启无限跨天滚动时日时间轴在一天底部强制切换日期并重置滚动位置的问题；日时间轴现在按连续垂直画布呈现后续日期，越过 24:00 后直接进入下一天 00:00、01:00 等时段，不再像翻页一样跳转。
+- 修复开启无限跨天滚动时日时间轴在一天底部强制切换日期并重置滚动位置的问题；日、3 天和周视图现在按连续垂直画布呈现前后日期，可继续向上滚动，顶部日期跟随当前时间轴窗口更新，跨天边界统一显示为 `0:00`，不再出现 `24:00` 或翻页式跳转；“回到现在”会在跨日滚动离开今天时出现，并把当前时间线居中。
 
 ### 改进
 - 重做“习惯总览”面板：从一堆带边框的小方块改为结构化周视图表格，左列习惯名 + 右侧七天圆形完成单元，行与表头严格对齐，更像一张干净的纸面周表。
@@ -55,7 +55,7 @@
 ## 2026-07-06 · Habit overview refactor & feature toggle
 
 ### Fixes
-- Fixed daily timeline scrolling when continuous cross-day scroll is enabled: reaching the end of a day no longer forces a date switch or resets the scroll position. The daily timeline now continues vertically into the next date, moving from 24:00 to 00:00, 01:00, and onward without page-like snapping.
+- Fixed continuous cross-day timeline scrolling across day, 3-day, and week views: the timeline can scroll upward into previous dates and downward into following dates without forced date switches or page-like snapping. Header dates now follow the visible timeline window, cross-day boundaries use `0:00` instead of `24:00`, and Back to now appears after cross-day scrolling away from today and recenters the current time.
 
 ### Improvements
 - Rebuilt the Habits Overview panel: replaced the cluttered bordered-box grid with a structured week table — habit name column on the left, seven circular day-completion units on the right, with rows strictly aligned to the header for a clean paper-table feel.
