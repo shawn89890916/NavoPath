@@ -342,6 +342,22 @@ Records how `importance` and `urgency` are surfaced across the drawer, task card
 - **Disabled**: HabitCandidateCard hidden, overview panel won't open, beginHabitDrag is blocked, empty-state logic ignores habits
 - **Data preservation**: Habit data (`habits`, `habitDailyStates`) is NEVER deleted — only hidden from UI. Re-enabling restores all existing habits.
 
+## Timeline Quick Add & Project Color Bar Fixes
+
+### Fix 1: Timeline click creates task with no default project
+- **Problem**: Clicking timeline blank area created tasks that inherited the last-used project via `lastQuickAddProjectIdRef` and `FloatingTimeAddInput` pre-selection.
+- **Fix**: 
+  - `FloatingTimeAddInput`: Initialize `input=""` and `selectedProject=null` instead of reading from `add.lastProjectId`
+  - `setFloatingTimeAdd` calls: Removed `lastProjectId` field from both timeline click handlers
+  - `lastQuickAddProjectIdRef` and `saveFloatingTimeAdd` persistence: Kept intact so user-chosen projects still persist for future sessions
+- **Result**: New timeline tasks default to unassigned project; users can still manually type `#project` or select from dropdown
+
+### Fix 2: Project color bar persists during hover/selected/dragging
+- **Problem**: CSS `border-color` shorthand in hover and selected/dragging rules overrode all four borders, wiping out the project-colored left border.
+- **Fix**: Added explicit `border-left-color: var(--task-project-color, var(--accent-active)) !important` after `border-color` in both rules
+- **Affected rules**: `.df-task-block[data-task-appearance]:hover` / `:focus-within` and `.df-task-block[data-task-appearance].is-selected` / `.is-dragging`
+- **Result**: Project color bar stays visible in all interaction states while other borders change normally
+
 # Timeline Short Event Debug Proof
 
 For broken short task:

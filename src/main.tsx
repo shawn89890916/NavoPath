@@ -7187,7 +7187,6 @@ function App() {
                                   top: event.clientY,
                                   left: popLeft,
                                   width: popWidth,
-                                  lastProjectId: lastQuickAddProjectIdRef.current || undefined,
                                 });
                               }}
                             >
@@ -7647,7 +7646,6 @@ function App() {
                             top: event.clientY,
                             left: colLeft,
                             width: colWidth,
-                            lastProjectId: lastQuickAddProjectIdRef.current || undefined,
                           });
                         }}>
                         {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
@@ -8315,9 +8313,8 @@ function ScheduleTemplateModal({
 
 /** Floating quick-add popup for time-slot clicks on day / 3-day / week views. */
 function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNullable<FloatingTimeAdd>; projects: Project[]; onSave: (title: string, projectId: string | null) => void; onCancel: () => void }) {
-  const lastProject = add.lastProjectId ? projects.find((p) => p.id === add.lastProjectId) : null;
-  const [input, setInput] = useState(lastProject ? `#${lastProject.title} ` : "");
-  const [selectedProject, setSelectedProject] = useState<Project | null>(lastProject ?? null);
+  const [input, setInput] = useState("");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectQuery, setProjectQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

@@ -178,6 +178,7 @@
 .navo-demo-app .df-task-block[data-task-appearance]:hover,
 .navo-demo-app .df-task-block[data-task-appearance]:focus-within {
   border-color: var(--task-border-hover) !important;
+  border-left-color: var(--task-project-color, var(--accent-active)) !important;
   background: var(--task-bg) !important;
   box-shadow: none !important;
   transform: none !important;
@@ -194,6 +195,7 @@
 .navo-demo-app .df-task-block[data-task-appearance].is-selected,
 .navo-demo-app .df-task-block[data-task-appearance].is-dragging {
   border-color: var(--task-selected-border) !important;
+  border-left-color: var(--task-project-color, var(--accent-active)) !important;
   background: var(--task-bg) !important;
   box-shadow: none !important;
   transform: none !important;
