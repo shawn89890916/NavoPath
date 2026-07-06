@@ -114,10 +114,12 @@ function donutLeaderLine(
   // p1 = elbow, p2 = (endX, elbow.y). Label anchor = midpoint of p1→p2,
   // so the project name sits centered above the horizontal segment itself.
   const midX = (elbow.x + endX) / 2;
+  // p1.y == p2.y == elbow.y (horizontal segment). Place label 8px above the
+  // horizontal segment so it reads as annotation sitting on top of the line.
   return {
     path: `M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${endX} ${elbow.y}`,
     labelX: midX,
-    labelY: elbow.y,
+    labelY: elbow.y - 8,
     textAnchor: "middle",
   };
 }
@@ -2278,7 +2280,7 @@ export default function PlanningView(props: {
                                 <text
                                   className="df-metrics-donut-label"
                                   x={leader.labelX}
-                                  y={leader.labelY - 2}
+                                  y={leader.labelY}
                                   textAnchor={leader.textAnchor}
                                   dominantBaseline="alphabetic"
                                 >{group.label}</text>

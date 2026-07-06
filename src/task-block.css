@@ -2523,7 +2523,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-app .df-planning .df-metrics-donut-leader {
   fill: none;
   stroke: color-mix(in srgb, var(--paper-rule, var(--line)) 80%, transparent);
-  stroke-width: 1;
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
