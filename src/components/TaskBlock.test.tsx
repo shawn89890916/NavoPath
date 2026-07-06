@@ -212,12 +212,15 @@ describe("TaskBlock shared component contract", () => {
     expect(css).toContain(".df-habit-week-table");
   });
 
-  it("routes continuous cross-day wheel navigation through a boundary helper", () => {
+  it("renders continuous cross-day scroll as one vertical daily timeline", () => {
     const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
 
-    expect(main).toContain("shiftTimelineAtScrollBoundary");
-    expect(main).toContain("settings.continuousCrossDayScroll !== false");
+    expect(main).toContain("buildDailyContinuousDates");
+    expect(main).toContain("dailyContinuousTargetFromContentY");
+    expect(main).toContain("dailyContinuousBlockTop");
     expect(main).toContain("data-cross-day-scroll");
+    expect(main).not.toContain("shiftTimelineAtScrollBoundary");
+    expect(main).not.toContain("scrollTop = direction > 0 ? 0");
   });
 
   it("uses a shared pointer-event drag system for Planning views", () => {
