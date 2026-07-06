@@ -1766,6 +1766,14 @@ function App() {
     document.addEventListener("keydown", closeCompactLayer);
     return () => document.removeEventListener("keydown", closeCompactLayer);
   }, [quickAddOpen]);
+
+  useEffect(() => {
+    if (settings?.featureHabitsEnabled === false && habitPanel) {
+      setHabitPanel(null);
+      setEditingHabitId(null);
+    }
+  }, [settings?.featureHabitsEnabled]);
+
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -4381,11 +4389,13 @@ function App() {
   }
 
   function openHabitDetail(habitId: string) {
+    if (!settings || settings.featureHabitsEnabled === false) return;
     setEditingHabitId(habitId);
     setHabitPanel("detail");
   }
 
   function openHabitOverview() {
+    if (!settings || settings.featureHabitsEnabled === false) return;
     setEditingHabitId(null);
     setHabitPanel("overview");
   }
@@ -4461,6 +4471,7 @@ function App() {
   }
 
   function beginHabitDrag(event: React.PointerEvent, habit: Habit) {
+    if (!settings || settings.featureHabitsEnabled === false) return;
     const target = event.target as HTMLElement;
     if (event.button !== 0 || target.closest("button,input,textarea,select,a")) return;
     const pointerId = event.pointerId;
@@ -6491,7 +6502,7 @@ function App() {
   const onboardingStep = (settings.onboardingStep || "add") as OnboardingStep;
   const habits = data.habits || [];
   const habitDailyStates = data.habitDailyStates || [];
-  const hasActiveHabits = habits.some((habit) => !habit.archived);
+  const hasActiveHabits = settings.featureHabitsEnabled !== false && habits.some((habit) => !habit.archived);
   const draggedTask = drag
     ? tasks.find((task) => task.id === drag.taskId)
       || recordToTaskMap.get(drag.taskId)
@@ -6789,18 +6800,20 @@ function App() {
                   {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
                 </div>
               ))}
-              <HabitCandidateCard
-                habits={habits}
-                habitDailyStates={habitDailyStates}
-                today={today}
-                lang={lang}
-                onToggle={toggleHabitDaily}
-                onPointerDragStart={beginHabitDrag}
-                onFocusScheduled={focusHabitSchedule}
-                onEditHabit={openHabitDetail}
-                onOpenOverview={openHabitOverview}
-                isClickSuppressed={() => suppressBlockClickRef.current}
-              />
+              {settings.featureHabitsEnabled !== false && (
+                <HabitCandidateCard
+                  habits={habits}
+                  habitDailyStates={habitDailyStates}
+                  today={today}
+                  lang={lang}
+                  onToggle={toggleHabitDaily}
+                  onPointerDragStart={beginHabitDrag}
+                  onFocusScheduled={focusHabitSchedule}
+                  onEditHabit={openHabitDetail}
+                  onOpenOverview={openHabitOverview}
+                  isClickSuppressed={() => suppressBlockClickRef.current}
+                />
+              )}
             </div>
             <form className="df-quick-add" onSubmit={(event) => {
               event.preventDefault();
@@ -7759,7 +7772,7 @@ function App() {
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
-      {habitPanel && data && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
+      {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
       {focusOverlayMode && (
         <div className="df-focus-overlay" style={focusProject?.color ? { ["--focus-accent" as string]: focusProject.color } as React.CSSProperties : undefined}>
           <div className="df-focus-topbar">
@@ -11635,6 +11648,11 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
             <label className="df-utility-check">
               <input type="checkbox" checked={settings.featureListViewEnabled !== false} onChange={(e) => onSave({ featureListViewEnabled: e.target.checked })} />
               <span>{lang === "zh" ? "启用列表视图" : "Enable list view"}</span>
+            </label>
+            <label className="df-utility-check">
+              <input type="checkbox" checked={settings.featureHabitsEnabled !== false} onChange={(e) => onSave({ featureHabitsEnabled: e.target.checked })} />
+              <span>{lang === "zh" ? "启用习惯追踪" : "Enable habit tracking"}</span>
+              <small>{lang === "zh" ? "用于追踪每日/每周重复行为" : "Track daily/weekly recurring behaviors"}</small>
             </label>
             <label className="df-utility-check">
               <input type="checkbox" checked={settings.continuousCrossDayScroll !== false} onChange={(e) => onSave({ continuousCrossDayScroll: e.target.checked })} />

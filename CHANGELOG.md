@@ -1,6 +1,6 @@
 # NavoPath 更新日志
 
-## 2026-07-06 · 习惯总览重构
+## 2026-07-06 · 习惯总览重构与功能开关
 
 ### 改进
 - 重做“习惯总览”面板：从一堆带边框的小方块改为结构化周视图表格，左列习惯名 + 右侧七天圆形完成单元，行与表头严格对齐，更像一张干净的纸面周表。
@@ -10,6 +10,7 @@
 - 已禁用习惯区改为底部折叠栏（▸/▾ 指示），展开后每行提供查看/编辑与恢复启用的轻量图标操作，不再占据巨大空白框。
 - 习惯名右侧弱化显示预设时长（mono 字体小号），保持视觉层级清晰。
 - 习惯面板宽度从 520px 调整为 560px，给八列表格更舒适的呼吸感；窄屏下表格横向滚动且列宽自适应。
+- 设置页“功能”分区新增“启用习惯追踪”开关：关闭后隐藏候选区习惯区块、隐藏习惯总览入口、禁止打开习惯面板；重新开启后原有习惯数据完整保留。
 
 ## 2026-07-05 · 时间轴短任务渲染与选择器优化
 
@@ -48,7 +49,7 @@
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
 
-## 2026-07-06 · Habit overview refactor
+## 2026-07-06 · Habit overview refactor & feature toggle
 
 ### Improvements
 - Rebuilt the Habits Overview panel: replaced the cluttered bordered-box grid with a structured week table — habit name column on the left, seven circular day-completion units on the right, with rows strictly aligned to the header for a clean paper-table feel.
@@ -58,6 +59,7 @@
 - The disabled-habits section is now a bottom collapsible bar (▸/▾ indicator); expanding it shows one row per habit with lightweight view/edit and restore icon actions, replacing the old oversized empty box.
 - Habit duration is shown muted (small mono font) on the right of the habit name to keep visual hierarchy clear.
 - Habit panel width increased from 520px to 560px so the eight-column table breathes; on narrow screens the table scrolls horizontally and column widths adapt.
+- Added "Enable habit tracking" toggle in Settings > Features: when disabled, hides the habit section in the candidate list, hides the habit overview entry point, and prevents opening the habit panel; all habit data is preserved for when the feature is re-enabled.
 
 ## 2026-07-05 · Timeline short tasks & selector improvements
 

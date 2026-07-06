@@ -342,6 +342,7 @@ export interface Settings {
   featureKanbanViewEnabled?: boolean;
   featureQuadrantViewEnabled?: boolean;
   featureListViewEnabled?: boolean;
+  featureHabitsEnabled?: boolean;
   /** 最近一次成功同步时间（ISO 字符串）。 */
   lastSyncedAt?: string;
   /** 已启用（已安装并激活）的插件 ID 列表。 */

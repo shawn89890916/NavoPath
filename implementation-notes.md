@@ -320,6 +320,28 @@ Records how `importance` and `urgency` are surfaced across the drawer, task card
 - The check SVG inside the completed dot is a fixed white stroke (`%23FBF9FF`) which matches the light `--surface-main`; in dark mode the contrast may be slightly off but acceptable since the accent fill is still clearly distinct from empty cells.
 - No explicit "delete" action on archived habits (only edit + restore) because the existing `HabitPanel` props do not expose a delete handler. Adding delete would require plumbing a new `onDeleteHabit` callback through `HabitPanel` — out of scope for this layout refactor.
 
+## Habit Feature Toggle
+
+### Settings field
+- Added `featureHabitsEnabled?: boolean` to the `Settings` interface in `src/types.ts`.
+- Defaults to `true` (enabled) when undefined — existing users won't be affected.
+- Persisted via `saveSettings()` and `getSettings()` like all other settings fields.
+
+### Guard points in src/main.tsx
+1. **Settings toggle**: Added checkbox in Settings > Features section (`settings.featureHabitsEnabled !== false`)
+2. **HabitCandidateCard rendering**: Conditional wrap `{settings.featureHabitsEnabled !== false && (<HabitCandidateCard .../>)}`
+3. **HabitPanel rendering**: Guarded with `settings.featureHabitsEnabled !== false`
+4. **openHabitDetail(habitId)**: No-op when `!settings || settings.featureHabitsEnabled === false`
+5. **openHabitOverview()**: No-op when `!settings || settings.featureHabitsEnabled === false`
+6. **beginHabitDrag(event, habit)**: No-op when `!settings || settings.featureHabitsEnabled === false`
+7. **hasActiveHabits**: Gated with `settings.featureHabitsEnabled !== false && habits.some(...)` — so the empty-state logic doesn't reference habits when feature is off
+8. **Auto-close panel**: `useEffect` watches `settings?.featureHabitsEnabled` and closes habitPanel + clears editingHabitId when toggled off
+
+### Behavior
+- **Enabled (default)**: All habit features work normally — candidate list shows habits, overview panel opens, drag works
+- **Disabled**: HabitCandidateCard hidden, overview panel won't open, beginHabitDrag is blocked, empty-state logic ignores habits
+- **Data preservation**: Habit data (`habits`, `habitDailyStates`) is NEVER deleted — only hidden from UI. Re-enabling restores all existing habits.
+
 # Timeline Short Event Debug Proof
 
 For broken short task:
