@@ -10,7 +10,7 @@
 - 修复指标视图甜甜圈图悬停效果错误的问题：此前悬停时段使用 `translate` 整体向外平移，导致内圈与外圈一起位移、中心孔变形。现在悬停时仅扩大外半径（88 → 94），内半径保持不变，中心孔大小不受影响，段块呈现为向外生长而非整体平移或缩放。
 
 ### 改进
-- 重做指标视图甜甜圈图为带引线的环形图：仍为一张整体甜甜圈图，每个色段代表一个项目；中心固定显示总安排时长与范围标签；段块外侧通过引线（leader line）标注项目名称、百分比与时长，左右两侧根据角度自动对齐；悬停时段块仅外径扩大、内径不变，中心不再切换内容。
+- 重做指标视图甜甜圈图为带引线的环形图：仍为一张整体甜甜圈图，每个色段代表一个项目；段块外侧通过两段式引线（径向短段 + 水平段）只标注项目名，百分比/时长不再出现在外部引线旁；中心默认显示总安排时长与范围标签，悬停某段时切换为当前项目的颜色点、名称、时长与百分比；右侧排名列表与 tooltip 仍提供完整 duration / percentage / task count。悬停时段块仅外径扩大、内径不变。
 - Planning 页面新增“指标”视图，以已安排/计划时间为分母统计项目时间占比，提供今天/昨天/本周/上周/本月/自定义范围、项目 donut、排名列表、时间密度热力图、任务下钻明细与 Linear 风格筛选；未安排时间作为辅助指标单独显示，习惯默认参与统计，跨天任务按实际重叠切分，并尊重“一天开始时间”设置。
 - 重做“习惯总览”面板：从一堆带边框的小方块改为结构化周视图表格，左列习惯名 + 右侧七天圆形完成单元，行与表头严格对齐，更像一张干净的纸面周表。
 - 顶部控制区拆分为左右两组：左侧周范围标题（编辑级字体）+ 今日完成统计；右侧上一周 / 今天 / 下一周 / 新增习惯按钮，不再挤在一起。
@@ -68,7 +68,7 @@
 - Fixed the donut chart hover effect in the Metrics allocation view: hovering a segment previously used `translate` to shift the whole segment outward, which moved both the inner and outer edges and distorted the center hole. The hover now only expands the outer radius (88 → 94) while keeping the inner radius unchanged, so the center hole size stays fixed and the segment grows outward instead of scaling or translating.
 
 ### Improvements
-- Reworked the Metrics donut into a labeled ring chart: it remains a single donut where each colored segment represents one project; the center always shows the total scheduled duration and range label; outside each segment a leader line points to the project name, percentage, and duration, automatically left/right aligned by angle; hovering a segment only expands its outer radius while the inner radius and center content stay unchanged.
+- Reworked the Metrics donut into a labeled ring chart: it remains a single donut where each colored segment represents one project; outside each segment a two-segment leader line (short radial stub + horizontal segment) points to just the project name — percentage and duration no longer appear beside the leader line; the center defaults to total scheduled duration + range label and switches to the hovered project's color dot, name, duration, and percentage on hover; the ranked list and tooltip still provide full duration / percentage / task count. Hovering a segment only expands its outer radius while the inner radius stays unchanged.
 - Added a new Metrics view to Planning. It reports project time allocation from scheduled/planned timeline records, with today/yesterday/week/month/custom ranges, a project donut, ranked list, density heatmap, task drill-down, and Linear-style filters. Unplanned time is shown separately, habits are included by default, cross-day tasks are split by actual overlap, and day-start settings are respected.
 - Rebuilt the Habits Overview panel: replaced the cluttered bordered-box grid with a structured week table — habit name column on the left, seven circular day-completion units on the right, with rows strictly aligned to the header for a clean paper-table feel.
 - Split the top control bar into two groups: week range title (editorial display type) + today's completion stats on the left; previous / today / next / new-habit buttons on the right, no longer crammed together.

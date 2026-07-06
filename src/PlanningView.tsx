@@ -2276,20 +2276,26 @@ export default function PlanningView(props: {
                                   textAnchor={leader.textAnchor}
                                   dominantBaseline="middle"
                                 >{group.label}</text>
-                                <text
-                                  className="df-metrics-donut-label-meta"
-                                  x={leader.labelX + (leader.textAnchor === "start" ? 4 : -4)}
-                                  y={leader.labelY + 13}
-                                  textAnchor={leader.textAnchor}
-                                  dominantBaseline="middle"
-                                >{Math.round(group.percentage)}% · {formatMinutesZh(group.durationMinutes)}</text>
                               </g>
                             );
                           })}
                         </svg>
                         <div className="df-metrics-donut-center">
-                          <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
-                          <span>{metricsResult.range.label}</span>
+                          {activeDonutGroup ? (
+                            <>
+                              <div className="df-metrics-donut-center-label">
+                                <i style={{ background: activeDonutGroup.color }} />
+                                <span>{activeDonutGroup.label}</span>
+                              </div>
+                              <strong>{formatMinutesZh(activeDonutGroup.durationMinutes)}</strong>
+                              <span>{Math.round(activeDonutGroup.percentage)}%</span>
+                            </>
+                          ) : (
+                            <>
+                              <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
+                              <span>{metricsResult.range.label}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </section>
