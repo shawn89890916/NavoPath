@@ -2253,7 +2253,7 @@ export default function PlanningView(props: {
                           <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
                           {donutSegments.map(({ group, startAngle, endAngle }) => {
                             const isActive = activeDonutGroup?.id === group.id;
-                            const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 128, startAngle, endAngle, 165);
+                            const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 148, startAngle, endAngle, 158);
                             return (
                               <g key={group.id} className={`df-metrics-donut-group${isActive ? " active" : ""}`}>
                                 <path
@@ -2268,16 +2268,14 @@ export default function PlanningView(props: {
                                   onFocus={() => setHoveredMetricGroupId(group.id)}
                                   onBlur={() => setHoveredMetricGroupId(null)}
                                   onClick={() => setHoveredMetricGroupId(group.id)}
-                                >
-                                  <title>{`${group.label}: ${formatMinutesZh(group.durationMinutes)} · ${Math.round(group.percentage)}%`}</title>
-                                </path>
+                                />
                                 <path className="df-metrics-donut-leader" d={leader.path} />
                                 <text
                                   className="df-metrics-donut-label"
-                                  x={leader.labelX + (leader.textAnchor === "start" ? 4 : -4)}
-                                  y={leader.labelY - 4}
+                                  x={leader.labelX + (leader.textAnchor === "start" ? 2 : -2)}
+                                  y={leader.labelY - 2}
                                   textAnchor={leader.textAnchor}
-                                  dominantBaseline="auto"
+                                  dominantBaseline="alphabetic"
                                 >{group.label}</text>
                               </g>
                             );
