@@ -78,21 +78,23 @@ function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadi
 interface DonutLeaderLine {
   /** SVG path for the polyline from segment edge to label anchor. */
   path: string;
-  /** Anchor x for the label text (start of text). */
+  /** Anchor x for the label text (midpoint of horizontal segment). */
   labelX: number;
   /** Anchor y for the label text. */
   labelY: number;
-  /** "start" for right-side labels (text-anchor start), "end" for left-side. */
-  textAnchor: "start" | "end";
+  /** Always "middle" so the label is centered above the horizontal segment. */
+  textAnchor: "middle";
 }
 
 /**
  * Build a two-segment leader line from the outer edge of a donut segment to
  * a horizontal label anchor. The line starts at `outerRadius`, extends to
- * `elbowRadius` along the mid-angle (radial segment), then bends horizontally
- * outward to the label x (horizontal segment). The label sits ABOVE the
- * horizontal segment. Labels on the right half use text-anchor "start",
- * left half "end".
+ * `elbowRadius` along the mid-angle (radial segment p0→p1), then bends
+ * horizontally outward to `cx ± labelDistance` (horizontal segment p1→p2).
+ * The label is centered ABOVE the midpoint of the horizontal segment
+ * (between p1/elbow and p2/end), using text-anchor "middle", so it reads
+ * as annotation text sitting on top of the horizontal line — not as a tag
+ * stuck to the line's endpoint.
  */
 function donutLeaderLine(
   cx: number,
@@ -108,12 +110,15 @@ function donutLeaderLine(
   const elbow = polarPoint(cx, cy, elbowRadius, mid);
   const radians = (mid - 90) * Math.PI / 180;
   const onRight = Math.cos(radians) >= 0;
-  const labelX = onRight ? cx + labelDistance : cx - labelDistance;
+  const endX = onRight ? cx + labelDistance : cx - labelDistance;
+  // p1 = elbow, p2 = (endX, elbow.y). Label anchor = midpoint of p1→p2,
+  // so the project name sits centered above the horizontal segment itself.
+  const midX = (elbow.x + endX) / 2;
   return {
-    path: `M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${labelX} ${elbow.y}`,
-    labelX,
+    path: `M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${endX} ${elbow.y}`,
+    labelX: midX,
     labelY: elbow.y,
-    textAnchor: onRight ? "start" : "end",
+    textAnchor: "middle",
   };
 }
 
@@ -2272,7 +2277,7 @@ export default function PlanningView(props: {
                                 <path className="df-metrics-donut-leader" d={leader.path} />
                                 <text
                                   className="df-metrics-donut-label"
-                                  x={leader.labelX + (leader.textAnchor === "start" ? 2 : -2)}
+                                  x={leader.labelX}
                                   y={leader.labelY - 2}
                                   textAnchor={leader.textAnchor}
                                   dominantBaseline="alphabetic"
