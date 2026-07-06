@@ -2555,6 +2555,35 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   line-height: 1.25;
 }
 
+.df-app .df-planning .df-metrics-donut-center-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-bottom: 6px;
+  color: var(--muted, var(--paper-muted));
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.df-app .df-planning .df-metrics-donut-center-label i {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-active, var(--accent));
+}
+
+.df-app .df-planning .df-metrics-donut-center-label span {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+  color: inherit;
+}
+
 .df-app .df-planning .df-metrics-ranked-list,
 .df-app .df-planning .df-metrics-task-list {
   display: grid;

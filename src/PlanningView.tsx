@@ -2231,8 +2231,21 @@ export default function PlanningView(props: {
                           })}
                         </svg>
                         <div className="df-metrics-donut-center">
-                          <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
-                          <span>{metricsResult.range.label}</span>
+                          {activeDonutGroup ? (
+                            <>
+                              <div className="df-metrics-donut-center-label">
+                                <i style={{ background: activeDonutGroup.color }} />
+                                <span>{activeDonutGroup.label}</span>
+                              </div>
+                              <strong>{formatMinutesZh(activeDonutGroup.durationMinutes)}</strong>
+                              <span>{Math.round(activeDonutGroup.percentage)}% · {activeDonutGroup.taskCount}{props.lang === "zh" ? "项" : " tasks"}</span>
+                            </>
+                          ) : (
+                            <>
+                              <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
+                              <span>{metricsResult.range.label}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </section>
@@ -2242,13 +2255,6 @@ export default function PlanningView(props: {
                       <div><span>{props.lang === "zh" ? "任务数量" : "Tasks"}</span><strong>{metricsResult.summary.taskCount}</strong></div>
                       <div><span>{props.lang === "zh" ? "完成率" : "Done"}</span><strong>{Math.round(metricsResult.summary.completionRate * 100)}%</strong></div>
                       <div><span>{props.lang === "zh" ? "最高投入" : "Top focus"}</span><strong>{metricsResult.summary.topGroup?.label || "-"}</strong></div>
-                      {activeDonutGroup && (
-                        <div className="df-metrics-summary-focus">
-                          <span>{props.lang === "zh" ? "当前项目" : "Current"}</span>
-                          <strong>{activeDonutGroup.label}</strong>
-                          <em>{formatMinutesZh(activeDonutGroup.durationMinutes)} · {Math.round(activeDonutGroup.percentage)}%</em>
-                        </div>
-                      )}
                     </aside>
                   </div>
                 </>
