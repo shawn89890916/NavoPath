@@ -75,6 +75,46 @@ function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadi
   ].join(" ");
 }
 
+interface DonutLeaderLine {
+  /** SVG path for the polyline from segment edge to label anchor. */
+  path: string;
+  /** Anchor x for the label text (start of text). */
+  labelX: number;
+  /** Anchor y for the label text. */
+  labelY: number;
+  /** "start" for right-side labels (text-anchor start), "end" for left-side. */
+  textAnchor: "start" | "end";
+}
+
+/**
+ * Build a two-segment leader line from the outer edge of a donut segment to
+ * a horizontal label anchor. The line starts at `outerRadius`, extends to
+ * `elbowRadius` along the mid-angle, then bends horizontally outward to the
+ * label x. Labels on the right half use text-anchor "start", left half "end".
+ */
+function donutLeaderLine(
+  cx: number,
+  cy: number,
+  outerRadius: number,
+  elbowRadius: number,
+  startAngle: number,
+  endAngle: number,
+  labelDistance: number,
+): DonutLeaderLine {
+  const mid = (startAngle + endAngle) / 2;
+  const start = polarPoint(cx, cy, outerRadius, mid);
+  const elbow = polarPoint(cx, cy, elbowRadius, mid);
+  const radians = (mid - 90) * Math.PI / 180;
+  const onRight = Math.cos(radians) >= 0;
+  const labelX = onRight ? cx + labelDistance : cx - labelDistance;
+  return {
+    path: `M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${labelX} ${elbow.y}`,
+    labelX,
+    labelY: elbow.y,
+    textAnchor: onRight ? "start" : "end",
+  };
+}
+
 function formatMinutesZh(minutes: number) {
   const safe = Math.max(0, Math.round(minutes || 0));
   const hours = Math.floor(safe / 60);
@@ -2207,45 +2247,49 @@ export default function PlanningView(props: {
                         <span>{metricsResult.range.label}</span>
                       </div>
                       <div className="df-metrics-donut-wrap" onMouseLeave={() => setHoveredMetricGroupId(null)}>
-                        <svg className="df-metrics-donut" viewBox="0 0 240 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
+                        <svg className="df-metrics-donut" viewBox="-130 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
                           <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
                           {donutSegments.map(({ group, startAngle, endAngle }) => {
                             const isActive = activeDonutGroup?.id === group.id;
+                            const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 108, startAngle, endAngle, 170);
                             return (
-                              <path
-                                key={group.id}
-                                className={`df-metrics-donut-segment${isActive ? " active" : ""}`}
-                                d={donutSegmentPath(120, 120, isActive ? 94 : 88, 50, startAngle, endAngle)}
-                                fill={alphaColor(group.color, 0.58)}
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
-                                onMouseEnter={() => setHoveredMetricGroupId(group.id)}
-                                onFocus={() => setHoveredMetricGroupId(group.id)}
-                                onBlur={() => setHoveredMetricGroupId(null)}
-                                onClick={() => setHoveredMetricGroupId(group.id)}
-                              >
-                                <title>{`${group.label}: ${formatMinutesZh(group.durationMinutes)} · ${Math.round(group.percentage)}%`}</title>
-                              </path>
+                              <g key={group.id} className={`df-metrics-donut-group${isActive ? " active" : ""}`}>
+                                <path
+                                  className="df-metrics-donut-segment"
+                                  d={donutSegmentPath(120, 120, isActive ? 94 : 88, 50, startAngle, endAngle)}
+                                  fill={alphaColor(group.color, 0.58)}
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
+                                  onMouseEnter={() => setHoveredMetricGroupId(group.id)}
+                                  onFocus={() => setHoveredMetricGroupId(group.id)}
+                                  onBlur={() => setHoveredMetricGroupId(null)}
+                                  onClick={() => setHoveredMetricGroupId(group.id)}
+                                >
+                                  <title>{`${group.label}: ${formatMinutesZh(group.durationMinutes)} · ${Math.round(group.percentage)}%`}</title>
+                                </path>
+                                <path className="df-metrics-donut-leader" d={leader.path} />
+                                <text
+                                  className="df-metrics-donut-label"
+                                  x={leader.labelX + (leader.textAnchor === "start" ? 4 : -4)}
+                                  y={leader.labelY}
+                                  textAnchor={leader.textAnchor}
+                                  dominantBaseline="middle"
+                                >{group.label}</text>
+                                <text
+                                  className="df-metrics-donut-label-meta"
+                                  x={leader.labelX + (leader.textAnchor === "start" ? 4 : -4)}
+                                  y={leader.labelY + 13}
+                                  textAnchor={leader.textAnchor}
+                                  dominantBaseline="middle"
+                                >{Math.round(group.percentage)}% · {formatMinutesZh(group.durationMinutes)}</text>
+                              </g>
                             );
                           })}
                         </svg>
                         <div className="df-metrics-donut-center">
-                          {activeDonutGroup ? (
-                            <>
-                              <div className="df-metrics-donut-center-label">
-                                <i style={{ background: activeDonutGroup.color }} />
-                                <span>{activeDonutGroup.label}</span>
-                              </div>
-                              <strong>{formatMinutesZh(activeDonutGroup.durationMinutes)}</strong>
-                              <span>{Math.round(activeDonutGroup.percentage)}% · {activeDonutGroup.taskCount}{props.lang === "zh" ? "项" : " tasks"}</span>
-                            </>
-                          ) : (
-                            <>
-                              <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
-                              <span>{metricsResult.range.label}</span>
-                            </>
-                          )}
+                          <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
+                          <span>{metricsResult.range.label}</span>
                         </div>
                       </div>
                     </section>
