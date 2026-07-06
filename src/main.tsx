@@ -7403,11 +7403,17 @@ function App() {
                                 })()}
                                 {/* Now line — only in today's column in multi-day view */}
                                 {(() => {
+                                  // Render the now-line whenever today is inside the visible
+                                  // date range, regardless of whether infinite cross-day
+                                  // scrolling is enabled. In continuous mode the range is the
+                                  // 7-day vertical canvas; in non-continuous mode it is the
+                                  // 3-day/week window derived from `threeDates`.
+                                  if (!continuousTimelineDates.includes(today) || multiColWidth <= 0) return null;
                                   const todayOffset = continuousDateOffset(today);
                                   const todayIdx = continuousTimelineEnabled ? ((todayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(today);
-                                  if (todayIdx === -1 || multiColWidth <= 0) return null;
+                                  if (todayIdx === -1) return null;
                                   const now = new Date();
-                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth, top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} lang={lang} />;
+                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth, top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} lang={lang} dayStartHour={dayStartHour} />;
                                 })()}
                                 {/* Empty state */}
                                 {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
@@ -7791,6 +7797,12 @@ function App() {
                           const label = dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour });
                           return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{label}</span></div>;
                         })}
+                        {/* Now line — renders whenever today is inside the visible date range.
+                            In non-continuous daily mode the range is [timelineDate], so this
+                            evaluates to true only when viewing today. In continuous mode the
+                            range is the 7-day vertical canvas. Position uses `dayStartHour`
+                            in non-continuous mode (via NowLine's internal timeBlockTop) and
+                            the continuous absolute coordinate in continuous mode. */}
                         {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
                         {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
                         {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
