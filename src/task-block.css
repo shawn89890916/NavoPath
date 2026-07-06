@@ -2492,7 +2492,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   width: min(520px, 64vw);
   aspect-ratio: 380 / 240;
   overflow: visible;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 #root .df-app .df-planning .df-metrics-donut {
@@ -2503,19 +2503,37 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   fill: none;
   stroke: color-mix(in srgb, var(--paper-rule, var(--line)) 72%, transparent);
   stroke-width: 38;
+  pointer-events: none;
 }
 
+/* Hit layer: transparent pie sectors (innerRadius = 0) that cover the full
+   angular range of each segment, including the center hole. These receive
+   all pointer events so hovering near the center activates the correct
+   project by angle. */
+.df-app .df-planning .df-metrics-donut-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: pointer;
+  outline: none;
+  pointer-events: all;
+}
+
+.df-app .df-planning .df-metrics-donut-hit:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--accent-active, var(--accent)) 62%, transparent);
+  outline-offset: -1px;
+}
+
+/* Visual layer: the actual donut arcs. pointer-events disabled so all
+   hover/click passes through to the hit layer below. */
 .df-app .df-planning .df-metrics-donut-segment {
   cursor: pointer;
   outline: none;
-  pointer-events: visiblePainted;
+  pointer-events: none;
   stroke: var(--paper, var(--paper-bg));
   stroke-width: 1.5;
   transition: d 160ms ease, fill 160ms ease, filter 160ms ease;
 }
 
-.df-app .df-planning .df-metrics-donut-segment:hover,
-.df-app .df-planning .df-metrics-donut-segment:focus-visible,
 .df-app .df-planning .df-metrics-donut-segment.active {
   filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--paper-ink, var(--ink)) 16%, transparent));
 }

@@ -75,6 +75,27 @@ function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadi
   ].join(" ");
 }
 
+/**
+ * Build a full pie-sector path (slice from center, innerRadius = 0) used as
+ * the transparent hit area for a donut segment. Because the slice reaches
+ * all the way to the center, the pointer can hover anywhere within the
+ * segment's angular range — including the center hole — and still activate
+ * the correct project by angle. The visual donut arc is drawn separately on
+ * top with pointer-events disabled.
+ */
+function pieSectorPath(cx: number, cy: number, outerRadius: number, startAngle: number, endAngle: number) {
+  const safeEndAngle = Math.min(endAngle, startAngle + 359.99);
+  const outerStart = polarPoint(cx, cy, outerRadius, startAngle);
+  const outerEnd = polarPoint(cx, cy, outerRadius, safeEndAngle);
+  const largeArc = safeEndAngle - startAngle > 180 ? 1 : 0;
+  return [
+    `M ${cx} ${cy}`,
+    `L ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+    "Z",
+  ].join(" ");
+}
+
 interface DonutLeaderLine {
   /** SVG path for the polyline from segment edge to label anchor. */
   path: string;
@@ -2258,35 +2279,64 @@ export default function PlanningView(props: {
                       <div className="df-metrics-donut-wrap">
                         <svg className="df-metrics-donut" viewBox="-70 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
                           <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
-                          {donutSegments.map(({ group, startAngle, endAngle }) => {
-                            const isActive = activeDonutGroup?.id === group.id;
-                            const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 148, startAngle, endAngle, 158);
-                            return (
-                              <g key={group.id} className={`df-metrics-donut-group${isActive ? " active" : ""}`}>
+                          {/* Hit layer: transparent pie sectors (innerRadius=0) so the
+                              pointer can hover anywhere within a segment's angular
+                              range — including the center hole — and activate the
+                              correct project by angle. */}
+                          <g className="df-metrics-donut-hit-layer">
+                            {donutSegments.map(({ group, startAngle, endAngle }) => (
+                              <path
+                                key={`hit-${group.id}`}
+                                className="df-metrics-donut-hit"
+                                d={pieSectorPath(120, 120, 96, startAngle, endAngle)}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
+                                onMouseEnter={() => setHoveredMetricGroupId(group.id)}
+                                onMouseMove={() => setHoveredMetricGroupId(group.id)}
+                                onMouseLeave={() => setHoveredMetricGroupId(null)}
+                                onFocus={() => setHoveredMetricGroupId(group.id)}
+                                onBlur={() => setHoveredMetricGroupId(null)}
+                                onClick={() => setHoveredMetricGroupId(group.id)}
+                              />
+                            ))}
+                          </g>
+                          {/* Visual layer: actual donut arcs. pointer-events disabled
+                              so all hover/click goes through to the hit layer below. */}
+                          <g className="df-metrics-donut-visual-layer">
+                            {donutSegments.map(({ group, startAngle, endAngle }) => {
+                              const isActive = activeDonutGroup?.id === group.id;
+                              return (
                                 <path
-                                  className="df-metrics-donut-segment"
+                                  key={`arc-${group.id}`}
+                                  className={`df-metrics-donut-segment${isActive ? " active" : ""}`}
                                   d={donutSegmentPath(120, 120, isActive ? 94 : 88, 50, startAngle, endAngle)}
                                   fill={alphaColor(group.color, 0.58)}
-                                  role="button"
-                                  tabIndex={0}
-                                  aria-label={`${group.label}: ${formatMinutesZh(group.durationMinutes)}, ${Math.round(group.percentage)}%`}
-                                  onMouseEnter={() => setHoveredMetricGroupId(group.id)}
-                                  onMouseLeave={() => setHoveredMetricGroupId(null)}
-                                  onFocus={() => setHoveredMetricGroupId(group.id)}
-                                  onBlur={() => setHoveredMetricGroupId(null)}
-                                  onClick={() => setHoveredMetricGroupId(group.id)}
+                                  aria-hidden="true"
                                 />
-                                <path className="df-metrics-donut-leader" d={leader.path} />
-                                <text
-                                  className="df-metrics-donut-label"
-                                  x={leader.labelX}
-                                  y={leader.labelY}
-                                  textAnchor={leader.textAnchor}
-                                  dominantBaseline="alphabetic"
-                                >{group.label}</text>
-                              </g>
-                            );
-                          })}
+                              );
+                            })}
+                          </g>
+                          {/* Label layer: leader lines + project names. pointer-events
+                              none so they never interfere with the hit sectors. */}
+                          <g className="df-metrics-donut-label-layer">
+                            {donutSegments.map(({ group, startAngle, endAngle }) => {
+                              const isActive = activeDonutGroup?.id === group.id;
+                              const leader = donutLeaderLine(120, 120, isActive ? 96 : 90, 148, startAngle, endAngle, 158);
+                              return (
+                                <g key={`label-${group.id}`}>
+                                  <path className="df-metrics-donut-leader" d={leader.path} />
+                                  <text
+                                    className="df-metrics-donut-label"
+                                    x={leader.labelX}
+                                    y={leader.labelY}
+                                    textAnchor={leader.textAnchor}
+                                    dominantBaseline="alphabetic"
+                                  >{group.label}</text>
+                                </g>
+                              );
+                            })}
+                          </g>
                         </svg>
                         <div className="df-metrics-donut-center">
                           {activeDonutGroup ? (
