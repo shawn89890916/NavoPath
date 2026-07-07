@@ -21,5 +21,24 @@ contextBridge.exposeInMainWorld("desktopApi", {
   readExternalPluginEntry: (pluginId) => ipcRenderer.invoke("plugins:readExternalEntry", pluginId),
   writeSnapshot: (payload) => ipcRenderer.invoke("backup:writeSnapshot", payload),
   readLatestSnapshot: () => ipcRenderer.invoke("backup:readLatest"),
+  widget: {
+    open: () => ipcRenderer.invoke("widget:open"),
+    close: () => ipcRenderer.invoke("widget:close"),
+    setAlwaysOnTop: (enabled) => ipcRenderer.invoke("widget:set-always-on-top", Boolean(enabled)),
+    setPosition: (x, y) => ipcRenderer.invoke("widget:set-position", Number(x), Number(y)),
+    getPosition: () => ipcRenderer.invoke("widget:get-position"),
+    sendAction: (action) => ipcRenderer.send("widget:action", action),
+    onSnapshot: (listener) => {
+      const handler = (_event, snapshot) => listener(snapshot);
+      ipcRenderer.on("widget:snapshot", handler);
+      return () => ipcRenderer.removeListener("widget:snapshot", handler);
+    },
+    onAction: (listener) => {
+      const handler = (_event, action) => listener(action);
+      ipcRenderer.on("widget:action", handler);
+      return () => ipcRenderer.removeListener("widget:action", handler);
+    },
+    pushSnapshot: (snapshot) => ipcRenderer.send("widget:push-snapshot", snapshot),
+  },
   isDesktop: () => true
 });

@@ -292,7 +292,7 @@ export interface Settings {
   continuousCrossDayScroll?: boolean;
   language: Language;
   planningView: "tree" | "matrix" | "split";
-  metricsRangePreset?: "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "custom";
+  metricsRangePreset?: "all" | "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "custom";
   metricsGroupBy?: "project" | "customCategory" | "tag" | "importance" | "urgency" | "completion" | "taskType";
   metricsDisplayMetric?: "percentage" | "duration" | "taskCount" | "completionRate";
   metricsIncludeHabits?: "include" | "exclude" | "only";
@@ -350,6 +350,12 @@ export interface Settings {
   featureQuadrantViewEnabled?: boolean;
   featureListViewEnabled?: boolean;
   featureHabitsEnabled?: boolean;
+  /** 桌面置顶小组件开关（仅 Electron 桌面端生效）。 */
+  featureWidgetEnabled?: boolean;
+  /** 小组件始终置顶。 */
+  widgetAlwaysOnTop?: boolean;
+  /** 启动时自动打开小组件。 */
+  widgetOpenOnLaunch?: boolean;
   /** 最近一次成功同步时间（ISO 字符串）。 */
   lastSyncedAt?: string;
   /** 已启用（已安装并激活）的插件 ID 列表。 */
@@ -508,6 +514,36 @@ export interface NavoPathPluginRuntime {
   };
 }
 
+/** 桌面小组件状态快照——由主窗口构建并推送到小组件窗口。 */
+export interface WidgetSnapshot {
+  /** 当前正在做/计时的任务（无则字段为空）。 */
+  taskId?: string;
+  taskTitle: string;
+  taskProjectColor?: string;
+  /** 计时累计秒数。 */
+  elapsedSeconds: number;
+  /** 计时是否运行中。 */
+  timerRunning: boolean;
+  /** 今日候选数量。 */
+  candidateCount: number;
+  /** 语言。 */
+  lang: "zh" | "en";
+  /** 小组件设置镜像。 */
+  alwaysOnTop: boolean;
+}
+
+/** 小组件发往主窗口的动作请求。 */
+export type WidgetAction =
+  | { type: "requestSnapshot" }
+  | { type: "quickAdd"; title: string }
+  | { type: "timerStart"; taskId?: string }
+  | { type: "timerPause" }
+  | { type: "timerResume" }
+  | { type: "timerStop" }
+  | { type: "complete"; taskId?: string }
+  | { type: "setAlwaysOnTop"; enabled: boolean }
+  | { type: "resetPosition" };
+
 declare global {
   interface Window {
     plannerApi: PlannerApi;
@@ -528,6 +564,21 @@ declare global {
       readExternalPluginEntry?: (pluginId: string) => Promise<{ id: string; code: string; path: string; missing: boolean }>;
       writeSnapshot?: (payload: { data?: PlannerData | null; settings?: Partial<Settings> | null; authUser?: { id?: string; email?: string } | null }) => Promise<{ ok: boolean; path?: string; stampedPath?: string; error?: string }>;
       readLatestSnapshot?: () => Promise<{ ok: boolean; payload?: { exportedAt?: string; appVersion?: string; data?: PlannerData | null; settings?: Settings | null; authUser?: { id?: string; email?: string } | null }; reason?: string; error?: string }>;
+      widget?: {
+        open: () => Promise<boolean>;
+        close: () => Promise<boolean>;
+        setAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
+        setPosition: (x: number, y: number) => Promise<boolean>;
+        getPosition: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
+        /** Widget side: fire an action request to the main window (fire-and-forget). */
+        sendAction: (action: WidgetAction) => void;
+        /** Widget side: listen for snapshot pushes from the main window. */
+        onSnapshot: (listener: (snapshot: WidgetSnapshot) => void) => () => void;
+        /** Main side: listen for action requests relayed from the widget. */
+        onAction: (listener: (action: WidgetAction) => void) => () => void;
+        /** Main side: push a snapshot to the widget window. */
+        pushSnapshot: (snapshot: WidgetSnapshot) => void;
+      };
       isDesktop: () => boolean;
     };
     navopath?: NavoPathPluginRuntime;

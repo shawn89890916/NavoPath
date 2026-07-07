@@ -1,8 +1,8 @@
-import type { PlannerData, Project, Task, TimelineRecord } from "../types";
+import type { PlannerData, Project, Task, TaskRecurrence, TimelineRecord } from "../types";
 import { normalizeWorkflowStatus } from "../utils/productivityModel";
 import { normalizeTimelineRecord, recordEndDateTime, recordStartDateTime } from "../utils/timelineRecords";
 
-export type MetricRangePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "custom";
+export type MetricRangePreset = "all" | "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "custom";
 export type MetricGroupBy = "project" | "customCategory" | "tag" | "importance" | "urgency" | "completion" | "taskType";
 export type MetricHabitMode = "include" | "exclude" | "only";
 export type MetricCompletionFilter = "all" | "completed" | "incomplete";
@@ -72,7 +72,21 @@ export type TimeAllocationMetrics = {
   };
 };
 
+type MetricDebugRow = {
+  id: string;
+  title: string;
+  projectId?: string | null;
+  scheduledStart: string;
+  scheduledEnd: string;
+  durationMinutes: number;
+  completed: boolean;
+  isHabit: boolean;
+  included: boolean;
+  excludeReason: string;
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+const RECURRENCE_RECORD_PREFIX = "metric-recurring";
 export const UNASSIGNED_GROUP_ID = "__unassigned__";
 export const UNASSIGNED_LABEL = "未归属";
 export const UNASSIGNED_COLOR = "#8D877D";
@@ -95,6 +109,40 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
+function addIsoDays(iso: string, days: number) {
+  return isoDate(addDays(localDateTime(iso, 0), days));
+}
+
+function addIsoMonths(iso: string, months: number) {
+  const date = localDateTime(iso, 0);
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + months);
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, last));
+  return isoDate(date);
+}
+
+function isWeekdayIso(iso: string) {
+  const day = localDateTime(iso, 0).getDay();
+  return day >= 1 && day <= 5;
+}
+
+function isWeekendIso(iso: string) {
+  const day = localDateTime(iso, 0).getDay();
+  return day === 0 || day === 6;
+}
+
+function timeToMinutes(value = "00:00") {
+  const [hours, minutes] = value.split(":").map(Number);
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function minutesToTime(minutes: number) {
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+  return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
+}
+
 function startOfMonth(anchor: Date, dayStartMinutes: number) {
   return localDateTime(`${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-01`, dayStartMinutes);
 }
@@ -104,6 +152,54 @@ function startOfMetricWeek(anchor: Date, dayStartMinutes: number) {
   const day = date.getDay();
   const mondayOffset = day === 0 ? -6 : 1 - day;
   return addDays(date, mondayOffset);
+}
+
+function enumerateRecurrenceDates(recurrence: TaskRecurrence, visibleDates: Set<string>) {
+  if (!recurrence.startDate || visibleDates.size === 0) return [];
+  const sortedVisibleDates = [...visibleDates].sort();
+  const minDate = sortedVisibleDates[0];
+  const maxDate = sortedVisibleDates[sortedVisibleDates.length - 1];
+  const results: string[] = [];
+  let cursor = recurrence.startDate;
+  let occurrenceCount = 0;
+  const isVisibleMatch = (date: string) => date >= minDate && date <= maxDate && visibleDates.has(date);
+  const advanceCursor = (date: string) => {
+    switch (recurrence.frequency) {
+      case "weekly":
+        return addIsoDays(date, 7);
+      case "biweekly":
+        return addIsoDays(date, 14);
+      case "monthly":
+        return addIsoMonths(date, 1);
+      case "quarterly":
+        return addIsoMonths(date, 3);
+      default:
+        return addIsoDays(date, 1);
+    }
+  };
+  const matchesCursor = (date: string) => {
+    switch (recurrence.frequency) {
+      case "weekdays":
+        return isWeekdayIso(date);
+      case "weekends":
+        return isWeekendIso(date);
+      default:
+        return true;
+    }
+  };
+
+  while (cursor <= maxDate) {
+    if (recurrence.endDate && cursor > recurrence.endDate) break;
+    if (matchesCursor(cursor)) {
+      occurrenceCount += 1;
+      if (!recurrence.count || occurrenceCount <= recurrence.count) {
+        if (isVisibleMatch(cursor)) results.push(cursor);
+      }
+      if (recurrence.count && occurrenceCount >= recurrence.count) break;
+    }
+    cursor = advanceCursor(cursor);
+  }
+  return results;
 }
 
 export function parseDayStartMinutes(value: string | undefined): number {
@@ -118,6 +214,14 @@ export function getMetricRange(input: MetricRangeInput & { dayStartMinutes?: num
   const todayStart = localDateTime(isoDate(anchor), dayStartMinutes);
   if (anchor < todayStart) todayStart.setDate(todayStart.getDate() - 1);
 
+  if (input.preset === "all") {
+    return {
+      preset: input.preset,
+      start: localDateTime("2000-01-01", dayStartMinutes),
+      end: localDateTime("2100-01-01", dayStartMinutes),
+      label: "全部",
+    };
+  }
   if (input.preset === "yesterday") {
     const start = addDays(todayStart, -1);
     return { preset: input.preset, start, end: todayStart, label: "昨天" };
@@ -149,6 +253,16 @@ function minutesBetween(start: Date, end: Date) {
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
 }
 
+function metricDatesInRange(range: MetricDateRange) {
+  const dates = new Set<string>();
+  let cursor = new Date(range.start);
+  while (cursor < range.end) {
+    dates.add(isoDate(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return dates;
+}
+
 function clampInterval(start: Date, end: Date, range: MetricDateRange) {
   const clampedStart = new Date(Math.max(start.getTime(), range.start.getTime()));
   const clampedEnd = new Date(Math.min(end.getTime(), range.end.getTime()));
@@ -169,14 +283,31 @@ function isCompletedEntry(data: PlannerData, task: Task, record: TimelineRecord,
     const state = (data.habitDailyStates || []).find((item) => item.timelineRecordId === record.id);
     if (state) return Boolean(state.completed);
   }
-  return Boolean(task.completed || normalizeWorkflowStatus(task) === "done");
+  return Boolean(record.executionStatus === "completed" || task.completed || normalizeWorkflowStatus(task) === "done");
 }
 
-function taskRecords(task: Task): TimelineRecord[] {
-  const records = (task.timelineRecords || []).filter((record) => record.executionStatus === "scheduled");
-  if (records.length > 0) return records;
+function isRecurringScheduledTask(task: Task) {
+  return Boolean(
+    task.recurrence &&
+    task.recurrence.frequency !== "none" &&
+    task.recurrence.mode === "scheduled" &&
+    task.recurrence.startDate &&
+    task.recurrence.startTime &&
+    task.recurrence.durationMinutes
+  );
+}
+
+function endForStartAndDuration(date: string, startTime: string, durationMinutes: number) {
+  const start = localDateTime(date, timeToMinutes(startTime));
+  const end = new Date(start.getTime() + Math.max(1, durationMinutes) * 60000);
+  return { endDate: isoDate(end), endTime: minutesToTime(timeToMinutes(startTime) + durationMinutes) };
+}
+
+function taskRecords(task: Task, range: MetricDateRange): TimelineRecord[] {
+  const records = (task.timelineRecords || []).filter((record) => record.executionStatus !== "cancelled");
+  const allRecords = [...records];
   if (task.scheduledDate && task.scheduledStart && task.scheduledEnd) {
-    return [{
+    allRecords.push({
       id: `legacy-${task.id}`,
       taskId: task.id,
       scheduledDate: task.scheduledDate,
@@ -185,9 +316,33 @@ function taskRecords(task: Task): TimelineRecord[] {
       scheduledEnd: task.scheduledEnd,
       executionStatus: "scheduled",
       createdAt: task.createdAt,
-    }];
+    });
   }
-  return [];
+  if (isRecurringScheduledTask(task) && task.recurrence?.startTime && task.recurrence.durationMinutes) {
+    if (range.preset === "all" && !task.recurrence.endDate && !task.recurrence.count) return allRecords;
+    const metricDates = metricDatesInRange(range);
+    const blockedDates = new Set(
+      (task.timelineRecords || [])
+        .filter((record) => metricDates.has(record.scheduledDate))
+        .map((record) => record.scheduledDate)
+    );
+    if (task.scheduledDate && metricDates.has(task.scheduledDate)) blockedDates.add(task.scheduledDate);
+    for (const date of enumerateRecurrenceDates(task.recurrence, metricDates)) {
+      if (blockedDates.has(date)) continue;
+      const { endDate, endTime } = endForStartAndDuration(date, task.recurrence.startTime, task.recurrence.durationMinutes);
+      allRecords.push({
+        id: `${RECURRENCE_RECORD_PREFIX}-${task.id}-${date}-${task.recurrence.startTime.replace(":", "")}`,
+        taskId: task.id,
+        scheduledDate: date,
+        scheduledStart: task.recurrence.startTime,
+        scheduledEndDate: endDate,
+        scheduledEnd: endTime,
+        executionStatus: "scheduled",
+        createdAt: task.createdAt,
+      });
+    }
+  }
+  return allRecords;
 }
 
 function splitByMetricDay(entry: MetricTaskEntry, dayStartMinutes: number): MetricTaskEntry[] {
@@ -259,24 +414,40 @@ export function buildTimeAllocationMetrics(options: {
   const projects = options.data.projects || [];
   const projectFilter = new Set(options.projectIds || []);
   const splitEntries: MetricTaskEntry[] = [];
+  const debugRows: MetricDebugRow[] = [];
 
   for (const task of options.data.tasks || []) {
     const project = projectForTask(projects, task);
-    if (projectFilter.size > 0 && !projectFilter.has(task.projectId || UNASSIGNED_GROUP_ID)) continue;
-    for (const rawRecord of taskRecords(task)) {
+    const projectBlocked = projectFilter.size > 0 && !projectFilter.has(task.projectId || UNASSIGNED_GROUP_ID);
+    for (const rawRecord of taskRecords(task, range)) {
       const record = normalizeTimelineRecord(rawRecord);
       const start = recordStartDateTime(record);
       const end = recordEndDateTime(record);
       const clamped = clampInterval(start, end, range);
-      if (!clamped) continue;
       const habit = isHabitEntry(options.data, task, record);
-      if (habitMode === "exclude" && habit) continue;
-      if (habitMode === "only" && !habit) continue;
       const completed = isCompletedEntry(options.data, task, record, habit);
-      if (completion === "completed" && !completed) continue;
-      if (completion === "incomplete" && completed) continue;
-      const durationMinutes = minutesBetween(clamped.start, clamped.end);
-      if (durationMinutes <= 0) continue;
+      let excludeReason = "";
+      if (projectBlocked) excludeReason = "project-filter";
+      else if (!clamped) excludeReason = "outside-range";
+      else if (habitMode === "exclude" && habit) excludeReason = "habit-excluded";
+      else if (habitMode === "only" && !habit) excludeReason = "not-habit";
+      else if (completion === "completed" && !completed) excludeReason = "not-completed";
+      else if (completion === "incomplete" && completed) excludeReason = "completed";
+      const durationMinutes = clamped ? minutesBetween(clamped.start, clamped.end) : 0;
+      if (!excludeReason && durationMinutes <= 0) excludeReason = "invalid-duration";
+      debugRows.push({
+        id: record.id,
+        title: task.title,
+        projectId: task.projectId || null,
+        scheduledStart: clamped ? clamped.start.toISOString() : start.toISOString(),
+        scheduledEnd: clamped ? clamped.end.toISOString() : end.toISOString(),
+        durationMinutes,
+        completed,
+        isHabit: habit,
+        included: !excludeReason,
+        excludeReason,
+      });
+      if (excludeReason || !clamped) continue;
       const entry: MetricTaskEntry = {
         taskId: task.id,
         recordId: record.id,
@@ -292,6 +463,10 @@ export function buildTimeAllocationMetrics(options: {
       };
       splitEntries.push(...splitByMetricDay(entry, dayStartMinutes));
     }
+  }
+
+  if (import.meta.env.DEV && debugRows.length > 0) {
+    console.table(debugRows);
   }
 
   const plannedMinutes = splitEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
@@ -352,7 +527,7 @@ export function buildTimeAllocationMetrics(options: {
     });
   const uniqueTaskIds = new Set(splitEntries.map((entry) => entry.taskId));
   const completedTaskIds = new Set(splitEntries.filter((entry) => entry.completed).map((entry) => entry.taskId));
-  const rangeMinutes = minutesBetween(range.start, range.end);
+  const rangeMinutes = range.preset === "all" ? 0 : minutesBetween(range.start, range.end);
   const occupiedMinutes = mergeScheduledIntervals(splitEntries);
 
   return {

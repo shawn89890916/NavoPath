@@ -117,6 +117,27 @@ describe("time allocation metrics", () => {
     expect(result.summary.completedTaskCount).toBe(1);
   });
 
+  it("counts explicit timeline records across dates when range is all", () => {
+    const task: Task = {
+      ...baseTask,
+      timelineRecords: [
+        { id: "record-early", taskId: "task-1", scheduledDate: "2026-05-01", scheduledStart: "09:00", scheduledEndDate: "2026-05-01", scheduledEnd: "10:00", executionStatus: "completed", createdAt: "now" },
+        { id: "record-late", taskId: "task-1", scheduledDate: "2026-07-06", scheduledStart: "14:00", scheduledEndDate: "2026-07-06", scheduledEnd: "15:30", executionStatus: "scheduled", createdAt: "now" },
+      ],
+    };
+
+    const result = buildTimeAllocationMetrics({
+      data: { ...baseData, tasks: [task] },
+      range: { preset: "all", anchorDate: "2026-07-06" },
+      dayStartMinutes: 0,
+    });
+
+    expect(result.range.label).toBe("全部");
+    expect(result.summary.plannedMinutes).toBe(150);
+    expect(result.summary.unplannedMinutes).toBe(0);
+    expect(result.heatmapBuckets.map((bucket) => bucket.date)).toEqual(["2026-05-01", "2026-07-06"]);
+  });
+
   it("includes habits by default and can filter them out", () => {
     const habitTask: Task = {
       ...baseTask,
@@ -138,5 +159,81 @@ describe("time allocation metrics", () => {
     expect(buildTimeAllocationMetrics({ data, range: { preset: "today", anchorDate: "2026-07-06" }, dayStartMinutes: 0 }).summary.plannedMinutes).toBe(20);
     expect(buildTimeAllocationMetrics({ data, range: { preset: "today", anchorDate: "2026-07-06" }, dayStartMinutes: 0, habitMode: "exclude" }).summary.plannedMinutes).toBe(0);
     expect(buildTimeAllocationMetrics({ data, range: { preset: "today", anchorDate: "2026-07-06" }, dayStartMinutes: 0 }).summary.completedTaskCount).toBe(1);
+  });
+
+  it("counts visible non-cancelled timeline records including completed and returned blocks", () => {
+    const completed: Task = {
+      ...baseTask,
+      id: "task-completed",
+      title: "Completed schedule",
+      completed: true,
+      timelineRecords: [
+        { id: "record-completed", taskId: "task-completed", scheduledDate: "2026-07-06", scheduledStart: "13:00", scheduledEndDate: "2026-07-06", scheduledEnd: "14:00", executionStatus: "completed", createdAt: "now" },
+      ],
+    };
+    const returned: Task = {
+      ...baseTask,
+      id: "task-returned",
+      title: "Returned schedule",
+      completed: false,
+      timelineRecords: [
+        { id: "record-returned", taskId: "task-returned", scheduledDate: "2026-07-06", scheduledStart: "18:00", scheduledEndDate: "2026-07-06", scheduledEnd: "18:45", executionStatus: "returned_unfinished", createdAt: "now" },
+      ],
+    };
+    const cancelled: Task = {
+      ...baseTask,
+      id: "task-cancelled",
+      title: "Cancelled schedule",
+      timelineRecords: [
+        { id: "record-cancelled", taskId: "task-cancelled", scheduledDate: "2026-07-06", scheduledStart: "20:00", scheduledEndDate: "2026-07-06", scheduledEnd: "21:00", executionStatus: "cancelled", createdAt: "now" },
+      ],
+    };
+
+    const result = buildTimeAllocationMetrics({
+      data: { ...baseData, tasks: [completed, returned, cancelled] },
+      range: { preset: "today", anchorDate: "2026-07-06" },
+      dayStartMinutes: 0,
+    });
+
+    expect(result.summary.plannedMinutes).toBe(105);
+    expect(result.summary.taskCount).toBe(2);
+    expect(result.summary.completedTaskCount).toBe(1);
+  });
+
+  it("expands scheduled recurrence occurrences and respects cancellation exceptions", () => {
+    const recurring: Task = {
+      ...baseTask,
+      id: "task-recurring",
+      title: "Daily review",
+      recurrence: {
+        mode: "scheduled",
+        frequency: "daily",
+        startDate: "2026-07-01",
+        startTime: "11:30",
+        durationMinutes: 60,
+      },
+      timelineRecords: [
+        { id: "record-cancelled", taskId: "task-recurring", scheduledDate: "2026-07-07", scheduledStart: "11:30", scheduledEndDate: "2026-07-07", scheduledEnd: "12:30", executionStatus: "cancelled", createdAt: "now" },
+      ],
+    };
+
+    const todayResult = buildTimeAllocationMetrics({
+      data: { ...baseData, tasks: [recurring] },
+      range: { preset: "today", anchorDate: "2026-07-06" },
+      dayStartMinutes: 0,
+    });
+    const cancelledResult = buildTimeAllocationMetrics({
+      data: { ...baseData, tasks: [recurring] },
+      range: { preset: "today", anchorDate: "2026-07-07" },
+      dayStartMinutes: 0,
+    });
+
+    expect(todayResult.summary.plannedMinutes).toBe(60);
+    expect(todayResult.taskEntries[0]).toMatchObject({
+      taskId: "task-recurring",
+      title: "Daily review",
+      durationMinutes: 60,
+    });
+    expect(cancelledResult.summary.plannedMinutes).toBe(0);
   });
 });

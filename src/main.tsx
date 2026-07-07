@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -1551,6 +1551,205 @@ function YearCalendarOverview({
         <button type="button" onClick={() => onYearChange(year + 1)}>{lang === "zh" ? "下一年" : "Next year"}</button>
       </div>
     </section>
+  );
+}
+
+/* ============================================================
+ * Desktop Widget — a compact always-on-top mini panel rendered in
+ * a separate Electron BrowserWindow (loaded with ?widget=1). It is
+ * a pure IPC client: it holds NO task data of its own and never
+ * reads PlannerData. All truth stays in the main window's React
+ * store; the widget sends action requests via desktopApi.widget.
+ * sendAction and receives WidgetSnapshot pushes via onSnapshot.
+ * ============================================================ */
+
+const WIDGET_POSITION_KEY = "navopath-widget-position";
+
+function formatWidgetTimer(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function WidgetApp() {
+  const [snapshot, setSnapshot] = useState<WidgetSnapshot | null>(null);
+  const [localElapsed, setLocalElapsed] = useState(0);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [toast, setToast] = useState("");
+  const [alwaysOnTop, setAlwaysOnTop] = useState(true);
+  const lang = snapshot?.lang || detectSystemLanguage();
+
+  // Subscribe to snapshot pushes from the main window.
+  useEffect(() => {
+    const unsubscribe = window.desktopApi?.widget?.onSnapshot((s) => {
+      setSnapshot(s);
+      setAlwaysOnTop(s.alwaysOnTop);
+      setLocalElapsed(s.elapsedSeconds);
+    });
+    // Request the initial snapshot.
+    window.desktopApi?.widget?.sendAction({ type: "requestSnapshot" });
+    return unsubscribe;
+  }, []);
+
+  // Local 1-second tick for smooth timer display while running.
+  useEffect(() => {
+    if (!snapshot?.timerRunning) return;
+    const id = window.setInterval(() => setLocalElapsed((p) => p + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [snapshot?.timerRunning]);
+
+  // Restore window position from localStorage on mount.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(WIDGET_POSITION_KEY);
+      if (saved) {
+        const pos = JSON.parse(saved);
+        if (typeof pos.x === "number" && typeof pos.y === "number") {
+          void window.desktopApi?.widget?.setPosition(pos.x, pos.y);
+        }
+      }
+    } catch { /* ignore */ }
+    // Debounced save on move/resize via polling getPosition.
+    const interval = window.setInterval(() => {
+      void window.desktopApi?.widget?.getPosition().then((pos) => {
+        if (!pos) return;
+        try { localStorage.setItem(WIDGET_POSITION_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+      });
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const sendAction = useCallback((action: WidgetAction) => {
+    window.desktopApi?.widget?.sendAction(action);
+  }, []);
+
+  const handleQuickAdd = useCallback(() => {
+    const title = quickTitle.trim();
+    if (!title) return;
+    sendAction({ type: "quickAdd", title });
+    setQuickTitle("");
+    setToast(lang === "zh" ? "已添加到今日候选" : "Added to today's candidates");
+    window.setTimeout(() => setToast(""), 2200);
+  }, [quickTitle, sendAction, lang]);
+
+  const handleTimerToggle = useCallback(() => {
+    if (!snapshot) return;
+    if (snapshot.timerRunning) {
+      sendAction({ type: "timerPause" });
+    } else if (snapshot.taskId) {
+      sendAction({ type: "timerResume" });
+    } else if (snapshot.taskId === undefined) {
+      // No task — nothing to start.
+    }
+  }, [snapshot, sendAction]);
+
+  const handleComplete = useCallback(() => {
+    if (!snapshot?.taskId) return;
+    sendAction({ type: "complete", taskId: snapshot.taskId });
+  }, [snapshot, sendAction]);
+
+  const handleStop = useCallback(() => {
+    sendAction({ type: "timerStop" });
+  }, [sendAction]);
+
+  const toggleAlwaysOnTop = useCallback(() => {
+    const next = !alwaysOnTop;
+    setAlwaysOnTop(next);
+    sendAction({ type: "setAlwaysOnTop", enabled: next });
+  }, [alwaysOnTop, sendAction]);
+
+  const resetPosition = useCallback(() => {
+    try { localStorage.removeItem(WIDGET_POSITION_KEY); } catch { /* ignore */ }
+    sendAction({ type: "resetPosition" });
+  }, [sendAction]);
+
+  const closeWidget = useCallback(() => {
+    void window.desktopApi?.widget?.close();
+  }, []);
+
+  const hasTask = Boolean(snapshot?.taskId);
+  const displayElapsed = localElapsed;
+  const zh = lang === "zh";
+
+  return (
+    <div className="df-widget-root" data-lang={lang}>
+      <div className="df-widget-header">
+        <span className="df-widget-brand">NavoPath</span>
+        <button
+          className="df-widget-icon-btn"
+          aria-label={zh ? "更多" : "More"}
+          onClick={() => setMenuOpen((v) => !v)}
+        >⋮</button>
+        <button
+          className="df-widget-icon-btn"
+          aria-label={zh ? "关闭" : "Close"}
+          onClick={closeWidget}
+        >×</button>
+      </div>
+
+      {menuOpen && (
+        <div className="df-widget-menu">
+          <button onClick={toggleAlwaysOnTop}>
+            <span>{zh ? "始终置顶" : "Always on top"}</span>
+            <span className="df-widget-menu-check">{alwaysOnTop ? "✓" : ""}</span>
+          </button>
+          <button onClick={resetPosition}>{zh ? "重置位置" : "Reset position"}</button>
+          <button onClick={closeWidget}>{zh ? "关闭小组件" : "Close widget"}</button>
+        </div>
+      )}
+
+      {/* 正在做 */}
+      <section className="df-widget-section">
+        <h3 className="df-widget-section-title">{zh ? "正在做" : "Working"}</h3>
+        {hasTask ? (
+          <div className="df-widget-current">
+            <div className="df-widget-task-row">
+              {snapshot?.taskProjectColor && (
+                <span className="df-widget-task-dot" style={{ background: snapshot.taskProjectColor }} />
+              )}
+              <span className="df-widget-task-title">{snapshot?.taskTitle}</span>
+            </div>
+            <div className="df-widget-timer-row">
+              <span className="df-widget-timer-display">{formatWidgetTimer(displayElapsed)}</span>
+              <div className="df-widget-timer-actions">
+                <button className="df-widget-btn" onClick={handleTimerToggle}>
+                  {snapshot?.timerRunning ? (zh ? "暂停" : "Pause") : (zh ? "继续" : "Resume")}
+                </button>
+                <button className="df-widget-btn" onClick={handleStop}>{zh ? "保存" : "Save"}</button>
+                <button className="df-widget-btn df-widget-btn-accent" onClick={handleComplete}>{zh ? "完成" : "Done"}</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="df-widget-empty">
+            <p>{zh ? "当前没有正在做的任务" : "No active task"}</p>
+            <small>{zh ? `今日候选 ${snapshot?.candidateCount ?? 0} 项` : `${snapshot?.candidateCount ?? 0} candidates today`}</small>
+          </div>
+        )}
+      </section>
+
+      {/* 快速添加 */}
+      <section className="df-widget-section">
+        <h3 className="df-widget-section-title">{zh ? "快速添加" : "Quick add"}</h3>
+        <form
+          className="df-widget-quick-add"
+          onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }}
+        >
+          <input
+            type="text"
+            className="df-widget-input"
+            placeholder={zh ? "添加任务..." : "Add a task..."}
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+          />
+          <button type="submit" className="df-widget-btn" disabled={!quickTitle.trim()}>{zh ? "添加" : "Add"}</button>
+        </form>
+      </section>
+
+      {toast && <div className="df-widget-toast">{toast}</div>}
+    </div>
   );
 }
 
@@ -3843,6 +4042,125 @@ function App() {
     }
     showToast(t(lang, "toast.addedToCandidates"));
   }
+
+  /** Quick-add entry point used by the desktop widget (title comes from IPC). */
+  function widgetQuickAdd(title: string) {
+    if (!data || !title.trim()) return;
+    const targetDate = today;
+    const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, "");
+    const task = makeTask({
+      ...defaultForm("task"),
+      title,
+      projectId: "",
+      dueDate: targetDate,
+      estimatedHours: estimatedMinutes / 60,
+    });
+    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
+    showToast(t(lang, "toast.addedToCandidates"));
+  }
+
+  /** Build a WidgetSnapshot from the current live React state. */
+  function buildWidgetSnapshot(): WidgetSnapshot {
+    const task = timerTask || headerTask;
+    const project = task?.projectId ? projects.find((p) => String(p.id) === String(task.projectId)) || null : null;
+    return {
+      taskId: task?.id,
+      taskTitle: task?.title || "",
+      taskProjectColor: project?.color,
+      elapsedSeconds: timerElapsed,
+      timerRunning,
+      candidateCount: todayCandidates.length,
+      lang,
+      alwaysOnTop: settings?.widgetAlwaysOnTop !== false,
+    };
+  }
+
+  /**
+   * Process an action request relayed from the desktop widget. Reads the
+   * latest state via refs so the handler stays correct even though the
+   * IPC listener is registered once.
+   */
+  function handleWidgetAction(action: WidgetAction) {
+    switch (action.type) {
+      case "requestSnapshot":
+        window.desktopApi?.widget?.pushSnapshot(buildWidgetSnapshot());
+        break;
+      case "quickAdd":
+        widgetQuickAdd(action.title);
+        break;
+      case "timerStart":
+        if (action.taskId) startTimer(action.taskId);
+        else if (headerTask) startTimer(headerTask.id);
+        break;
+      case "timerPause":
+        pauseTimer();
+        break;
+      case "timerResume":
+        resumeTimer();
+        break;
+      case "timerStop":
+        stopAndSaveTimer();
+        break;
+      case "complete":
+        if (action.taskId) toggleTaskDone(action.taskId);
+        else if (headerTask) toggleTaskDone(headerTask.id);
+        break;
+      case "setAlwaysOnTop":
+        void window.desktopApi?.widget?.setAlwaysOnTop(action.enabled);
+        void saveSettings({ widgetAlwaysOnTop: action.enabled });
+        break;
+      case "resetPosition":
+        try { localStorage.removeItem("navopath-widget-position"); } catch { /* ignore */ }
+        // Re-center: the widget window will fall back to its default position.
+        void window.desktopApi?.widget?.setPosition(80, 80);
+        break;
+    }
+  }
+
+  // Keep a ref to the latest action handler so the IPC listener (registered
+  // once) always calls the current closure with up-to-date state.
+  const widgetActionHandlerRef = useRef(handleWidgetAction);
+  widgetActionHandlerRef.current = handleWidgetAction;
+
+  // Register the widget action listener once. Desktop-only.
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    const unsubscribe = window.desktopApi.widget.onAction((action) => {
+      widgetActionHandlerRef.current(action);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Push a fresh snapshot to the widget whenever relevant state changes so
+  // the widget stays in sync without polling (timer ticks, task complete,
+  // quick add, candidate changes). Throttled to avoid flooding on rapid
+  // timer ticks (every second).
+  const widgetSnapshotRef = useRef<number>(0);
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    const now = Date.now();
+    if (now - widgetSnapshotRef.current < 400) return; // throttle
+    widgetSnapshotRef.current = now;
+    window.desktopApi.widget.pushSnapshot(buildWidgetSnapshot());
+  }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, lang]);
+
+  // Auto-open the widget on launch if the user opted in. Runs once.
+  const widgetAutoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (widgetAutoOpenedRef.current) return;
+    if (!window.desktopApi?.widget) return;
+    if (settings?.widgetOpenOnLaunch !== true) return;
+    if (settings?.featureWidgetEnabled === false) return;
+    widgetAutoOpenedRef.current = true;
+    void window.desktopApi.widget.open();
+  }, [settings?.widgetOpenOnLaunch, settings?.featureWidgetEnabled]);
+
+  // Apply always-on-top setting to an existing widget window when it changes.
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    if (settings?.widgetAlwaysOnTop === undefined) return;
+    void window.desktopApi.widget.setAlwaysOnTop(settings.widgetAlwaysOnTop !== false);
+  }, [settings?.widgetAlwaysOnTop]);
 
   function createQuickProject() {
     if (!data || !quickProjectTitle.trim()) return;
@@ -6797,6 +7115,14 @@ function App() {
                 <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
                 <button className="df-icon-action df-icon-template" data-tip={lang === "zh" ? "日程模版" : "Schedule Template"} aria-label={lang === "zh" ? "日程模版" : "Schedule Template"} onClick={() => setScheduleTemplateOpen(true)}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2M16 4V2M8 13h3M8 17h6"/></svg></button>
+                {Boolean(window.desktopApi?.widget) && settings.featureWidgetEnabled !== false && (
+                  <button
+                    className="df-icon-action"
+                    data-tip={lang === "zh" ? "桌面小组件" : "Desktop widget"}
+                    aria-label={lang === "zh" ? "桌面小组件" : "Desktop widget"}
+                    onClick={() => void window.desktopApi?.widget?.open()}
+                  ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/></svg></button>
+                )}
                 {!settings.hideAi && (
                   <button
                     className={`df-icon-action df-ai-plan-title-icon ${autoScheduleState === "generating" || autoScheduleState === "committing" ? "thinking" : ""}`}
@@ -11803,6 +12129,25 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               <input type="checkbox" checked={settings.continuousCrossDayScroll !== false} onChange={(e) => onSave({ continuousCrossDayScroll: e.target.checked })} />
               <span>{lang === "zh" ? "无限跨天滚动" : "Continuous cross-day scroll"}</span>
             </label>
+            {Boolean(window.desktopApi?.widget) && (
+              <label className="df-utility-check">
+                <input type="checkbox" checked={settings.featureWidgetEnabled !== false} onChange={(e) => onSave({ featureWidgetEnabled: e.target.checked })} />
+                <span>{lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"}</span>
+                <small>{lang === "zh" ? "置顶小窗快速查看正在做、快速添加任务与计时" : "Always-on-top mini panel for current task, quick add and timer"}</small>
+              </label>
+            )}
+            {Boolean(window.desktopApi?.widget) && (
+              <label className="df-utility-check">
+                <input type="checkbox" checked={settings.widgetAlwaysOnTop !== false} onChange={(e) => { onSave({ widgetAlwaysOnTop: e.target.checked }); void window.desktopApi?.widget?.setAlwaysOnTop(e.target.checked); }} />
+                <span>{lang === "zh" ? "小组件始终置顶" : "Widget always on top"}</span>
+              </label>
+            )}
+            {Boolean(window.desktopApi?.widget) && (
+              <label className="df-utility-check">
+                <input type="checkbox" checked={settings.widgetOpenOnLaunch === true} onChange={(e) => onSave({ widgetOpenOnLaunch: e.target.checked })} />
+                <span>{lang === "zh" ? "启动时自动打开小组件" : "Open widget on launch"}</span>
+              </label>
+            )}
             <hr />
             <label className="df-utility-select">
               {lang === "zh" ? "默认专注模式" : "Default focus mode"}
@@ -12178,10 +12523,13 @@ const rootKey = "__plannerRoot";
 const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
 const root = rootWindow[rootKey] ?? createRoot(rootElement);
 rootWindow[rootKey] = root;
+const isWidgetRoute = new URLSearchParams(window.location.search).get("widget") === "1";
 root.render(
-  window.location.pathname === "/changelog"
-    ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
-    : window.location.pathname === "/plugin-guide"
-      ? <PluginGuidePage />
-    : <App />,
+  isWidgetRoute
+    ? <WidgetApp />
+    : window.location.pathname === "/changelog"
+      ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
+      : window.location.pathname === "/plugin-guide"
+        ? <PluginGuidePage />
+      : <App />,
 );

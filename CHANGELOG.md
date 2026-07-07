@@ -1,9 +1,13 @@
 # NavoPath 更新日志
 
-## 2026-07-07 · 指标圆环图标注优化
+## 2026-07-07 · 指标圆环图标注优化与桌面小组件
 
 ### 修复
 - 重构指标视图甜甜圈图外部标注为紧凑的两段式引线 + 侧标 annotation 系统，且每个项目默认常驻显示外部项目名：圆环外缘短径向 tick（outer+34 折点）接 42px 水平段，项目名贴在线末端外侧（右侧 start、左侧 end），字号 12px/600，引线 1.5px、22% 半透明灰（激活 36%），整体回归安静的数据图表标注风格。项目名是常驻 annotation 而非 hover tooltip——圆环中出现的每个项目（含"日常""文书"等小扇区）默认都有外部项目名，不再有"占比 ≥6% 或前 5 名才显示、其余 hover 才出现"的过滤逻辑；同侧标签做一次 Y 排序避让（minGap 20px），若整列溢出则整体上移再 clamp 到图表安全区内，保证全部标签可见、不隐藏、不飞到边缘。右侧指标摘要删除"最高投入/Top focus"一项（与圆环图和列表重复），仅保留已安排时间、未安排时间、任务数量、完成率；圆环中心悬停态移除彩色圆点，仅保留项目名、时长与百分比。hover 只负责当前扇区外径轻微扩展、中心文字切换、当前 label/引线轻微高亮，不让其他项目名消失或重排。
+
+### 改进
+- 新增桌面端置顶小组件：真正的 Electron `BrowserWindow`（`alwaysOnTop`、`frame`、可拖动、可调整大小、记住位置），通过 `?widget=1` 路由渲染独立的 `WidgetApp` 而非完整 App，不启动 Supabase 登录/数据加载。小组件为纯 IPC 客户端——不持有任何任务数据，所有状态由主窗口 React store 维护并通过 IPC 中继同步：小组件发动作（快速添加、计时开始/暂停/继续/保存、完成、置顶切换、重置位置）经主进程转发到主窗口执行，主窗口将 `WidgetSnapshot`（当前任务、计时、候选数量、语言、置顶设置）推送给小组件。小组件本地每秒 tick 计时显示并在快照到达时对齐。入口在候选区面板标题栏的图标按钮（仅桌面端、且功能开关开启时显示）；设置 > 功能新增"启用桌面小组件""小组件始终置顶""启动时自动打开"三项开关。快速添加默认未归属项目、加入今日候选，与主窗口共用同一 store，不引入独立假数据。视觉为 NavoPath 纸感风格（暖白底、细边框、克制阴影、紧凑按钮），无 dashboard/glow 感。移动端与纯 Web 环境不显示入口。
+- 指标视图新增"全部"时间范围选项，可统计所有时间内的项目时间占比与任务完成情况，不再局限于今天/昨天/本周/上周/本月/自定义；同步补全 `MetricRangePreset` 类型与对应日期范围计算逻辑。
 
 ## 2026-07-06 · 习惯总览重构与功能开关
 
@@ -70,10 +74,14 @@
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
 
-## 2026-07-07 · Metrics donut label refinement
+## 2026-07-07 · Metrics donut label refinement & desktop widget
 
 ### Fixes
 - Rebuilt the Metrics donut outside annotations as a compact two-segment leader + side-label system where every project shows a permanent external label: a short radial tick from the arc edge (outer+34 elbow) joins a 42px horizontal segment, with the project name beside the line end (start anchor on the right, end anchor on the left) at 12px/600, leader stroke 1.5px at 22% semi-transparent gray (36% when active) — a quiet data-chart annotation style. Project names are standing annotations, not hover tooltips: every project in the donut (including small slices like "Daily" and "Essays") gets a default external label, with no ">=6% or top 5 only" filtering and no hover-only surfacing. Same-side labels get a single Y sort-and-push collision pass (minGap 20px); if the lane overflows the safe band the whole lane shifts up and clamps back inside, so all labels stay visible — none are hidden and none spill to the edge. Removed the "Top focus" item from the right-side metrics summary (it duplicated the donut and project list), keeping only Planned, Unplanned, Tasks, and Done; removed the colored dot from the donut center hover state, keeping just the project name, duration, and percentage. On hover only the active segment's outer radius expands, the center text swaps, and the current label/leader brighten slightly — other labels never disappear or reshuffle.
+
+### Improvements
+- Added a desktop always-on-top widget: a real Electron `BrowserWindow` (`alwaysOnTop`, `frame`, draggable, resizable, remembers position) that renders a standalone `WidgetApp` via the `?widget=1` route instead of the full App, so it does not boot Supabase auth/data loading. The widget is a pure IPC client — it holds no task data; all state is owned by the main window's React store and synced via an IPC relay. The widget sends actions (quick add, timer start/pause/resume/save, complete, toggle always-on-top, reset position) through the main process to the main window for execution; the main window pushes a `WidgetSnapshot` (current task, timer, candidate count, language, always-on-top setting) back to the widget. The widget ticks its display locally every second and reconciles on each incoming snapshot. The entry point is an icon button in the candidate panel header (visible only on desktop and when the feature toggle is on); Settings > Features adds three toggles — "Enable desktop widget", "Widget always on top", and "Open on launch". Quick add defaults to no project and adds to today's candidates, sharing the same store as the main window with no independent fake data. The visual style is NavoPath paper-like (warm white background, thin border, restrained shadow, compact buttons), with no dashboard or glow feel. Mobile and web-only environments do not show the entry.
+- Added an "All" time range option to the Metrics view, so project time allocation and task completion can be measured across all time instead of being limited to today/yesterday/this week/last week/this month/custom; the `MetricRangePreset` type and corresponding date-range calculation were updated accordingly.
 
 ## 2026-07-06 · Habit overview refactor & feature toggle
 
