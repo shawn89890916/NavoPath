@@ -110,10 +110,10 @@ function donutLeaderLine(
   const onRight = Math.cos(radians) >= 0;
   const p0 = polarPoint(cx, cy, visualOuter + 4, mid);
   const p1 = polarPoint(cx, cy, visualOuter + 52, mid);
-  const horizontalLength = Math.max(128, label.length * 16);
+  const horizontalLength = Math.max(88, label.length * 13);
   const p2x = p1.x + (onRight ? horizontalLength : -horizontalLength);
   const labelX = (p1.x + p2x) / 2;
-  const labelY = p1.y - 8;
+  const labelY = p1.y - 6;
   return {
     path: `M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} L ${p2x} ${p1.y}`,
     labelX,
@@ -2369,7 +2369,6 @@ export default function PlanningView(props: {
                       <div><span>{props.lang === "zh" ? "未安排时间" : "Unplanned"}</span><strong>{formatMinutesZh(metricsResult.summary.unplannedMinutes)}</strong></div>
                       <div><span>{props.lang === "zh" ? "任务数量" : "Tasks"}</span><strong>{metricsResult.summary.taskCount}</strong></div>
                       <div><span>{props.lang === "zh" ? "完成率" : "Done"}</span><strong>{Math.round(metricsResult.summary.completionRate * 100)}%</strong></div>
-                      <div><span>{props.lang === "zh" ? "最高投入" : "Top focus"}</span><strong>{metricsResult.summary.topGroup?.label || "-"}</strong></div>
                     </aside>
                   </div>
                 </>

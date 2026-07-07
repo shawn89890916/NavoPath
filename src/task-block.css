@@ -2551,8 +2551,8 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 
 .df-app .df-planning .df-metrics-donut-label {
   fill: var(--ink, var(--paper-ink));
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 500;
   line-height: 1.2;
   pointer-events: none;
 }

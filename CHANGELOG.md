@@ -1,5 +1,10 @@
 # NavoPath 更新日志
 
+## 2026-07-07 · 指标圆环图标注优化
+
+### 修复
+- 优化指标视图甜甜圈图外部项目名排版与右侧摘要：外部项目名字号从 11px 降至 10px、字重从 600 降至 500，不再像大标题抢画面，回归 chart annotation 视觉层级；水平段长度公式收紧为 `max(88, label.length * 13)`，labelY 调为 `p1.y - 6`，项目名更贴合水平段上方；右侧指标摘要删除"最高投入/Top focus"一项（与圆环图和项目列表重复），仅保留已安排时间、未安排时间、任务数量、完成率，不再留空占位。
+
 ## 2026-07-06 · 习惯总览重构与功能开关
 
 ### 修复
@@ -65,6 +70,11 @@
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
 
+## 2026-07-07 · Metrics donut label refinement
+
+### Fixes
+- Refined the Metrics donut outside label typography and the right-side summary: reduced the outside project name font-size from 11px to 10px and font-weight from 600 to 500 so it no longer reads like a headline and returns to chart-annotation visual weight; tightened the horizontal length formula to `max(88, label.length * 13)` and adjusted labelY to `p1.y - 6` so the name sits closer above the horizontal segment; removed the "Top focus" item from the right-side metrics summary (it duplicated the donut and project list), keeping only Planned, Unplanned, Tasks, and Done with no empty placeholder left behind.
+
 ## 2026-07-06 · Habit overview refactor & feature toggle
 
 ### Fixes
@@ -80,6 +90,7 @@
 - Rebuilt the Metrics donut hover detection as a layered structure: separated the visual ring from the hit layer — added a transparent pie-sector hit layer (`pieSectorPath`, innerRadius=0, outerRadius=96) where each project sector spans from the center to the outer edge, so the pointer hovering inside the center hole still activates the correct project by angle (right-center → right project, lower-left center → lower-left project, upper-left center → upper-left project); the visual arc layer, leader lines, labels, decorative ring, and center text are all set to `pointer-events: none` so events pass through to the hit layer; the hit layer outer edge does not exceed visual outer radius + 2px, so outside whitespace never triggers hover. Hovering still only expands the active segment's outer radius (88→94) while the inner radius stays unchanged.
 - Fixed the Metrics donut cursor flickering between pointer and default on hover: the root cause was multiple SVG elements (visual arcs, hit sectors, leader lines, labels) each receiving pointer events, so the cursor switched rapidly as the pointer crossed element boundaries. Replaced with a single transparent hit disk (`<circle r=98>`) on top that handles all `onPointerMove` / `onPointerLeave` / `onClick`; every other SVG element is `pointer-events: none`. Hover is computed from the pointer's angle relative to center (`atan2 → polar angle → segment match`) rather than relying on multiple paths competing for events; the cursor is pointer only on the hit disk and default elsewhere, eliminating the jitter.
 - Fixed the Metrics donut outside project name still being offset: the horizontal segment was only 10px long (elbow radius 148 vs labelDistance 158 — nearly equal), so the segment was too short and the label anchor still sat near the p2 endpoint. The horizontal length is now driven by the project name length (`horizontalLength = max(128, label.length * 16)`), with p1 fixed at `visualOuter + 52` and p2 at `p1.x ± horizontalLength`; the label is anchored at `(p1.x + p2.x) / 2`, `p1.y - 8`, `text-anchor: middle`, so both left- and right-side project names are centered strictly above the horizontal segment, with the line acting like an underline beneath the name.
+- Refined the Metrics donut outside label typography and the right-side summary: reduced the outside project name font-size from 11px to 10px and font-weight from 600 to 500 so it no longer reads like a headline and returns to chart-annotation visual weight; tightened the horizontal length formula to `max(88, label.length * 13)` and adjusted labelY to `p1.y - 6` so the name sits closer above the horizontal segment; removed the "Top focus" item from the right-side metrics summary (it duplicated the donut and project list), keeping only Planned, Unplanned, Tasks, and Done with no empty placeholder left behind.
 
 ### Improvements
 - Reworked the Metrics donut into a labeled ring chart: it remains a single donut where each colored segment represents one project; outside each segment a two-segment leader line (radial segment + horizontal segment) points to just the project name, placed above the horizontal segment — percentage and duration no longer appear beside the leader line; the center defaults to total scheduled duration + range label and switches to the hovered project's color dot, name, duration, and percentage on hover; the ranked list and tooltip still provide full duration / percentage / task count. Hovering a segment only expands its outer radius while the inner radius stays unchanged.
