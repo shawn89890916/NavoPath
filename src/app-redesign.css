@@ -4429,7 +4429,9 @@ body.df-timeline-pointer-drag * {
   min-height: min(720px, calc(100dvh - 36px));
   max-height: calc(100dvh - 36px);
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  /* 3 rows: ExecutionLayoutShell (1fr) + status (auto) + footer (auto). The close
+     button is absolutely positioned so it does not take a grid row. */
+  grid-template-rows: minmax(0, 1fr) auto auto;
   border: 1px solid var(--paper-rule-strong);
   border-radius: var(--paper-radius-soft);
   background: var(--surface-main);
@@ -4438,41 +4440,6 @@ body.df-timeline-pointer-drag * {
   overflow: hidden;
   animation: paper-sheet-in 170ms cubic-bezier(.2,.75,.25,1) both !important;
   transform-origin: center top !important;
-}
-
-.df-app .df-template-modal-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 20px 22px 17px;
-  border-bottom: 1px solid var(--paper-rule);
-  background: var(--surface-main);
-}
-
-.df-app .df-template-kicker {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--paper-ink-muted);
-  font: 700 11px/1 var(--paper-mono);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.df-app .df-template-modal h2 {
-  margin: 0;
-  color: var(--text-main);
-  font: 700 24px/1.12 var(--paper-display);
-  letter-spacing: 0;
-}
-
-.df-app .df-template-modal h2:focus { outline: none; }
-
-.df-app .df-template-modal p {
-  max-width: 560px;
-  margin: 8px 0 0;
-  color: var(--text-muted);
-  font: 500 13px/1.55 var(--paper-sans);
 }
 
 .df-app .df-template-close {
@@ -4505,38 +4472,19 @@ body.df-timeline-pointer-drag * {
   z-index: 2;
 }
 
-/* ── Template v3: candidate-list + timeline language (replaces v1/v2) ── */
-.df-app .df-template-modal-v2 {
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  padding-top: 0;
-}
-
-.df-app .df-template-split {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+/* Template modal now reuses the execution-page shell directly:
+   .df-template-shell overrides df-execute's viewport-bound height so it
+   fills the modal's 1fr grid row instead. The candidate-panel and
+   timeline-panel section classes are the SAME ones the execution page
+   uses — no template-specific left/right layout CSS is needed here. */
+.df-app .df-template-shell.df-execute {
+  height: 100%;
   min-height: 0;
-  border-bottom: 1px solid var(--paper-rule);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: var(--surface-main);
-}
-
-/* Left: candidate-list language */
-.df-app .df-template-candidate {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--paper-rule);
-  background: var(--surface-main);
-}
-
-.df-app .df-template-candidate .df-panel-title {
-  padding: 14px 14px 10px;
-}
-
-.df-app .df-template-candidate .df-candidate-list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0 6px 12px;
+  overflow: hidden;
 }
 
 .df-app .df-candidate-task-row {
@@ -4630,30 +4578,27 @@ body.df-timeline-pointer-drag * {
   font: 700 16px/1 var(--paper-sans);
 }
 
-/* Right: timeline language */
-.df-app .df-template-timeline-panel {
+/* Compact name editing bar — replaces the old big-title chrome. Sits at the
+   top of the shared df-timeline-panel section, below the candidate-panel
+   header line, so the timeline panel keeps the same shape as the execution
+   page (panel header strip + scroll body). */
+.df-app .df-template-name-bar {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px 9px 16px;
+  border-bottom: 1px solid var(--paper-rule);
   background: var(--surface-main);
+  min-height: 38px;
 }
 
-.df-app .df-template-timeline-panel .df-timeline-daily {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px 16px 16px;
-}
-
-.df-app .df-template-timeline-panel .df-date-title {
-  padding: 0 0 8px;
-}
-
-.df-app .df-template-allday-static {
-  cursor: default;
-  min-height: 36px;
+.df-app .df-template-name-meta {
+  color: var(--text-muted);
+  font: 500 11px/1.3 var(--paper-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
 }
 
 .df-app .df-template-name-inline {
@@ -4672,23 +4617,11 @@ body.df-timeline-pointer-drag * {
   font: 500 12px/1.4 var(--paper-sans);
 }
 
-.df-app .df-template-timeline-panel .df-timeline-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.df-app .df-template-timeline-panel .df-timeline-canvas {
-  position: relative;
-  width: 100%;
-  border: 1px solid var(--paper-rule);
-  border-radius: var(--paper-radius);
-  background: var(--surface-main);
-  cursor: crosshair;
-  touch-action: none;
-}
-
-.df-app .df-template-timeline-panel .df-slot {
+/* Hour-label slots inside the template timeline canvas. The execution page
+   draws its hour grid via a repeating-linear-gradient background on
+   .df-timeline-canvas and does not render .df-slot divs, so these rules are
+   template-only and scoped to .df-template-shell. */
+.df-app .df-template-shell .df-slot {
   position: absolute;
   left: 0;
   right: 0;
@@ -4697,11 +4630,11 @@ body.df-timeline-pointer-drag * {
   pointer-events: none;
 }
 
-.df-app .df-template-timeline-panel .df-slot.hour {
+.df-app .df-template-shell .df-slot.hour {
   border-top-color: var(--paper-rule-strong);
 }
 
-.df-app .df-template-timeline-panel .df-slot span {
+.df-app .df-template-shell .df-slot span {
   position: absolute;
   left: 4px;
   top: -7px;
@@ -4709,6 +4642,19 @@ body.df-timeline-pointer-drag * {
   background: var(--surface-main);
   color: var(--text-muted);
   font: 600 10px/1 var(--paper-mono);
+}
+
+/* Template timeline canvas needs explicit positioning/border/cursor because
+   the execution page's .df-timeline-canvas gets those from its parent
+   .df-time-grid / .df-day-col layout, which the template does not render. */
+.df-app .df-template-shell .df-timeline-canvas {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--paper-radius);
+  background: var(--surface-main);
+  cursor: crosshair;
+  touch-action: none;
 }
 
 /* Period block = df-time-block language (annotated time region) */
@@ -4816,11 +4762,15 @@ body.df-timeline-pointer-drag * {
 }
 
 @media (max-width: 720px) {
-  .df-app .df-template-modal-v2 .df-template-split {
+  /* On narrow screens the shared df-execute grid collapses to a single
+     column so the template list and the template timeline stack. The
+     candidate panel keeps a bounded max-height so the timeline still has
+     room below it. */
+  .df-app .df-template-shell.df-execute {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
-  .df-app .df-template-modal-v2 .df-template-candidate {
+  .df-app .df-template-shell .df-candidate-panel {
     max-height: 220px;
     border-right: 0;
     border-bottom: 1px solid var(--paper-rule);

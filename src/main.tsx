@@ -7099,7 +7099,7 @@ function App() {
       )}
 
       {mode === "execute" ? (
-        <main className={`df-execute${candidatePanelCollapsed ? " candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
+        <ExecutionLayoutShell className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button className={compactExecuteView === "tasks" ? "active" : ""} onClick={() => setCompactExecuteView("tasks")}>{lang === "zh" ? "任务" : "Tasks"}</button>
@@ -8264,7 +8264,7 @@ function App() {
             </div>
             </>}
           </section>
-        </main>
+        </ExecutionLayoutShell>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
           <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} dayStartTime={settings.dayStartTime} metricsRangePreset={settings.metricsRangePreset} metricsGroupBy={settings.metricsGroupBy} metricsDisplayMetric={settings.metricsDisplayMetric} metricsIncludeHabits={settings.metricsIncludeHabits} metricsCompletionFilter={settings.metricsCompletionFilter} metricsCustomStart={settings.metricsCustomStart} metricsCustomEnd={settings.metricsCustomEnd} onMetricsSettingsChange={(patch) => void saveSettings(patch)} />
@@ -8867,14 +8867,11 @@ function ScheduleTemplateModal({
 
   const portalTarget = document.getElementById("df-portal-target") || document.body;
   const hourLabels: number[] = Array.from({ length: 25 }, (_, i) => i);
-  const displayTemplateName = templateName
-    || (activeBuiltInId ? (zh ? SCHEDULE_TEMPLATES[activeBuiltInId].labelZh : SCHEDULE_TEMPLATES[activeBuiltInId].labelEn)
-    : (zh ? "新模板草稿" : "New draft"));
 
   return createPortal(
     <div className="df-modal-backdrop df-template-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
-        className="df-template-modal df-template-modal-v2"
+        className="df-template-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="df-template-modal-title"
@@ -8882,9 +8879,9 @@ function ScheduleTemplateModal({
       >
         <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
 
-        <div className="df-template-split">
-          {/* ── Left: candidate-list language ── */}
-          <aside className="df-template-candidate" aria-label={zh ? "模板列表" : "Template list"}>
+        <ExecutionLayoutShell className="df-template-shell">
+          {/* ── Left: real df-candidate-panel shell (same class as execution page) ── */}
+          <section className="df-candidate-panel" aria-label={zh ? "模板列表" : "Template list"}>
             <div className="df-panel-title">
               <h2 id="df-template-modal-title" ref={titleRef} tabIndex={-1}>{zh ? "模板" : "Templates"}</h2>
               <div>
@@ -8943,41 +8940,36 @@ function ScheduleTemplateModal({
                 <span className="df-candidate-task-plus">+</span>
               </div>
             </div>
-          </aside>
+          </section>
 
-          {/* ── Right: execution-timeline language ── */}
-          <div className="df-template-timeline-panel">
+          {/* ── Right: real df-timeline-panel shell (same class as execution page) ── */}
+          <section className="df-timeline-panel" id="df-template-timeline">
             <div className="df-timeline-daily">
-              <div className="df-date-title df-date-title-compact">
-                <span className="df-date-num">{displayTemplateName}</span>
-                <span className="df-date-sep"></span>
-                <span className="df-date-wd">{zh ? "模板时间轴" : "Template timeline"}</span>
+              {/* Compact template-name bar — replaces the old big date-title + allday region.
+                  Keeps the shell layout intact: no giant title, no separate title row. */}
+              <div className="df-template-name-bar">
+                {(activeCustom || templateKey === "draft:new") ? (
+                  <input
+                    className="df-template-name-inline"
+                    value={templateName}
+                    onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }}
+                    aria-label={zh ? "模板名称" : "Template name"}
+                    placeholder={zh ? "模板名称…" : "Template name…"}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  />
+                ) : activeBuiltInId ? (
+                  <span className="df-template-name-readonly">{zh ? "默认模板（不可重命名）" : "Built-in template (read-only)"}</span>
+                ) : null}
+                <span className="df-template-name-meta">{rowSpan(periods.length, periods.map((p) => ({ start: minutesToTime(p.startMinutes), end: minutesToTime(p.startMinutes + p.durationMinutes) })))}</span>
               </div>
-              <div className="df-timeline-allday df-template-allday-static">
-                <span className="df-timeline-allday-label">{zh ? "模板" : "Template"}</span>
-                <div className="df-timeline-allday-content">
-                  {(activeCustom || templateKey === "draft:new") && (
-                    <input
-                      className="df-template-name-inline"
-                      value={templateName}
-                      onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }}
-                      aria-label={zh ? "模板名称" : "Template name"}
-                      placeholder={zh ? "模板名称…" : "Template name…"}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    />
-                  )}
-                  {activeBuiltInId && <span className="df-template-name-readonly">{zh ? "默认模板（不可重命名）" : "Built-in template (read-only)"}</span>}
-                </div>
-              </div>
-              <div className="df-timeline-scroll" ref={timelineRef}>
-                <div
-                  className="df-timeline-canvas"
-                  style={{ height: `${TIMELINE_HEIGHT}px` }}
-                  onPointerDown={handleTimelinePointerDown}
-                  onPointerMove={handleTimelinePointerMove}
-                  onPointerUp={handleTimelinePointerUp}
-                  onPointerCancel={handleTimelinePointerUp}
-                >
+              <TimelineCanvasShell
+                scrollRef={timelineRef}
+                height={TIMELINE_HEIGHT}
+                onCanvasPointerDown={handleTimelinePointerDown}
+                onCanvasPointerMove={handleTimelinePointerMove}
+                onCanvasPointerUp={handleTimelinePointerUp}
+                onCanvasPointerCancel={handleTimelinePointerUp}
+              >
                   {hourLabels.map((hour) => (
                     <div key={hour} className="df-slot hour" style={{ top: `${hour * 4 * SLOT_HEIGHT}px` }}>
                       <span>{String(hour).padStart(2, "0")}:00</span>
@@ -9048,11 +9040,10 @@ function ScheduleTemplateModal({
                       }}
                     />
                   )}
-                </div>
-              </div>
+              </TimelineCanvasShell>
             </div>
-          </div>
-        </div>
+          </section>
+        </ExecutionLayoutShell>
 
         {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
 
@@ -12812,6 +12803,106 @@ function PluginGuidePage() {
         </section>
       </article>
     </main>
+  );
+}
+
+
+// ── Shared layout shells: reused by BOTH the execution page and the template modal ──
+// These thin wrappers guarantee the execution page and template mode render through the
+// SAME layout primitives (df-execute grid, df-timeline-scroll + df-timeline-canvas), so
+// the template modal can never drift into a separate visual system. Differences between
+// the two callers live entirely in the children/handlers they pass in.
+
+/**
+ * ExecutionLayoutShell — the real execution-page 2-column grid (`<main className="df-execute">`).
+ * The grid template, column widths, gap, padding and height all come from the single
+ * `.df-execute` CSS rule (styles.css). Both the execution page and the template modal
+ * render their panels through this shell so the outer layout is identical. Children are
+ * passed through unchanged so the execution page can keep its compact-controls/tabs and
+ * the template modal can pass its two panels.
+ */
+function ExecutionLayoutShell({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <main className={`df-execute${className ? ` ${className}` : ""}`}>
+      {children}
+    </main>
+  );
+}
+
+/**
+ * TimelineCanvasShell — the shared timeline scroll container + positioned canvas.
+ * Renders `df-timeline-scroll` (scroll container) wrapping `df-timeline-canvas` (the
+ * absolutely-positioned canvas whose height sets the total scrollable range). The hour
+ * grid, event blocks, now-line, etc. are passed as `children` so each caller keeps its
+ * own grid logic (execution has 15-min slots + continuous-cross-day labels; template has
+ * 25 simple hour labels). The container primitive — scroll behavior, canvas positioning,
+ * time-gutter width — is shared through the same CSS classes.
+ */
+function TimelineCanvasShell({
+  scrollRef,
+  canvasRef,
+  height,
+  canvasClassName,
+  onScrollPointerDown,
+  onScrollPointerMove,
+  onScrollPointerUp,
+  onScrollDragOver,
+  onScrollDrop,
+  onScrollDragLeave,
+  onCanvasPointerDown,
+  onCanvasPointerMove,
+  onCanvasPointerUp,
+  onCanvasPointerCancel,
+  onCanvasMouseDown,
+  children,
+}: {
+  scrollRef?: React.Ref<HTMLDivElement>;
+  canvasRef?: React.Ref<HTMLDivElement>;
+  height: number;
+  canvasClassName?: string;
+  onScrollPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  onScrollPointerMove?: React.PointerEventHandler<HTMLDivElement>;
+  onScrollPointerUp?: React.PointerEventHandler<HTMLDivElement>;
+  onScrollDragOver?: React.DragEventHandler<HTMLDivElement>;
+  onScrollDrop?: React.DragEventHandler<HTMLDivElement>;
+  onScrollDragLeave?: React.DragEventHandler<HTMLDivElement>;
+  onCanvasPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  onCanvasPointerMove?: React.PointerEventHandler<HTMLDivElement>;
+  onCanvasPointerUp?: React.PointerEventHandler<HTMLDivElement>;
+  onCanvasPointerCancel?: React.PointerEventHandler<HTMLDivElement>;
+  onCanvasMouseDown?: React.MouseEventHandler<HTMLDivElement>;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="df-timeline-scroll"
+      ref={scrollRef}
+      onPointerDown={onScrollPointerDown}
+      onPointerMove={onScrollPointerMove}
+      onPointerUp={onScrollPointerUp}
+      onDragOver={onScrollDragOver}
+      onDrop={onScrollDrop}
+      onDragLeave={onScrollDragLeave}
+    >
+      <div
+        ref={canvasRef}
+        className={`df-timeline-canvas${canvasClassName ? ` ${canvasClassName}` : ""}`}
+        style={{ height: `${height}px` }}
+        onPointerDown={onCanvasPointerDown}
+        onPointerMove={onCanvasPointerMove}
+        onPointerUp={onCanvasPointerUp}
+        onPointerCancel={onCanvasPointerCancel}
+        onMouseDown={onCanvasMouseDown}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
