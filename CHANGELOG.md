@@ -4,6 +4,7 @@
 
 ### 修复
 - 优化指标视图甜甜圈图外部项目名排版与右侧摘要：外部项目名字号从 11px 降至 10px、字重从 600 降至 500，不再像大标题抢画面，回归 chart annotation 视觉层级；水平段长度公式收紧为 `max(88, label.length * 13)`，labelY 调为 `p1.y - 6`，项目名更贴合水平段上方；右侧指标摘要删除"最高投入/Top focus"一项（与圆环图和项目列表重复），仅保留已安排时间、未安排时间、任务数量、完成率，不再留空占位。
+- 重做指标视图甜甜圈图外部标注为统一的柱式 annotation 系统：此前每条引线的水平段长度随项目名长度变化、斜线段较长（visualOuter+52）且角度随扇区角度变化，导致左右两侧标注节奏不一、顶部多个项目名拥挤堆叠、折线转折角度混乱。现改为固定柱式定位——所有右侧项目名终止于同一 x 列、所有左侧项目名终止于同一 x 列（columnExtent=172），斜线段缩短为 visualOuter+24 的短径向 tick，项目名仍以水平段中点居中、text-anchor middle；顶部扇区自然分流到左右两列，消除拥挤；每条标注读作"圆环→短斜线→水平线→项目名"的统一节奏，整体像一套成熟的信息图表标注系统。
 
 ## 2026-07-06 · 习惯总览重构与功能开关
 
@@ -74,6 +75,7 @@
 
 ### Fixes
 - Refined the Metrics donut outside label typography and the right-side summary: reduced the outside project name font-size from 11px to 10px and font-weight from 600 to 500 so it no longer reads like a headline and returns to chart-annotation visual weight; tightened the horizontal length formula to `max(88, label.length * 13)` and adjusted labelY to `p1.y - 6` so the name sits closer above the horizontal segment; removed the "Top focus" item from the right-side metrics summary (it duplicated the donut and project list), keeping only Planned, Unplanned, Tasks, and Done with no empty placeholder left behind.
+- Rebuilt the Metrics donut outside annotations as a unified column-style annotation system: previously each leader line's horizontal length varied with project name length and the diagonal segment was long (visualOuter+52) with an angle that changed per segment, causing inconsistent left/right rhythm, crowding of top labels, and messy bend angles. Now uses fixed column positioning — all right-side labels terminate at the same x column and all left-side labels at another (columnExtent=172), the diagonal is shortened to a visualOuter+24 radial tick, and the label remains centered at the horizontal-segment midpoint with text-anchor middle; top segments split naturally to the left and right columns, eliminating crowding; every annotation reads as a unified "circle → short diagonal → horizontal line → project name" rhythm, like a mature information-chart annotation system.
 
 ## 2026-07-06 · Habit overview refactor & feature toggle
 

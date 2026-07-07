@@ -87,15 +87,21 @@ interface DonutLeaderLine {
 }
 
 /**
- * Build a two-segment leader line using three key points:
- *   p0 — donut outer edge (visualOuter + 4)
- *   p1 — elbow / bend point (visualOuter + 52), end of the radial diagonal
- *   p2 — horizontal segment end (p1.x ± horizontalLength)
+ * Build a two-segment leader line as a unified annotation unit:
+ *   p0 — donut outer edge (visualOuter + 4), short gap so the line doesn't
+ *        touch the segment fill
+ *   p1 — elbow, a SHORT radial diagonal (visualOuter + 24) away from the
+ *        edge. Keeping this short makes every annotation read as
+ *        "circle → short tick → horizontal line" regardless of segment angle
+ *   p2 — horizontal segment end, terminating at a FIXED column x so all
+ *        right-side labels align to one vertical column and all left-side
+ *        labels to another. This is what mature donut charts use: it gives
+ *        a clean two-column annotation rhythm, splits top segments naturally
+ *        to left/right (eliminating top crowding), and keeps the bend angle
+ *        consistent because the diagonal is short.
  *
- * The horizontal segment length is driven by the project name length so the
- * line always underlines the text. The label is anchored at the MIDPOINT of
- * the horizontal segment (p1→p2) with text-anchor "middle", sitting 8px
- * above the line like annotation text on top of it.
+ * The label is anchored at the MIDPOINT of the horizontal segment (p1→p2)
+ * with text-anchor "middle", sitting 6px above the line.
  */
 function donutLeaderLine(
   cx: number,
@@ -103,15 +109,14 @@ function donutLeaderLine(
   visualOuter: number,
   startAngle: number,
   endAngle: number,
-  label: string,
 ): DonutLeaderLine {
   const mid = (startAngle + endAngle) / 2;
   const radians = (mid - 90) * Math.PI / 180;
   const onRight = Math.cos(radians) >= 0;
   const p0 = polarPoint(cx, cy, visualOuter + 4, mid);
-  const p1 = polarPoint(cx, cy, visualOuter + 52, mid);
-  const horizontalLength = Math.max(88, label.length * 13);
-  const p2x = p1.x + (onRight ? horizontalLength : -horizontalLength);
+  const p1 = polarPoint(cx, cy, visualOuter + 24, mid);
+  const columnExtent = 172;
+  const p2x = onRight ? cx + columnExtent : cx - columnExtent;
   const labelX = (p1.x + p2x) / 2;
   const labelY = p1.y - 6;
   return {
@@ -2306,7 +2311,7 @@ export default function PlanningView(props: {
                           <g className="df-metrics-donut-label-layer">
                             {donutSegments.map(({ group, startAngle, endAngle }) => {
                               const isActive = activeDonutGroup?.id === group.id;
-                              const leader = donutLeaderLine(120, 120, isActive ? 94 : 88, startAngle, endAngle, group.label);
+                              const leader = donutLeaderLine(120, 120, isActive ? 94 : 88, startAngle, endAngle);
                               return (
                                 <g key={`label-${group.id}`}>
                                   <path className="df-metrics-donut-leader" d={leader.path} />
