@@ -2542,22 +2542,23 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 
 .df-app .df-planning .df-metrics-donut-leader {
   fill: none;
-  stroke: rgba(120, 114, 102, 0.24);
-  stroke-width: 1.75;
+  stroke: rgba(120, 114, 102, 0.22);
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
-  transition: stroke 160ms ease, opacity 160ms ease;
+  transition: stroke 160ms ease;
 }
 
 .df-app .df-planning .df-metrics-donut-label-layer .is-active .df-metrics-donut-leader {
-  stroke: rgba(120, 114, 102, 0.5);
+  stroke: rgba(120, 114, 102, 0.36);
 }
 
 .df-app .df-planning .df-metrics-donut-label {
   fill: var(--paper-ink, var(--ink));
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0;
   line-height: 1;
   pointer-events: none;
   transition: fill 160ms ease;
@@ -2612,14 +2613,6 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   color: var(--muted, var(--paper-muted));
   font-size: 12px;
   line-height: 1.2;
-}
-
-.df-app .df-planning .df-metrics-donut-center-label i {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-active, var(--accent));
 }
 
 .df-app .df-planning .df-metrics-donut-center-label span {
