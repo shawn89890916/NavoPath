@@ -4768,13 +4768,25 @@ body.df-timeline-pointer-drag * {
 }
 
 .df-app .df-template-modal-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
   padding: 15px 22px 18px;
   border-top: 1px solid var(--paper-rule);
   background: var(--surface-main);
+  position: relative;
+  z-index: 3;
+}
+
+/* Conflict note sits on the LEFT while the action group right-aligns.
+   This keeps Cancel / Apply to today anchored at the bottom-right corner
+   regardless of how many buttons are currently rendered. */
+.df-app .df-template-modal-actions .df-template-conflict-note {
+  margin-right: auto;
+  color: var(--text-muted);
+  font: 600 12px/1.4 var(--paper-sans);
 }
 
 .df-app .df-template-modal-actions button {

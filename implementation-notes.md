@@ -796,3 +796,39 @@ Opening the template modal and inspecting the DOM should show all five `data-reu
 - Execution TimeBlock positioning: `left: 8` (baseLeft), `width: innerW` (canvas width - 16) — equivalent to `left: 8px, right: 8px`
 - Template TimelineEventBlock positioning (BEFORE this fix): `left: 56px, right: 8px` — blocks were pushed right to avoid in-canvas labels
 - Template TimelineEventBlock positioning (AFTER this fix): `left: 8px, right: 8px` — MATCHES execution's baseLeft, blocks sit in the content area like execution scheduled blocks
+
+## Template Button Audit
+
+### Old template UI buttons
+- Close button: `.df-template-close` — absolute top-right, `z-index: 2`, always rendered
+- Cancel button: in `.df-template-modal-actions` footer — always rendered
+- Apply to today button: in footer — always rendered (disabled when 0 slots)
+- New template button: TWO entry points — (1) `df-icon-template-new` in `CandidatePanelHeader` actions, (2) `CandidateBlock mode="template-new"` at bottom of list
+- Save template button: in footer — conditional (`activeCustom || templateKey === "draft:new"`)
+- Rename/edit template name: (1) hover action button on custom `CandidateBlock`, (2) double-click custom row → inline `df-template-list-rename` input, (3) `df-template-name-inline` input in name bar for active custom/draft
+- Duplicate template: hover action button on custom `CandidateBlock`
+- Delete template: hover action button on custom `CandidateBlock`
+- Set default / default marker: NOT a button — built-in templates show a `badge` ("默认"/"Built-in") via `CandidateBlock badge` prop; no "set default" action exists
+
+### Current template UI buttons
+- Visible: close (top-right), new template (header + list row), name-bar inline rename input (for custom/draft)
+- Footer buttons present but MISALIGNED: footer uses `grid-template-columns: minmax(0,1fr) auto auto auto`. When fewer than 4 items render (e.g. builtin template → no save, no conflict note), Cancel flows into column 1 (1fr, stretches full width) and Apply flows into column 2 — so Apply sits in the middle, NOT at the right edge. This makes the bottom-right action buttons look "missing" or displaced.
+- Hidden due to overflow: none (footer is a grid row in the modal, not overflow-clipped)
+- Disabled unexpectedly: Apply is `disabled` when `applySlots.length === 0` (expected behavior)
+- Covered by timeline: no — timeline is in grid row 1 (1fr), footer is row 3 (auto)
+- Outside modal viewport: no — modal has `max-height: calc(100dvh - 36px)` and `overflow: hidden`; footer is inside
+
+### Fix plan
+- Buttons to keep: ALL existing buttons (close, cancel, apply, save, new, rename, duplicate, delete)
+- Buttons to remove intentionally: none
+- Buttons to move: none — but footer LAYOUT must change from 4-col grid to flex so action group right-aligns regardless of item count
+- Buttons to restore: none missing functionally — the "disappeared" buttons are a footer-layout bug, not deleted buttons
+
+### Root cause of "buttons disappeared"
+1. Footer `grid-template-columns: minmax(0,1fr) auto auto auto` does NOT right-align a variable-count action group. With only Cancel + Apply, Cancel occupies the 1fr column (stretches) and Apply sits immediately after it in the middle of the bar.
+2. The right timeline panel is missing the `df-timeline-body` + `df-timeline-content` flex wrappers that the execution page uses. Without these, `df-timeline-daily` does not inherit the flex layout, so the timeline canvas may not fill/scale correctly, which can make the modal body look broken.
+
+### Fix (this iteration)
+- Footer: change to `display: flex; justify-content: flex-end; gap: 12px;` with the conflict note using `margin-right: auto` so it sits on the left while the action group right-aligns.
+- Right panel: wrap the `df-timeline-daily` in `df-timeline-body` > `df-timeline-content` so the template timeline uses the SAME flex layout path as the execution page.
+- Add `TEMPLATE_VISUAL_PARITY_DEBUG` flag: when on, the modal body renders placeholder content using the execution page's EXACT wrapper hierarchy (`df-timeline-panel` > `df-timeline-body` > `df-timeline-content` > `df-timeline-daily` > `df-date-title` + `TimelineCanvas`), to verify the modal frame does not break the execution layout.

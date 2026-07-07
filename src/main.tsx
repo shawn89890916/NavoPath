@@ -8456,6 +8456,13 @@ function FloatingShelfDragPreview({ task, pointer, candidateTarget, lang }: { ta
   return <div className={`df-floating-unschedule df-floating-shelf-drag${candidateTarget ? " candidate-target" : ""}`} style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>{hint}</span></div>;
 }
 
+// Visual parity debug switch. When true, the template modal body renders
+// placeholder content using the execution page's EXACT wrapper hierarchy
+// (df-timeline-panel > df-timeline-body > df-timeline-content > df-timeline-daily
+// > df-date-title + TimelineCanvas). If the debug layout still differs from the
+// execution page, the problem is the modal frame, not the template data.
+const TEMPLATE_VISUAL_PARITY_DEBUG = false;
+
 function ScheduleTemplateModal({
   lang,
   date,
@@ -8887,6 +8894,50 @@ function ScheduleTemplateModal({
       >
         <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
 
+        {TEMPLATE_VISUAL_PARITY_DEBUG ? (
+          <ExecutionSplitLayout className="df-template-shell">
+            {/* Debug left: real CandidatePanelShell with placeholder candidate rows */}
+            <CandidatePanelShell ariaLabel={zh ? "今日候选（debug）" : "Today's candidates (debug)"}>
+              <CandidatePanelHeader title={<span>{zh ? "今日候选" : "Today"}</span>} />
+              <div className="df-candidate-list">
+                <CandidateBlock mode="template" title={zh ? "示例任务 A" : "Sample task A"} meta="09:00–10:00" />
+                <CandidateBlock mode="template" title={zh ? "示例任务 B" : "Sample task B"} meta="30m" />
+                <CandidateBlock mode="template" title={zh ? "示例任务 C" : "Sample task C"} meta="2h" />
+              </div>
+            </CandidatePanelShell>
+            {/* Debug right: EXACT execution-page wrapper hierarchy
+                df-timeline-panel > df-timeline-body > df-timeline-content >
+                df-timeline-daily > df-date-title + TimelineCanvas.
+                If this looks wrong inside the modal, the modal frame is the problem. */}
+            <section className="df-timeline-panel" id="df-template-timeline-debug">
+              <div className="df-timeline-body">
+                <div className="df-timeline-content">
+                  <div className="df-timeline-daily">
+                    <div className="df-date-title df-date-title-compact today">
+                      <span className="df-date-num">{new Date().getDate()}</span>
+                      <span className="df-date-sep" />
+                      <span className="df-date-wd">{zh ? "今天" : "Today"}</span>
+                    </div>
+                    <TimelineCanvas height={TIMELINE_HEIGHT} scrollRef={timelineRef}>
+                      {Array.from({ length: 96 }).map((_, index) => {
+                        const minutes = index * SLOT_MINUTES;
+                        const isHour = minutes % 60 === 0;
+                        const isMajor = minutes % (6 * 60) === 0;
+                        const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+                        const mm = String(minutes % 60).padStart(2, "0");
+                        return (
+                          <div key={index} className={`df-slot ${isHour ? "hour" : "quarter"}${isMajor ? " major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }}>
+                            <span>{hh}:{mm}</span>
+                          </div>
+                        );
+                      })}
+                    </TimelineCanvas>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </ExecutionSplitLayout>
+        ) : (
         <ExecutionSplitLayout className="df-template-shell">
           {/* ── Left: shared CandidatePanelShell (same component as execution page) ── */}
           <CandidatePanelShell ariaLabel={zh ? "模板列表" : "Template list"}>
@@ -8945,8 +8996,13 @@ function ScheduleTemplateModal({
             </div>
           </CandidatePanelShell>
 
-          {/* ── Right: real df-timeline-panel shell (same class as execution page) ── */}
+          {/* ── Right: real df-timeline-panel shell (same class as execution page) ──
+              Uses the SAME df-timeline-body > df-timeline-content > df-timeline-daily
+              wrapper hierarchy as the execution page so the flex layout path is
+              identical and the TimelineCanvas fills/scales correctly. */}
           <section className="df-timeline-panel" id="df-template-timeline">
+            <div className="df-timeline-body">
+              <div className="df-timeline-content">
             <div className="df-timeline-daily">
               {/* Compact template-name bar — replaces the old big date-title + allday region.
                   Keeps the shell layout intact: no giant title, no separate title row. */}
@@ -9037,8 +9093,11 @@ function ScheduleTemplateModal({
                   )}
               </TimelineCanvas>
             </div>
+              </div>
+            </div>
           </section>
         </ExecutionSplitLayout>
+        )}
 
         {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
 
