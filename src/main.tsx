@@ -7127,7 +7127,11 @@ function App() {
               </nav>
             )}
           </div>
-          <section className={`df-candidate-panel${compactExecuteView === "tasks" ? " compact-active" : " compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`} aria-hidden={compactLayout && compactExecuteView !== "tasks"} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+          <CandidatePanelShell
+            className={`${compactExecuteView === "tasks" ? "compact-active" : "compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`}
+            ariaHidden={compactLayout && compactExecuteView !== "tasks"}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
             if (taskId) {
@@ -7151,9 +7155,9 @@ function App() {
               </div>
             ) : (
               <>
-            <div className="df-panel-title">
-              <h2>{t(lang, "candidate.title")}</h2>
-              <div>
+            <CandidatePanelHeader
+              title={t(lang, "candidate.title")}
+              actions={<>
                 {(timelineView === "3day" || timelineView === "weekly" || timelineView === "month") && (
                   <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => { setCandidatePanelCollapsed(true); setFullscreen(false); }} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
                 )}
@@ -7183,8 +7187,9 @@ function App() {
                     </svg>
                   </button>
                 )}
-              </div>
-            </div>
+              </>
+            }
+            />
             {focusTask && (
               <div className="df-active-task-chip" style={focusProject?.color ? { ["--timer-project-color" as string]: focusProject.color } as React.CSSProperties : undefined}>
                 <button className="df-active-task-chip-main" onClick={() => openTaskEdit(focusTask)}>
@@ -7323,7 +7328,7 @@ function App() {
             </form>
               </>
             )}
-          </section>
+          </CandidatePanelShell>
 
           <section
             className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`}
@@ -8030,7 +8035,11 @@ function App() {
                         ))}
                       </div>
                     </div>
-                    <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
+                    <TimelineCanvas
+                      scrollRef={timelineRef}
+                      canvasRef={timelineCanvasRef}
+                      height={dailyTimelineCanvasHeight}
+                      onScrollDragOver={(event) => {
                       event.preventDefault();
                       const gridEl = timelineCanvasRef.current;
                       const scrollEl = timelineRef.current;
@@ -8047,7 +8056,7 @@ function App() {
                         dragTargetDateRef.current = dailyTarget.date;
                         setHoverSlot(dailyTarget.startTime);
                       }
-                    }} onDrop={(event) => {
+                    }} onScrollDrop={(event) => {
                       event.preventDefault();
                       const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
                       if (taskId) {
@@ -8068,9 +8077,8 @@ function App() {
                           scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY, 0, event.clientX));
                         }
                       }
-                    }} onDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}>
-                      <div ref={timelineCanvasRef} className="df-timeline-canvas" style={{ height: `${dailyTimelineCanvasHeight}px` }}
-                        onMouseDown={(event) => {
+                    }} onScrollDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}
+                      onCanvasMouseDown={(event) => {
                           if (drag || resizePreview || autoScheduleState === "generating") return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
                           if ((event.target as HTMLElement).closest(".df-all-day-block,.df-all-day-quick")) return;
@@ -8138,7 +8146,7 @@ function App() {
                           window.addEventListener("mouseup", upHandler);
                           window.addEventListener("keydown", keyHandler);
                         }}
-                        onClick={(event) => {
+                        onCanvasClick={(event) => {
                           if (dragCreateSuppressClickRef.current) { dragCreateSuppressClickRef.current = false; return; }
                           if (suppressBlockClickRef.current) return;
                           if (drag || resizePreview) return;
@@ -8160,7 +8168,8 @@ function App() {
                             left: colLeft,
                             width: colWidth,
                           });
-                        }}>
+                        }}
+                    >
                         {Array.from({ length: dailyTimelineSlotCount }).map((_, index) => {
                           const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                           const isHour = minutes % 60 === 0;
@@ -8248,8 +8257,7 @@ function App() {
                             )}
                           </div>
                         )}
-                      </div>
-                    </div>
+                    </TimelineCanvas>
                   </div>
                 )}
               </div>
@@ -8880,67 +8888,62 @@ function ScheduleTemplateModal({
         <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
 
         <ExecutionLayoutShell className="df-template-shell">
-          {/* ── Left: real df-candidate-panel shell (same class as execution page) ── */}
-          <section className="df-candidate-panel" aria-label={zh ? "模板列表" : "Template list"}>
-            <div className="df-panel-title">
-              <h2 id="df-template-modal-title" ref={titleRef} tabIndex={-1}>{zh ? "模板" : "Templates"}</h2>
-              <div>
+          {/* ── Left: shared CandidatePanelShell (same component as execution page) ── */}
+          <CandidatePanelShell ariaLabel={zh ? "模板列表" : "Template list"}>
+            <CandidatePanelHeader
+              title={<span id="df-template-modal-title" ref={titleRef} tabIndex={-1}>{zh ? "模板" : "Templates"}</span>}
+              actions={
                 <button type="button" className="df-icon-action df-icon-template-new" data-tip={zh ? "新建模板" : "New template"} aria-label={zh ? "新建模板" : "New template"} onClick={createCustomTemplate}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
-              </div>
-            </div>
+              }
+            />
             <div className="df-candidate-list">
               {listRows.map((row) => {
                 const key = row.kind === "builtin" ? `builtin:${row.id}` : row.kind === "custom" ? `custom:${row.id}` : "draft:new";
                 const isActive = templateKey === key;
+                const isRenaming = row.kind === "custom" && renamingId === row.id;
                 return (
-                  <div
+                  <CandidateBlock
                     key={key}
-                    className="df-candidate-task-row"
-                    data-active={isActive ? "true" : "false"}
+                    mode="template"
+                    selected={isActive}
+                    title={isRenaming ? undefined : row.title}
+                    meta={row.span}
+                    badge={row.kind === "builtin" ? (zh ? "默认" : "Built-in") : undefined}
                     onClick={() => changeTemplate(key as TemplateKey)}
                     onDoubleClick={(e) => { if (row.kind === "custom") { e.stopPropagation(); startRename(customTemplates.find((t) => t.id === row.id)!); } }}
                   >
-                    <div className="df-candidate-task-main">
-                      {row.kind === "custom" && renamingId === row.id ? (
-                        <input
-                          className="df-template-list-rename"
-                          autoFocus
-                          value={renameDraft}
-                          onChange={(e) => setRenameDraft(e.target.value)}
-                          onBlur={commitRename}
-                          onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span className="df-candidate-task-title">{row.title}</span>
-                      )}
-                      <small className="df-candidate-task-meta">{row.span}</small>
-                    </div>
-                    {row.kind === "custom" && renamingId !== row.id && (
-                      <div className="df-candidate-task-actions" onClick={(e) => e.stopPropagation()}>
+                    {isRenaming ? (
+                      <input
+                        className="df-template-list-rename"
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : null}
+                    {row.kind === "custom" && !isRenaming ? (
+                      <span className="df-candidate-block-actions" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="df-icon-action" data-tip={zh ? "重命名" : "Rename"} aria-label={zh ? "重命名" : "Rename"} onClick={() => startRename(customTemplates.find((t) => t.id === row.id)!)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
                         <button type="button" className="df-icon-action" data-tip={zh ? "复制" : "Duplicate"} aria-label={zh ? "复制" : "Duplicate"} onClick={() => duplicateCustomTemplate(row.id)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                         <button type="button" className="df-icon-action" data-tip={zh ? "删除" : "Delete"} aria-label={zh ? "删除" : "Delete"} onClick={() => deleteCustomTemplateById(row.id)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
-                      </div>
-                    )}
-                    {row.kind === "builtin" && <span className="df-candidate-task-badge">{zh ? "默认" : "Built-in"}</span>}
-                  </div>
+                      </span>
+                    ) : null}
+                  </CandidateBlock>
                 );
               })}
-              {/* New-template row — same language as a candidate card */}
-              <div
-                className="df-candidate-task-row df-candidate-task-new"
-                data-active={templateKey === "draft:new" ? "true" : "false"}
+              {/* New-template row — same CandidateBlock primitive */}
+              <CandidateBlock
+                mode="template-new"
+                selected={templateKey === "draft:new"}
+                title={zh ? "新建" : "New"}
+                meta={zh ? "创建一个空白模板" : "Create a blank template"}
+                icon="+"
                 onClick={createCustomTemplate}
-              >
-                <div className="df-candidate-task-main">
-                  <span className="df-candidate-task-title">{zh ? "新建" : "New"}</span>
-                  <small className="df-candidate-task-meta">{zh ? "创建一个空白模板" : "Create a blank template"}</small>
-                </div>
-                <span className="df-candidate-task-plus">+</span>
-              </div>
+              />
             </div>
-          </section>
+          </CandidatePanelShell>
 
           {/* ── Right: real df-timeline-panel shell (same class as execution page) ── */}
           <section className="df-timeline-panel" id="df-template-timeline">
@@ -8962,7 +8965,7 @@ function ScheduleTemplateModal({
                 ) : null}
                 <span className="df-template-name-meta">{rowSpan(periods.length, periods.map((p) => ({ start: minutesToTime(p.startMinutes), end: minutesToTime(p.startMinutes + p.durationMinutes) })))}</span>
               </div>
-              <TimelineCanvasShell
+              <TimelineCanvas
                 scrollRef={timelineRef}
                 height={TIMELINE_HEIGHT}
                 onCanvasPointerDown={handleTimelinePointerDown}
@@ -8982,11 +8985,11 @@ function ScheduleTemplateModal({
                     const startStr = minutesToTime(period.startMinutes);
                     const endStr = minutesToTime(period.startMinutes + period.durationMinutes);
                     return (
-                      <TaskBlock
+                      <TimelineEventBlock
                         key={period.id}
-                        as="div"
-                        variant="scheduled"
-                        appearance="calm"
+                        mode="template"
+                        title={period.title}
+                        timeRange={`${startStr}–${endStr}`}
                         className="df-template-period-block"
                         style={{ position: "absolute", left: "56px", right: "8px", top: `${top}px`, height: `${height}px` }}
                         dataAttrs={{ "template-period": "true" }}
@@ -8998,36 +9001,14 @@ function ScheduleTemplateModal({
                             setEditingTitle(period.title);
                           }
                         }}
-                        main={
-                          <>
-                            <div className="df-resize-dot top" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-top")} />
-                            <div className="df-time-block-body">
-                              {isEditing ? (
-                                <input
-                                  className="df-template-period-title-input"
-                                  autoFocus
-                                  value={editingTitle}
-                                  onChange={(e) => setEditingTitle(e.target.value)}
-                                  onBlur={() => commitPeriodTitle(period.id)}
-                                  onKeyDown={(e) => { if (e.key === "Enter") commitPeriodTitle(period.id); if (e.key === "Escape") setEditingPeriodId(null); }}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                <span className="df-time-block-title">{period.title || (zh ? "未命名" : "Untitled")}</span>
-                              )}
-                              <span className="df-time-block-time">{startStr}–{endStr}</span>
-                            </div>
-                            <div className="df-resize-dot bottom" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-bottom")} />
-                            <button
-                              type="button"
-                              className="df-template-period-delete"
-                              aria-label={zh ? "删除时间段" : "Delete period"}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); removePeriod(period.id); }}
-                            >×</button>
-                          </>
-                        }
+                        onResizeStart={(edge) => (e) => beginPeriodDrag(e, period, edge === "top" ? "resize-top" : "resize-bottom")}
+                        onDelete={() => removePeriod(period.id)}
+                        editing={isEditing}
+                        editingTitle={editingTitle}
+                        onTitleChange={setEditingTitle}
+                        onTitleCommit={() => commitPeriodTitle(period.id)}
+                        onTitleCancel={() => setEditingPeriodId(null)}
+                        lang={lang}
                       />
                     );
                   })}
@@ -9040,7 +9021,7 @@ function ScheduleTemplateModal({
                       }}
                     />
                   )}
-              </TimelineCanvasShell>
+              </TimelineCanvas>
             </div>
           </section>
         </ExecutionLayoutShell>
@@ -12836,15 +12817,17 @@ function ExecutionLayoutShell({
 }
 
 /**
- * TimelineCanvasShell — the shared timeline scroll container + positioned canvas.
+ * TimelineCanvas — the shared timeline scroll container + positioned canvas.
  * Renders `df-timeline-scroll` (scroll container) wrapping `df-timeline-canvas` (the
  * absolutely-positioned canvas whose height sets the total scrollable range). The hour
  * grid, event blocks, now-line, etc. are passed as `children` so each caller keeps its
  * own grid logic (execution has 15-min slots + continuous-cross-day labels; template has
  * 25 simple hour labels). The container primitive — scroll behavior, canvas positioning,
  * time-gutter width — is shared through the same CSS classes.
+ *
+ * Used by BOTH the execution page daily timeline and the template modal timeline.
  */
-function TimelineCanvasShell({
+function TimelineCanvas({
   scrollRef,
   canvasRef,
   height,
@@ -12860,6 +12843,7 @@ function TimelineCanvasShell({
   onCanvasPointerUp,
   onCanvasPointerCancel,
   onCanvasMouseDown,
+  onCanvasClick,
   children,
 }: {
   scrollRef?: React.Ref<HTMLDivElement>;
@@ -12877,6 +12861,7 @@ function TimelineCanvasShell({
   onCanvasPointerUp?: React.PointerEventHandler<HTMLDivElement>;
   onCanvasPointerCancel?: React.PointerEventHandler<HTMLDivElement>;
   onCanvasMouseDown?: React.MouseEventHandler<HTMLDivElement>;
+  onCanvasClick?: React.MouseEventHandler<HTMLDivElement>;
   children?: React.ReactNode;
 }) {
   return (
@@ -12899,10 +12884,237 @@ function TimelineCanvasShell({
         onPointerUp={onCanvasPointerUp}
         onPointerCancel={onCanvasPointerCancel}
         onMouseDown={onCanvasMouseDown}
+        onClick={onCanvasClick}
       >
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * CandidatePanelShell — the shared left-panel section wrapper.
+ * Renders `<section className="df-candidate-panel">` — the SAME CSS class the execution
+ * page uses for Today's Candidates. Both the execution page and the template modal wrap
+ * their panel content in this shell so the panel border, radius, surface, padding, and
+ * width are identical by construction.
+ */
+function CandidatePanelShell({
+  className,
+  ariaHidden,
+  ariaLabel,
+  onDragOver,
+  onDrop,
+  children,
+}: {
+  className?: string;
+  ariaHidden?: boolean;
+  ariaLabel?: string;
+  onDragOver?: React.DragEventHandler<HTMLElement>;
+  onDrop?: React.DragEventHandler<HTMLElement>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className={`df-candidate-panel${className ? ` ${className}` : ""}`}
+      aria-hidden={ariaHidden}
+      aria-label={ariaLabel}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {children}
+    </section>
+  );
+}
+
+/**
+ * CandidatePanelHeader — the shared panel title strip.
+ * Renders `<div className="df-panel-title"><h2>{title}</h2><div>{actions}</div></div>`
+ * — the SAME structure the execution page uses for its candidate panel header. Both
+ * execution and template use this so the title style, divider, and action-button rhythm
+ * are identical.
+ */
+function CandidatePanelHeader({
+  title,
+  actions,
+}: {
+  title: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="df-panel-title">
+      <h2>{title}</h2>
+      {actions ? <div>{actions}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * CandidateBlock — the shared list-row visual primitive for items inside a candidate panel.
+ * Renders `<TaskBlock variant="candidate">` — the SAME shared component that `TaskCard`
+ * (execution page candidate items) composes. Template list items use this so the visual
+ * language (accent bar, grid layout, selected state, hover) matches execution candidate
+ * cards by construction, not by CSS imitation.
+ *
+ * mode="template"   — a selectable template row (title + meta + optional actions)
+ * mode="template-new" — the "+ new template" row (icon + title + meta)
+ */
+function CandidateBlock({
+  mode,
+  selected,
+  title,
+  meta,
+  actions,
+  icon,
+  badge,
+  onClick,
+  onDoubleClick,
+  onPointerDown,
+  children,
+}: {
+  mode: "template" | "template-new";
+  selected?: boolean;
+  title: React.ReactNode;
+  meta?: React.ReactNode;
+  actions?: React.ReactNode;
+  icon?: React.ReactNode;
+  badge?: React.ReactNode;
+  onClick?: React.MouseEventHandler<HTMLElement>;
+  onDoubleClick?: React.MouseEventHandler<HTMLElement>;
+  onPointerDown?: React.PointerEventHandler<HTMLElement>;
+  children?: React.ReactNode;
+}) {
+  return (
+    <TaskBlock
+      as="div"
+      variant="candidate"
+      appearance="calm"
+      selected={selected}
+      className={`df-candidate-block df-candidate-block--${mode}`}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onPointerDown={onPointerDown}
+      main={
+        <span className="df-candidate-block-content">
+          {children}
+          <span className="df-candidate-block-title">{title}</span>
+          {meta ? <small className="df-candidate-block-meta">{meta}</small> : null}
+        </span>
+      }
+      trailing={
+        <>
+          {badge ? <span className="df-candidate-block-badge">{badge}</span> : null}
+          {actions ? <span className="df-candidate-block-actions">{actions}</span> : null}
+          {icon ? <span className="df-candidate-block-icon">{icon}</span> : null}
+        </>
+      }
+    />
+  );
+}
+
+/**
+ * TimelineEventBlock — the shared scheduled-block visual primitive for timeline events.
+ * Renders `<TaskBlock variant="scheduled">` — the SAME shared component that `TimeBlock`
+ * (execution page scheduled blocks) composes. Template period blocks use this so the
+ * visual language (scheduled appearance, resize dots, body, time range) matches execution
+ * scheduled blocks by construction.
+ *
+ * mode="template" — a template period block (resize dots + title + time range + delete)
+ * mode="execution" — reserved for future use; execution currently uses `TimeBlock` which
+ *   composes the same `TaskBlock variant="scheduled"` primitive.
+ */
+function TimelineEventBlock({
+  mode,
+  title,
+  timeRange,
+  selected,
+  style,
+  className,
+  dataAttrs,
+  onPointerDown,
+  onClick,
+  onResizeStart,
+  onDelete,
+  editing,
+  editingTitle,
+  onTitleChange,
+  onTitleCommit,
+  onTitleCancel,
+  lang,
+  children,
+}: {
+  mode: "template" | "execution";
+  title: string;
+  timeRange?: string;
+  selected?: boolean;
+  style?: CSSProperties;
+  className?: string;
+  dataAttrs?: Record<string, string | undefined>;
+  onPointerDown?: React.PointerEventHandler<HTMLElement>;
+  onClick?: React.MouseEventHandler<HTMLElement>;
+  onResizeStart?: (edge: "top" | "bottom") => React.PointerEventHandler<HTMLElement>;
+  onDelete?: React.MouseEventHandler<HTMLElement>;
+  editing?: boolean;
+  editingTitle?: string;
+  onTitleChange?: (value: string) => void;
+  onTitleCommit?: () => void;
+  onTitleCancel?: () => void;
+  lang?: Language;
+  children?: React.ReactNode;
+}) {
+  const untitled = lang === "zh" ? "未命名" : "Untitled";
+  return (
+    <TaskBlock
+      as="div"
+      variant="scheduled"
+      appearance="calm"
+      selected={selected}
+      className={className}
+      style={style}
+      dataAttrs={dataAttrs}
+      onPointerDown={onPointerDown}
+      onClick={onClick}
+      main={
+        <>
+          {onResizeStart ? (
+            <div className="df-resize-dot top" onPointerDown={onResizeStart("top")} />
+          ) : null}
+          <div className="df-time-block-body">
+            {editing && onTitleChange ? (
+              <input
+                className="df-template-period-title-input"
+                autoFocus
+                value={editingTitle}
+                onChange={(e) => onTitleChange(e.target.value)}
+                onBlur={onTitleCommit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onTitleCommit?.();
+                  if (e.key === "Escape") onTitleCancel?.();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="df-time-block-title">{title || untitled}</span>
+            )}
+            {timeRange ? <span className="df-time-block-time">{timeRange}</span> : null}
+            {children}
+          </div>
+          {onResizeStart ? (
+            <div className="df-resize-dot bottom" onPointerDown={onResizeStart("bottom")} />
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              className="df-template-period-delete"
+              aria-label={lang === "zh" ? "删除时间段" : "Delete period"}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onDelete(e); }}
+            >×</button>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 

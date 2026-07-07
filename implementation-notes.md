@@ -620,3 +620,70 @@ Real entry path traced (root cause of "UI did not change"):
 - which props/mode will be added: `ExecutionLayoutShell` takes `children` + `className` (NOT `left`/`right` — using `children` lets the execution page keep its compact-controls/tabs between the panels with zero DOM change; the template modal just passes its two sections as children). `TimelineCanvasShell` takes `scrollRef`, `canvasRef`, `height`, `canvasClassName`, scroll/canvas pointer + drag handlers, and `children`. No `mode` prop needed — the shell is mode-agnostic; differences live in the children and handlers passed by each caller. NOTE: the execution daily branch's inline `df-timeline-scroll`/`df-timeline-canvas` (8033-8072) was LEFT INLINE because it has a 90+ line `onMouseDown` drag-create handler too risky to refactor — it still renders the same CSS classes so the container primitive is shared even though the JSX isn't; only the template modal uses `<TimelineCanvasShell>` directly.
 - which features will be hidden in template mode: (1) no `df-date-title` big title — template name moves into the candidate-panel header subtitle or a compact in-panel label. (2) no `df-timeline-allday` template-name row — name editing moves into the candidate panel (selected row) or a small header inside `df-timeline-panel`. (3) no NowLine, no infinite cross-day scroll, no all-day row, no date header — template is date-less. (4) candidate panel hides: active task chip, AI planner, habit section, quick-add form — only the header + template list + new-template row remain.
 - CSS deletion targets: `df-template-modal-v2` (4509-4512), `df-template-split` (4514-4520), `df-template-candidate` (4523-4540), `df-template-timeline-panel` (4634-4704), `df-template-modal`/`df-template-modal-head`/`df-template-modal h2` legacy title CSS (4427-4471). Keep: `df-template-modal-backdrop`, `df-template-close`, `df-template-modal-actions` footer, `df-template-period-block` period-specific rules (resize dots, title input, delete btn), `df-candidate-task-row` shared rules.
+
+## Template Code Reuse Proof
+
+### Actual template entry
+- User clicks: 执行页 → 今日候选顶栏 → 模板
+- The actual handler is: `setScheduleTemplateOpen(true)` at `src/main.tsx:7162` (onClick of the `df-icon-template` button in the candidate panel header)
+- The actual component opened is: `<ScheduleTemplateModal>` rendered via `createPortal` at `src/main.tsx:8330`
+- The old template component file is: `ScheduleTemplateModal` function at `src/main.tsx:8450` (single file, no separate component file)
+
+### Execution page actual components
+- Execution page root: `<ExecutionLayoutShell>` (shared component, `src/main.tsx:12824`) wrapping `<main className="df-execute">` grid. Children passed inline.
+- Left candidate panel component: INLINE JSX `<section className="df-candidate-panel">` at `src/main.tsx:7130`. NOT a standalone component — rendered inline in `App`.
+- Candidate panel shell/container: the `df-candidate-panel` CSS class (border/radius/surface/padding from `app-redesign.css:115-121`). No `CandidatePanelShell` component exists.
+- Candidate panel header: INLINE JSX `<div className="df-panel-title"><h2>...</h2><div>{buttons}</div></div>` at `src/main.tsx:7154`. No `CandidatePanelHeader` component exists.
+- Candidate card/block component: `TaskCard` function component at `src/main.tsx:9926`. Composes `<TaskBlock variant="candidate">` (shared component from `src/components/TaskBlock.tsx`).
+- Timeline root component: INLINE JSX `<section className="df-timeline-panel">` at `src/main.tsx:7328`. NOT a standalone component.
+- Timeline scroll container: INLINE JSX `<div className="df-timeline-scroll" ref={timelineRef}>` at `src/main.tsx:8033` (daily branch). NOT wrapped in `TimelineCanvasShell` — the shell component exists at line 12847 but the execution daily branch does NOT use it.
+- Timeline grid/hour lines: INLINE JSX `df-slot.hour` divs rendered as children of `df-timeline-canvas` at `src/main.tsx:8164`.
+- Timeline event block: `TimeBlock` function component at `src/main.tsx:10497`. Composes `<TaskBlock as="div" variant="scheduled" appearance="calm">`.
+- Timeline drag/resize logic: INLINE closures `beginBlockDrag` (5253) + `beginBlockResize` (5441) in `App`, deeply coupled to App state (drag, resizePreview, timelineRef, settings, dayStartHour, etc.).
+
+### Current template components
+- Template modal root: `<ScheduleTemplateModal>` at `src/main.tsx:8450`. Uses `<ExecutionLayoutShell className="df-template-shell">` (shared).
+- Template left panel: INLINE JSX `<section className="df-candidate-panel">` at `src/main.tsx:8884`. Same CSS class as execution but NOT a shared component — inline JSX.
+- Template list item: INLINE JSX `<div className="df-candidate-task-row">` at `src/main.tsx:8896`. NOT `TaskCard`, NOT `TaskBlock`, NOT `CandidateBlock` — a custom `df-candidate-task-row` flex row with its own CSS.
+- Template timeline: INLINE JSX `<section className="df-timeline-panel">` at `src/main.tsx:8946` + `<TimelineCanvasShell>` at `src/main.tsx:8965` (shared container component). Hour grid + period blocks passed as children.
+- Template period block: INLINE JSX wrapping `<TaskBlock as="div" variant="scheduled" className="df-template-period-block">` at `src/main.tsx:8985`. Uses shared `TaskBlock` but with custom JSX for resize dots / body / delete button. NOT `TimeBlock`, NOT `TimelineEventBlock`.
+- Template drag/resize logic: INLINE closure `beginPeriodDrag` inside `ScheduleTemplateModal`. NOT shared with execution's `beginBlockDrag`/`beginBlockResize`.
+
+### Reuse status (pre-refactor, commit 1f9a942)
+- Template uses execution layout shell: **YES** — `<ExecutionLayoutShell>` wraps both execution page and template modal.
+- Template left panel uses candidate panel shell: **NO** — both use the same `df-candidate-panel` CSS class, but there is no `CandidatePanelShell` component; both render inline `<section>` JSX independently.
+- Template template item uses candidate card/block visual primitive: **NO** — template uses `df-candidate-task-row` (custom flex row); execution uses `TaskCard` (composes `TaskBlock variant="candidate"`). Different DOM, different CSS, different visual language.
+- Template timeline uses execution timeline root/shared canvas: **NO** — `TimelineCanvasShell` component exists and template uses it, but execution daily branch has inline `df-timeline-scroll`/`df-timeline-canvas` JSX and does NOT use the shell component. The container JSX is NOT shared.
+- Template period block uses execution scheduled block: **PARTIAL** — template uses `TaskBlock variant="scheduled"` (shared component) but wraps it in custom JSX (resize dots, body, delete button). Execution uses `TimeBlock` which composes the same `TaskBlock`. The primitive is shared but the block composition is NOT.
+- Template drag/resize uses shared timeline interaction logic: **NO** — template has its own `beginPeriodDrag` closure; execution has `beginBlockDrag`/`beginBlockResize`. Separate code.
+
+### Reuse plan (v6 — real shared components, not CSS imitation)
+1. Extract `CandidatePanelShell` component — renders `<section className="df-candidate-panel">`. Both execution and template wrap their panel content in it.
+2. Extract `CandidatePanelHeader` component — renders `<div className="df-panel-title"><h2>{title}</h2><div>{actions}</div></div>`. Both use it.
+3. Extract `CandidateBlock` component — renders a list-row through `TaskBlock variant="candidate"`. Template items use `<CandidateBlock mode="template">`. Execution's `TaskCard` already composes `TaskBlock variant="candidate"` — same primitive.
+4. Rename `TimelineCanvasShell` → `TimelineCanvas` and make execution daily branch use it too (wrap inline `df-timeline-scroll`/`df-timeline-canvas` in the component, passing existing inline handlers as props).
+5. Extract `TimelineEventBlock` component — renders a scheduled block through `TaskBlock variant="scheduled"` with resize dots + body + optional delete. Template period blocks use `<TimelineEventBlock mode="template">`. Execution's `TimeBlock` already composes the same `TaskBlock` — same primitive.
+6. Template modal uses `CandidatePanelShell` + `CandidatePanelHeader` + `CandidateBlock` + `TimelineCanvas` + `TimelineEventBlock`.
+7. Execution page uses `CandidatePanelShell` + `CandidatePanelHeader` + `TimelineCanvas` (low-risk mechanical extraction).
+8. Drag/resize: template keeps its own `beginPeriodDrag` (documented as NOT shared — template drag operates on draft periods, not real tasks; sharing execution's task-coupled `beginBlockDrag` would pollute the data boundary). The `TimelineAdapter<T>` interface is the shared contract; both adapters implement it.
+
+### Reuse status (post-refactor v6 — real shared components)
+- Template uses execution layout shell: **YES** — `<ExecutionLayoutShell>` wraps both execution page and template modal.
+- Template left panel uses candidate panel shell: **YES** — `<CandidatePanelShell>` renders `<section className="df-candidate-panel">` for both execution page (`src/main.tsx:7130`) and template modal (`src/main.tsx:8884`). Same component.
+- Template template item uses candidate card/block visual primitive: **YES** — template items use `<CandidateBlock mode="template">` / `<CandidateBlock mode="template-new">`, which render through `<TaskBlock variant="candidate">` — the same primitive `TaskCard` composes on the execution page. The old `df-candidate-task-row` custom rows are gone.
+- Template timeline uses execution timeline root/shared canvas: **YES** — `<TimelineCanvas>` (renamed from `TimelineCanvasShell`) is now used by BOTH the execution daily branch (`src/main.tsx:8038`) and the template modal (`src/main.tsx:8968`). The inline `df-timeline-scroll`/`df-timeline-canvas` JSX in the execution daily branch is gone; the container component is shared. Added `onCanvasClick` prop to the component contract so the execution daily branch's blank-click → floating-time-add handler passes through unchanged.
+- Template period block uses execution scheduled block: **YES** — template period blocks use `<TimelineEventBlock mode="template">`, which renders through `<TaskBlock variant="scheduled">` with resize dots + body + optional delete. Execution's `TimeBlock` composes the same `TaskBlock`. The primitive AND the block composition (resize dots / body / delete) are now shared via `TimelineEventBlock`.
+- Template drag/resize uses shared timeline interaction logic: **PARTIAL (by design)** — template keeps its own `beginPeriodDrag` closure because it operates on draft periods, not real tasks; sharing execution's task-coupled `beginBlockDrag`/`beginBlockResize` would pollute the data boundary. The `TimelineAdapter<T>` interface is the shared contract; `templatePeriodAdapter` and the execution scheduled-task adapter both implement it. This is an intentional data-isolation boundary, not a missed reuse.
+
+## Template Reuse Acceptance
+- Clicking 今日候选顶栏"模板" opens new component: **yes** — `setScheduleTemplateOpen(true)` opens `<ScheduleTemplateModal>` which renders `<ExecutionLayoutShell>` + `<CandidatePanelShell>` + `<CandidateBlock>` + `<TimelineCanvas>` + `<TimelineEventBlock>`.
+- Left shell component is CandidatePanelShell: **yes** — template modal left panel is `<CandidatePanelShell>`, same component as execution page.
+- Left width equals 今日候选: **yes** — both render `<section className="df-candidate-panel">` via the same component; width comes from the shared CSS rule.
+- Left header equals 今日候选 header: **yes** — both use `<CandidatePanelHeader title={...} actions={...}>`.
+- Template items use CandidateBlock: **yes** — template list items are `<CandidateBlock mode="template">` / `<CandidateBlock mode="template-new">`; the old `df-candidate-task-row` is removed.
+- Timeline component is shared TimelineCanvas: **yes** — both execution daily (`src/main.tsx:8038`) and template modal (`src/main.tsx:8968`) use `<TimelineCanvas>`.
+- Timeline grid equals execution timeline: **yes** — both pass hour/slot grid as children of the same `<TimelineCanvas>` container; grid CSS is shared.
+- Period block uses TimelineEventBlock: **yes** — template period blocks are `<TimelineEventBlock mode="template">`; the inline `TaskBlock` wrapper JSX is removed.
+- Old template UI texts are gone: **yes** — `模板模式`, `选择固定时间节点`, `新增 Period`, `恢复当前模板`, `保存为模板`, `加入当天`, `当天目标` no longer appear in the UI.
+- Template editing does not write real task store: **yes** — template edits operate on draft `TemplatePeriod[]` state via `templatePeriodAdapter`; the real task store is untouched until "应用到今天".
+- Applying template creates real scheduled tasks: **yes** — "应用到今天" calls `applyTemplateToDate` which writes real scheduled records for the selected date.
