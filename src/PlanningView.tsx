@@ -86,14 +86,14 @@ function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadi
  *   right side: labelX = lineEnd.x + 8, textAnchor "start"
  *   left side:  labelX = lineEnd.x - 8, textAnchor "end"
  *
- * Only the top 5 projects OR those with percentage >= 6% get a
- * permanent external label; smaller segments stay in the project
- * list and can surface on hover. A single sort-and-push pass per
- * side resolves Y overlaps; labels that would need to move more
- * than MAX_LABEL_SHIFT, or that fall outside the safe chart area,
- * are hidden to keep the chart calm. Hover only re-anchors the
- * active segment's anchor point so the leader still touches the
- * expanded arc; elbow, lineEnd and label positions stay put.
+ * EVERY segment gets a permanent external label — project names are
+ * standing annotations, not hover tooltips. No percentage/top-N
+ * filtering, no hide-on-overflow. A single sort-and-push pass per
+ * side resolves Y overlaps; if the lane overflows its safe band the
+ * whole lane shifts up so all labels stay visible and within bounds.
+ * Hover only re-anchors the active segment's anchor point so the
+ * leader still touches the expanded arc; elbow, lineEnd and label
+ * positions stay put — hover never hides or reshuffles other labels.
  * ============================================================ */
 
 interface DonutAnnotationResult {
@@ -112,42 +112,32 @@ interface DonutAnnotationResult {
   elbowY: number;
   lineEndX: number;
   lineEndY: number;
-  /** Whether the label is shown by default (top 5 / >= 6%). */
-  visible: boolean;
 }
 
 const DONUT_HORIZONTAL_LENGTH = 42;
 const DONUT_LABEL_PAD_X = 8;
 const DONUT_LABEL_BIAS_Y = 4;
-const DONUT_MIN_LABEL_GAP = 22;
-const DONUT_MAX_LABEL_SHIFT = 36;
-const DONUT_LABEL_MIN_PERCENT = 6;
-const DONUT_LABEL_MAX_COUNT = 5;
-const DONUT_LABEL_RIGHT_MAX = 300;
-const DONUT_LABEL_LEFT_MIN = -60;
+const DONUT_MIN_LABEL_GAP = 20;
 
 /**
- * Build annotation results for all donut segments. Deterministic:
- * anchor/elbow/lineEnd come from the segment's mid-angle, label sits
- * beside the line end. Only default-visible labels participate in
- * Y collision resolution; labels needing too much shift or falling
- * outside the safe chart area are hidden (they remain in the project
- * list and can surface on hover).
+ * Build annotation results for ALL donut segments. Every segment gets
+ * a permanent external label — no top-N / percentage filtering, no
+ * hide-on-overflow. anchor/elbow/lineEnd come from the segment's
+ * mid-angle; label sits beside the line end. A single sort-and-push
+ * pass per side resolves Y overlaps; if the lane overflows its safe
+ * band the whole lane shifts up so all labels stay visible and within
+ * the chart area.
  */
 function layoutDonutAnnotations(
   cx: number,
   cy: number,
   visualOuter: number,
-  segments: Array<{ group: { id: string; label: string; color: string; percentage: number }; startAngle: number; endAngle: number }>,
+  segments: Array<{ group: { id: string; label: string; color: string }; startAngle: number; endAngle: number }>,
 ): DonutAnnotationResult[] {
   const anchorOffset = 4;
   const elbowRadius = visualOuter + 34;
-  const labelMinY = cy - visualOuter - 60;
-  const labelMaxY = cy + visualOuter + 60;
-
-  // Default visibility: top N by percentage, or any segment >= MIN_PERCENT.
-  const ranked = [...segments].sort((a, b) => b.group.percentage - a.group.percentage);
-  const topIds = new Set(ranked.slice(0, DONUT_LABEL_MAX_COUNT).map((s) => s.group.id));
+  const labelMinY = cy - visualOuter - 64;
+  const labelMaxY = cy + visualOuter + 64;
 
   // Phase 1: per-segment geometry — anchor, elbow, lineEnd, label.
   const raw = segments.map(({ group, startAngle, endAngle }) => {
@@ -160,7 +150,6 @@ function layoutDonutAnnotations(
     const lineEndY = elbow.y;
     const labelX = side === "right" ? lineEndX + DONUT_LABEL_PAD_X : lineEndX - DONUT_LABEL_PAD_X;
     const labelY = lineEndY + DONUT_LABEL_BIAS_Y;
-    const visibleByRank = topIds.has(group.id) || group.percentage >= DONUT_LABEL_MIN_PERCENT;
     return {
       id: group.id,
       label: group.label,
@@ -176,26 +165,40 @@ function layoutDonutAnnotations(
       labelX,
       labelY,
       idealY: labelY,
-      visibleByRank,
-      visible: visibleByRank,
     };
   });
 
-  // Phase 2: per-side Y collision resolution among default-visible labels.
+  // Phase 2: per-side Y collision resolution (sort + push down, then
+  // shift the whole lane up if it overflowed, then clamp). No hiding —
+  // every segment keeps its label.
   (["left", "right"] as const).forEach((side) => {
-    const lane = raw.filter((n) => n.side === side && n.visibleByRank).sort((a, b) => a.idealY - b.idealY);
+    const lane = raw.filter((n) => n.side === side).sort((a, b) => a.idealY - b.idealY);
+    if (lane.length === 0) return;
     for (let i = 1; i < lane.length; i++) {
       if (lane[i].labelY - lane[i - 1].labelY < DONUT_MIN_LABEL_GAP) {
         lane[i].labelY = lane[i - 1].labelY + DONUT_MIN_LABEL_GAP;
         lane[i].lineEndY = lane[i].labelY - DONUT_LABEL_BIAS_Y;
       }
     }
-    // Hide labels that moved too far or fall outside the safe vertical bounds.
+    // If the lane overflowed downward, shift the whole lane back up so
+    // the last label stays within labelMaxY; then clamp each label to
+    // the safe band as a final guard.
+    const overflow = lane[lane.length - 1].labelY - labelMaxY;
+    if (overflow > 0) {
+      for (const n of lane) {
+        n.labelY -= overflow;
+        n.lineEndY -= overflow;
+      }
+    }
     for (const n of lane) {
-      const shift = Math.abs(n.labelY - n.idealY);
-      const outOfBounds = n.labelY < labelMinY || n.labelY > labelMaxY;
-      if (shift > DONUT_MAX_LABEL_SHIFT || outOfBounds) {
-        n.visible = false;
+      if (n.labelY < labelMinY) {
+        const dy = labelMinY - n.labelY;
+        n.labelY = labelMinY;
+        n.lineEndY += dy;
+      } else if (n.labelY > labelMaxY) {
+        const dy = n.labelY - labelMaxY;
+        n.labelY = labelMaxY;
+        n.lineEndY -= dy;
       }
     }
   });
@@ -216,7 +219,6 @@ function layoutDonutAnnotations(
     elbowY: n.elbowY,
     lineEndX: n.lineEndX,
     lineEndY: n.lineEndY,
-    visible: n.visible,
   }));
 }
 
@@ -2051,11 +2053,11 @@ export default function PlanningView(props: {
   }, []);
 
   /**
-   * Compact 2-segment leader layout for donut outside labels. Only top 5
-   * projects OR segments >= 6% get a permanent label; smaller segments
-   * stay in the project list and can surface on hover. Layout uses the
-   * NON-hovered outer radius so labels don't jump when a segment expands;
-   * the active segment's anchor re-anchors to its hovered radius while
+   * Compact 2-segment leader layout for donut outside labels. EVERY
+   * segment gets a permanent external label — no top-N / percentage
+   * filtering, no hide-on-overflow. Layout uses the NON-hovered outer
+   * radius so labels don't jump when a segment expands; the active
+   * segment's anchor re-anchors to its hovered radius while
    * elbow/lineEnd/label positions stay stable.
    */
   const donutAnnotations = useMemo(() => {
@@ -2414,16 +2416,15 @@ export default function PlanningView(props: {
                           </g>
                           {/* Label layer: short 2-segment leader + side label.
                               pointer-events none so they never interfere with
-                              the hit disk. Only default-visible labels render;
-                              a hidden label also renders when its segment is
-                              hovered so users can still identify it. The active
-                              segment's anchor re-anchors to the hovered outer
-                              radius so the leader still touches the expanded
-                              arc; elbow/lineEnd/label stay put (no jump). */}
+                              the hit disk. EVERY segment renders a permanent
+                              label — project names are standing annotations,
+                              not hover tooltips. The active segment's anchor
+                              re-anchors to the hovered outer radius so the
+                              leader still touches the expanded arc; elbow/
+                              lineEnd/label stay put (no jump, no reshuffle). */}
                           <g className="df-metrics-donut-label-layer">
                             {donutAnnotations.map((ann) => {
                               const isActive = activeDonutGroup?.id === ann.id;
-                              if (!ann.visible && !isActive) return null;
                               // Anchor follows the (possibly expanded) outer radius;
                               // elbow + lineEnd are precomputed at the resting radius
                               // so the label position never moves on hover.
