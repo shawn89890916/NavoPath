@@ -340,10 +340,6 @@ type BuiltInScheduleTemplateSlot = {
   titleZh: string;
   titleEn: string;
 };
-type ScheduleTemplateDraftSlot = BuiltInScheduleTemplateSlot & {
-  selected: boolean;
-  title: string;
-};
 type ScheduleTemplateApplySlot = {
   title: string;
   start: string;
@@ -8462,135 +8458,201 @@ function ScheduleTemplateModal({
   onApply: (slots: ScheduleTemplateApplySlot[], conflictCount: number) => void;
   onClose: () => void;
 }) {
+  // Template mode = execution-page interaction model applied to date-less
+  // template periods. Left list visually corresponds to 今日候选; right
+  // timeline editor visually corresponds to the execution timeline. Periods
+  // store only { title, startMinutes, durationMinutes } and never pollute the
+  // real task store until Apply.
   type TemplateKey = `builtin:${BuiltInScheduleTemplateId}` | `custom:${string}` | "draft:new";
+  type TemplatePeriod = { id: string; title: string; startMinutes: number; durationMinutes: number };
   const [templateKey, setTemplateKey] = useState<TemplateKey>("builtin:school");
   const [templateName, setTemplateName] = useState("");
-  const [slots, setSlots] = useState<ScheduleTemplateDraftSlot[]>(() => makeBuiltInDraft("school"));
+  const [periods, setPeriods] = useState<TemplatePeriod[]>(() => makeBuiltInPeriods("school"));
   const [templateNotice, setTemplateNotice] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [dragState, setDragState] = useState<{ periodId: string; mode: "move" | "resize-top" | "resize-bottom"; originY: number; originStart: number; originDuration: number } | null>(null);
+  const [creatingState, setCreatingState] = useState<{ startMinutes: number; currentMinutes: number } | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
   const zh = lang === "zh";
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        if (dragState || creatingState || renamingId || editingPeriodId) {
+          setDragState(null);
+          setCreatingState(null);
+          setRenamingId(null);
+          setEditingPeriodId(null);
+        } else {
+          onClose();
+        }
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, dragState, creatingState, renamingId, editingPeriodId]);
 
-  function makeBuiltInDraft(id: BuiltInScheduleTemplateId) {
-    return SCHEDULE_TEMPLATES[id].slots.map((slot) => ({
-      ...slot,
-      selected: false,
-      title: "",
-    }));
+  // ── Period factory helpers ──
+  function slotToPeriod(slot: BuiltInScheduleTemplateSlot): TemplatePeriod {
+    const startMinutes = timeToMinutes(slot.start);
+    const endMinutes = timeToMinutes(slot.end);
+    return {
+      id: slot.id || uid("period"),
+      title: zh ? slot.labelZh : slot.labelEn,
+      startMinutes,
+      durationMinutes: Math.max(SLOT_MINUTES, endMinutes - startMinutes),
+    };
   }
 
-  function makeCustomDraft(template: ScheduleTemplate) {
+  function makeBuiltInPeriods(id: BuiltInScheduleTemplateId): TemplatePeriod[] {
+    return SCHEDULE_TEMPLATES[id].slots.map(slotToPeriod);
+  }
+
+  function makeCustomPeriods(template: ScheduleTemplate): TemplatePeriod[] {
     return template.slots.map((slot, index) => ({
-      id: slot.id || uid("slot"),
-      labelZh: slot.label || `第 ${index + 1} 段`,
-      labelEn: slot.label || `Period ${index + 1}`,
-      start: slot.start || "09:00",
-      end: slot.end || "10:00",
-      titleZh: "填写任务目标",
-      titleEn: "Goal for this block",
-      selected: false,
-      title: "",
+      id: slot.id || uid("period"),
+      title: slot.label || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
+      startMinutes: timeToMinutes(slot.start || "09:00"),
+      durationMinutes: Math.max(SLOT_MINUTES, timeToMinutes(slot.end || "10:00") - timeToMinutes(slot.start || "09:00")),
     }));
   }
 
-  function makeBlankCustomDraft() {
+  function makeBlankPeriods(): TemplatePeriod[] {
     return [
-      {
-        id: uid("slot"),
-        labelZh: zh ? "第一段" : "Period 1",
-        labelEn: zh ? "第一段" : "Period 1",
-        start: "09:00",
-        end: "10:00",
-        titleZh: "填写任务目标",
-        titleEn: "Goal for this block",
-        selected: false,
-        title: "",
-      },
-      {
-        id: uid("slot"),
-        labelZh: zh ? "第二段" : "Period 2",
-        labelEn: zh ? "第二段" : "Period 2",
-        start: "10:15",
-        end: "11:15",
-        titleZh: "填写任务目标",
-        titleEn: "Goal for this block",
-        selected: false,
-        title: "",
-      },
+      { id: uid("period"), title: zh ? "第一段" : "Period 1", startMinutes: 9 * 60, durationMinutes: 60 },
+      { id: uid("period"), title: zh ? "第二段" : "Period 2", startMinutes: 10 * 60 + 15, durationMinutes: 60 },
     ];
   }
 
   function changeTemplate(key: TemplateKey) {
     setTemplateKey(key);
     setTemplateNotice("");
+    setRenamingId(null);
+    setEditingPeriodId(null);
     if (key.startsWith("builtin:")) {
       const id = key.replace("builtin:", "") as BuiltInScheduleTemplateId;
       setTemplateName("");
-      setSlots(makeBuiltInDraft(id));
+      setPeriods(makeBuiltInPeriods(id));
+      return;
+    }
+    if (key === "draft:new") {
+      setTemplateName("");
+      setPeriods(makeBlankPeriods());
       return;
     }
     const id = key.replace("custom:", "");
     const template = customTemplates.find((item) => item.id === id);
     if (!template) return;
     setTemplateName(template.title);
-    setSlots(makeCustomDraft(template));
+    setPeriods(makeCustomPeriods(template));
   }
 
-  function updateSlot(slotId: string, patch: Partial<ScheduleTemplateDraftSlot>) {
-    setSlots((current) => current.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+  // ── Period editing ──
+  function updatePeriod(periodId: string, patch: Partial<TemplatePeriod>) {
+    setPeriods((current) => current.map((p) => p.id === periodId ? { ...p, ...patch } : p));
     setTemplateNotice("");
   }
 
-  function addSlot() {
-    setSlots((current) => {
-      const last = current[current.length - 1];
-      const start = last?.end && validTime(last.end) ? last.end : "09:00";
-      const end = addMinutes(start, 45);
-      const index = current.length + 1;
-      return [...current, {
-        id: `custom-${Date.now().toString(36)}-${index}`,
-        labelZh: `第 ${index} 段`,
-        labelEn: `Period ${index}`,
-        start,
-        end,
-        titleZh: "填写任务目标",
-        titleEn: "Goal for this block",
-        selected: true,
-        title: "",
-      }];
-    });
-  }
-
-  function removeSlot(slotId: string) {
-    setSlots((current) => current.filter((slot) => slot.id !== slotId));
+  function removePeriod(periodId: string) {
+    setPeriods((current) => current.filter((p) => p.id !== periodId));
+    setEditingPeriodId(null);
     setTemplateNotice("");
   }
 
+  // ── Timeline pointer interactions ──
+  const TIMELINE_TOTAL_MINUTES = 24 * 60;
+  const TIMELINE_TOTAL_SLOTS = TIMELINE_TOTAL_MINUTES / SLOT_MINUTES;
+  const TIMELINE_HEIGHT = TIMELINE_TOTAL_SLOTS * SLOT_HEIGHT;
+
+  function pointerToMinutes(clientY: number): number {
+    const el = timelineRef.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    const raw = ((clientY - rect.top) / rect.height) * TIMELINE_TOTAL_MINUTES;
+    const snapped = Math.round(raw / SLOT_MINUTES) * SLOT_MINUTES;
+    return Math.max(0, Math.min(TIMELINE_TOTAL_MINUTES - SLOT_MINUTES, snapped));
+  }
+
+  function handleTimelinePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("[data-template-period]")) return;
+    const startMinutes = pointerToMinutes(event.clientY);
+    setCreatingState({ startMinutes, currentMinutes: startMinutes + SLOT_MINUTES });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function handleTimelinePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (creatingState) {
+      const current = pointerToMinutes(event.clientY);
+      setCreatingState((prev) => prev ? { ...prev, currentMinutes: Math.max(current, prev.startMinutes + SLOT_MINUTES) } : prev);
+      return;
+    }
+    if (!dragState) return;
+    const el = timelineRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const deltaMinutes = Math.round(((event.clientY - dragState.originY) / rect.height) * TIMELINE_TOTAL_MINUTES / SLOT_MINUTES) * SLOT_MINUTES;
+    if (dragState.mode === "move") {
+      const nextStart = Math.max(0, Math.min(TIMELINE_TOTAL_MINUTES - dragState.originDuration, dragState.originStart + deltaMinutes));
+      updatePeriod(dragState.periodId, { startMinutes: nextStart });
+    } else if (dragState.mode === "resize-top") {
+      const maxStart = dragState.originStart + dragState.originDuration - SLOT_MINUTES;
+      const nextStart = Math.max(0, Math.min(maxStart, dragState.originStart + deltaMinutes));
+      const nextDuration = dragState.originDuration - (nextStart - dragState.originStart);
+      updatePeriod(dragState.periodId, { startMinutes: nextStart, durationMinutes: nextDuration });
+    } else if (dragState.mode === "resize-bottom") {
+      const nextDuration = Math.max(SLOT_MINUTES, dragState.originDuration + deltaMinutes);
+      const cappedDuration = Math.min(nextDuration, TIMELINE_TOTAL_MINUTES - dragState.originStart);
+      updatePeriod(dragState.periodId, { durationMinutes: cappedDuration });
+    }
+  }
+
+  function handleTimelinePointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (creatingState) {
+      const start = creatingState.startMinutes;
+      const end = creatingState.currentMinutes;
+      if (end > start) {
+        const newPeriod: TemplatePeriod = {
+          id: uid("period"),
+          title: zh ? "新时间段" : "New period",
+          startMinutes: start,
+          durationMinutes: end - start,
+        };
+        setPeriods((current) => [...current, newPeriod]);
+        setEditingPeriodId(newPeriod.id);
+        setEditingTitle(newPeriod.title);
+      }
+      setCreatingState(null);
+    }
+    if (dragState) setDragState(null);
+    try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* ignore */ }
+  }
+
+  function beginPeriodDrag(event: React.PointerEvent<HTMLDivElement>, period: TemplatePeriod, mode: "move" | "resize-top" | "resize-bottom") {
+    event.stopPropagation();
+    setDragState({ periodId: period.id, mode, originY: event.clientY, originStart: period.startMinutes, originDuration: period.durationMinutes });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  // ── Save / delete / duplicate / rename ──
   function currentTemplateTitle() {
     return templateName.trim();
   }
 
-  function slotLabel(slot: ScheduleTemplateDraftSlot) {
-    return (zh ? slot.labelZh : slot.labelEn).trim() || (zh ? "时间段" : "Period");
-  }
-
   function templateSlotsForSave() {
-    return slots
-      .filter((slot) => validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
-      .map((slot, index) => ({
-        id: slot.id || uid("slot"),
-        label: slotLabel(slot) || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
-        start: slot.start,
-        end: slot.end,
+    return periods
+      .filter((p) => p.durationMinutes >= SLOT_MINUTES && p.startMinutes + p.durationMinutes <= TIMELINE_TOTAL_MINUTES)
+      .map((p, index) => ({
+        id: p.id,
+        label: p.title.trim() || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
+        start: minutesToTime(p.startMinutes),
+        end: minutesToTime(p.startMinutes + p.durationMinutes),
       }));
   }
 
@@ -8631,13 +8693,26 @@ function ScheduleTemplateModal({
   function createCustomTemplate() {
     setTemplateKey("draft:new");
     setTemplateName("");
-    setSlots(makeBlankCustomDraft());
+    setPeriods(makeBlankPeriods());
     setTemplateNotice(zh ? "正在编辑新模板：先填写模板名称，再保存到自定义模板列表。" : "Editing a new template: name it before saving to Custom templates.");
   }
 
-  function deleteCustomTemplate() {
-    if (!templateKey.startsWith("custom:")) return;
-    deleteCustomTemplateById(templateKey.replace("custom:", ""));
+  function duplicateCustomTemplate(id: string) {
+    const template = customTemplates.find((item) => item.id === id);
+    if (!template) return;
+    const nowIso = new Date().toISOString();
+    const created: ScheduleTemplate = {
+      id: uid("template"),
+      title: template.title + (zh ? " 副本" : " copy"),
+      slots: template.slots.map((slot) => ({ ...slot, id: uid("slot") })),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    onSaveCustomTemplates([...customTemplates, created]);
+    setTemplateKey(`custom:${created.id}`);
+    setTemplateName(created.title);
+    setPeriods(makeCustomPeriods(created));
+    setTemplateNotice(zh ? "已复制模板。" : "Template duplicated.");
   }
 
   function deleteCustomTemplateById(id: string) {
@@ -8645,15 +8720,37 @@ function ScheduleTemplateModal({
     if (!template) return;
     const ok = window.confirm(zh ? `删除“${template.title}”？已生成的任务不会受影响。` : `Delete "${template.title}"? Existing tasks will not be changed.`);
     if (!ok) return;
-    onSaveCustomTemplates(customTemplates.filter((template) => template.id !== id));
+    onSaveCustomTemplates(customTemplates.filter((t) => t.id !== id));
     if (templateKey === `custom:${id}`) {
       setTemplateKey("builtin:school");
       setTemplateName("");
-      setSlots(makeBuiltInDraft("school"));
+      setPeriods(makeBuiltInPeriods("school"));
     }
     setTemplateNotice(zh ? "模板已删除。" : "Template deleted.");
   }
 
+  function startRename(template: ScheduleTemplate) {
+    setRenamingId(template.id);
+    setRenameDraft(template.title);
+  }
+
+  function commitRename() {
+    if (!renamingId) return;
+    const nextTitle = renameDraft.trim();
+    if (!nextTitle) { setRenamingId(null); return; }
+    const nowIso = new Date().toISOString();
+    onSaveCustomTemplates(customTemplates.map((t) => t.id === renamingId ? { ...t, title: nextTitle, updatedAt: nowIso } : t));
+    if (templateKey === `custom:${renamingId}`) setTemplateName(nextTitle);
+    setRenamingId(null);
+  }
+
+  function commitPeriodTitle(periodId: string) {
+    const trimmed = editingTitle.trim();
+    if (trimmed) updatePeriod(periodId, { title: trimmed });
+    setEditingPeriodId(null);
+  }
+
+  // ── Conflict detection (existing schedule on `date`) ──
   const existingIntervals = useMemo(() => {
     const intervals: Array<{ start: number; end: number }> = [];
     for (const task of tasks) {
@@ -8668,32 +8765,74 @@ function ScheduleTemplateModal({
     return intervals;
   }, [date, tasks]);
 
-  const applySlots = slots
-    .filter((slot) => slot.selected && validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
-    .map((slot) => ({ title: slot.title.trim() || slotLabel(slot), start: slot.start, end: slot.end }));
-  const invalidCount = slots.filter((slot) => slot.selected && (!validTime(slot.start) || !validTime(slot.end) || timeToMinutes(slot.end) <= timeToMinutes(slot.start))).length;
-  const conflictCount = applySlots.filter((slot) => {
-    const start = timeToMinutes(slot.start);
-    const end = timeToMinutes(slot.end);
+  const validPeriods = periods.filter((p) => p.durationMinutes >= SLOT_MINUTES && p.startMinutes + p.durationMinutes <= TIMELINE_TOTAL_MINUTES);
+  const conflictCount = validPeriods.filter((p) => {
+    const start = p.startMinutes;
+    const end = p.startMinutes + p.durationMinutes;
     return existingIntervals.some((item) => start < item.end && end > item.start);
   }).length;
+  const applySlots: ScheduleTemplateApplySlot[] = validPeriods
+    .filter((p) => !existingIntervals.some((item) => p.startMinutes < item.end && p.startMinutes + p.durationMinutes > item.start))
+    .map((p) => ({
+      title: p.title.trim() || (zh ? "模板时间段" : "Template block"),
+      start: minutesToTime(p.startMinutes),
+      end: minutesToTime(p.startMinutes + p.durationMinutes),
+    }));
+
   const activeBuiltInId = templateKey.startsWith("builtin:") ? templateKey.replace("builtin:", "") as BuiltInScheduleTemplateId : null;
   const activeCustom = templateKey.startsWith("custom:") ? customTemplates.find((item) => item.id === templateKey.replace("custom:", "")) : null;
   const templateDescription = activeBuiltInId
     ? (zh ? SCHEDULE_TEMPLATES[activeBuiltInId].descriptionZh : SCHEDULE_TEMPLATES[activeBuiltInId].descriptionEn)
-    : (zh ? "先编辑模板名称和 Period 时间，保存为模板；每天使用时再勾选要添加的 Period 并填写当天目标。" : "Edit the template name and periods, save it, then choose which periods to add and fill daily goals when using it.");
+    : (zh ? "在右侧时间轴上拖动创建时间段，拖动方块移动，拖动边缘调整时长；保存后可复用，点击「应用到今天」将时间段写入当天时间轴。" : "Drag on the right timeline to create periods, drag a block to move it, drag its edges to resize. Save to reuse, or Apply to today to write the blocks into today's timeline.");
   const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString(zh ? "zh-CN" : "en-US", {
     month: "short",
     day: "numeric",
     weekday: "short",
   });
 
+  // ── Template list rows (built-in + custom + new) ──
+  type ListRow =
+    | { kind: "builtin"; id: BuiltInScheduleTemplateId; title: string; periodCount: number; span: string }
+    | { kind: "custom"; id: string; title: string; periodCount: number; span: string }
+    | { kind: "draft"; title: string; periodCount: number; span: string };
+
+  function rowSpan(periodCount: number, slots: { start: string; end: string }[]): string {
+    if (slots.length === 0) return zh ? "无时间段" : "No periods";
+    const starts = slots.map((s) => timeToMinutes(s.start)).sort((a, b) => a - b);
+    const ends = slots.map((s) => timeToMinutes(s.end)).sort((a, b) => a - b);
+    return `${periodCount} ${zh ? "个时间段" : "blocks"} · ${minutesToTime(starts[0])}–${minutesToTime(ends[ends.length - 1])}`;
+  }
+
+  const listRows: ListRow[] = [
+    ...(Object.keys(SCHEDULE_TEMPLATES) as BuiltInScheduleTemplateId[]).map((id) => ({
+      kind: "builtin" as const,
+      id,
+      title: zh ? SCHEDULE_TEMPLATES[id].labelZh : SCHEDULE_TEMPLATES[id].labelEn,
+      periodCount: SCHEDULE_TEMPLATES[id].slots.length,
+      span: rowSpan(SCHEDULE_TEMPLATES[id].slots.length, SCHEDULE_TEMPLATES[id].slots),
+    })),
+    ...customTemplates.map((t) => ({
+      kind: "custom" as const,
+      id: t.id,
+      title: t.title,
+      periodCount: t.slots.length,
+      span: rowSpan(t.slots.length, t.slots),
+    })),
+    ...(templateKey === "draft:new" ? [{
+      kind: "draft" as const,
+      title: zh ? "新模板草稿" : "New draft",
+      periodCount: periods.length,
+      span: rowSpan(periods.length, periods.map((p) => ({ start: minutesToTime(p.startMinutes), end: minutesToTime(p.startMinutes + p.durationMinutes) }))),
+    }] : []),
+  ];
+
   const portalTarget = document.getElementById("df-portal-target") || document.body;
+  const hourLabels: number[] = Array.from({ length: 25 }, (_, i) => i);
 
   return createPortal(
     <div className="df-modal-backdrop df-template-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
-        className="df-template-modal"
+        className="df-template-modal df-template-modal-v2"
         role="dialog"
         aria-modal="true"
         aria-labelledby="df-template-modal-title"
@@ -8703,126 +8842,166 @@ function ScheduleTemplateModal({
           <div>
             <span className="df-template-kicker">{formattedDate}</span>
             <h2 id="df-template-modal-title" ref={titleRef} tabIndex={-1}>{zh ? "模板模式" : "Template mode"}</h2>
-            <p>{zh ? "选择固定时间节点，勾选要添加的段落，并填写当天任务目标。" : "Pick fixed time blocks, keep the ones you need, and fill in today's goals."}</p>
+            <p>{templateDescription}</p>
           </div>
           <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
         </header>
 
-        <div className="df-template-tabs" role="tablist" aria-label={zh ? "日程模板" : "Schedule templates"}>
-          {(Object.keys(SCHEDULE_TEMPLATES) as BuiltInScheduleTemplateId[]).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={templateKey === `builtin:${id}`}
-              className={templateKey === `builtin:${id}` ? "active" : ""}
-              onClick={() => changeTemplate(`builtin:${id}`)}
-            >
-              {zh ? SCHEDULE_TEMPLATES[id].labelZh : SCHEDULE_TEMPLATES[id].labelEn}
-            </button>
-          ))}
-          {customTemplates.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              role="tab"
-              aria-selected={templateKey === `custom:${template.id}`}
-              className={templateKey === `custom:${template.id}` ? "active" : ""}
-              onClick={() => changeTemplate(`custom:${template.id}`)}
-            >
-              {template.title}
-            </button>
-          ))}
-          {templateKey === "draft:new" && <button type="button" role="tab" aria-selected className="active">{zh ? "新模板草稿" : "New draft"}</button>}
-          <button type="button" className="df-template-new-tab" onClick={createCustomTemplate}>{zh ? "新建模板" : "New template"}</button>
-        </div>
+        <div className="df-template-split">
+          <aside className="df-template-list" aria-label={zh ? "模板列表" : "Template list"}>
+            <div className="df-template-list-head">
+              <strong>{zh ? "模板" : "Templates"}</strong>
+              <button type="button" className="df-template-list-new" onClick={createCustomTemplate}>+ {zh ? "新建模板" : "New"}</button>
+            </div>
+            <div className="df-template-list-body">
+              {listRows.map((row) => {
+                const key = row.kind === "builtin" ? `builtin:${row.id}` : row.kind === "custom" ? `custom:${row.id}` : "draft:new";
+                const isActive = templateKey === key;
+                return (
+                  <div
+                    key={key}
+                    className={`df-template-list-row${isActive ? " active" : ""}`}
+                    onClick={() => changeTemplate(key as TemplateKey)}
+                  >
+                    <div className="df-template-list-row-main">
+                      {row.kind === "custom" && renamingId === row.id ? (
+                        <input
+                          className="df-template-list-rename"
+                          autoFocus
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className="df-template-list-title">{row.title}</span>
+                      )}
+                      <small className="df-template-list-meta">{row.span}</small>
+                    </div>
+                    {row.kind === "custom" && renamingId !== row.id && (
+                      <div className="df-template-list-actions" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" data-tip={zh ? "重命名" : "Rename"} aria-label={zh ? "重命名" : "Rename"} onClick={() => startRename(customTemplates.find((t) => t.id === row.id)!)}>✎</button>
+                        <button type="button" data-tip={zh ? "复制" : "Duplicate"} aria-label={zh ? "复制" : "Duplicate"} onClick={() => duplicateCustomTemplate(row.id)}>⎘</button>
+                        <button type="button" data-tip={zh ? "删除" : "Delete"} aria-label={zh ? "删除" : "Delete"} onClick={() => deleteCustomTemplateById(row.id)}>×</button>
+                      </div>
+                    )}
+                    {row.kind === "builtin" && <span className="df-template-list-badge">{zh ? "默认" : "Built-in"}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="df-template-list-foot">
+              <input className="df-template-name-input" value={templateName} onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }} aria-label={zh ? "模板名称" : "Template name"} placeholder={zh ? "模板名称（保存时使用）" : "Template name (used when saving)"} />
+              <div className="df-template-list-foot-actions">
+                <button type="button" onClick={saveCurrentTemplate}>{zh ? "保存为模板" : "Save as template"}</button>
+                {activeCustom && <button type="button" className="danger" onClick={() => deleteCustomTemplateById(activeCustom.id)}>{zh ? "删除模板" : "Delete"}</button>}
+              </div>
+            </div>
+          </aside>
 
-        <div className="df-template-note">
-          <span>{templateDescription}</span>
-          <div className="df-template-note-actions">
-            <input className="df-template-name-input" value={templateName} onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }} aria-label={zh ? "模板名称" : "Template name"} placeholder={zh ? "模板名称" : "Template name"} />
-            <button type="button" onClick={() => {
-              if (activeBuiltInId) setSlots(makeBuiltInDraft(activeBuiltInId));
-              else if (activeCustom) setSlots(makeCustomDraft(activeCustom));
-              else setSlots(makeBlankCustomDraft());
-              setTemplateNotice("");
-            }}>{zh ? "恢复当前模板" : "Reset current"}</button>
-            <button type="button" onClick={addSlot}>{zh ? "新增 Period" : "Add period"}</button>
-            <button type="button" onClick={saveCurrentTemplate}>{activeBuiltInId ? (zh ? "保存为模板" : "Save as template") : (zh ? "保存为模板" : "Save as template")}</button>
-            {activeCustom && <button type="button" className="danger" onClick={deleteCustomTemplate}>{zh ? "删除模板" : "Delete"}</button>}
+          <div className="df-template-timeline-wrap">
+            <div className="df-template-timeline-toolbar">
+              <span className="df-template-timeline-title">{templateName || (activeBuiltInId ? (zh ? SCHEDULE_TEMPLATES[activeBuiltInId].labelZh : SCHEDULE_TEMPLATES[activeBuiltInId].labelEn) : (zh ? "新模板草稿" : "New draft"))}</span>
+              <span className="df-template-timeline-hint">{zh ? "点击空白创建时间段 · 拖动方块移动 · 拖动边缘调整时长 · 点击方块编辑标题" : "Click blank to create · drag block to move · drag edge to resize · click block to rename"}</span>
+            </div>
+            <div className="df-template-timeline-scroll">
+              <div
+                ref={timelineRef}
+                className="df-template-timeline"
+                style={{ height: `${TIMELINE_HEIGHT}px` }}
+                onPointerDown={handleTimelinePointerDown}
+                onPointerMove={handleTimelinePointerMove}
+                onPointerUp={handleTimelinePointerUp}
+                onPointerCancel={handleTimelinePointerUp}
+              >
+                {hourLabels.map((hour) => (
+                  <div key={hour} className="df-template-timeline-hour" style={{ top: `${hour * 4 * SLOT_HEIGHT}px` }}>
+                    <span>{String(hour).padStart(2, "0")}:00</span>
+                  </div>
+                ))}
+                {periods.map((period) => {
+                  const top = (period.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT;
+                  const height = Math.max(SLOT_HEIGHT, (period.durationMinutes / SLOT_MINUTES) * SLOT_HEIGHT);
+                  const isEditing = editingPeriodId === period.id;
+                  const startStr = minutesToTime(period.startMinutes);
+                  const endStr = minutesToTime(period.startMinutes + period.durationMinutes);
+                  return (
+                    <div
+                      key={period.id}
+                      data-template-period
+                      className="df-template-period"
+                      style={{ top: `${top}px`, height: `${height}px` }}
+                      onPointerDown={(e) => beginPeriodDrag(e, period, "move")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!dragState) {
+                          setEditingPeriodId(period.id);
+                          setEditingTitle(period.title);
+                        }
+                      }}
+                    >
+                      <div className="df-template-period-resize-top" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-top")} />
+                      <div className="df-template-period-body">
+                        {isEditing ? (
+                          <input
+                            className="df-template-period-title-input"
+                            autoFocus
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onBlur={() => commitPeriodTitle(period.id)}
+                            onKeyDown={(e) => { if (e.key === "Enter") commitPeriodTitle(period.id); if (e.key === "Escape") setEditingPeriodId(null); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className="df-template-period-title">{period.title || (zh ? "未命名" : "Untitled")}</span>
+                        )}
+                        <span className="df-template-period-time">{startStr}–{endStr}</span>
+                      </div>
+                      <div className="df-template-period-resize-bottom" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-bottom")} />
+                      <button
+                        type="button"
+                        className="df-template-period-delete"
+                        aria-label={zh ? "删除时间段" : "Delete period"}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); removePeriod(period.id); }}
+                      >×</button>
+                    </div>
+                  );
+                })}
+                {creatingState && (
+                  <div
+                    className="df-template-period df-template-period-creating"
+                    style={{
+                      top: `${(creatingState.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT}px`,
+                      height: `${Math.max(SLOT_HEIGHT, ((creatingState.currentMinutes - creatingState.startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT)}px`,
+                    }}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
+
         {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
-
-        {customTemplates.length > 0 && (
-          <section className="df-template-manager" aria-label={zh ? "自定义模板管理" : "Custom template management"}>
-            <div className="df-template-manager-head">
-              <strong>{zh ? "自定义模板" : "Custom templates"}</strong>
-              <span>{zh ? `${customTemplates.length} 个` : `${customTemplates.length} saved`}</span>
-            </div>
-            <div className="df-template-manager-list">
-              {customTemplates.map((template) => (
-                <div key={template.id} className={`df-template-manager-row${templateKey === `custom:${template.id}` ? " active" : ""}`}>
-                  <button type="button" className="df-template-manager-select" onClick={() => changeTemplate(`custom:${template.id}`)}>
-                    <span>{template.title}</span>
-                    <small>{template.slots.length} {zh ? "个时间段" : "blocks"}</small>
-                  </button>
-                  <button type="button" className="df-template-manager-delete" onClick={() => deleteCustomTemplateById(template.id)}>
-                    {zh ? "删除" : "Delete"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="df-template-use-hint">
-          {zh ? "使用模板时，勾选左侧“加入当天”就会把这个 Period 加入当天时间轴；当天目标可选，不填时会使用 Period 名称。" : "When using a template, check Add today to include that period in today's timeline. The daily goal is optional; the period name is used when it is blank."}
-        </div>
-
-        <div className="df-template-slots">
-          {slots.map((slot) => {
-            const validRange = validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start);
-            return (
-              <div key={slot.id} className={`df-template-slot${slot.selected ? " selected" : ""}${!validRange ? " invalid" : ""}`}>
-                <label className="df-template-check">
-                  <input type="checkbox" checked={slot.selected} onChange={(event) => updateSlot(slot.id, { selected: event.target.checked })} />
-                  <span>{zh ? "加入当天" : "Add today"}</span>
-                </label>
-                <div className="df-template-slot-meta">
-                  <input className="df-template-label-input" type="text" value={zh ? slot.labelZh : slot.labelEn} onChange={(event) => updateSlot(slot.id, zh ? { labelZh: event.target.value, labelEn: event.target.value } : { labelEn: event.target.value, labelZh: event.target.value })} aria-label={zh ? "节点名称" : "Block label"} />
-                  <div>
-                    <input type="text" inputMode="numeric" maxLength={5} value={slot.start} onFocus={() => updateSlot(slot.id, { selected: true })} onChange={(event) => updateSlot(slot.id, { start: event.target.value, selected: true })} placeholder="HH:MM" aria-label={zh ? `${slot.labelZh}开始时间` : `${slot.labelEn} start time`} />
-                    <span>–</span>
-                    <input type="text" inputMode="numeric" maxLength={5} value={slot.end} onFocus={() => updateSlot(slot.id, { selected: true })} onChange={(event) => updateSlot(slot.id, { end: event.target.value, selected: true })} placeholder="HH:MM" aria-label={zh ? `${slot.labelZh}结束时间` : `${slot.labelEn} end time`} />
-                  </div>
-                </div>
-                <input
-                  className="df-template-goal"
-                  value={slot.title}
-                  onFocus={() => updateSlot(slot.id, { selected: true })}
-                  onChange={(event) => updateSlot(slot.id, { title: event.target.value, selected: true })}
-                  placeholder={zh ? "当天目标（可选）" : "Daily goal (optional)"}
-                  aria-label={zh ? `${slot.labelZh}任务目标` : `${slot.labelEn} goal`}
-                />
-                <button type="button" className="df-template-slot-remove" onClick={() => removeSlot(slot.id)} aria-label={zh ? `删除 ${slot.labelZh}` : `Remove ${slot.labelEn}`}>×</button>
-              </div>
-            );
-          })}
-        </div>
 
         <footer className="df-template-modal-actions">
           <div className="df-template-summary">
             <strong>{zh ? `将添加 ${applySlots.length} 个时间块` : `${applySlots.length} blocks ready`}</strong>
             <span>
               {conflictCount > 0
-                ? (zh ? `${conflictCount} 个时间段与现有安排重叠，仍会添加。` : `${conflictCount} blocks overlap existing schedule and will still be added.`)
-                : (zh ? "勾选有效 Period 后即可应用到当天。" : "Checked valid periods can be applied to the day.")}
-              {invalidCount > 0 ? (zh ? ` ${invalidCount} 个时间段无效，将跳过。` : ` ${invalidCount} invalid blocks will be skipped.`) : ""}
+                ? (zh ? `${conflictCount} 个时间段与现有安排重叠，默认跳过。` : `${conflictCount} blocks overlap existing schedule and will be skipped.`)
+                : (zh ? "无冲突，所有时间段将写入当天。" : "No conflicts — all periods will be written to the day.")}
             </span>
           </div>
           <button type="button" className="secondary" onClick={onClose}>{zh ? "取消" : "Cancel"}</button>
-          <button type="button" className="primary" disabled={applySlots.length === 0} onClick={() => onApply(applySlots, conflictCount)}>{zh ? "应用到当天" : "Apply to day"}</button>
+          <button
+            type="button"
+            className="primary"
+            disabled={applySlots.length === 0}
+            onClick={() => onApply(applySlots, conflictCount)}
+          >{zh ? "应用到今天" : "Apply to today"}</button>
         </footer>
       </section>
     </div>,

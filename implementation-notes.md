@@ -557,3 +557,27 @@ Two independent timeline bugs reported:
 - Resize a task across the append boundary — duration correct.
 - Back-to-now after scrolling away — recenters.
 - Month view — scroll still prepends/appends weeks as before.
+
+## Template Entry Debug
+
+Real entry path traced (root cause of "UI did not change"):
+
+- 今日候选顶栏组件：`src/main.tsx` `df-panel-title` header inside the candidate panel (`<div className="df-panel-title"><h2>...`), around line 7152. The toolbar row holds the candidate-panel collapse / show-completed / group-by-project / **template** / widget / AI buttons.
+- "模板/模版"按钮位置：`src/main.tsx:7160` `<button className="df-icon-action df-icon-template" data-tip="日程模版" onClick={() => setScheduleTemplateOpen(true)}>`. It is the calendar-grid SVG icon button, the ONLY template entry in the execute page.
+- 点击后调用的 handler：`setScheduleTemplateOpen(true)` — flips the `scheduleTemplateOpen` state declared at `src/main.tsx:1852`.
+- 打开的 modal/component：`src/main.tsx:8327-8336` `{scheduleTemplateOpen && data && (<ScheduleTemplateModal ... onApply={applyTemplateToDate} onClose={() => setScheduleTemplateOpen(false)} />)}`. Rendered via `createPortal` into `#df-portal-target`.
+- 当前旧表格 UI component：`ScheduleTemplateModal` function defined at `src/main.tsx:8448-8831`. It renders the old table-style editor: a tab row of built-in + custom templates, a name input + "恢复当前模板" / "新增 Period" / "保存为模板" / "删除模板" toolbar, a custom-template manager list, and a `df-template-slots` list where each row has a "加入当天" checkbox, label input, start/end time inputs, "当天目标（可选）" input, and a remove button. Footer has "取消" + "应用到当天".
+- Previously edited component, if different: none in this repo's working history — the old `ScheduleTemplateModal` is the only template modal wired to the candidate toolbar. Any prior "template mode" work that did not touch this exact function/body would not affect what the user sees from this entry.
+- Root cause why UI did not change：the old `ScheduleTemplateModal` (8448-8831) was never replaced. To change what the user sees, this exact component must be rewritten in place (same function name, same props contract) OR the render site at 8327 must point at a new component. The data contract (`ScheduleTemplate` / `ScheduleTemplateSlot` in `src/types.ts:247-260`, `applyTemplateToDate` at 3916, `ScheduleTemplateApplySlot` at 347) must be preserved so existing saved templates and the apply-to-day flow keep working.
+
+### Redesign plan (replaces the old table UI in place)
+
+- Rewrite `ScheduleTemplateModal` body to a two-pane layout: left narrow template list (built-in 默认 1 / 默认 2 + custom templates + "+ 新建模板"), right template timeline editor that visually mirrors the execution timeline (same slot grid, same hour height, click-blank-to-create, drag-to-move, resize-to-change-duration, click-to-rename, delete).
+- Keep the props signature unchanged: `lang, date, tasks, customTemplates, onSaveCustomTemplates, onApply, onClose`.
+- Keep `applyTemplateToDate` and `ScheduleTemplateApplySlot` unchanged — the new modal still calls `onApply(applySlots, conflictCount)` with `{title, start, end}[]`.
+- Keep `ScheduleTemplate` / `ScheduleTemplateSlot` types unchanged — saved templates continue to store `{id, label, start, end}[]`.
+- Internal draft state changes from `ScheduleTemplateDraftSlot` (checkbox + label + start + end + title) to a lighter `TemplatePeriod` draft `{id, title, startMinutes, durationMinutes}`. Convert to `{label, start, end}` only when saving, and to `{title, start, end}` only when applying.
+- Conflict detection reuses the existing `existingIntervals` memo (intervals from `tasks.timelineRecords` + `task.scheduledDate` on `date`) and the same `start < item.end && end > item.start` overlap test. Default behavior on Apply: skip conflicting periods, surface a confirmation notice.
+- Remove the old table UI: no "加入当天" checkbox column, no "当天目标" column, no "新增 Period" toolbar button, no "恢复当前模板" toolbar button, no spreadsheet slot rows. The new modal is the only thing rendered from `scheduleTemplateOpen`.
+- CSS: reuse `df-template-modal-backdrop`, `df-template-modal`, `df-template-modal-head`, `df-template-close` shell classes (already defined). Add new classes only for the two-pane body (`df-template-split`, `df-template-list`, `df-template-timeline`) inside `src/app-redesign.css`, scoped under `.df-app`.
+- Regression guard: no edits to `applyTemplateToDate`, `createScheduledRecord`, `makeTask`, `defaultForm`, the candidate shelf, execution timeline, drag/resize, infinite scroll, now-line, or metrics.
