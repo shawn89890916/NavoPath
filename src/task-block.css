@@ -2542,19 +2542,31 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 
 .df-app .df-planning .df-metrics-donut-leader {
   fill: none;
-  stroke: color-mix(in srgb, var(--paper-rule, var(--line)) 80%, transparent);
-  stroke-width: 1.5;
+  stroke: color-mix(in srgb, var(--paper-ink, var(--ink)) 22%, transparent);
+  stroke-width: 2.25;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
+  transition: stroke 160ms ease, opacity 160ms ease;
+  opacity: 0.85;
+}
+
+.df-app .df-planning .df-metrics-donut-label-layer .is-active .df-metrics-donut-leader {
+  stroke: color-mix(in srgb, var(--paper-ink, var(--ink)) 38%, transparent);
+  opacity: 1;
 }
 
 .df-app .df-planning .df-metrics-donut-label {
   fill: var(--ink, var(--paper-ink));
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.2;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
   pointer-events: none;
+  transition: fill 160ms ease, opacity 160ms ease;
+}
+
+.df-app .df-planning .df-metrics-donut-label-layer .is-active .df-metrics-donut-label {
+  fill: var(--paper-ink, var(--ink));
 }
 
 .df-app .df-planning .df-metrics-donut-center {
