@@ -1,8 +1,10 @@
 # NavoPath 更新日志
 
-## 2026-07-07 · 指标圆环图标注优化与桌面小组件
+## 2026-07-07 · 时间轴无限滚动与现在线修复、指标圆环图标注优化与桌面小组件
 
 ### 修复
+- 修复开启无限跨天滚动后日/3 天/周时间轴向上滚动到画布顶部即触底、无法继续加载前几天的问题：此前连续时间轴是一个以选中日为中心的固定窗口（日 7 天、3 天 21 天、周 49 天），滚动监听只更新顶部日期标签而不滑动窗口。现在滚动接近顶部时自动向前 prepend 一段日期、接近底部时向后 append 一段日期，并通过 `useLayoutEffect` 在窗口重算后按位移波段补偿 `scrollTop`，视口不跳动；任务拖拽/调整时长/候选拖入仍基于重算后的连续坐标，落点不受影响。
+- 修复关闭无限跨天滚动后"现在"时间线在日/3 天/周视图中不显示或位置错误的问题：`NowLine` 组件以 `style={{ top, ...extraStyle }}` 合并样式，非连续模式下 `extraStyle.top` 为 `undefined`，展开后覆盖了组件内部按 `dayStartHour` 计算出的 `top`，导致绝对定位失效。改为显式合并——仅当 `extraStyle` 未提供 `top` 时才使用内部计算值，连续模式仍由 `continuousTimedTop` 接管，非连续模式恢复正确的日间偏移位置。
 - 重构指标视图甜甜圈图外部标注为紧凑的两段式引线 + 侧标 annotation 系统，且每个项目默认常驻显示外部项目名：圆环外缘短径向 tick（outer+34 折点）接 42px 水平段，项目名贴在线末端外侧（右侧 start、左侧 end），字号 12px/600，引线 1.5px、22% 半透明灰（激活 36%），整体回归安静的数据图表标注风格。项目名是常驻 annotation 而非 hover tooltip——圆环中出现的每个项目（含"日常""文书"等小扇区）默认都有外部项目名，不再有"占比 ≥6% 或前 5 名才显示、其余 hover 才出现"的过滤逻辑；同侧标签做一次 Y 排序避让（minGap 20px），若整列溢出则整体上移再 clamp 到图表安全区内，保证全部标签可见、不隐藏、不飞到边缘。右侧指标摘要删除"最高投入/Top focus"一项（与圆环图和列表重复），仅保留已安排时间、未安排时间、任务数量、完成率；圆环中心悬停态移除彩色圆点，仅保留项目名、时长与百分比。hover 只负责当前扇区外径轻微扩展、中心文字切换、当前 label/引线轻微高亮，不让其他项目名消失或重排。
 
 ### 改进
@@ -74,9 +76,11 @@
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
 
-## 2026-07-07 · Metrics donut label refinement & desktop widget
+## 2026-07-07 · Timeline infinite scroll & now-line fixes, metrics donut label refinement & desktop widget
 
 ### Fixes
+- Fixed the day / 3-day / week continuous timeline hitting a hard stop at the top of the canvas when infinite cross-day scrolling was enabled, so earlier days could not be loaded by scrolling up: the continuous timeline was a fixed centered window (7 days for daily, 21 for 3-day, 49 for weekly) and the scroll listener only updated the header date label without sliding the window. The timeline now prepends a block of earlier dates when scrolling near the top and appends a block of later dates when scrolling near the bottom, with a `useLayoutEffect` compensating `scrollTop` by the shifted band count after the window recomputes so the viewport does not jump. Task drag / resize / candidate drop still use the recomputed continuous coordinates, so drop targets are unaffected.
+- Fixed the "now" line not displaying or being mispositioned in day / 3-day / week views when infinite cross-day scrolling was disabled: `NowLine` merged styles as `style={{ top, ...extraStyle }}`, and in non-continuous mode `extraStyle.top` was `undefined`, which overwrote the internally computed, `dayStartHour`-aware `top` and broke the absolute positioning. The merge is now explicit — the internal top is used only when `extraStyle` does not supply one — so continuous mode still defers to `continuousTimedTop` while non-continuous mode restores the correct within-day offset.
 - Rebuilt the Metrics donut outside annotations as a compact two-segment leader + side-label system where every project shows a permanent external label: a short radial tick from the arc edge (outer+34 elbow) joins a 42px horizontal segment, with the project name beside the line end (start anchor on the right, end anchor on the left) at 12px/600, leader stroke 1.5px at 22% semi-transparent gray (36% when active) — a quiet data-chart annotation style. Project names are standing annotations, not hover tooltips: every project in the donut (including small slices like "Daily" and "Essays") gets a default external label, with no ">=6% or top 5 only" filtering and no hover-only surfacing. Same-side labels get a single Y sort-and-push collision pass (minGap 20px); if the lane overflows the safe band the whole lane shifts up and clamps back inside, so all labels stay visible — none are hidden and none spill to the edge. Removed the "Top focus" item from the right-side metrics summary (it duplicated the donut and project list), keeping only Planned, Unplanned, Tasks, and Done; removed the colored dot from the donut center hover state, keeping just the project name, duration, and percentage. On hover only the active segment's outer radius expands, the center text swaps, and the current label/leader brighten slightly — other labels never disappear or reshuffle.
 
 ### Improvements

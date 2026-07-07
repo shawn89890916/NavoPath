@@ -1804,6 +1804,12 @@ function App() {
   const monthScrollRef = useRef<HTMLDivElement>(null);
   const monthAnchorOffsetRef = useRef<number | null>(null);
   const [monthFocus, setMonthFocus] = useState("");
+  // Continuous-timeline infinite scroll: records the pre-shift scrollTop and the
+  // number of bands shifted so a useLayoutEffect can restore the viewport after
+  // the centered date window recomputes. `continuousPrependLockRef` prevents the
+  // scroll listener from re-triggering a shift while one is already in flight.
+  const continuousScrollRestoreRef = useRef<{ oldScrollTop: number; shiftBands: number } | null>(null);
+  const continuousPrependLockRef = useRef(false);
 
   useLayoutEffect(() => {
     const container = monthScrollRef.current;
@@ -1819,6 +1825,25 @@ function App() {
     const selectedWeek = selectedCell?.closest<HTMLElement>("[data-week-anchor]");
     if (selectedWeek) container.scrollTop = Math.max(0, selectedWeek.offsetTop - container.clientHeight * 0.32);
     setMonthFocus(selectedDate.slice(0, 7));
+  }, [selectedDate, timelineView]);
+
+  // Continuous-timeline infinite scroll: after the centered date window shifts
+  // (prepend/append), restore the viewport so the user does not perceive a jump.
+  // The centered window keeps a constant band count, so scrollHeight is unchanged;
+  // we only translate scrollTop by the shifted band count × day height.
+  useLayoutEffect(() => {
+    const restore = continuousScrollRestoreRef.current;
+    if (!restore) return;
+    const container = timelineRef.current;
+    if (!container) return;
+    continuousScrollRestoreRef.current = null;
+    const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const next = restore.oldScrollTop + restore.shiftBands * dayHeight;
+    container.scrollTop = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, next));
+    // Release the lock on the next frame so the scroll event triggered by this
+    // scrollTop assignment does not re-enter the prepend/append branch.
+    const frame = window.requestAnimationFrame(() => { continuousPrependLockRef.current = false; });
+    return () => window.cancelAnimationFrame(frame);
   }, [selectedDate, timelineView]);
   const [pendingTimelineFocus, setPendingTimelineFocus] = useState<TimelineFocusTarget | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview>(null);
@@ -2675,11 +2700,29 @@ function App() {
     const effectStartDate = effectDates[0] || selectedDate;
     const effectBandCount = Math.max(1, Math.ceil(effectDates.length / effectColumnCount));
     const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const bufferBands = Math.max(1, Math.floor(effectBandCount / 4));
     const updateVisibleTimelineDate = () => {
       const centerY = scrollElement.scrollTop + scrollElement.clientHeight / 2;
       const bandIndex = Math.max(0, Math.min(effectBandCount - 1, Math.floor(centerY / dayHeight)));
       const nextDate = getContinuousTimelineDateForOffset(effectStartDate, bandIndex, effectColumnCount);
       setVisibleTimelineDate((current) => current === nextDate ? current : nextDate);
+      // Infinite scroll: when the viewport reaches either edge of the centered
+      // window, shift `selectedDate` so the window slides and more dates become
+      // reachable. The centered window keeps a constant band count, so the
+      // useLayoutEffect only needs to translate scrollTop by the shifted bands.
+      if (continuousPrependLockRef.current) return;
+      const distanceFromBottom = scrollElement.scrollHeight - scrollElement.clientHeight - scrollElement.scrollTop;
+      if (scrollElement.scrollTop < dayHeight && effectBandCount > 1) {
+        // Near top — prepend earlier bands.
+        continuousPrependLockRef.current = true;
+        continuousScrollRestoreRef.current = { oldScrollTop: scrollElement.scrollTop, shiftBands: bufferBands };
+        setSelectedDate(addDays(selectedDate, -bufferBands * effectColumnCount));
+      } else if (distanceFromBottom < dayHeight && effectBandCount > 1) {
+        // Near bottom — append later bands.
+        continuousPrependLockRef.current = true;
+        continuousScrollRestoreRef.current = { oldScrollTop: scrollElement.scrollTop, shiftBands: -bufferBands };
+        setSelectedDate(addDays(selectedDate, bufferBands * effectColumnCount));
+      }
     };
     updateVisibleTimelineDate();
     scrollElement.addEventListener("scroll", updateVisibleTimelineDate, { passive: true });
@@ -10501,7 +10544,13 @@ function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties;
   const minutes = now.getHours() * 60 + now.getMinutes();
   if (minutes < 0 || minutes > 24 * 60) return null;
   const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, dayStartHour);
-  return <div className="df-now-line" style={{ top, ...extraStyle }} />;
+  // Merge so an `undefined` top from extraStyle (non-continuous mode) does NOT
+  // clobber the computed, day-start-aware top. Continuous mode supplies a real
+  // top via extraStyle and wins; non-continuous mode omits it and the computed
+  // top is used.
+  const mergedStyle: CSSProperties = { ...extraStyle };
+  if (mergedStyle.top === undefined) mergedStyle.top = top;
+  return <div className="df-now-line" style={mergedStyle} />;
 }
 
 function EditDrawer(props: {

@@ -495,3 +495,65 @@ For broken short task:
 - Window position memory: the widget reads/writes `localStorage["navopath-widget-position"]` (x, y, width, height). Because the widget loads from the same origin as the main window, both share the same localStorage; the widget restores position on mount and saves on `moved`/`resized` debounce. A "reset position" action clears the key and re-centers.
 - Impact on existing code: changes are additive — new `BrowserWindow` factory + IPC handlers in `electron/main.cjs`, new `widget` surface in `electron/preload.cjs`, new `WidgetApp` component + `?widget=1` route guard in `src/main.tsx`, new types in `src/types.ts`, new entry button in the candidate panel header (guarded by `Boolean(window.desktopApi)`), new settings toggles in the Features section, and new CSS in `src/task-block.css`. No existing timer/quickAdd/complete logic is rewritten — the main window's action listener calls the existing `quickAddTask`/`startTimer`/`pauseTimer`/`resumeTimer`/`stopAndSaveTimer`/`toggleTaskDone` functions by reading refs to current state.
 - Rollback: revert the commit; the feature is fully behind `Boolean(window.desktopApi)` and `?widget=1`, so removing it restores prior behavior with no migration.
+
+## Timeline Infinite Upward Scroll & Now-Line Debug
+
+Two independent timeline bugs reported:
+1. With continuous cross-day scroll **enabled**, scrolling **up** does not infinitely load previous days (only the fixed centered window is reachable; the top edge is a hard stop).
+2. With continuous cross-day scroll **disabled**, the now-line does not display / is mispositioned in day / 3-day / week views.
+
+### Root cause — Bug 1 (no infinite upward scroll)
+
+- `src/utils/continuousTimeline.ts` `buildDailyContinuousDates(anchorDate, enabled, dayCount)` builds a **fixed centered window**: for daily it returns 7 days (3 before + anchor + 3 after); for 3-day 21 days; for weekly 49 days. The window size is constant and never grows.
+- `continuousAnchorDate` (main.tsx :3271) derives from `timelineDate` (= `selectedDate`): daily → `timelineDate`; weekly → start-of-week of `timelineDate`.
+- `continuousTimelineDates` (main.tsx :3275) = `buildDailyContinuousDates(continuousAnchorDate, true, 7 * timelineColumnCount)`. So the window is centered on `selectedDate` and only moves when `selectedDate` moves.
+- The scroll listener (main.tsx :2664-2687) only calls `setVisibleTimelineDate(nextDate)` to update the **header label**. It never shifts `selectedDate` and never prepends/appends bands. Reaching the top of the 7-band canvas is a hard stop.
+- Only **month view** (main.tsx :7822-7836) has real prepend/append: when `scrollTop < 160` it shifts `selectedDate` back 140 days and captures an anchor offset; a `useLayoutEffect` (:1808-1822) restores `scrollTop` by the anchor delta after re-render. Day / 3-day / week continuous views have no equivalent.
+
+### Fix — Bug 1 (port month-view prepend/append pattern)
+
+- Add `continuousScrollRestoreRef` (records `oldScrollTop` + `shiftBands` before the window shift) and `continuousPrependLockRef` (prevents re-entry while a shift is in flight).
+- In the existing scroll listener, after the header-date update, detect edge proximity:
+  - Near top (`scrollTop < dayHeight`): prepend by shifting `selectedDate` back by `bufferBands * columnCount` days. For a centered window this inserts `bufferBands` new bands at the top and drops `bufferBands` bands at the bottom; `scrollHeight` is unchanged. To keep the viewport stable, `newScrollTop = oldScrollTop + bufferBands * dayHeight`.
+  - Near bottom (`scrollTop + clientHeight > scrollHeight - dayHeight`): append by shifting `selectedDate` forward by `bufferBands * columnCount` days. This inserts bands at the bottom and drops bands at the top; `scrollHeight` unchanged. `newScrollTop = oldScrollTop - bufferBands * dayHeight`.
+  - `bufferBands = max(1, floor(bandCount / 4))` so after each shift the viewport sits comfortably mid-window and does not immediately re-trigger.
+- A `useLayoutEffect` keyed on `[selectedDate, timelineView]` consumes `continuousScrollRestoreRef`, applies the compensated `scrollTop`, and releases the prepend lock. Runs only for day/3-day/week continuous mode (guarded by `continuousTimelineEnabled` and `timelineView !== "month"`).
+- All-day tasks, candidate drop, drag/resize, and `continuousTimedTop` are unaffected — they derive from `continuousTimelineDates` / `continuousTimelineStartDate`, which already recompute when `selectedDate` changes.
+
+### Root cause — Bug 2 (now-line missing when infinite scroll OFF)
+
+- `NowLine` (main.tsx :10495-10505) computes the correct `top` via `timeBlockTop(nowTime, dayStartHour)` and merges styles as `style={{ top, ...extraStyle }}`.
+- Both render sites pass `extraStyle.top = continuousTimelineEnabled ? continuousTimedTop(today, now) : undefined`. In non-continuous mode `extraStyle.top === undefined`.
+- JS object spread `{ top, ...extraStyle }` lets `extraStyle.top === undefined` **overwrite** the computed `top` with `undefined`. React then omits the inline `top` entirely, so the absolutely-positioned `.df-now-line` falls back to static-flow position (top:auto), rendering at the canvas top or not visibly at the current time.
+- `dayStartHour` is already passed at both render sites (daily :8132, 3-day/week :7742), so the computed `top` is correct when not clobbered. The only defect is the merge.
+
+### Fix — Bug 2 (don't let undefined clobber computed top)
+
+- In `NowLine`, build the merged style explicitly: `const merged = { ...extraStyle }; if (merged.top === undefined) merged.top = top;` then `style={merged}`. When continuous mode supplies a `top` it wins; when non-continuous mode omits it, the internally computed `top` (day-start aware) is used.
+- No change needed at the render sites — they already pass `dayStartHour` and the guard `continuousTimelineDates.includes(today)` ensures the now-line only renders when today is in the visible range.
+
+### Acceptance criteria mapping
+
+- [1] Infinite cross-day scroll enabled: scrolling up past the first band prepends earlier dates and the viewport does not jump. → prepend branch + `useLayoutEffect` scrollTop compensation.
+- [2] Scrolling down past the last band appends later dates and the viewport does not jump. → append branch.
+- [3] `continuousTimelineDates` / `continuousTimelineStartDate` recompute after each shift (existing useMemo, no change).
+- [4] Drag / resize / candidate drop still use `continuousTimedTop` and `continuousPointerTarget` against the recomputed start date (no change).
+- [5] Now-line visible in day view with infinite scroll OFF when viewing today. → NowLine merge fix.
+- [6] Now-line visible in 3-day / week view with infinite scroll OFF when today is in the window. → same merge fix.
+- [7] Now-line respects `dayStartHour` (already passed; merge fix stops the clobber).
+- [8] Now-line position uses `continuousTimedTop` in continuous mode (extraStyle.top supplied by render site).
+- [9] Back-to-now re-centers today and current time (`goToNow` sets `selectedDate` + `pendingTimelineFocus`; unaffected).
+- [10] Task card visuals, candidate shelf, planning page unchanged (no edits to those code paths).
+- [11] Month view unaffected (prepend/append guard excludes `timelineView === "month"`).
+- [12] No new CSS; `.df-now-line` absolute positioning unchanged.
+
+### Manual test plan
+
+- Daily view, infinite scroll ON: scroll up repeatedly — header date follows, no hard stop at top; scroll down repeatedly — same at bottom; now-line stays at current time when today is in window.
+- Daily view, infinite scroll OFF: view today — now-line visible at current time respecting day-start; switch day — now-line hidden (today not in [timelineDate]).
+- 3-day view, infinite scroll OFF: today in window — now-line in today's column at correct time; infinite scroll ON — now-line tracks continuous coordinate.
+- Week view: same as 3-day.
+- Drag a task across the prepend boundary — lands on correct date/time.
+- Resize a task across the append boundary — duration correct.
+- Back-to-now after scrolling away — recenters.
+- Month view — scroll still prepends/appends weeks as before.
