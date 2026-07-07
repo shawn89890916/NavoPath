@@ -76,168 +76,108 @@ function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadi
 }
 
 /* ============================================================
- * Donut annotation system — force-based label layout
+ * Donut annotation system — constrained rail layout
  *
- * Each outside label is treated as a lightweight node with:
- *   - a fixed anchor point on the donut outer edge
- *   - an ideal (target) position along a left/right rail
- *   - a real (x,y) that gets gently pushed by collision resolution
- *
- * Layout runs a few iterations of spring-toward-target + vertical
- * collision resolution, producing non-overlapping labels that still
- * hug their segment. The result feels like a quiet graph-view label
- * settle rather than a hard-coded position dump.
+ * Labels live on two fixed vertical rails (left/right of the donut).
+ * X is FIXED per side — labels never drift horizontally. Only Y is
+ * adjusted by a simple sort-and-push collision pass so labels in the
+ * same rail don't overlap. Each label is connected to its segment by
+ * a three-point leader line: anchor (circle edge) → elbow (radial
+ * tick) → horizontal segment to the label. This keeps the annotation
+ * tightly bound to the donut instead of scattering across the page.
  * ============================================================ */
 
-interface DonutAnnotationNode {
+interface DonutAnnotationResult {
   id: string;
   label: string;
   color: string;
-  startAngle: number;
-  endAngle: number;
-  arcMidAngle: number;
   side: "left" | "right";
-  // Fixed anchor on the donut outer edge (start of leader line).
-  anchorX: number;
-  anchorY: number;
-  // Elbow point — short radial tick out from the anchor.
-  elbowX: number;
-  elbowY: number;
-  // Ideal label position on the rail (target for the spring).
-  targetX: number;
-  targetY: number;
-  // Actual label position after collision resolution.
-  x: number;
-  y: number;
-  // Estimated label box (for collision).
-  labelWidth: number;
-  labelHeight: number;
-}
-
-interface DonutAnnotationResult {
-  node: DonutAnnotationNode;
-  /** SVG path: anchor → elbow → (horizontal to label). */
+  arcMidAngle: number;
+  /** SVG path: anchor → elbow → horizontal segment to label. */
   path: string;
-  /** Label text x. */
+  /** Label text x (on the rail). */
   labelX: number;
-  /** Label text y. */
+  /** Label text y (after collision resolution). */
   labelY: number;
-  /** "start" for right side (label sits left of rail end), "end" for left. */
   textAnchor: "start" | "end";
 }
 
 /**
- * Build the initial annotation nodes from donut segments. Anchors and elbows
- * are computed once from the segment mid-angle; targetX is the rail column,
- * targetY is the elbow's natural y so the spring pulls labels back to their
- * segment's vertical position when there's no collision.
+ * Build annotation results for all donut segments. The layout is
+ * deterministic: railX is fixed per side, idealY comes from the segment's
+ * radial elbow, and a single top-to-bottom push pass per rail resolves
+ * overlaps. No free-form force simulation — labels stay anchored to the
+ * chart.
  */
-function buildDonutAnnotationNodes(
+function layoutDonutAnnotations(
   cx: number,
   cy: number,
   visualOuter: number,
   segments: Array<{ group: { id: string; label: string; color: string }; startAngle: number; endAngle: number }>,
   railExtent: number,
-): DonutAnnotationNode[] {
-  return segments.map(({ group, startAngle, endAngle }) => {
+): DonutAnnotationResult[] {
+  const labelMinY = cy - visualOuter - 70;
+  const labelMaxY = cy + visualOuter + 70;
+  const minGap = 26;
+
+  // Phase 1: compute fixed anchor/elbow/railX and ideal Y per segment.
+  const raw = segments.map(({ group, startAngle, endAngle }) => {
     const mid = (startAngle + endAngle) / 2;
     const radians = (mid - 90) * Math.PI / 180;
     const side: "left" | "right" = Math.cos(radians) >= 0 ? "right" : "left";
+    const railX = side === "right" ? cx + railExtent : cx - railExtent;
     const anchor = polarPoint(cx, cy, visualOuter + 4, mid);
-    const elbow = polarPoint(cx, cy, visualOuter + 26, mid);
-    // Rail column x — fixed per side so labels line up into two clean rails.
-    const targetX = side === "right" ? cx + railExtent : cx - railExtent;
-    const targetY = elbow.y;
-    // Estimate label box. ~7.4px per CJK char, ~6.6px per latin char; use a
-    // blended estimate so mixed labels still collide-detect sanely.
-    const charWidth = /[\u4e00-\u9fff]/.test(group.label) ? 7.6 : 6.6;
-    const labelWidth = Math.max(36, group.label.length * charWidth + 6);
-    const labelHeight = 14;
+    const elbow = polarPoint(cx, cy, visualOuter + 40, mid);
     return {
       id: group.id,
       label: group.label,
       color: group.color,
-      startAngle,
-      endAngle,
-      arcMidAngle: mid,
       side,
+      arcMidAngle: mid,
       anchorX: anchor.x,
       anchorY: anchor.y,
       elbowX: elbow.x,
-      elbowY: elbow.y,
-      targetX,
-      targetY,
-      x: targetX,
-      y: targetY,
-      labelWidth,
-      labelHeight,
+      railX,
+      idealY: elbow.y,
+      labelY: elbow.y, // will be adjusted
     };
   });
-}
 
-/**
- * Resolve label collisions per side. Each rail is a 1D vertical lane: labels
- * are sorted by targetY, then pushed apart vertically so their bounding boxes
- * don't overlap. A spring then gently pulls each label back toward its
- * targetY, with damping so the settle is soft rather than a snap. Iterating
- * a few times lets tight clusters relax without oscillation.
- */
-function layoutDonutAnnotations(nodes: DonutAnnotationNode[], iterations = 6): void {
-  const damping = 0.55;
-  const springStrength = 0.22;
-  for (let iter = 0; iter < iterations; iter++) {
-    // Per-side vertical collision pass.
-    (["left", "right"] as const).forEach((side) => {
-      const lane = nodes.filter((n) => n.side === side).sort((a, b) => a.y - b.y);
-      for (let i = 1; i < lane.length; i++) {
-        const a = lane[i - 1];
-        const b = lane[i];
-        const minGap = (a.labelHeight + b.labelHeight) / 2 + 4;
-        const dy = b.y - a.y;
-        if (dy < minGap) {
-          const push = (minGap - dy) / 2;
-          a.y -= push * damping;
-          b.y += push * damping;
-        }
+  // Phase 2: per-side Y collision resolution (sort + push down, then clamp).
+  (["left", "right"] as const).forEach((side) => {
+    const lane = raw.filter((n) => n.side === side).sort((a, b) => a.idealY - b.idealY);
+    for (let i = 1; i < lane.length; i++) {
+      if (lane[i].labelY - lane[i - 1].labelY < minGap) {
+        lane[i].labelY = lane[i - 1].labelY + minGap;
       }
-    });
-    // Spring pull toward targetY (vertical only — x stays on the rail).
-    nodes.forEach((n) => {
-      n.y += (n.targetY - n.y) * springStrength * damping;
-    });
-  }
-}
+    }
+    // If the last label overflowed, shift the whole lane back up.
+    const overflow = lane.length > 0 ? lane[lane.length - 1].labelY - labelMaxY : 0;
+    if (overflow > 0) {
+      for (const n of lane) n.labelY -= overflow;
+    }
+    // Clamp into bounds.
+    for (const n of lane) {
+      n.labelY = Math.max(labelMinY, Math.min(labelMaxY, n.labelY));
+    }
+  });
 
-/**
- * Build the SVG path for a leader line: anchor → elbow → horizontal segment
- * ending at the label node. The horizontal segment runs from the elbow to
- * the label's x, giving the classic "short tick + underline" shape.
- */
-function buildLeaderPath(n: DonutAnnotationNode): string {
-  return `M ${n.anchorX} ${n.anchorY} L ${n.elbowX} ${n.elbowY} L ${n.x} ${n.y}`;
-}
-
-/**
- * Compute the final annotation result for rendering: leader path + label
- * anchor. Label text sits just inside the rail end (toward the donut) so the
- * text reads as attached to the line end rather than floating past it.
- * Vertical offset is -5 (alphabetic baseline) so text sits just above the
- * horizontal segment.
- */
-function buildDonutAnnotationResults(nodes: DonutAnnotationNode[]): DonutAnnotationResult[] {
-  return nodes.map((node) => {
-    const path = buildLeaderPath(node);
-    // Right side: text starts at the rail end and reads leftward → anchor "start"
-    // but we pull it slightly inside so the first character hugs the line end.
-    // Left side: text ends at the rail end and reads rightward → anchor "end".
-    const labelX = node.side === "right" ? node.x - 4 : node.x + 4;
-    const labelY = node.y - 5;
+  // Phase 3: build leader path + label anchor for each node.
+  return raw.map((n) => {
+    // Horizontal segment runs at labelY + 5 (just below the text baseline).
+    const lineY = n.labelY + 5;
+    const lineEndX = n.side === "right" ? n.railX - 8 : n.railX + 8;
+    const path = `M ${n.anchorX} ${n.anchorY} L ${n.elbowX} ${lineY} L ${lineEndX} ${lineY}`;
     return {
-      node,
+      id: n.id,
+      label: n.label,
+      color: n.color,
+      side: n.side,
+      arcMidAngle: n.arcMidAngle,
       path,
-      labelX,
-      labelY,
-      textAnchor: node.side === "right" ? "start" : "end",
+      labelX: n.railX,
+      labelY: n.labelY,
+      textAnchor: n.side === "right" ? "start" : "end",
     };
   });
 }
@@ -2073,18 +2013,15 @@ export default function PlanningView(props: {
   }, []);
 
   /**
-   * Force-based outside label layout for the donut. Runs once per render
-   * (cheap — a handful of iterations over a tiny node set) and produces
-   * non-overlapping label positions along left/right rails. The layout is
-   * driven by the NON-hovered outer radius so labels don't jump when a
-   * segment expands on hover; the active segment's leader path simply uses
-   * its hovered anchor/elbow while the label position stays stable.
+   * Constrained rail layout for donut outside labels. X is fixed per side
+   * (left/right rail), only Y is adjusted by collision resolution. Layout
+   * uses the NON-hovered outer radius so labels don't jump when a segment
+   * expands on hover; the active segment's leader re-anchors to its hovered
+   * radius while the label position stays stable.
    */
   const donutAnnotations = useMemo(() => {
     if (donutSegments.length === 0) return [];
-    const nodes = buildDonutAnnotationNodes(120, 120, 88, donutSegments, 168);
-    layoutDonutAnnotations(nodes);
-    return buildDonutAnnotationResults(nodes);
+    return layoutDonutAnnotations(120, 120, 88, donutSegments, 142);
   }, [donutSegments]);
 
   /**
@@ -2438,21 +2375,23 @@ export default function PlanningView(props: {
                           </g>
                           {/* Label layer: leader lines + project names. pointer-events
                               none so they never interfere with the hit disk.
-                              Layout comes from the force-based annotation system;
-                              the active segment's leader re-anchors to its hovered
-                              outer radius so the tick follows the expansion, while
-                              the label position stays stable (no jump on hover). */}
+                              Layout comes from the constrained rail system; the
+                              active segment's leader re-anchors to its hovered outer
+                              radius so the tick follows the expansion, while the
+                              label position stays stable (no jump on hover). */}
                           <g className="df-metrics-donut-label-layer">
                             {donutAnnotations.map((ann) => {
-                              const isActive = activeDonutGroup?.id === ann.node.id;
-                              // Recompute the anchor + elbow for the active segment's
-                              // hovered outer radius; others use the laid-out values.
+                              const isActive = activeDonutGroup?.id === ann.id;
+                              // Recompute anchor + elbow for the active segment's
+                              // hovered outer radius; label position stays put.
                               const visualOuter = isActive ? 94 : 88;
-                              const anchor = polarPoint(120, 120, visualOuter + 4, ann.node.arcMidAngle);
-                              const elbow = polarPoint(120, 120, visualOuter + 26, ann.node.arcMidAngle);
-                              const path = `M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${ann.node.x} ${ann.node.y}`;
+                              const anchor = polarPoint(120, 120, visualOuter + 4, ann.arcMidAngle);
+                              const elbow = polarPoint(120, 120, visualOuter + 40, ann.arcMidAngle);
+                              const lineY = ann.labelY + 5;
+                              const lineEndX = ann.side === "right" ? ann.labelX - 8 : ann.labelX + 8;
+                              const path = `M ${anchor.x} ${anchor.y} L ${elbow.x} ${lineY} L ${lineEndX} ${lineY}`;
                               return (
-                                <g key={`label-${ann.node.id}`} className={isActive ? "is-active" : ""}>
+                                <g key={`label-${ann.id}`} className={isActive ? "is-active" : ""} data-active={isActive || undefined}>
                                   <path className="df-metrics-donut-leader" d={path} />
                                   <text
                                     className="df-metrics-donut-label"
@@ -2460,7 +2399,7 @@ export default function PlanningView(props: {
                                     y={ann.labelY}
                                     textAnchor={ann.textAnchor}
                                     dominantBaseline="alphabetic"
-                                  >{ann.node.label}</text>
+                                  >{ann.label}</text>
                                 </g>
                               );
                             })}
