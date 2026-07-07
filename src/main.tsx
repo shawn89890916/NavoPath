@@ -8875,7 +8875,6 @@ function ScheduleTemplateModal({
   ];
 
   const portalTarget = document.getElementById("df-portal-target") || document.body;
-  const hourLabels: number[] = Array.from({ length: 25 }, (_, i) => i);
 
   return createPortal(
     <div className="df-modal-backdrop df-template-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -8974,11 +8973,22 @@ function ScheduleTemplateModal({
                 onCanvasPointerUp={handleTimelinePointerUp}
                 onCanvasPointerCancel={handleTimelinePointerUp}
               >
-                  {hourLabels.map((hour) => (
-                    <div key={hour} className="df-slot hour" style={{ top: `${hour * 4 * SLOT_HEIGHT}px` }}>
-                      <span>{String(hour).padStart(2, "0")}:00</span>
-                    </div>
-                  ))}
+                  {Array.from({ length: 96 }).map((_, index) => {
+                    const minutes = index * SLOT_MINUTES;
+                    const isHour = minutes % 60 === 0;
+                    const isMajor = minutes % (6 * 60) === 0;
+                    const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+                    const mm = String(minutes % 60).padStart(2, "0");
+                    return (
+                      <div
+                        key={index}
+                        className={`df-slot ${isHour ? "hour" : "quarter"}${isMajor ? " major" : ""}`}
+                        style={{ top: `${index * SLOT_HEIGHT}px` }}
+                      >
+                        <span>{hh}:{mm}</span>
+                      </div>
+                    );
+                  })}
                   {periods.map((period) => {
                     const top = (period.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT;
                     const height = Math.max(SLOT_HEIGHT, (period.durationMinutes / SLOT_MINUTES) * SLOT_HEIGHT);
@@ -8992,7 +9002,7 @@ function ScheduleTemplateModal({
                         title={period.title}
                         timeRange={`${startStr}–${endStr}`}
                         className="df-template-period-block"
-                        style={{ position: "absolute", left: "56px", right: "8px", top: `${top}px`, height: `${height}px` }}
+                        style={{ position: "absolute", left: "8px", right: "8px", top: `${top}px`, height: `${height}px` }}
                         dataAttrs={{ "template-period": "true" }}
                         onPointerDown={(e) => beginPeriodDrag(e, period, "move")}
                         onClick={(e) => {
@@ -9017,6 +9027,9 @@ function ScheduleTemplateModal({
                     <div
                       className="df-time-block df-template-period-creating"
                       style={{
+                        position: "absolute",
+                        left: "8px",
+                        right: "8px",
                         top: `${(creatingState.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT}px`,
                         height: `${Math.max(SLOT_HEIGHT, ((creatingState.currentMinutes - creatingState.startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT)}px`,
                       }}

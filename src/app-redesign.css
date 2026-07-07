@@ -4617,45 +4617,13 @@ body.df-timeline-pointer-drag * {
   font: 500 12px/1.4 var(--paper-sans);
 }
 
-/* Hour-label slots inside the template timeline canvas. The execution page
-   draws its hour grid via a repeating-linear-gradient background on
-   .df-timeline-canvas and does not render .df-slot divs, so these rules are
-   template-only and scoped to .df-template-shell. */
-.df-app .df-template-shell .df-slot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  border-top: 1px solid var(--paper-rule);
-  pointer-events: none;
-}
-
-.df-app .df-template-shell .df-slot.hour {
-  border-top-color: var(--paper-rule-strong);
-}
-
-.df-app .df-template-shell .df-slot span {
-  position: absolute;
-  left: 4px;
-  top: -7px;
-  padding: 1px 4px;
-  background: var(--surface-main);
-  color: var(--text-muted);
-  font: 600 10px/1 var(--paper-mono);
-}
-
-/* Template timeline canvas needs explicit positioning/border/cursor because
-   the execution page's .df-timeline-canvas gets those from its parent
-   .df-time-grid / .df-day-col layout, which the template does not render. */
-.df-app .df-template-shell .df-timeline-canvas {
-  position: relative;
-  width: 100%;
-  border: 1px solid var(--paper-rule);
-  border-radius: var(--paper-radius);
-  background: var(--surface-main);
-  cursor: crosshair;
-  touch-action: none;
-}
+/* Template timeline now uses the SAME global .df-slot / .df-timeline-canvas CSS
+   as the execution page — no template-specific overrides. The hour grid
+   (repeating-linear-gradient background on .df-timeline-canvas), the hour
+   labels (positioned in the left gutter via .df-slot span { left: -56px }),
+   and the canvas border all come from the global rules in styles.css. This
+   is the visual parity guarantee: the template timeline is styled by the
+   exact same CSS as the execution timeline. */
 
 /* Period block = df-time-block language (annotated time region) */
 /* Period block reuses TaskBlock variant="scheduled" (df-task-block--scheduled)

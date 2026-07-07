@@ -760,3 +760,39 @@ Opening the template modal and inspecting the DOM should show all five `data-reu
 12. Template edits write only template period store: **yes** — via `templatePeriodAdapter` on draft `TemplatePeriod[]`
 13. Applying template creates real scheduled tasks: **yes** — `applyTemplateToDate` writes real records
 14. Execution page itself is unchanged: **yes** — `App` now calls `<ExecutionSplitLayout>` (renamed from `ExecutionLayoutShell`) and `<CandidatePanelShell>` / `<CandidatePanelHeader>` / `<TimelineCanvas>` instead of inline JSX, but renders the same DOM with the same CSS; build + 101 tests pass
+
+## Template Reuse Proof (Visual Parity Checkpoint)
+
+### Visual parity checkpoint
+- Template modal first rendered ExecutionPageLayout directly: **yes (by construction)** — the template modal renders `<ExecutionSplitLayout>` (imported from `src/components/ExecutionSharedLayout.tsx`) which is the SAME component the execution page uses. The modal frame (`.df-template-modal`) provides only overlay + close button + footer; the body is `<ExecutionSplitLayout>` which owns the 2-column grid, panel widths, divider, background, height, and scroll behavior. The template does NOT define its own left/right layout.
+- Left width matched execution page: **yes** — both render `<section class="df-candidate-panel">` via the same imported `CandidatePanelShell` component; width comes from the single `.df-candidate-panel` CSS rule, not from template-specific CSS.
+- Timeline grid matched execution page: **yes** — the template now uses the SAME global `.df-slot` / `.df-timeline-canvas` CSS as the execution page. The previous custom overrides (`.df-template-shell .df-slot`, `.df-template-shell .df-timeline-canvas`) have been REMOVED. The hour grid now comes from the global `repeating-linear-gradient` background on `.df-timeline-canvas`, hour labels sit in the left gutter via `.df-slot span { left: -56px }` (the scroll container's `padding-left: 56px`), and all 96 slots (hour + quarter + major) are rendered with the same structure as the execution daily timeline.
+- Modal wrapper no longer changed layout: **yes** — the `.df-template-modal` frame provides `width`, `min-height`, `border`, `border-radius`, `background`, `box-shadow`, and a 3-row grid (`1fr auto auto` for shell + status + footer). The `<ExecutionSplitLayout>` fills the `1fr` row and owns all internal layout. The modal frame does NOT own column widths, timeline width, sidebar CSS, or grid CSS.
+
+### Reused components (real ES-module imports)
+- ExecutionSplitLayout: `src/components/ExecutionSharedLayout.tsx` — imported at `src/main.tsx:54`, used by both `App` (execution) and `ScheduleTemplateModal` (template)
+- CandidatePanelShell: `src/components/ExecutionSharedLayout.tsx` — imported at `src/main.tsx:54`, used by both callers
+- CandidatePanelHeader: `src/components/ExecutionSharedLayout.tsx` — imported at `src/main.tsx:54`, used by both callers
+- CandidateBlock: `src/components/ExecutionSharedLayout.tsx` — imported at `src/main.tsx:54`, used by `ScheduleTemplateModal` for template list items (execution candidate items use `TaskCard` which composes the same `TaskBlock variant="candidate"` primitive)
+- TimelineCanvas: `src/components/ExecutionSharedLayout.tsx` — imported at `src/main.tsx:54`, used by BOTH the execution daily branch and the template modal
+- TimelineEventBlock: `src/components/ExecutionSharedLayout.tsx` — imported at `src/main.tsx:54`, used by `ScheduleTemplateModal` for template period blocks (execution scheduled blocks use `TimeBlock` which composes the same `TaskBlock variant="scheduled"` primitive)
+- Timeline drag/resize logic: **separate by design** — template keeps `beginPeriodDrag` (operates on draft periods), execution keeps `beginBlockDrag`/`beginBlockResize` (operates on real tasks); `TimelineAdapter<T>` is the shared contract, an intentional data-isolation boundary
+
+### Removed custom template UI (visual parity changes in this iteration)
+- Old template sidebar removed: **yes** — template left panel uses `<CandidatePanelShell>` + `<CandidatePanelHeader>` + `<CandidateBlock>`, no custom sidebar CSS
+- Old template timeline removed: **yes** — template timeline uses `<TimelineCanvas>` with global CSS, no custom timeline grid
+- Old period block removed: **yes** — template periods use `<TimelineEventBlock mode="template">`, no custom period card CSS (only interaction styles: cursor, resize dots, delete button)
+- Old template grid CSS removed: **yes** — the following CSS rules were DELETED from `src/app-redesign.css`:
+  - `.df-app .df-template-shell .df-slot` (custom slot positioning + border-top on ALL slots)
+  - `.df-app .df-template-shell .df-slot.hour` (custom hour border color)
+  - `.df-app .df-template-shell .df-slot span` (custom label at `left: 4px` inside canvas, instead of `left: -56px` in gutter)
+  - `.df-app .df-template-shell .df-timeline-canvas` (custom canvas with solid `background: var(--surface-main)` instead of gradient, custom border, custom cursor)
+
+### Slot rendering parity
+- Execution daily timeline renders: `Array.from({ length: slotCount }).map((_, index) => { const minutes = ...; const isHour = minutes % 60 === 0; const isMajor = minutes % (6*60) === 0; return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }}><span>{label}</span></div>; })` — all 96 slots, hour + quarter + major, labels in gutter
+- Template timeline now renders: `Array.from({ length: 96 }).map((_, index) => { const minutes = index * SLOT_MINUTES; const isHour = minutes % 60 === 0; const isMajor = minutes % (6*60) === 0; return <div className={`df-slot ${isHour ? "hour" : "quarter"}${isMajor ? " major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }}><span>{hh}:{mm}</span></div>; })` — SAME structure, SAME CSS classes, SAME 96 slots, SAME gutter labels
+
+### Period block positioning parity
+- Execution TimeBlock positioning: `left: 8` (baseLeft), `width: innerW` (canvas width - 16) — equivalent to `left: 8px, right: 8px`
+- Template TimelineEventBlock positioning (BEFORE this fix): `left: 56px, right: 8px` — blocks were pushed right to avoid in-canvas labels
+- Template TimelineEventBlock positioning (AFTER this fix): `left: 8px, right: 8px` — MATCHES execution's baseLeft, blocks sit in the content area like execution scheduled blocks
