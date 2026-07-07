@@ -12752,6 +12752,36 @@ function PluginGuidePage() {
 }
 
 
+// ── AppErrorBoundary: permanent top-level error boundary ──
+// Catches React render errors and displays the error message + stack so the
+// user sees a diagnostic screen instead of a blank white window. Without this,
+// any uncaught render error in the App tree unmounts the entire root and
+// leaves the Electron window blank.
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[AppErrorBoundary]", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      const message = String(this.state.error?.message || this.state.error);
+      const stack = String(this.state.error?.stack || "");
+      return (
+        <div style={{ padding: 24, fontFamily: "monospace", fontSize: 13, whiteSpace: "pre-wrap", color: "#C96F5B", background: "#fff", minHeight: "100vh" }}>
+          <h2 style={{ color: "#C96F5B", margin: "0 0 12px" }}>Render Error</h2>
+          <pre>{message}</pre>
+          {stack && <pre style={{ marginTop: 12, color: "#666" }}>{stack}</pre>}
+          <button onClick={() => window.location.reload()} style={{ marginTop: 12, padding: "6px 12px", fontSize: 14 }}>Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const rootElement = document.getElementById("root")!;
 const rootKey = "__plannerRoot";
 const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
@@ -12765,5 +12795,5 @@ root.render(
       ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
       : window.location.pathname === "/plugin-guide"
         ? <PluginGuidePage />
-      : <App />,
+      : <AppErrorBoundary><App /></AppErrorBoundary>,
 );
