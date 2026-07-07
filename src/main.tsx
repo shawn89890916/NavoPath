@@ -8471,6 +8471,19 @@ function ScheduleTemplateModal({
   // real task store until Apply.
   type TemplateKey = `builtin:${BuiltInScheduleTemplateId}` | `custom:${string}` | "draft:new";
   type TemplatePeriod = { id: string; title: string; startMinutes: number; durationMinutes: number };
+  // Adapter isolates template-period data from the real task store. The
+  // template timeline operates purely on TemplatePeriod drafts via this
+  // interface; real scheduled tasks are only created on Apply.
+  type TimelineAdapter<T> = {
+    getId: (item: T) => string;
+    getTitle: (item: T) => string;
+    getStartMinutes: (item: T) => number;
+    getDurationMinutes: (item: T) => number;
+    createAt: (startMinutes: number) => void;
+    updateTime: (id: string, startMinutes: number, durationMinutes: number) => void;
+    updateTitle: (id: string, title: string) => void;
+    delete: (id: string) => void;
+  };
   // NOTE: `zh` must be declared before any useState that calls helpers (e.g.
   // makeBuiltInPeriods → slotToPeriod) which reference `zh`. Declaring it
   // after the useState lines triggers a Temporal Dead Zone ReferenceError
@@ -8590,6 +8603,29 @@ function ScheduleTemplateModal({
     return Math.max(0, Math.min(TIMELINE_TOTAL_MINUTES - SLOT_MINUTES, snapped));
   }
 
+  // Adapter over TemplatePeriod drafts — isolates template data from the real
+  // task store. The template timeline operates purely through this interface;
+  // real scheduled tasks are only created on Apply.
+  const templatePeriodAdapter: TimelineAdapter<TemplatePeriod> = {
+    getId: (p) => p.id,
+    getTitle: (p) => p.title,
+    getStartMinutes: (p) => p.startMinutes,
+    getDurationMinutes: (p) => p.durationMinutes,
+    createAt: (startMinutes) => {
+      const id = uid("period");
+      setPeriods((prev) => [...prev, { id, title: "", startMinutes, durationMinutes: SLOT_MINUTES * 2 }]);
+      setEditingPeriodId(id);
+      setEditingTitle("");
+    },
+    updateTime: (id, startMinutes, durationMinutes) => {
+      setPeriods((prev) => prev.map((p) => (p.id === id ? { ...p, startMinutes, durationMinutes } : p)));
+    },
+    updateTitle: (id, title) => {
+      setPeriods((prev) => prev.map((p) => (p.id === id ? { ...p, title } : p)));
+    },
+    delete: (id) => removePeriod(id),
+  };
+
   function handleTimelinePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest("[data-template-period]")) return;
@@ -8645,7 +8681,7 @@ function ScheduleTemplateModal({
     try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* ignore */ }
   }
 
-  function beginPeriodDrag(event: React.PointerEvent<HTMLDivElement>, period: TemplatePeriod, mode: "move" | "resize-top" | "resize-bottom") {
+  function beginPeriodDrag(event: React.PointerEvent<HTMLElement>, period: TemplatePeriod, mode: "move" | "resize-top" | "resize-bottom") {
     event.stopPropagation();
     setDragState({ periodId: period.id, mode, originY: event.clientY, originStart: period.startMinutes, originDuration: period.durationMinutes });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -8954,11 +8990,14 @@ function ScheduleTemplateModal({
                     const startStr = minutesToTime(period.startMinutes);
                     const endStr = minutesToTime(period.startMinutes + period.durationMinutes);
                     return (
-                      <div
+                      <TaskBlock
                         key={period.id}
-                        data-template-period
-                        className="df-time-block df-template-period-block"
-                        style={{ top: `${top}px`, height: `${height}px` }}
+                        as="div"
+                        variant="scheduled"
+                        appearance="calm"
+                        className="df-template-period-block"
+                        style={{ position: "absolute", left: "56px", right: "8px", top: `${top}px`, height: `${height}px` }}
+                        dataAttrs={{ "template-period": "true" }}
                         onPointerDown={(e) => beginPeriodDrag(e, period, "move")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8967,34 +9006,37 @@ function ScheduleTemplateModal({
                             setEditingTitle(period.title);
                           }
                         }}
-                      >
-                        <div className="df-resize-dot top" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-top")} />
-                        <div className="df-time-block-body df-template-period-body">
-                          {isEditing ? (
-                            <input
-                              className="df-template-period-title-input"
-                              autoFocus
-                              value={editingTitle}
-                              onChange={(e) => setEditingTitle(e.target.value)}
-                              onBlur={() => commitPeriodTitle(period.id)}
-                              onKeyDown={(e) => { if (e.key === "Enter") commitPeriodTitle(period.id); if (e.key === "Escape") setEditingPeriodId(null); }}
+                        main={
+                          <>
+                            <div className="df-resize-dot top" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-top")} />
+                            <div className="df-time-block-body">
+                              {isEditing ? (
+                                <input
+                                  className="df-template-period-title-input"
+                                  autoFocus
+                                  value={editingTitle}
+                                  onChange={(e) => setEditingTitle(e.target.value)}
+                                  onBlur={() => commitPeriodTitle(period.id)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") commitPeriodTitle(period.id); if (e.key === "Escape") setEditingPeriodId(null); }}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <span className="df-time-block-title">{period.title || (zh ? "未命名" : "Untitled")}</span>
+                              )}
+                              <span className="df-time-block-time">{startStr}–{endStr}</span>
+                            </div>
+                            <div className="df-resize-dot bottom" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-bottom")} />
+                            <button
+                              type="button"
+                              className="df-template-period-delete"
+                              aria-label={zh ? "删除时间段" : "Delete period"}
                               onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span className="df-time-block-title">{period.title || (zh ? "未命名" : "Untitled")}</span>
-                          )}
-                          <span className="df-time-block-time">{startStr}–{endStr}</span>
-                        </div>
-                        <div className="df-resize-dot bottom" onPointerDown={(e) => beginPeriodDrag(e, period, "resize-bottom")} />
-                        <button
-                          type="button"
-                          className="df-template-period-delete"
-                          aria-label={zh ? "删除时间段" : "Delete period"}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => { e.stopPropagation(); removePeriod(period.id); }}
-                        >×</button>
-                      </div>
+                              onClick={(e) => { e.stopPropagation(); removePeriod(period.id); }}
+                            >×</button>
+                          </>
+                        }
+                      />
                     );
                   })}
                   {creatingState && (

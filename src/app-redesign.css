@@ -4712,23 +4712,15 @@ body.df-timeline-pointer-drag * {
 }
 
 /* Period block = df-time-block language (annotated time region) */
+/* Period block reuses TaskBlock variant="scheduled" (df-task-block--scheduled)
+   for its visual shell. Only layout + handles + delete button are customized
+   here; border/fill/typography come from the shared TaskBlock CSS so the
+   template period block reads as the same annotated-time-region language as
+   execution-page TimeBlock. */
 .df-app .df-template-period-block {
-  position: absolute;
-  left: 56px;
-  right: 8px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--paper-accent-rule);
-  border-radius: var(--paper-radius);
-  background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-main));
   cursor: grab;
   touch-action: none;
   overflow: hidden;
-}
-
-.df-app .df-template-period-block:hover {
-  border-color: var(--accent-active);
-  background: color-mix(in srgb, var(--accent-active) 12%, var(--surface-main));
 }
 
 .df-app .df-template-period-block:active {
@@ -4755,7 +4747,7 @@ body.df-timeline-pointer-drag * {
   border-top: 1px solid color-mix(in srgb, var(--accent-active) 30%, transparent);
 }
 
-.df-app .df-template-period-body {
+.df-app .df-template-period-block .df-time-block-body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
