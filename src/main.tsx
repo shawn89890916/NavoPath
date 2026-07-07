@@ -2697,16 +2697,22 @@ function App() {
     const effectBandCount = Math.max(1, Math.ceil(effectDates.length / effectColumnCount));
     const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
     const bufferBands = Math.max(1, Math.floor(effectBandCount / 4));
-    const updateVisibleTimelineDate = () => {
+    // Label-only update: safe to call on init (no state shift, no loop risk).
+    const updateVisibleLabel = () => {
       const centerY = scrollElement.scrollTop + scrollElement.clientHeight / 2;
       const bandIndex = Math.max(0, Math.min(effectBandCount - 1, Math.floor(centerY / dayHeight)));
       const nextDate = getContinuousTimelineDateForOffset(effectStartDate, bandIndex, effectColumnCount);
       setVisibleTimelineDate((current) => current === nextDate ? current : nextDate);
-      // Infinite scroll: when the viewport reaches either edge of the centered
-      // window, shift `selectedDate` so the window slides and more dates become
-      // reachable. The centered window keeps a constant band count, so the
-      // useLayoutEffect only needs to translate scrollTop by the shifted bands.
+    };
+    // Full scroll handler: label + infinite-scroll prepend/append. Only invoked
+    // on real scroll events, never on effect init, so mount-time scrollTop=0
+    // cannot trigger a setSelectedDate feedback loop.
+    const handleTimelineScroll = () => {
+      updateVisibleLabel();
       if (continuousPrependLockRef.current) return;
+      // Guard: if the container isn't scrollable (not laid out yet or content
+      // fits), skip prepend/append entirely to avoid a compensation clamp loop.
+      if (scrollElement.scrollHeight <= scrollElement.clientHeight) return;
       const distanceFromBottom = scrollElement.scrollHeight - scrollElement.clientHeight - scrollElement.scrollTop;
       if (scrollElement.scrollTop < dayHeight && effectBandCount > 1) {
         // Near top — prepend earlier bands.
@@ -2720,9 +2726,9 @@ function App() {
         setSelectedDate(addDays(selectedDate, bufferBands * effectColumnCount));
       }
     };
-    updateVisibleTimelineDate();
-    scrollElement.addEventListener("scroll", updateVisibleTimelineDate, { passive: true });
-    return () => scrollElement.removeEventListener("scroll", updateVisibleTimelineDate);
+    updateVisibleLabel();
+    scrollElement.addEventListener("scroll", handleTimelineScroll, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", handleTimelineScroll);
   }, [mode, settings?.continuousCrossDayScroll, timelineView, selectedDate]);
 
   useEffect(() => {
