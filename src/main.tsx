@@ -51,6 +51,7 @@ import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, 
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
 import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
+import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
@@ -7099,7 +7100,7 @@ function App() {
       )}
 
       {mode === "execute" ? (
-        <ExecutionLayoutShell className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
+        <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button className={compactExecuteView === "tasks" ? "active" : ""} onClick={() => setCompactExecuteView("tasks")}>{lang === "zh" ? "任务" : "Tasks"}</button>
@@ -8272,7 +8273,7 @@ function App() {
             </div>
             </>}
           </section>
-        </ExecutionLayoutShell>
+        </ExecutionSplitLayout>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
           <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} dayStartTime={settings.dayStartTime} metricsRangePreset={settings.metricsRangePreset} metricsGroupBy={settings.metricsGroupBy} metricsDisplayMetric={settings.metricsDisplayMetric} metricsIncludeHabits={settings.metricsIncludeHabits} metricsCompletionFilter={settings.metricsCompletionFilter} metricsCustomStart={settings.metricsCustomStart} metricsCustomEnd={settings.metricsCustomEnd} onMetricsSettingsChange={(patch) => void saveSettings(patch)} />
@@ -8887,7 +8888,7 @@ function ScheduleTemplateModal({
       >
         <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
 
-        <ExecutionLayoutShell className="df-template-shell">
+        <ExecutionSplitLayout className="df-template-shell">
           {/* ── Left: shared CandidatePanelShell (same component as execution page) ── */}
           <CandidatePanelShell ariaLabel={zh ? "模板列表" : "Template list"}>
             <CandidatePanelHeader
@@ -9024,7 +9025,7 @@ function ScheduleTemplateModal({
               </TimelineCanvas>
             </div>
           </section>
-        </ExecutionLayoutShell>
+        </ExecutionSplitLayout>
 
         {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
 
@@ -12788,335 +12789,13 @@ function PluginGuidePage() {
 }
 
 
-// ── Shared layout shells: reused by BOTH the execution page and the template modal ──
-// These thin wrappers guarantee the execution page and template mode render through the
-// SAME layout primitives (df-execute grid, df-timeline-scroll + df-timeline-canvas), so
-// the template modal can never drift into a separate visual system. Differences between
-// the two callers live entirely in the children/handlers they pass in.
-
-/**
- * ExecutionLayoutShell — the real execution-page 2-column grid (`<main className="df-execute">`).
- * The grid template, column widths, gap, padding and height all come from the single
- * `.df-execute` CSS rule (styles.css). Both the execution page and the template modal
- * render their panels through this shell so the outer layout is identical. Children are
- * passed through unchanged so the execution page can keep its compact-controls/tabs and
- * the template modal can pass its two panels.
- */
-function ExecutionLayoutShell({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <main className={`df-execute${className ? ` ${className}` : ""}`}>
-      {children}
-    </main>
-  );
-}
-
-/**
- * TimelineCanvas — the shared timeline scroll container + positioned canvas.
- * Renders `df-timeline-scroll` (scroll container) wrapping `df-timeline-canvas` (the
- * absolutely-positioned canvas whose height sets the total scrollable range). The hour
- * grid, event blocks, now-line, etc. are passed as `children` so each caller keeps its
- * own grid logic (execution has 15-min slots + continuous-cross-day labels; template has
- * 25 simple hour labels). The container primitive — scroll behavior, canvas positioning,
- * time-gutter width — is shared through the same CSS classes.
- *
- * Used by BOTH the execution page daily timeline and the template modal timeline.
- */
-function TimelineCanvas({
-  scrollRef,
-  canvasRef,
-  height,
-  canvasClassName,
-  onScrollPointerDown,
-  onScrollPointerMove,
-  onScrollPointerUp,
-  onScrollDragOver,
-  onScrollDrop,
-  onScrollDragLeave,
-  onCanvasPointerDown,
-  onCanvasPointerMove,
-  onCanvasPointerUp,
-  onCanvasPointerCancel,
-  onCanvasMouseDown,
-  onCanvasClick,
-  children,
-}: {
-  scrollRef?: React.Ref<HTMLDivElement>;
-  canvasRef?: React.Ref<HTMLDivElement>;
-  height: number;
-  canvasClassName?: string;
-  onScrollPointerDown?: React.PointerEventHandler<HTMLDivElement>;
-  onScrollPointerMove?: React.PointerEventHandler<HTMLDivElement>;
-  onScrollPointerUp?: React.PointerEventHandler<HTMLDivElement>;
-  onScrollDragOver?: React.DragEventHandler<HTMLDivElement>;
-  onScrollDrop?: React.DragEventHandler<HTMLDivElement>;
-  onScrollDragLeave?: React.DragEventHandler<HTMLDivElement>;
-  onCanvasPointerDown?: React.PointerEventHandler<HTMLDivElement>;
-  onCanvasPointerMove?: React.PointerEventHandler<HTMLDivElement>;
-  onCanvasPointerUp?: React.PointerEventHandler<HTMLDivElement>;
-  onCanvasPointerCancel?: React.PointerEventHandler<HTMLDivElement>;
-  onCanvasMouseDown?: React.MouseEventHandler<HTMLDivElement>;
-  onCanvasClick?: React.MouseEventHandler<HTMLDivElement>;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      className="df-timeline-scroll"
-      ref={scrollRef}
-      onPointerDown={onScrollPointerDown}
-      onPointerMove={onScrollPointerMove}
-      onPointerUp={onScrollPointerUp}
-      onDragOver={onScrollDragOver}
-      onDrop={onScrollDrop}
-      onDragLeave={onScrollDragLeave}
-    >
-      <div
-        ref={canvasRef}
-        className={`df-timeline-canvas${canvasClassName ? ` ${canvasClassName}` : ""}`}
-        style={{ height: `${height}px` }}
-        onPointerDown={onCanvasPointerDown}
-        onPointerMove={onCanvasPointerMove}
-        onPointerUp={onCanvasPointerUp}
-        onPointerCancel={onCanvasPointerCancel}
-        onMouseDown={onCanvasMouseDown}
-        onClick={onCanvasClick}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/**
- * CandidatePanelShell — the shared left-panel section wrapper.
- * Renders `<section className="df-candidate-panel">` — the SAME CSS class the execution
- * page uses for Today's Candidates. Both the execution page and the template modal wrap
- * their panel content in this shell so the panel border, radius, surface, padding, and
- * width are identical by construction.
- */
-function CandidatePanelShell({
-  className,
-  ariaHidden,
-  ariaLabel,
-  onDragOver,
-  onDrop,
-  children,
-}: {
-  className?: string;
-  ariaHidden?: boolean;
-  ariaLabel?: string;
-  onDragOver?: React.DragEventHandler<HTMLElement>;
-  onDrop?: React.DragEventHandler<HTMLElement>;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      className={`df-candidate-panel${className ? ` ${className}` : ""}`}
-      aria-hidden={ariaHidden}
-      aria-label={ariaLabel}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      {children}
-    </section>
-  );
-}
-
-/**
- * CandidatePanelHeader — the shared panel title strip.
- * Renders `<div className="df-panel-title"><h2>{title}</h2><div>{actions}</div></div>`
- * — the SAME structure the execution page uses for its candidate panel header. Both
- * execution and template use this so the title style, divider, and action-button rhythm
- * are identical.
- */
-function CandidatePanelHeader({
-  title,
-  actions,
-}: {
-  title: React.ReactNode;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <div className="df-panel-title">
-      <h2>{title}</h2>
-      {actions ? <div>{actions}</div> : null}
-    </div>
-  );
-}
-
-/**
- * CandidateBlock — the shared list-row visual primitive for items inside a candidate panel.
- * Renders `<TaskBlock variant="candidate">` — the SAME shared component that `TaskCard`
- * (execution page candidate items) composes. Template list items use this so the visual
- * language (accent bar, grid layout, selected state, hover) matches execution candidate
- * cards by construction, not by CSS imitation.
- *
- * mode="template"   — a selectable template row (title + meta + optional actions)
- * mode="template-new" — the "+ new template" row (icon + title + meta)
- */
-function CandidateBlock({
-  mode,
-  selected,
-  title,
-  meta,
-  actions,
-  icon,
-  badge,
-  onClick,
-  onDoubleClick,
-  onPointerDown,
-  children,
-}: {
-  mode: "template" | "template-new";
-  selected?: boolean;
-  title: React.ReactNode;
-  meta?: React.ReactNode;
-  actions?: React.ReactNode;
-  icon?: React.ReactNode;
-  badge?: React.ReactNode;
-  onClick?: React.MouseEventHandler<HTMLElement>;
-  onDoubleClick?: React.MouseEventHandler<HTMLElement>;
-  onPointerDown?: React.PointerEventHandler<HTMLElement>;
-  children?: React.ReactNode;
-}) {
-  return (
-    <TaskBlock
-      as="div"
-      variant="candidate"
-      appearance="calm"
-      selected={selected}
-      className={`df-candidate-block df-candidate-block--${mode}`}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onPointerDown={onPointerDown}
-      main={
-        <span className="df-candidate-block-content">
-          {children}
-          <span className="df-candidate-block-title">{title}</span>
-          {meta ? <small className="df-candidate-block-meta">{meta}</small> : null}
-        </span>
-      }
-      trailing={
-        <>
-          {badge ? <span className="df-candidate-block-badge">{badge}</span> : null}
-          {actions ? <span className="df-candidate-block-actions">{actions}</span> : null}
-          {icon ? <span className="df-candidate-block-icon">{icon}</span> : null}
-        </>
-      }
-    />
-  );
-}
-
-/**
- * TimelineEventBlock — the shared scheduled-block visual primitive for timeline events.
- * Renders `<TaskBlock variant="scheduled">` — the SAME shared component that `TimeBlock`
- * (execution page scheduled blocks) composes. Template period blocks use this so the
- * visual language (scheduled appearance, resize dots, body, time range) matches execution
- * scheduled blocks by construction.
- *
- * mode="template" — a template period block (resize dots + title + time range + delete)
- * mode="execution" — reserved for future use; execution currently uses `TimeBlock` which
- *   composes the same `TaskBlock variant="scheduled"` primitive.
- */
-function TimelineEventBlock({
-  mode,
-  title,
-  timeRange,
-  selected,
-  style,
-  className,
-  dataAttrs,
-  onPointerDown,
-  onClick,
-  onResizeStart,
-  onDelete,
-  editing,
-  editingTitle,
-  onTitleChange,
-  onTitleCommit,
-  onTitleCancel,
-  lang,
-  children,
-}: {
-  mode: "template" | "execution";
-  title: string;
-  timeRange?: string;
-  selected?: boolean;
-  style?: CSSProperties;
-  className?: string;
-  dataAttrs?: Record<string, string | undefined>;
-  onPointerDown?: React.PointerEventHandler<HTMLElement>;
-  onClick?: React.MouseEventHandler<HTMLElement>;
-  onResizeStart?: (edge: "top" | "bottom") => React.PointerEventHandler<HTMLElement>;
-  onDelete?: React.MouseEventHandler<HTMLElement>;
-  editing?: boolean;
-  editingTitle?: string;
-  onTitleChange?: (value: string) => void;
-  onTitleCommit?: () => void;
-  onTitleCancel?: () => void;
-  lang?: Language;
-  children?: React.ReactNode;
-}) {
-  const untitled = lang === "zh" ? "未命名" : "Untitled";
-  return (
-    <TaskBlock
-      as="div"
-      variant="scheduled"
-      appearance="calm"
-      selected={selected}
-      className={className}
-      style={style}
-      dataAttrs={dataAttrs}
-      onPointerDown={onPointerDown}
-      onClick={onClick}
-      main={
-        <>
-          {onResizeStart ? (
-            <div className="df-resize-dot top" onPointerDown={onResizeStart("top")} />
-          ) : null}
-          <div className="df-time-block-body">
-            {editing && onTitleChange ? (
-              <input
-                className="df-template-period-title-input"
-                autoFocus
-                value={editingTitle}
-                onChange={(e) => onTitleChange(e.target.value)}
-                onBlur={onTitleCommit}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onTitleCommit?.();
-                  if (e.key === "Escape") onTitleCancel?.();
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span className="df-time-block-title">{title || untitled}</span>
-            )}
-            {timeRange ? <span className="df-time-block-time">{timeRange}</span> : null}
-            {children}
-          </div>
-          {onResizeStart ? (
-            <div className="df-resize-dot bottom" onPointerDown={onResizeStart("bottom")} />
-          ) : null}
-          {onDelete ? (
-            <button
-              type="button"
-              className="df-template-period-delete"
-              aria-label={lang === "zh" ? "删除时间段" : "Delete period"}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); onDelete(e); }}
-            >×</button>
-          ) : null}
-        </>
-      }
-    />
-  );
-}
+// ── Shared layout shells: imported from ./components/ExecutionSharedLayout ──
+// The six shared components (ExecutionSplitLayout, CandidatePanelShell,
+// CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock)
+// are imported at the top of this file (line 54). Both the execution page
+// and ScheduleTemplateModal render through these imported components, so
+// reuse is enforced by the ES-module import graph — not by being in the
+// same file scope.
 
 
 // ── AppErrorBoundary: permanent top-level error boundary ──

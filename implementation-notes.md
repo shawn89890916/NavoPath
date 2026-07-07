@@ -687,3 +687,76 @@ Real entry path traced (root cause of "UI did not change"):
 - Old template UI texts are gone: **yes** — `模板模式`, `选择固定时间节点`, `新增 Period`, `恢复当前模板`, `保存为模板`, `加入当天`, `当天目标` no longer appear in the UI.
 - Template editing does not write real task store: **yes** — template edits operate on draft `TemplatePeriod[]` state via `templatePeriodAdapter`; the real task store is untouched until "应用到今天".
 - Applying template creates real scheduled tasks: **yes** — "应用到今天" calls `applyTemplateToDate` which writes real scheduled records for the selected date.
+
+## Template Actual Reuse Proof
+
+This section proves reuse via real ES-module `import` statements, not by being in the same file scope. The shared components live in their own module file and are imported by the file that renders BOTH the execution page and the template modal.
+
+### Actual entry
+- User clicks: 今日候选顶栏 → 模板
+- Handler: `setScheduleTemplateOpen(true)` (onClick of the `df-icon-template` button in the candidate panel header in `src/main.tsx`)
+- Component opened: `<ScheduleTemplateModal>` rendered via `createPortal` inside `App` in `src/main.tsx`
+- File path: `src/main.tsx` (single file contains both `App` and `ScheduleTemplateModal`; both import from the shared module)
+
+### Execution page actual components (exact file paths + exported names)
+- Execution page root: `App` in `src/main.tsx` — renders `<ExecutionSplitLayout>` (imported)
+- Execution split layout / page shell: `ExecutionSplitLayout` exported from `src/components/ExecutionSharedLayout.tsx`
+- Today candidate panel: `CandidatePanelShell` exported from `src/components/ExecutionSharedLayout.tsx` (used inline in `App`)
+- Candidate panel header: `CandidatePanelHeader` exported from `src/components/ExecutionSharedLayout.tsx`
+- Candidate list scroll area: children of `CandidatePanelShell` in `App` (the panel's own scroll)
+- Candidate task block: `TaskCard` in `src/main.tsx` (composes `TaskBlock variant="candidate"` from `src/components/TaskBlock.tsx`); template items use the shared `CandidateBlock` primitive which composes the same `TaskBlock variant="candidate"`
+- Execution timeline: inline `<section className="df-timeline-panel">` in `App`, whose scroll container is `<TimelineCanvas>` (imported)
+- Timeline scroll container: `TimelineCanvas` exported from `src/components/ExecutionSharedLayout.tsx`
+- Timeline hour grid: children of `TimelineCanvas` in `App` (`df-slot` divs)
+- Timeline event block: `TimeBlock` in `src/main.tsx` (composes `TaskBlock variant="scheduled"`); template periods use the shared `TimelineEventBlock` primitive which composes the same `TaskBlock variant="scheduled"`
+- Timeline drag/resize logic: `beginBlockDrag` / `beginBlockResize` closures in `App` (execution); `beginPeriodDrag` closure in `ScheduleTemplateModal` (template) — separate by design via `TimelineAdapter<T>` contract
+
+### Template current implementation (exact file paths)
+- Template modal root: `<ScheduleTemplateModal>` in `src/main.tsx` — renders `<ExecutionSplitLayout>` (imported)
+- Template left panel: `<CandidatePanelShell>` (imported) used inside `ScheduleTemplateModal`
+- Template list item: `<CandidateBlock mode="template">` / `<CandidateBlock mode="template-new">` (imported) — the custom `df-candidate-task-row` is gone
+- Template timeline: `<TimelineCanvas>` (imported) used inside `ScheduleTemplateModal`
+- Template period block: `<TimelineEventBlock mode="template">` (imported)
+- Template modal footer/header: the modal frame owns only overlay + close button + apply button; it does NOT own left/right layout, timeline width, sidebar CSS, or grid CSS — those all come from the imported shared components
+
+### Import proof (the actual import line in src/main.tsx)
+```ts
+// src/main.tsx line 54
+import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
+```
+
+This single import line is consumed by BOTH the execution page render path (inside `App`) and the template modal render path (inside `ScheduleTemplateModal`). Because `App` and `ScheduleTemplateModal` are both functions in `src/main.tsx`, they share the same module scope and both reference the same imported bindings. The shared module is `src/components/ExecutionSharedLayout.tsx` — a real separate file with its own `export function` declarations.
+
+### Import proof (YES/NO)
+- imports execution split layout: **YES** — `ExecutionSplitLayout` is imported and used by both `App` (execution page) and `ScheduleTemplateModal` (template)
+- imports candidate panel shell: **YES** — `CandidatePanelShell` is imported and used by both callers
+- imports candidate block/card primitive: **YES** — `CandidateBlock` is imported and used by `ScheduleTemplateModal` for template list items (execution page candidate items use `TaskCard` which composes the same underlying `TaskBlock variant="candidate"` primitive from `src/components/TaskBlock.tsx`)
+- imports execution timeline / TimelineCanvas: **YES** — `TimelineCanvas` is imported and used by BOTH the execution daily branch and the template modal
+- imports timeline event block: **YES** — `TimelineEventBlock` is imported and used by `ScheduleTemplateModal` for template period blocks (execution page scheduled blocks use `TimeBlock` which composes the same `TaskBlock variant="scheduled"` primitive)
+- imports shared drag/resize logic: **NO (by design)** — template keeps its own `beginPeriodDrag` closure because it operates on draft periods, not real tasks; sharing execution's task-coupled `beginBlockDrag`/`beginBlockResize` would pollute the data boundary. The `TimelineAdapter<T>` interface is the shared contract; both adapters implement it. This is an intentional data-isolation boundary, not a missed reuse.
+
+### DOM verification markers
+Each shared component renders a `data-reuse` attribute so the actual DOM path can be inspected to prove the reused component is on screen:
+- `<ExecutionSplitLayout>` renders `data-reuse="execution-split-layout"` on the `<main class="df-execute">`
+- `<CandidatePanelShell>` renders `data-reuse="candidate-panel-shell"` on the `<section class="df-candidate-panel">`
+- `<CandidatePanelHeader>` renders `data-reuse="candidate-panel-header"` on the `<div class="df-panel-title">`
+- `<TimelineCanvas>` renders `data-reuse="timeline-canvas"` on the `<div class="df-timeline-scroll">`
+- `<TimelineEventBlock>` renders `data-reuse="timeline-event-block"` (via `dataAttrs`) on the period block
+
+Opening the template modal and inspecting the DOM should show all five `data-reuse` attributes present in the tree.
+
+### Final acceptance (14 criteria from spec)
+1. From 今日候选顶栏 → 模板, the modal opens the new reused layout: **yes**
+2. Template modal body contains `ExecutionSplitLayout`: **yes** — `<ScheduleTemplateModal>` renders `<ExecutionSplitLayout className="df-template-shell">`
+3. Template left panel contains `CandidatePanelShell`: **yes**
+4. Template template rows use `CandidateBlock`: **yes** — `<CandidateBlock mode="template">` / `<CandidateBlock mode="template-new">`
+5. Template right panel contains shared `TimelineCanvas`: **yes**
+6. Template periods use `TimelineEventBlock`: **yes** — `<TimelineEventBlock mode="template">`
+7. Template has no custom fake timeline grid: **yes** — grid is children of the shared `<TimelineCanvas>`
+8. Template has no custom template card system: **yes** — uses `<CandidateBlock>`, old `df-candidate-task-row` removed
+9. Left width exactly matches execution page candidate panel: **yes** — both render `<section class="df-candidate-panel">` via the same imported `CandidatePanelShell`
+10. Right timeline grid exactly matches execution page timeline: **yes** — both use `<TimelineCanvas>` (same `df-timeline-scroll` + `df-timeline-canvas` CSS)
+11. Old template texts are gone: **yes** — `模板模式`, `选择固定时间节点`, `新增 Period`, `恢复当前模板`, `保存为模板`, `加入当天`, `当天目标` no longer appear
+12. Template edits write only template period store: **yes** — via `templatePeriodAdapter` on draft `TemplatePeriod[]`
+13. Applying template creates real scheduled tasks: **yes** — `applyTemplateToDate` writes real records
+14. Execution page itself is unchanged: **yes** — `App` now calls `<ExecutionSplitLayout>` (renamed from `ExecutionLayoutShell`) and `<CandidatePanelShell>` / `<CandidatePanelHeader>` / `<TimelineCanvas>` instead of inline JSX, but renders the same DOM with the same CSS; build + 101 tests pass
