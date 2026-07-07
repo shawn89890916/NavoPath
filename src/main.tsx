@@ -8471,6 +8471,12 @@ function ScheduleTemplateModal({
   // real task store until Apply.
   type TemplateKey = `builtin:${BuiltInScheduleTemplateId}` | `custom:${string}` | "draft:new";
   type TemplatePeriod = { id: string; title: string; startMinutes: number; durationMinutes: number };
+  // NOTE: `zh` must be declared before any useState that calls helpers (e.g.
+  // makeBuiltInPeriods → slotToPeriod) which reference `zh`. Declaring it
+  // after the useState lines triggers a Temporal Dead Zone ReferenceError
+  // because the useState initializer runs during mount, before `zh` is
+  // initialized.
+  const zh = lang === "zh";
   const [templateKey, setTemplateKey] = useState<TemplateKey>("builtin:school");
   const [templateName, setTemplateName] = useState("");
   const [periods, setPeriods] = useState<TemplatePeriod[]>(() => makeBuiltInPeriods("school"));
@@ -8483,7 +8489,6 @@ function ScheduleTemplateModal({
   const [creatingState, setCreatingState] = useState<{ startMinutes: number; currentMinutes: number } | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const zh = lang === "zh";
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
