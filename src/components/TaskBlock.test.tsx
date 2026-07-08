@@ -211,7 +211,10 @@ describe("TaskBlock shared component contract", () => {
     // test tracks the post-refactor contract instead of the removed CSS.
     expect(main).toContain("df-habit-overview-toolbar");
     expect(main).toContain("df-habit-overview-add");
-    expect(main).toContain("df-habit-candidate-settings");
+    // The small square settings button next to the "习惯" title was intentionally
+    // removed; the habit overview is now opened by clicking the habit card itself
+    // (TaskGroup onClick → onOpenOverview). Assert the button class is gone.
+    expect(main).not.toContain("df-habit-candidate-settings");
     expect(css).toContain(".df-habit-overview-table");
   });
 

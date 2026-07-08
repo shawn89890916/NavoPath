@@ -1,6 +1,6 @@
 # NavoPath 更新日志
 
-## 2026-07-08 · 模板弹窗底部按钮归位与时间轴布局对齐执行页
+## 2026-07-08 · 模板弹窗底部按钮归位、时间轴布局对齐执行页、今日候选间距收紧与习惯标题精简
 
 ### 修复
 - 修复模板弹窗底部「取消」「应用到今天」等按钮看起来消失或错位的问题：底部操作栏此前使用 4 列网格（`grid-template-columns: minmax(0,1fr) auto auto auto`），当按钮数量不足 4 个（如选中默认模板时只有取消 + 应用两项）时，取消会占据 1fr 列拉伸至整行、应用紧随其后落在中间而非右下角。改为 flex 布局并右对齐操作组，冲突提示用 `margin-right: auto` 独占左侧，取消 / 保存 / 应用到今天始终锚定在右下角，不再随按钮数量漂移。
@@ -8,6 +8,8 @@
 
 ### 改进
 - 模板弹窗新增 `TEMPLATE_VISUAL_PARITY_DEBUG` 调试开关（默认关闭）：开启后弹窗主体直接以执行页的精确包裹层级（`df-timeline-body` > `df-timeline-content` > `df-timeline-daily` > `df-date-title` + `TimelineCanvas`）渲染占位内容，用于验证弹窗外框是否破坏执行页布局——若调试模式下仍与执行页不一致，则问题在 modal 外框而非模板数据。
+- 收紧执行页左侧「今日候选」任务卡之间的垂直间距：候选行垂直内边距由 9px 调整为 7px，卡片间视觉间隙从约 18px 收紧到约 14px，列表更紧凑但不拥挤；卡片内部布局、padding、字体、边框、颜色均不变。
+- 删除「习惯」标题旁的小方形设置按钮：该按钮此前与卡片点击打开习惯总览重复，现从 JSX 中彻底移除（非隐藏），不留空白占位；习惯总览仍可通过点击习惯卡片整体打开。同时将「习惯」标题字重由 650 提升至 700，与面板标题体系更统一，但不抢过任务卡标题。
 
 ## 2026-07-07 · 模板模式重构为时间轴编辑器、时间轴无限滚动与现在线修复、指标圆环图标注优化与桌面小组件
 
@@ -90,7 +92,7 @@
 - 修复拖动任务时页面文字被意外选中；拖动期间统一禁用文本选择（输入框、文本域与可编辑区域不受影响）。
 - 修复拖动源原位置占位呈现为紫色底，改为中性灰色虚线占位，深色模式下同样保持灰色。
 
-## 2026-07-08 · Template modal footer buttons restored & timeline layout aligned with execution page
+## 2026-07-08 · Template modal footer buttons restored, timeline layout aligned with execution page, today's candidate spacing tightened & habits title refined
 
 ### Fixes
 - Fixed template modal footer buttons (Cancel / Apply to today) appearing missing or displaced: the footer used a 4-column grid (`grid-template-columns: minmax(0,1fr) auto auto auto`), so when fewer than 4 items rendered (e.g. a built-in template selected → only Cancel + Apply), Cancel stretched across the 1fr column and Apply sat in the middle instead of the bottom-right corner. Switched to a flex layout with the action group right-aligned; the conflict note uses `margin-right: auto` to sit on the left, so Cancel / Save / Apply to today stay anchored at the bottom-right regardless of button count.
@@ -98,6 +100,8 @@
 
 ### Improvements
 - Added a `TEMPLATE_VISUAL_PARITY_DEBUG` toggle (off by default) to the template modal: when enabled, the modal body renders placeholder content using the execution page's exact wrapper hierarchy (`df-timeline-body` > `df-timeline-content` > `df-timeline-daily` > `df-date-title` + `TimelineCanvas`) to verify whether the modal frame breaks the execution layout — if the debug layout still differs from the execution page, the problem is the modal frame, not the template data.
+- Tightened the vertical spacing between today's candidate task cards on the execution page left panel: candidate row vertical padding reduced from 9px to 7px, tightening the visual gap between cards from ~18px to ~14px for a more compact (but not crowded) list; card internal layout, padding, font, border, and color are unchanged.
+- Removed the small square settings button next to the "Habits" title: it duplicated the card-click action for opening the habit overview, so it is now fully removed from the JSX (not hidden) with no empty placeholder left behind; the habit overview is still opened by clicking the habit card as a whole. Also bumped the "Habits" title font-weight from 650 to 700 to better match the panel title system without overpowering task card titles.
 
 ## 2026-07-07 · Template mode rebuilt as timeline editor, timeline infinite scroll & now-line fixes, metrics donut label refinement & desktop widget
 

@@ -9448,20 +9448,6 @@ function HabitCandidateCard(props: {
       title={(
         <span className="df-habit-card-title">
           <strong>{props.lang === "zh" ? "习惯" : "Habits"}</strong>
-          <button
-            type="button"
-            className="df-habit-candidate-settings"
-            aria-label={props.lang === "zh" ? "打开习惯设置" : "Open habit settings"}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onOpenOverview();
-            }}
-          >
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <circle cx="10" cy="10" r="2.4" />
-              <path d="M10 3.5v2M10 14.5v2M4.4 5.6l1.4 1.4M14.2 13l1.4 1.4M3.5 10h2M14.5 10h2M4.4 14.4 5.8 13M14.2 7l1.4-1.4" />
-            </svg>
-          </button>
         </span>
       )}
       count={`${completed}/${active.length}`}

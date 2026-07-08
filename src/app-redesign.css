@@ -2970,7 +2970,7 @@
 }
 .df-habit-candidate-card header strong {
   font-size: 16px;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -.012em;
 }
 .df-habit-candidate-card header span {
@@ -4491,7 +4491,7 @@ body.df-timeline-pointer-drag * {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 8px;
+  padding: 7px 8px;
   border-radius: var(--paper-radius);
   cursor: pointer;
   transition: background 120ms ease;
