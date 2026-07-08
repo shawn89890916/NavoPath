@@ -797,6 +797,154 @@ Opening the template modal and inspecting the DOM should show all five `data-reu
 - Template TimelineEventBlock positioning (BEFORE this fix): `left: 56px, right: 8px` — blocks were pushed right to avoid in-canvas labels
 - Template TimelineEventBlock positioning (AFTER this fix): `left: 8px, right: 8px` — MATCHES execution's baseLeft, blocks sit in the content area like execution scheduled blocks
 
+## Settings Migration Audit
+
+### Existing settings / preferences store
+- settings store file: `src/types.ts:289` — `export interface Settings` (~70 fields)
+- preferences store file: same `Settings` interface; no separate preferences store
+- localStorage keys:
+  - Preview/browser fallback: `planner-preview-data`, `planner-preview-settings` (`src/browserFallback.ts:6-7`)
+  - Bootstrap cache: `navopath-bootstrap-${userId}` (`src/main.tsx:466`, `bootstrapCacheKey`)
+  - Electron desktop: `planner-data.json` file at `electron/main.cjs:424`
+- feature flags (all REAL, persisted, consumed):
+  - `featureHabitsEnabled` — consumed at `src/main.tsx:2017,4928,4934,5010,6983,7270,8279` (gates habit panel)
+  - `featureWidgetEnabled` — consumed at `src/main.tsx:4199,4202,7168` (gates widget button + auto-open)
+  - `featureKanbanViewEnabled` — consumed at `src/PlanningView.tsx:969,974`
+  - `featureQuadrantViewEnabled` — consumed at `src/PlanningView.tsx:970,975`
+  - `featureListViewEnabled` — consumed at `src/PlanningView.tsx:971,976`
+  - `featureTemplatesEnabled` — DOES NOT EXIST yet (net-new, to be added)
+  - `featureMetricsEnabled` — DOES NOT EXIST yet (metrics always shows; net-new, to be added)
+- theme settings: `theme: "light" | "dark"`, `typographyStyle`, `accentColor`, `executeAccentColor`, `planningAccentColor`, `uiStyle`, `glassEnabled`, `glassBlur`, `glassOpacity`, `backgroundImagePath`, `backgroundDim` — all in `Settings`, consumed
+- timeline settings: `continuousCrossDayScroll` (consumed 14 places), `dayStartTime` (consumed), `defaultTimelineView`, `timelineFontScale`, `taskBlockFill`
+- planning settings: `planningView` is VESTIGIAL (defined but unconsumed — actual modes are `tree/kanban/eisenhower/list/metrics`); `hideCompleted` exists but candidate panel uses separate local state `showCompletedCandidates`
+- template settings: NONE in Settings (template data lives on `PlannerData.scheduleTemplates`); template button always shows
+- habit settings: `featureHabitsEnabled` (real), `metricsIncludeHabits` (real)
+- metrics settings: `metricsRangePreset`, `metricsGroupBy`, `metricsDisplayMetric`, `metricsCompletionFilter`, `metricsIncludeHabits`, `metricsCustomStart`, `metricsCustomEnd` — all real and consumed in `PlanningView.tsx`
+- desktop widget settings: `featureWidgetEnabled`, `widgetAlwaysOnTop`, `widgetOpenOnLaunch` — all real and consumed (widget showCurrentTask/showQuickAdd/showTimer/compactMode DO NOT exist as settings)
+- data import/export code:
+  - `exportDataAsJson` at `src/main.tsx:11908` (button at `12616`)
+  - `exportTasksAsCsv` at `src/main.tsx:11926` (button at `12619`)
+  - `importDataFromJson` at `src/main.tsx:12230` (button at `12624`, expects `{data, settings}` envelope)
+  - `importTasksFromCsv` (button at `12631`)
+- default settings constants: `src/browserFallback.ts:510` (preview), `src/supabasePlannerApi.ts:24` (cloud), electron inline at `electron/main.cjs:715`
+
+### Existing scattered controls
+- 一天开始时间 (`dayStartTime`): `src/main.tsx:12404` in "page" section — REAL, consumed
+- 默认任务时长: DOES NOT EXIST as a setting (net-new — show as coming soon)
+- 无限跨天滚动 (`continuousCrossDayScroll`): `src/main.tsx:12433` in "features" section — REAL
+- 显示现在时间线: DOES NOT EXIST as a setting (now-line always shows when today visible — net-new, show as coming soon)
+- 点击空白创建任务: DOES NOT EXIST as a setting (always enabled — net-new, show as coming soon)
+- 拖拽吸附间隔: DOES NOT EXIST as a setting (hardcoded `SLOT_MINUTES=15` — net-new, show as coming soon)
+- 模板功能入口: template button at `src/main.tsx:7167` — ALWAYS shows, no toggle
+- 习惯功能入口/显示: `featureHabitsEnabled` at `src/main.tsx:12428` in "features" — REAL
+- 指标页入口: metrics view always available at `src/PlanningView.tsx:977` — no toggle
+- 桌面小组件: `featureWidgetEnabled` at `src/main.tsx:12437` in "features" — REAL
+- 外观/任务块强度: `taskBlockFill` at "page" section, `timelineFontScale` at "page" — REAL
+- 数据导入导出: account section at `src/main.tsx:12616-12634` — REAL
+- 调试/实验功能: NONE (net-new — show as coming soon)
+
+### Migration plan
+| setting name | current location | current state source | new settings category | already functional? | migrate now? |
+|---|---|---|---|---|---|
+| dayStartTime | page section | Settings.dayStartTime | 通用 | yes | yes |
+| language | page section | Settings.language | 通用 | yes | yes |
+| activeMode (default page) | page section | Settings.activeMode | 通用 | yes | yes |
+| theme | page section | Settings.theme | 外观 | yes | yes |
+| typographyStyle | page section | Settings.typographyStyle | 外观 | yes | yes |
+| accentColor/execute/planning | page section | Settings.* | 外观 | yes | yes |
+| timelineFontScale | page section | Settings.timelineFontScale | 外观 | yes | yes |
+| taskBlockFill | page section | Settings.taskBlockFill | 外观 | yes | yes |
+| uiStyle | page section | Settings.uiStyle | 外观 | yes | yes |
+| continuousCrossDayScroll | features section | Settings.continuousCrossDayScroll | 执行 | yes | yes |
+| hideCompleted | page section | Settings.hideCompleted | 执行 | partial (cand. panel uses local state) | yes |
+| featureKanbanViewEnabled | features section | Settings.featureKanbanViewEnabled | 规划 | yes | yes |
+| featureQuadrantViewEnabled | features section | Settings.featureQuadrantViewEnabled | 规划 | yes | yes |
+| featureListViewEnabled | features section | Settings.featureListViewEnabled | 规划 | yes | yes |
+| featureTemplatesEnabled | DOES NOT EXIST | (net-new) | 模板 | wireable (hide template button) | yes (add + wire) |
+| featureHabitsEnabled | features section | Settings.featureHabitsEnabled | 习惯 | yes | yes |
+| metricsIncludeHabits | (passed to PlanningView) | Settings.metricsIncludeHabits | 习惯 + 指标 | yes | yes |
+| featureMetricsEnabled | DOES NOT EXIST | (net-new) | 指标 | wireable (hide metrics view) | yes (add + wire) |
+| metricsRangePreset | (passed to PlanningView) | Settings.metricsRangePreset | 指标 | yes | yes |
+| metricsGroupBy | (passed to PlanningView) | Settings.metricsGroupBy | 指标 | yes | yes |
+| metricsDisplayMetric | (passed to PlanningView) | Settings.metricsDisplayMetric | 指标 | yes | yes |
+| metricsCompletionFilter | (passed to PlanningView) | Settings.metricsCompletionFilter | 指标 | yes | yes |
+| featureWidgetEnabled | features section | Settings.featureWidgetEnabled | 桌面小组件 | yes | yes |
+| widgetAlwaysOnTop | features section | Settings.widgetAlwaysOnTop | 桌面小组件 | yes | yes |
+| widgetOpenOnLaunch | features section | Settings.widgetOpenOnLaunch | 桌面小组件 | yes | yes |
+| export/import data | account section | functions in main.tsx | 数据与备份 | yes | yes |
+| reset settings | DOES NOT EXIST | (net-new) | 高级 | wireable (use defaultSettings) | yes (add) |
+| model/reasoningMode/aiMemory/hideAi | ai section | Settings.* | (keep as AI section) | yes | yes |
+| shortcuts display | shortcuts section | (read-only) | 快捷键 | yes | yes |
+| defaultTaskDuration | DOES NOT EXIST | — | — | no | coming soon |
+| showNowLine toggle | DOES NOT EXIST | — | — | no | coming soon |
+| clickBlankToCreateTask | DOES NOT EXIST | — | — | no | coming soon |
+| dragSnapMinutes | DOES NOT EXIST | — | — | no | coming soon |
+| widget showCurrentTask/QuickAdd/Timer | DOES NOT EXIST | — | — | no | coming soon |
+
+## Settings Migration — Completion Proof
+
+### Unified SettingRow system
+- New primitive module: `src/components/SettingsControls.tsx`
+- Exports: `SettingSection`, `SettingRow`, `SettingToggle`, `SettingSelect<T>`, `SettingNumberInput`, `SettingTextInput`, `SettingActionButton`, `SettingDivider`, `SettingComingSoon`, `SettingDescription`
+- Imported into `src/main.tsx` at line 55 via real ES-module import.
+- Every settings row in every new section (general / appearance / execution / planning / templates / habits / metrics / widget / data / advanced) renders through `SettingRow`. No section hand-rolls its own label + control markup.
+- The `shortcuts`, `ai`, `mcp`, `plugins`, `account` sections keep their existing panel content (shortcut reference, AI memory list, MCP token manager, plugin cards, account profile) because those are rich panels, not simple toggle/select rows. Their simple toggles (hideAi, aiMemoryEnabled, etc.) remain inside the AI section since they are part of the AI controls.
+
+### Left-sidebar categories
+The settings nav now has 14 categories in this order:
+1. 通用 (general)
+2. 外观 (appearance)
+3. 执行 (execution)
+4. 规划 (planning)
+5. 模板 (templates)
+6. 习惯 (habits)
+7. 指标 (metrics)
+8. 桌面小组件 (widget)
+9. 数据与备份 (data)
+10. 快捷键 (shortcuts)
+11. Navo AI (ai)
+12. MCP (mcp)
+13. 插件 (plugins)
+14. 账户 (account)
+15. 高级 (advanced)
+
+### Feature toggles really affect the UI
+- `featureTemplatesEnabled` → gates the template button in `CandidatePanelHeader` at `src/main.tsx:7187`. When off, the button is hidden.
+- `featureMetricsEnabled` → gates the `metrics` view mode in `PlanningView.tsx`. The `availableModes` memo at `src/PlanningView.tsx:975` only pushes `"metrics"` when `props.featureMetrics !== false`. A `useEffect` at line 987 falls back to `"tree"` if the active `viewMode` is removed from the available set, so disabling metrics while sitting on the metrics view never renders a gated mode.
+- `featureHabitsEnabled` → already wired (habit panel + today-candidate habits area hidden when off).
+- `featureWidgetEnabled` → already wired (widget button hidden when off).
+
+### No fake toggles
+Every SettingRow that does not have a real backing field is rendered as `SettingComingSoon` with a disabled state and a "即将支持 / Coming soon" tag. Specifically:
+- 通用: default task duration (no Settings field)
+- 外观: match system dark mode (no Settings field)
+- 执行: show now line, click blank to create task, drag snap interval (no Settings fields)
+- 规划: default planning view, show completed tasks (no Settings fields)
+- 模板: default template, conflict handling, default period duration (no Settings fields)
+- 指标: show unscheduled time (no Settings field)
+- 桌面小组件: show current task, show quick add, show timer, compact mode, reset position (no Settings fields). These are additionally disabled with a "桌面端启用后可用 / Available on desktop" note when no desktop runtime is detected.
+- 数据与备份: automatic backups (no Settings field)
+- 高级: developer mode, show debug info, experimental features, performance mode (no Settings fields)
+
+### Danger operations have confirmation
+- Reset all settings → opens a confirmation dialog (portal to document.body) with a clear impact statement and Cancel / Reset buttons. Reset calls `onSave(getDefaultSettings())` which restores every Settings field to the canonical defaults in `src/defaultSettings.ts`.
+- Clear local data → opens a confirmation dialog that requires the user to type `DELETE` to enable the confirm button. Clear wipes all NavoPath-owned localStorage keys (preserving `sb-*` Supabase auth session keys so cloud users stay signed in) and then hard-reloads the page.
+- Import JSON → existing `confirm()` guard retained.
+
+### New shared default settings module
+- `src/defaultSettings.ts` exports `defaultSettings` (canonical) and `getDefaultSettings()` (fresh copy).
+- Used by the reset-all-settings action.
+- The existing `defaultSettings` copies in `browserFallback.ts` and `supabasePlannerApi.ts` are left intact for now (reconciliation is a separate refactor) — the new module is the single source the reset action reads from, and any new Settings field should land here first.
+
+### Old entry points
+- The old `page` and `features` sections are removed. Their content is fully migrated into the new categories above.
+- Legacy persisted `utilityPanel.section === "page"` is mapped to `general`; `"features"` is mapped to `planning`, so older builds land on a real settings group instead of an empty panel.
+- Data export/import moved out of the `account` section into the new `data` section. The `account` section now contains only profile, subscription, sync, desktop update, auto-launch, and the account-more actions.
+
+### Verification
+- `npm run build` passes (tsc + vite build, 513 modules transformed).
+- `npm test` passes: 101 / 101 tests green across 18 test files.
+
 ## Template Button Audit
 
 ### Old template UI buttons

@@ -946,6 +946,8 @@ export default function PlanningView(props: {
   featureKanban?: boolean;
   featureQuadrant?: boolean;
   featureList?: boolean;
+  /** 指标视图开关：关闭后隐藏规划页的「指标」视图入口。 */
+  featureMetrics?: boolean;
   dayStartTime?: string;
   metricsRangePreset?: MetricRangePreset;
   metricsGroupBy?: MetricGroupBy;
@@ -969,15 +971,24 @@ export default function PlanningView(props: {
   const enableKanban = props.featureKanban !== false;
   const enableQuadrant = props.featureQuadrant !== false;
   const enableList = props.featureList !== false;
+  const enableMetrics = props.featureMetrics !== false;
   const availableModes = useMemo<PlanningViewMode[]>(() => {
     const modes: PlanningViewMode[] = ["tree"];
     if (enableKanban) modes.push("kanban");
     if (enableQuadrant) modes.push("eisenhower");
     if (enableList) modes.push("list");
-    modes.push("metrics");
+    if (enableMetrics) modes.push("metrics");
     return modes;
-  }, [enableKanban, enableQuadrant, enableList]);
+  }, [enableKanban, enableQuadrant, enableList, enableMetrics]);
   const [viewMode, setViewMode] = useState<PlanningViewMode>("tree");
+  // Safety: if the active view mode is removed from the available set (e.g. the
+  // user just disabled the metrics feature while sitting on the metrics view),
+  // fall back to the default tree view so the panel never renders a gated mode.
+  useEffect(() => {
+    if (!availableModes.includes(viewMode)) {
+      setViewMode("tree");
+    }
+  }, [availableModes, viewMode]);
   const [metricsRangePreset, setMetricsRangePreset] = useState<MetricRangePreset>(props.metricsRangePreset || "today");
   const [metricsGroupBy, setMetricsGroupBy] = useState<MetricGroupBy>(props.metricsGroupBy || "project");
   const [metricsDisplayMetric, setMetricsDisplayMetric] = useState<MetricDisplayMetric>(props.metricsDisplayMetric || "percentage");

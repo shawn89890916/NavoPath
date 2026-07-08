@@ -377,6 +377,176 @@
 .df-utility-select select, .df-settings-name-input, .df-notes-editor textarea {
   border-color: var(--paper-rule) !important; border-radius: var(--paper-radius) !important; background: var(--surface-card) !important; box-shadow: none !important;
 }
+
+/* ============================================================
+ * Unified settings-page primitives (SettingSection / SettingRow /
+ * SettingToggle / SettingSelect / SettingNumberInput /
+ * SettingActionButton / SettingComingSoon). Every settings row in
+ * every section renders through these classes so the visual rhythm
+ * stays consistent. Follows NavoPathStyle.md: paper-like surfaces,
+ * fine rules, restrained annotation color, no hover lift, no glow.
+ * ============================================================ */
+
+/* SettingSection: titled group with optional description. Reuses the
+   existing .df-settings-group container so the section rhythm, border,
+   and h3 treatment stay identical to the legacy settings panels. */
+.df-settings-group { display: flex; flex-direction: column; gap: 2px; }
+.df-settings-group-head { margin: 0 0 10px; }
+.df-settings-group-title { margin: 0; color: var(--text-main); font: 600 11px/1.4 var(--paper-mono); letter-spacing: .1em; text-transform: uppercase; }
+.df-settings-group-desc { margin: 4px 0 0; color: var(--text-muted); font: 400 12px/1.5 var(--paper-sans); }
+.df-settings-group-body { display: flex; flex-direction: column; }
+.df-settings-group--danger { padding: 14px 16px; border: 1px solid var(--paper-rule-strong); border-left: 2px solid #C96F5B; background: var(--paper-note); margin-top: 6px; }
+.df-settings-group--danger .df-settings-group-title { color: #C96F5B; }
+
+/* SettingRow: a single fine-ruled row with a label column and a
+   control column. No card, no fill, no hover surface — just paper
+   rhythm. */
+.df-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 18px;
+  min-height: 44px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--paper-rule);
+}
+.df-settings-row:last-child { border-bottom: 0; }
+.df-settings-row-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.df-settings-row-title { color: var(--text-main); font: 500 13px/1.4 var(--paper-sans); }
+.df-settings-row-desc { color: var(--text-muted); font: 400 11px/1.45 var(--paper-sans); }
+.df-settings-row-control { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.df-settings-row[data-disabled="true"] .df-settings-row-title,
+.df-settings-row[data-disabled="true"] .df-settings-row-desc { color: var(--text-faint); }
+.df-settings-row[data-disabled="true"] .df-settings-row-control { opacity: .55; pointer-events: none; }
+
+/* Coming-soon rows use the same rhythm but mute the control and show
+   a small annotation tag instead of an interactive control. */
+.df-settings-row--coming-soon .df-settings-row-control { opacity: 1; pointer-events: none; }
+.df-settings-coming-soon-tag {
+  display: inline-flex; align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--paper-radius);
+  color: var(--text-faint);
+  font: 600 10px/1 var(--paper-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: transparent;
+}
+
+/* SettingToggle: a quiet paper switch. Ink track, accent knob when on.
+   No glow, no scale, no hover lift. */
+.df-settings-toggle {
+  position: relative;
+  width: 34px; height: 18px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--paper-motion), background-color var(--paper-motion);
+}
+.df-settings-toggle:hover { border-color: var(--accent-active); }
+.df-settings-toggle.is-on { background: var(--accent-active); border-color: var(--accent-active); }
+.df-settings-toggle:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+.df-settings-toggle:disabled { cursor: not-allowed; opacity: .5; }
+.df-settings-toggle-knob {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform var(--paper-motion), background-color var(--paper-motion);
+}
+.df-settings-toggle.is-on .df-settings-toggle-knob { transform: translateX(16px); background: var(--surface-main); }
+
+/* SettingSelect / SettingTextInput / SettingNumberInput: native controls
+   styled as quiet paper inputs. They reuse .df-utility-select /
+   .df-utility-input where the legacy styles already apply. */
+.df-settings-select.df-utility-select {
+  min-height: 30px;
+  padding: 4px 22px 4px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--paper-radius);
+  background: var(--surface-card);
+  color: var(--text-main);
+  font: 500 12px/1 var(--paper-sans);
+  box-shadow: none;
+}
+.df-settings-input.df-utility-input,
+.df-settings-number.df-utility-input {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--paper-radius);
+  background: var(--surface-card);
+  color: var(--text-main);
+  font: 500 12px/1 var(--paper-sans);
+  box-shadow: none;
+}
+.df-settings-number-wrap { display: inline-flex; align-items: center; gap: 8px; }
+.df-settings-number-suffix { color: var(--text-muted); font: 500 11px/1 var(--paper-mono); min-width: 32px; text-align: right; }
+.df-settings-range { width: 120px; accent-color: var(--accent-active); }
+
+/* SettingActionButton: secondary text action by default, primary uses
+   a fine accent rule, danger uses a muted coral rule. Never a filled
+   SaaS pill. */
+.df-settings-action {
+  min-height: 28px;
+  padding: 5px 12px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--paper-radius);
+  background: transparent;
+  color: var(--text-main);
+  font: 600 11px/1 var(--paper-sans);
+  letter-spacing: .02em;
+  cursor: pointer;
+  transition: border-color var(--paper-motion), color var(--paper-motion), background-color var(--paper-motion);
+}
+.df-settings-action:hover { border-color: var(--accent-active); color: var(--accent-active); }
+.df-settings-action:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+.df-settings-action:disabled { opacity: .5; cursor: not-allowed; }
+.df-settings-action--primary { border-color: var(--accent-active); color: var(--accent-active); }
+.df-settings-action--primary:hover { background: var(--paper-note); }
+.df-settings-action--danger { border-color: #C96F5B; color: #C96F5B; }
+.df-settings-action--danger:hover { background: rgba(201, 111, 91, 0.06); }
+
+/* SettingDivider: a single fine rule between sub-groups. */
+.df-settings-divider {
+  border: 0;
+  border-top: 1px solid var(--paper-rule);
+  margin: 10px 0 6px;
+}
+
+/* Accent color row: place the two ThemeColorSetting pickers side by
+   side when there is room. */
+.df-settings-accent-row { display: flex; flex-wrap: wrap; gap: 18px; padding: 4px 0 8px; }
+.df-settings-accent-row > .df-theme-setting { padding: 6px 0 !important; border: 0 !important; }
+
+/* Confirmation phrase input for danger dialogs. */
+.df-utility-confirm-phrase { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; }
+.df-utility-confirm-phrase span { color: var(--text-muted); font: 500 11px/1.3 var(--paper-sans); }
+.df-utility-confirm-phrase input {
+  min-height: 32px; padding: 6px 10px;
+  border: 1px solid var(--paper-rule-strong); border-radius: var(--paper-radius);
+  background: var(--surface-card); color: var(--text-main);
+  font: 500 13px/1 var(--paper-mono);
+}
+
+/* Danger dialog button: muted coral, no fill. */
+.df-dialog-danger {
+  border: 1px solid #C96F5B !important;
+  color: #C96F5B !important;
+  background: transparent !important;
+}
+.df-dialog-danger:hover:not(:disabled) { background: rgba(201, 111, 91, 0.08) !important; }
+.df-dialog-danger:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .df-settings-row { grid-template-columns: 1fr; row-gap: 6px; }
+  .df-settings-row-control { justify-content: flex-start; }
+  .df-settings-accent-row { flex-direction: column; }
+}
 .df-app .df-task-detail.df-drawer {
   width: min(560px,94vw) !important; padding: 30px 28px !important; border-radius: var(--paper-radius-soft) 0 0 var(--paper-radius-soft) !important;
   background: var(--surface-main) !important; border-color: var(--paper-rule-strong) !important; box-shadow: var(--paper-float-shadow) !important;
