@@ -28,6 +28,20 @@
         .boot-grid { height:calc(100dvh - 140px); margin:18px 12px 84px; }
       }
     </style>
+    <script>
+      // Pre-React error handler: if the JS bundle fails to load or throws
+      // before React mounts, display the error instead of a blank white page.
+      window.addEventListener("error", function (event) {
+        var el = document.createElement("div");
+        el.style.cssText = "position:fixed;inset:0;padding:24px;font-family:monospace;font-size:13px;white-space:pre-wrap;color:#C96F5B;background:#fff;z-index:99999;overflow:auto;";
+        var msg = (event.error && event.error.stack) ? event.error.stack : (event.message || String(event.error || event));
+        el.innerHTML = "<h2 style='color:#C96F5B;margin:0 0 12px'>Fatal Error (pre-React)</h2><pre>" + msg.replace(/</g,"&lt;") + "</pre><button onclick='location.reload()' style='margin-top:12px;padding:6px 12px;font-size:14px'>Reload</button>";
+        document.body && document.body.appendChild(el);
+      });
+      window.addEventListener("unhandledrejection", function (event) {
+        console.error("Unhandled promise rejection:", event.reason);
+      });
+    </script>
   </head>
   <body>
     <div id="root">

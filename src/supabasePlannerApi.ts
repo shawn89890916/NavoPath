@@ -27,6 +27,11 @@ const defaultSettings: Settings = {
   continuousCrossDayScroll: true,
   language: "en",
   planningView: "tree",
+  metricsRangePreset: "today",
+  metricsGroupBy: "project",
+  metricsDisplayMetric: "percentage",
+  metricsIncludeHabits: "include",
+  metricsCompletionFilter: "all",
   aiDockOpen: false,
   appTitle: "NavoPath",
   model: "deepseek-ai/DeepSeek-V3.2",
@@ -223,6 +228,16 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
   async function ensureProfile(user: User, force = false) {
     if (!force && profileCache) return profileCache;
     if (!force && profilePromise) return profilePromise;
+    const useTemporaryProfile = () => {
+      const initialData = emptyCloudData();
+      const initialSettings = {
+        ...defaultSettings,
+        onboardingVersion: 0,
+        onboardingStep: "add" as const,
+      };
+      profileCache = { data: initialData, settings: initialSettings, revision: 0 };
+      return profileCache;
+    };
     const pending = (async () => {
       let data: any = null;
       let error: any = null;
@@ -249,6 +264,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       }
 
       if (error) {
+        if (isRetryableProfileError(error.message)) return useTemporaryProfile();
         throw new Error(`Cloud profile load failed: ${error.message}`);
       }
       if (data) {
@@ -283,6 +299,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       }
 
       if (insertError) {
+        if (isRetryableProfileError(insertError.message)) return useTemporaryProfile();
         throw new Error(`Cloud profile create failed: ${insertError.message}`);
       }
       profileCache = { data: initialData, settings: initialSettings, revision: 0 };
@@ -346,6 +363,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         }
       });
       if (error) throw new Error(authErrorMessage(error.message));
+      cachedUser = data.user ?? null;
       if (data.user && data.session) await ensureProfile(data.user, true);
       return {
         user: publicUser(data.user),
@@ -358,6 +376,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     signIn: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(authErrorMessage(error.message));
+      cachedUser = data.user ?? null;
       if (data.user) await ensureProfile(data.user, true);
       return { user: publicUser(data.user) };
     },

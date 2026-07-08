@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PlannerData, Project, Subtask, Task, WorkflowStatus } from "./types";
+import type { PlannerData, Project, Settings, Subtask, Task, WorkflowStatus } from "./types";
 import { t, type Language } from "./i18n";
 import { useInAppDialog } from "./InAppDialog";
 import { localIsoDate } from "./utils/localDate";
@@ -10,6 +10,7 @@ import { normalizeTaskCheckTone, normalizeWorkflowStatus, workflowStatusForPatch
 import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox, type TaskBlockVariant } from "./components/TaskBlock";
 import { TaskDragLayer } from "./unifiedDrag";
+import { buildTimeAllocationMetrics, parseDayStartMinutes, type MetricCompletionFilter, type MetricDisplayMetric, type MetricGroupBy, type MetricHabitMode, type MetricRangePreset, type TimeAllocationGroup } from "./metrics/timeAllocation";
 
 type TreeNodeKind = "project" | "task" | "subtask";
 type TreeDragNode = { kind: TreeNodeKind; id: string };
@@ -48,6 +49,202 @@ function alphaColor(color: string, alpha: number) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
   return color;
+}
+
+function polarPoint(cx: number, cy: number, radius: number, angle: number) {
+  const radians = (angle - 90) * Math.PI / 180;
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy + radius * Math.sin(radians),
+  };
+}
+
+function donutSegmentPath(cx: number, cy: number, outerRadius: number, innerRadius: number, startAngle: number, endAngle: number) {
+  const safeEndAngle = Math.min(endAngle, startAngle + 359.99);
+  const outerStart = polarPoint(cx, cy, outerRadius, safeEndAngle);
+  const outerEnd = polarPoint(cx, cy, outerRadius, startAngle);
+  const innerStart = polarPoint(cx, cy, innerRadius, startAngle);
+  const innerEnd = polarPoint(cx, cy, innerRadius, safeEndAngle);
+  const largeArc = safeEndAngle - startAngle > 180 ? 1 : 0;
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 0 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerStart.x} ${innerStart.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 1 ${innerEnd.x} ${innerEnd.y}`,
+    "Z",
+  ].join(" ");
+}
+
+/* ============================================================
+ * Donut annotation system — compact 2-segment leader + side label
+ *
+ * Every annotation is a short 2-segment polyline:
+ *   anchor (circle edge + 4) → elbow (radial tick at outer+34) → lineEnd
+ *   (elbow + ±horizontalLength on the segment's side)
+ *
+ * The label sits BESIDE the line end (not on top of a rail):
+ *   right side: labelX = lineEnd.x + 8, textAnchor "start"
+ *   left side:  labelX = lineEnd.x - 8, textAnchor "end"
+ *
+ * EVERY segment gets a permanent external label — project names are
+ * standing annotations, not hover tooltips. No percentage/top-N
+ * filtering, no hide-on-overflow. A single sort-and-push pass per
+ * side resolves Y overlaps; if the lane overflows its safe band the
+ * whole lane shifts up so all labels stay visible and within bounds.
+ * Hover only re-anchors the active segment's anchor point so the
+ * leader still touches the expanded arc; elbow, lineEnd and label
+ * positions stay put — hover never hides or reshuffles other labels.
+ * ============================================================ */
+
+interface DonutAnnotationResult {
+  id: string;
+  label: string;
+  color: string;
+  side: "left" | "right";
+  arcMidAngle: number;
+  /** Label text x. */
+  labelX: number;
+  /** Label text y. */
+  labelY: number;
+  textAnchor: "start" | "end";
+  /** Elbow + lineEnd kept for hover re-anchoring (computed at non-hover radius). */
+  elbowX: number;
+  elbowY: number;
+  lineEndX: number;
+  lineEndY: number;
+}
+
+const DONUT_HORIZONTAL_LENGTH = 42;
+const DONUT_LABEL_PAD_X = 8;
+const DONUT_LABEL_BIAS_Y = 4;
+const DONUT_MIN_LABEL_GAP = 20;
+
+/**
+ * Build annotation results for ALL donut segments. Every segment gets
+ * a permanent external label — no top-N / percentage filtering, no
+ * hide-on-overflow. anchor/elbow/lineEnd come from the segment's
+ * mid-angle; label sits beside the line end. A single sort-and-push
+ * pass per side resolves Y overlaps; if the lane overflows its safe
+ * band the whole lane shifts up so all labels stay visible and within
+ * the chart area.
+ */
+function layoutDonutAnnotations(
+  cx: number,
+  cy: number,
+  visualOuter: number,
+  segments: Array<{ group: { id: string; label: string; color: string }; startAngle: number; endAngle: number }>,
+): DonutAnnotationResult[] {
+  const anchorOffset = 4;
+  const elbowRadius = visualOuter + 34;
+  const labelMinY = cy - visualOuter - 64;
+  const labelMaxY = cy + visualOuter + 64;
+
+  // Phase 1: per-segment geometry — anchor, elbow, lineEnd, label.
+  const raw = segments.map(({ group, startAngle, endAngle }) => {
+    const mid = (startAngle + endAngle) / 2;
+    const radians = (mid - 90) * Math.PI / 180;
+    const side: "left" | "right" = Math.cos(radians) >= 0 ? "right" : "left";
+    const anchor = polarPoint(cx, cy, visualOuter + anchorOffset, mid);
+    const elbow = polarPoint(cx, cy, elbowRadius, mid);
+    const lineEndX = elbow.x + (side === "right" ? DONUT_HORIZONTAL_LENGTH : -DONUT_HORIZONTAL_LENGTH);
+    const lineEndY = elbow.y;
+    const labelX = side === "right" ? lineEndX + DONUT_LABEL_PAD_X : lineEndX - DONUT_LABEL_PAD_X;
+    const labelY = lineEndY + DONUT_LABEL_BIAS_Y;
+    return {
+      id: group.id,
+      label: group.label,
+      color: group.color,
+      side,
+      arcMidAngle: mid,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      elbowX: elbow.x,
+      elbowY: elbow.y,
+      lineEndX,
+      lineEndY,
+      labelX,
+      labelY,
+      idealY: labelY,
+    };
+  });
+
+  // Phase 2: per-side Y collision resolution (sort + push down, then
+  // shift the whole lane up if it overflowed, then clamp). No hiding —
+  // every segment keeps its label.
+  (["left", "right"] as const).forEach((side) => {
+    const lane = raw.filter((n) => n.side === side).sort((a, b) => a.idealY - b.idealY);
+    if (lane.length === 0) return;
+    for (let i = 1; i < lane.length; i++) {
+      if (lane[i].labelY - lane[i - 1].labelY < DONUT_MIN_LABEL_GAP) {
+        lane[i].labelY = lane[i - 1].labelY + DONUT_MIN_LABEL_GAP;
+        lane[i].lineEndY = lane[i].labelY - DONUT_LABEL_BIAS_Y;
+      }
+    }
+    // If the lane overflowed downward, shift the whole lane back up so
+    // the last label stays within labelMaxY; then clamp each label to
+    // the safe band as a final guard.
+    const overflow = lane[lane.length - 1].labelY - labelMaxY;
+    if (overflow > 0) {
+      for (const n of lane) {
+        n.labelY -= overflow;
+        n.lineEndY -= overflow;
+      }
+    }
+    for (const n of lane) {
+      if (n.labelY < labelMinY) {
+        const dy = labelMinY - n.labelY;
+        n.labelY = labelMinY;
+        n.lineEndY += dy;
+      } else if (n.labelY > labelMaxY) {
+        const dy = n.labelY - labelMaxY;
+        n.labelY = labelMaxY;
+        n.lineEndY -= dy;
+      }
+    }
+  });
+
+  // Phase 3: build result. The render layer rebuilds the path so the
+  // active segment's anchor can follow the hover-expanded outer radius
+  // while elbow/lineEnd/label stay stable.
+  return raw.map((n) => ({
+    id: n.id,
+    label: n.label,
+    color: n.color,
+    side: n.side,
+    arcMidAngle: n.arcMidAngle,
+    labelX: n.labelX,
+    labelY: n.labelY,
+    textAnchor: (n.side === "right" ? "start" : "end") as "start" | "end",
+    elbowX: n.elbowX,
+    elbowY: n.elbowY,
+    lineEndX: n.lineEndX,
+    lineEndY: n.lineEndY,
+  }));
+}
+
+function formatMinutesZh(minutes: number) {
+  const safe = Math.max(0, Math.round(minutes || 0));
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+function localDateTimeLabel(date: Date) {
+  return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function localDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function metricViewLabel(lang: Language, mode: PlanningViewMode) {
+  if (mode === "tree") return lang === "zh" ? "树" : "Tree";
+  if (mode === "kanban") return "Kanban";
+  if (mode === "eisenhower") return lang === "zh" ? "矩阵" : "Matrix";
+  if (mode === "metrics") return lang === "zh" ? "指标" : "Metrics";
+  return lang === "zh" ? "列表" : "List";
 }
 
 function planningTaskPriority(task: Pick<Task, "importance" | "urgency">) {
@@ -726,7 +923,7 @@ function useTreeLines(
   return lines;
 }
 
-type PlanningViewMode = "tree" | "kanban" | "eisenhower" | "list";
+type PlanningViewMode = "tree" | "kanban" | "eisenhower" | "list" | "metrics";
 
 export default function PlanningView(props: {
   lang: Language;
@@ -749,6 +946,17 @@ export default function PlanningView(props: {
   featureKanban?: boolean;
   featureQuadrant?: boolean;
   featureList?: boolean;
+  /** 指标视图开关：关闭后隐藏规划页的「指标」视图入口。 */
+  featureMetrics?: boolean;
+  dayStartTime?: string;
+  metricsRangePreset?: MetricRangePreset;
+  metricsGroupBy?: MetricGroupBy;
+  metricsDisplayMetric?: MetricDisplayMetric;
+  metricsIncludeHabits?: MetricHabitMode;
+  metricsCompletionFilter?: MetricCompletionFilter;
+  metricsCustomStart?: string;
+  metricsCustomEnd?: string;
+  onMetricsSettingsChange?: (patch: Partial<Settings>) => void;
 }) {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
@@ -757,19 +965,41 @@ export default function PlanningView(props: {
   const [dragNode, setDragNode] = useState<TreeDragNode | null>(null);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
+  const donutSvgRef = useRef<SVGSVGElement>(null);
   const dialog = useInAppDialog(props.lang);
 
   const enableKanban = props.featureKanban !== false;
   const enableQuadrant = props.featureQuadrant !== false;
   const enableList = props.featureList !== false;
+  const enableMetrics = props.featureMetrics !== false;
   const availableModes = useMemo<PlanningViewMode[]>(() => {
     const modes: PlanningViewMode[] = ["tree"];
     if (enableKanban) modes.push("kanban");
     if (enableQuadrant) modes.push("eisenhower");
     if (enableList) modes.push("list");
+    if (enableMetrics) modes.push("metrics");
     return modes;
-  }, [enableKanban, enableQuadrant, enableList]);
+  }, [enableKanban, enableQuadrant, enableList, enableMetrics]);
   const [viewMode, setViewMode] = useState<PlanningViewMode>("tree");
+  // Safety: if the active view mode is removed from the available set (e.g. the
+  // user just disabled the metrics feature while sitting on the metrics view),
+  // fall back to the default tree view so the panel never renders a gated mode.
+  useEffect(() => {
+    if (!availableModes.includes(viewMode)) {
+      setViewMode("tree");
+    }
+  }, [availableModes, viewMode]);
+  const [metricsRangePreset, setMetricsRangePreset] = useState<MetricRangePreset>(props.metricsRangePreset || "today");
+  const [metricsGroupBy, setMetricsGroupBy] = useState<MetricGroupBy>(props.metricsGroupBy || "project");
+  const [metricsDisplayMetric, setMetricsDisplayMetric] = useState<MetricDisplayMetric>(props.metricsDisplayMetric || "percentage");
+  const [metricsHabitMode, setMetricsHabitMode] = useState<MetricHabitMode>(props.metricsIncludeHabits || "include");
+  const [metricsCompletion, setMetricsCompletion] = useState<MetricCompletionFilter>(props.metricsCompletionFilter || "all");
+  const [metricsCustomStart, setMetricsCustomStart] = useState(props.metricsCustomStart || todayIso());
+  const [metricsCustomEnd, setMetricsCustomEnd] = useState(props.metricsCustomEnd || todayIso());
+  const [metricsFilterOpen, setMetricsFilterOpen] = useState(false);
+  const [metricsFilterCategory, setMetricsFilterCategory] = useState<"range" | "group" | "habit" | "completion" | "metric" | "project">("range");
+  const [metricsProjectFilter, setMetricsProjectFilter] = useState<string[]>([]);
+  const [hoveredMetricGroupId, setHoveredMetricGroupId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [filterProjects, setFilterProjects] = useState<string[]>([]);
   const [filterWorkflows, setFilterWorkflows] = useState<UiWorkflowStatus[]>([]);
@@ -831,6 +1061,14 @@ export default function PlanningView(props: {
   }
 
   const today = todayIso();
+
+  useEffect(() => setMetricsRangePreset(props.metricsRangePreset || "today"), [props.metricsRangePreset]);
+  useEffect(() => setMetricsGroupBy(props.metricsGroupBy || "project"), [props.metricsGroupBy]);
+  useEffect(() => setMetricsDisplayMetric(props.metricsDisplayMetric || "percentage"), [props.metricsDisplayMetric]);
+  useEffect(() => setMetricsHabitMode(props.metricsIncludeHabits || "include"), [props.metricsIncludeHabits]);
+  useEffect(() => setMetricsCompletion(props.metricsCompletionFilter || "all"), [props.metricsCompletionFilter]);
+  useEffect(() => setMetricsCustomStart(props.metricsCustomStart || todayIso()), [props.metricsCustomStart]);
+  useEffect(() => setMetricsCustomEnd(props.metricsCustomEnd || todayIso()), [props.metricsCustomEnd]);
 
   const renameTask = useCallback(async (task: Task) => {
     const title = await dialog.prompt(t(props.lang, "planning.editName"), task.title);
@@ -1771,6 +2009,125 @@ export default function PlanningView(props: {
     ? Math.max(0, effectiveFilterCategories.findIndex((cat) => cat.key === activeFilterCategory))
     : 0;
 
+  const updateMetricsSetting = useCallback((patch: Partial<Settings>) => {
+    props.onMetricsSettingsChange?.(patch);
+  }, [props]);
+
+  const setMetricRange = useCallback((value: MetricRangePreset) => {
+    setMetricsRangePreset(value);
+    updateMetricsSetting({ metricsRangePreset: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricGroup = useCallback((value: MetricGroupBy) => {
+    setMetricsGroupBy(value);
+    setHoveredMetricGroupId(null);
+    updateMetricsSetting({ metricsGroupBy: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricDisplay = useCallback((value: MetricDisplayMetric) => {
+    setMetricsDisplayMetric(value);
+    updateMetricsSetting({ metricsDisplayMetric: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricHabit = useCallback((value: MetricHabitMode) => {
+    setMetricsHabitMode(value);
+    updateMetricsSetting({ metricsIncludeHabits: value });
+  }, [updateMetricsSetting]);
+
+  const setMetricCompletion = useCallback((value: MetricCompletionFilter) => {
+    setMetricsCompletion(value);
+    updateMetricsSetting({ metricsCompletionFilter: value });
+  }, [updateMetricsSetting]);
+
+  const dayStartMinutes = parseDayStartMinutes(props.dayStartTime || "00:00");
+  const metricsResult = useMemo(() => buildTimeAllocationMetrics({
+    data: props.data,
+    range: {
+      preset: metricsRangePreset,
+      anchorDate: today,
+      customStart: metricsCustomStart,
+      customEnd: metricsCustomEnd,
+    },
+    dayStartMinutes,
+    groupBy: metricsGroupBy,
+    habitMode: metricsHabitMode,
+    completion: metricsCompletion,
+    projectIds: metricsProjectFilter,
+  }), [props.data, metricsRangePreset, today, metricsCustomStart, metricsCustomEnd, dayStartMinutes, metricsGroupBy, metricsHabitMode, metricsCompletion, metricsProjectFilter]);
+  const hoveredMetricGroup = metricsResult.groups.find((group) => group.id === hoveredMetricGroupId) || null;
+  const activeDonutGroup = hoveredMetricGroup;
+  const donutSegments = metricsResult.groups.reduce<Array<{ group: TimeAllocationGroup; startAngle: number; endAngle: number }>>((segments, group) => {
+    const startAngle = segments.length > 0 ? segments[segments.length - 1].endAngle : 0;
+    const endAngle = startAngle + (group.percentage / 100) * 360;
+    segments.push({ group, startAngle, endAngle });
+    return segments;
+  }, []);
+
+  /**
+   * Compact 2-segment leader layout for donut outside labels. EVERY
+   * segment gets a permanent external label — no top-N / percentage
+   * filtering, no hide-on-overflow. Layout uses the NON-hovered outer
+   * radius so labels don't jump when a segment expands; the active
+   * segment's anchor re-anchors to its hovered radius while
+   * elbow/lineEnd/label positions stay stable.
+   */
+  const donutAnnotations = useMemo(() => {
+    if (donutSegments.length === 0) return [];
+    return layoutDonutAnnotations(120, 120, 88, donutSegments);
+  }, [donutSegments]);
+
+  /**
+   * Convert a pointer position to a donut segment by angle. The SVG viewBox
+   * is mapped to the rendered element via getBoundingClientRect, so this
+   * works regardless of CSS size. Distance from center must be within
+   * hitRadius (hoveredOuterRadius + 4) or the hover is cleared. Inside that
+   * radius, the angle determines which segment is hovered — including the
+   * center hole area, so hovering near the center still picks the correct
+   * project by angle.
+   */
+  const computeHoveredSegment = (clientX: number, clientY: number): string | null => {
+    const svg = donutSvgRef.current;
+    if (!svg || donutSegments.length === 0) return null;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const vb = svg.viewBox.baseVal;
+    if (!vb || vb.width === 0) return null;
+    const x = (clientX - rect.left) * (vb.width / rect.width) + vb.x;
+    const y = (clientY - rect.top) * (vb.height / rect.height) + vb.y;
+    const dx = x - 120;
+    const dy = y - 120;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const hitRadius = 98;
+    if (distance > hitRadius) return null;
+    const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+    const segment = donutSegments.find((s) => angle >= s.startAngle && angle < s.endAngle);
+    return segment?.group.id ?? null;
+  };
+  const rangeOptions: Array<{ value: MetricRangePreset; label: string }> = [
+    { value: "all", label: props.lang === "zh" ? "\u5168\u90e8" : "All" },
+    { value: "today", label: props.lang === "zh" ? "今天" : "Today" },
+    { value: "yesterday", label: props.lang === "zh" ? "昨天" : "Yesterday" },
+    { value: "thisWeek", label: props.lang === "zh" ? "本周" : "This week" },
+    { value: "lastWeek", label: props.lang === "zh" ? "上周" : "Last week" },
+    { value: "thisMonth", label: props.lang === "zh" ? "本月" : "This month" },
+    { value: "custom", label: props.lang === "zh" ? "自定义" : "Custom" },
+  ];
+  const groupOptions: Array<{ value: MetricGroupBy; label: string; disabled?: boolean }> = [
+    { value: "project", label: props.lang === "zh" ? "项目" : "Project" },
+    { value: "importance", label: props.lang === "zh" ? "重要程度" : "Importance" },
+    { value: "urgency", label: props.lang === "zh" ? "紧急程度" : "Urgency" },
+    { value: "completion", label: props.lang === "zh" ? "完成状态" : "Completion" },
+    { value: "taskType", label: props.lang === "zh" ? "任务类型" : "Task type" },
+    { value: "customCategory", label: props.lang === "zh" ? "自定义分类（未来）" : "Custom category (later)", disabled: true },
+    { value: "tag", label: props.lang === "zh" ? "标签（未来）" : "Tag (later)", disabled: true },
+  ];
+  const metricActiveChips = [
+    metricsGroupBy !== "project" ? { key: "group", label: `${props.lang === "zh" ? "分组" : "Group"}: ${groupOptions.find((item) => item.value === metricsGroupBy)?.label}`, onClear: () => setMetricGroup("project") } : null,
+    metricsHabitMode !== "include" ? { key: "habit", label: `${props.lang === "zh" ? "习惯" : "Habits"}: ${metricsHabitMode === "exclude" ? (props.lang === "zh" ? "排除" : "Exclude") : (props.lang === "zh" ? "仅习惯" : "Only habits")}`, onClear: () => setMetricHabit("include") } : null,
+    metricsCompletion !== "all" ? { key: "completion", label: `${props.lang === "zh" ? "完成" : "Completion"}: ${metricsCompletion === "completed" ? (props.lang === "zh" ? "已完成" : "Completed") : (props.lang === "zh" ? "未完成" : "Incomplete")}`, onClear: () => setMetricCompletion("all") } : null,
+    metricsProjectFilter.length > 0 ? { key: "project", label: `${props.lang === "zh" ? "项目" : "Project"}: ${metricsProjectFilter.length}`, onClear: () => setMetricsProjectFilter([]) } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; onClear: () => void }>;
+
   return (
     <main className={`df-planning${props.compact ? " compact-layout" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {dialog.host}
@@ -1789,12 +2146,13 @@ export default function PlanningView(props: {
               {availableModes.length > 1 && (
                 <div className="df-planning-view-switch">
                   {availableModes.map((m) => (
-                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={m === "tree" ? (props.lang === "zh" ? "\u6811" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "\u77e9\u9635" : "Matrix") : (props.lang === "zh" ? "\u5217\u8868" : "List")}>
+                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={metricViewLabel(props.lang, m)}>
                       {m === "tree" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M3 5h4M3 9h6M3 13h5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
                       {m === "kanban" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="3.5" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="6.5" y="3" width="3.5" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="11" y="3" width="3.5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
                       {m === "eisenhower" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="2" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
                       {m === "list" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
-                      <span>{m === "tree" ? (props.lang === "zh" ? "\u6811" : "Tree") : m === "kanban" ? "Kanban" : m === "eisenhower" ? (props.lang === "zh" ? "\u77e9\u9635" : "Matrix") : (props.lang === "zh" ? "\u5217\u8868" : "List")}</span>
+                      {m === "metrics" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12V8M7 12V4M11 12V6M2 13h12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
+                      <span>{metricViewLabel(props.lang, m)}</span>
                     </button>
                   ))}
                 </div>
@@ -1802,6 +2160,7 @@ export default function PlanningView(props: {
           </aside>
           <div className="df-tree-wrap">
             <div className="df-planning-filter-corner">
+              {viewMode !== "metrics" && (
               <div className="df-filter-popover-anchor">
                 <button
                   type="button"
@@ -1871,9 +2230,10 @@ export default function PlanningView(props: {
                   </>
                 )}
               </div>
+              )}
             </div>
 
-          {activeFilterChips.length > 0 && (
+          {viewMode !== "metrics" && activeFilterChips.length > 0 && (
             <div className="df-active-filter-bar" role="region" aria-label={props.lang === "zh" ? "Active filters" : "Active filters"}>
               {activeFilterChips.map((chip) => (
                 <button
@@ -1891,6 +2251,262 @@ export default function PlanningView(props: {
                 {props.lang === "zh" ? "\u6e05\u9664\u5168\u90e8" : "Clear all"}
               </button>
             </div>
+          )}
+
+          {viewMode === "metrics" && (
+            <section className="df-metrics-view" aria-label={props.lang === "zh" ? "时间占比" : "Time allocation metrics"}>
+              <header className="df-metrics-header">
+                <div className="df-metrics-toolbar">
+                  <div className="df-filter-popover-anchor">
+                    <button
+                      type="button"
+                      className={`df-filter-trigger${metricsFilterOpen ? " active" : ""}${metricActiveChips.length > 0 ? " has-active" : ""}`}
+                      aria-expanded={metricsFilterOpen}
+                      aria-label={props.lang === "zh" ? "指标筛选" : "Metrics filters"}
+                      title={props.lang === "zh" ? "指标筛选" : "Metrics filters"}
+                      onClick={() => setMetricsFilterOpen((open) => !open)}
+                    >
+                      <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 4h12M5 9h8M7 14h4" /></svg>
+                      {metricActiveChips.length > 0 && <b>{metricActiveChips.length}</b>}
+                    </button>
+                    {metricsFilterOpen && (
+                      <>
+                        <div className="df-filter-panel df-metrics-filter-panel" onClick={(e) => e.stopPropagation()}>
+                          <div className="df-filter-categories">
+                            {([
+                              ["range", props.lang === "zh" ? "时间范围" : "Range"],
+                              ["group", props.lang === "zh" ? "分组方式" : "Group by"],
+                              ["project", props.lang === "zh" ? "项目" : "Projects"],
+                              ["completion", props.lang === "zh" ? "完成状态" : "Completion"],
+                              ["habit", props.lang === "zh" ? "是否包含习惯" : "Habits"],
+                              ["metric", props.lang === "zh" ? "显示指标" : "Metric"],
+                            ] as Array<[typeof metricsFilterCategory, string]>).map(([key, label]) => (
+                              <button
+                                type="button"
+                                key={key}
+                                className={`df-filter-cat-row${metricsFilterCategory === key ? " active" : ""}`}
+                                onMouseEnter={() => setMetricsFilterCategory(key)}
+                                onFocus={() => setMetricsFilterCategory(key)}
+                              >
+                                <span className="df-filter-cat-icon" aria-hidden="true">
+                                  <svg viewBox="0 0 14 14"><path d="M3 4h8M4 7h6M5 10h4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                                </span>
+                                <span className="df-filter-cat-label">{label}</span>
+                                <svg className="df-filter-cat-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M2 2l4 5-4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              </button>
+                            ))}
+                          </div>
+                          {metricActiveChips.length > 0 && (
+                            <button type="button" className="df-filter-reset" onClick={() => {
+                              setMetricRange("today");
+                              setMetricGroup("project");
+                              setMetricHabit("include");
+                              setMetricCompletion("all");
+                              setMetricsProjectFilter([]);
+                            }}>
+                              {props.lang === "zh" ? "清除全部" : "Clear all"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="df-filter-flyout-panel df-metrics-filter-flyout" onClick={(e) => e.stopPropagation()}>
+                          <div className="df-filter-options-view">
+                            <div className="df-filter-options-title">
+                              {metricsFilterCategory === "range" ? (props.lang === "zh" ? "时间范围" : "Range")
+                                : metricsFilterCategory === "group" ? (props.lang === "zh" ? "分组方式" : "Group by")
+                                : metricsFilterCategory === "project" ? (props.lang === "zh" ? "项目" : "Projects")
+                                : metricsFilterCategory === "completion" ? (props.lang === "zh" ? "完成状态" : "Completion")
+                                : metricsFilterCategory === "habit" ? (props.lang === "zh" ? "是否包含习惯" : "Habits")
+                                : (props.lang === "zh" ? "显示指标" : "Metric")}
+                            </div>
+                            {metricsFilterCategory === "range" && (
+                              <>
+                                {rangeOptions.map((option) => (
+                                  <label key={option.value} className={`df-filter-option${metricsRangePreset === option.value ? " checked" : ""}`}>
+                                    <input type="radio" checked={metricsRangePreset === option.value} onChange={() => setMetricRange(option.value)} />
+                                    <span>{option.label}</span>
+                                  </label>
+                                ))}
+                                {metricsRangePreset === "custom" && (
+                                  <div className="df-metrics-custom-dates">
+                                    <input type="date" value={metricsCustomStart} onChange={(event) => { setMetricsCustomStart(event.target.value); updateMetricsSetting({ metricsCustomStart: event.target.value }); }} />
+                                    <input type="date" value={metricsCustomEnd} onChange={(event) => { setMetricsCustomEnd(event.target.value); updateMetricsSetting({ metricsCustomEnd: event.target.value }); }} />
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {metricsFilterCategory === "group" && groupOptions.map((option) => (
+                              <label key={option.value} className={`df-filter-option${metricsGroupBy === option.value ? " checked" : ""}${option.disabled ? " disabled" : ""}`}>
+                                <input type="radio" checked={metricsGroupBy === option.value} disabled={option.disabled} onChange={() => !option.disabled && setMetricGroup(option.value)} />
+                                <span>{option.label}</span>
+                              </label>
+                            ))}
+                            {metricsFilterCategory === "project" && (
+                              <>
+                                <label className={`df-filter-option${metricsProjectFilter.length === 0 ? " checked" : ""}`}>
+                                  <input type="checkbox" checked={metricsProjectFilter.length === 0} onChange={() => setMetricsProjectFilter([])} />
+                                  <span>{props.lang === "zh" ? "全部项目" : "All projects"}</span>
+                                </label>
+                                {safeProjects.map((project) => (
+                                  <label key={project.id} className={`df-filter-option${metricsProjectFilter.includes(project.id) ? " checked" : ""}`}>
+                                    <input type="checkbox" checked={metricsProjectFilter.includes(project.id)} onChange={() => toggleArray(setMetricsProjectFilter, project.id)} />
+                                    <span className="df-filter-option-dot" style={{ background: project.color || DEFAULT_PROJECT_COLOR }} />
+                                    <span>{project.title}</span>
+                                  </label>
+                                ))}
+                              </>
+                            )}
+                            {metricsFilterCategory === "completion" && (["all", "completed", "incomplete"] as MetricCompletionFilter[]).map((value) => (
+                              <label key={value} className={`df-filter-option${metricsCompletion === value ? " checked" : ""}`}>
+                                <input type="radio" checked={metricsCompletion === value} onChange={() => setMetricCompletion(value)} />
+                                <span>{value === "all" ? (props.lang === "zh" ? "全部" : "All") : value === "completed" ? (props.lang === "zh" ? "已完成" : "Completed") : (props.lang === "zh" ? "未完成" : "Incomplete")}</span>
+                              </label>
+                            ))}
+                            {metricsFilterCategory === "habit" && (["include", "exclude", "only"] as MetricHabitMode[]).map((value) => (
+                              <label key={value} className={`df-filter-option${metricsHabitMode === value ? " checked" : ""}`}>
+                                <input type="radio" checked={metricsHabitMode === value} onChange={() => setMetricHabit(value)} />
+                                <span>{value === "include" ? (props.lang === "zh" ? "包含习惯" : "Include habits") : value === "exclude" ? (props.lang === "zh" ? "排除习惯" : "Exclude habits") : (props.lang === "zh" ? "仅习惯" : "Only habits")}</span>
+                              </label>
+                            ))}
+                            {metricsFilterCategory === "metric" && (["percentage", "duration", "taskCount", "completionRate"] as MetricDisplayMetric[]).map((value) => (
+                              <label key={value} className={`df-filter-option${metricsDisplayMetric === value ? " checked" : ""}`}>
+                                <input type="radio" checked={metricsDisplayMetric === value} onChange={() => setMetricDisplay(value)} />
+                                <span>{value === "percentage" ? (props.lang === "zh" ? "百分比" : "Percentage") : value === "duration" ? (props.lang === "zh" ? "总时长" : "Duration") : value === "taskCount" ? (props.lang === "zh" ? "任务数量" : "Task count") : (props.lang === "zh" ? "完成率" : "Completion rate")}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </header>
+
+              {metricActiveChips.length > 0 && (
+                <div className="df-active-filter-bar df-metrics-chip-bar" role="region" aria-label={props.lang === "zh" ? "指标筛选" : "Metric filters"}>
+                  {metricActiveChips.map((chip) => (
+                    <button key={chip.key} type="button" className="df-active-filter-chip" onClick={chip.onClear}>
+                      <span className="df-active-filter-chip-label">{chip.label}</span>
+                      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" /></svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {metricsResult.summary.plannedMinutes === 0 ? (
+                <div className="df-metrics-empty">
+                  <h3>{props.lang === "zh" ? "暂无时间安排" : "No scheduled time"}</h3>
+                  <p>{props.lang === "zh" ? "这个时间范围内还没有安排任务。把任务拖入时间轴后，这里会显示时间占比。" : "Schedule tasks on the timeline and this report will show allocation."}</p>
+                  <button type="button" className="df-metrics-text-action" onClick={() => setMetricRange("today")}>{props.lang === "zh" ? "调整筛选" : "Adjust filters"}</button>
+                </div>
+              ) : (
+                <>
+                  <div className="df-metrics-main-grid">
+                    <section className="df-metrics-panel df-metrics-donut-panel">
+                      <div className="df-metrics-panel-head">
+                        <h3>{props.lang === "zh" ? "项目时间占比图" : "Allocation chart"}</h3>
+                        <span>{metricsResult.range.label}</span>
+                      </div>
+                      <div className="df-metrics-donut-wrap">
+                        <svg ref={donutSvgRef} className="df-metrics-donut" viewBox="-70 0 380 240" role="img" aria-label={props.lang === "zh" ? "项目时间占比图" : "Project time allocation chart"}>
+                          <circle className="df-metrics-donut-rule" cx="120" cy="120" r="82" />
+                          {/* Visual layer: actual donut arcs. pointer-events none —
+                              all pointer events are handled by the hit disk on top. */}
+                          <g className="df-metrics-donut-visual-layer">
+                            {donutSegments.map(({ group, startAngle, endAngle }) => {
+                              const isActive = activeDonutGroup?.id === group.id;
+                              return (
+                                <path
+                                  key={`arc-${group.id}`}
+                                  className={`df-metrics-donut-segment${isActive ? " active" : ""}`}
+                                  d={donutSegmentPath(120, 120, isActive ? 94 : 88, 50, startAngle, endAngle)}
+                                  fill={alphaColor(group.color, 0.58)}
+                                  aria-hidden="true"
+                                />
+                              );
+                            })}
+                          </g>
+                          {/* Label layer: short 2-segment leader + side label.
+                              pointer-events none so they never interfere with
+                              the hit disk. EVERY segment renders a permanent
+                              label — project names are standing annotations,
+                              not hover tooltips. The active segment's anchor
+                              re-anchors to the hovered outer radius so the
+                              leader still touches the expanded arc; elbow/
+                              lineEnd/label stay put (no jump, no reshuffle). */}
+                          <g className="df-metrics-donut-label-layer">
+                            {donutAnnotations.map((ann) => {
+                              const isActive = activeDonutGroup?.id === ann.id;
+                              // Anchor follows the (possibly expanded) outer radius;
+                              // elbow + lineEnd are precomputed at the resting radius
+                              // so the label position never moves on hover.
+                              const anchor = polarPoint(120, 120, (isActive ? 94 : 88) + 4, ann.arcMidAngle);
+                              const path = `M ${anchor.x} ${anchor.y} L ${ann.elbowX} ${ann.elbowY} L ${ann.lineEndX} ${ann.lineEndY}`;
+                              return (
+                                <g key={`label-${ann.id}`} className={isActive ? "is-active" : ""} data-active={isActive || undefined}>
+                                  <path className="df-metrics-donut-leader" d={path} />
+                                  <text
+                                    className="df-metrics-donut-label"
+                                    x={ann.labelX}
+                                    y={ann.labelY}
+                                    textAnchor={ann.textAnchor}
+                                    dominantBaseline="alphabetic"
+                                  >{ann.label}</text>
+                                </g>
+                              );
+                            })}
+                          </g>
+                          {/* Single hit disk on top: transparent circle that handles
+                              ALL pointer events. Hover is computed by angle from the
+                              pointer position relative to center, so the cursor never
+                              flickers between SVG elements. The disk radius (98) covers
+                              the donut band and center hole but not the label area. */}
+                          <circle
+                            className="df-metrics-donut-hit-disk"
+                            cx={120}
+                            cy={120}
+                            r={98}
+                            tabIndex={0}
+                            role="application"
+                            aria-label={props.lang === "zh" ? "项目时间占比圆环图，移动鼠标查看各项目时长" : "Project time allocation donut, move pointer to explore"}
+                            onPointerMove={(e) => setHoveredMetricGroupId(computeHoveredSegment(e.clientX, e.clientY))}
+                            onPointerLeave={() => setHoveredMetricGroupId(null)}
+                            onClick={(e) => setHoveredMetricGroupId(computeHoveredSegment(e.clientX, e.clientY))}
+                            onFocus={() => {
+                              if (donutSegments.length > 0 && !hoveredMetricGroupId) {
+                                setHoveredMetricGroupId(donutSegments[0].group.id);
+                              }
+                            }}
+                            onBlur={() => setHoveredMetricGroupId(null)}
+                          />
+                        </svg>
+                        <div className="df-metrics-donut-center">
+                          {activeDonutGroup ? (
+                            <>
+                              <div className="df-metrics-donut-center-label">
+                                <span>{activeDonutGroup.label}</span>
+                              </div>
+                              <strong>{formatMinutesZh(activeDonutGroup.durationMinutes)}</strong>
+                              <span>{Math.round(activeDonutGroup.percentage)}%</span>
+                            </>
+                          ) : (
+                            <>
+                              <strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong>
+                              <span>{metricsResult.range.label}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                    <aside className="df-metrics-summary" aria-label={props.lang === "zh" ? "指标摘要" : "Metrics summary"}>
+                      <div><span>{props.lang === "zh" ? "已安排时间" : "Planned"}</span><strong>{formatMinutesZh(metricsResult.summary.plannedMinutes)}</strong></div>
+                      <div><span>{props.lang === "zh" ? "未安排时间" : "Unplanned"}</span><strong>{formatMinutesZh(metricsResult.summary.unplannedMinutes)}</strong></div>
+                      <div><span>{props.lang === "zh" ? "任务数量" : "Tasks"}</span><strong>{metricsResult.summary.taskCount}</strong></div>
+                      <div><span>{props.lang === "zh" ? "完成率" : "Done"}</span><strong>{Math.round(metricsResult.summary.completionRate * 100)}%</strong></div>
+                    </aside>
+                  </div>
+                </>
+              )}
+            </section>
           )}
 
           {viewMode === "kanban" && (

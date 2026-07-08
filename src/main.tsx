@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -35,6 +35,15 @@ import { scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, upda
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
 import { buildCommandSearchIndex, searchCommands, type CommandSearchResult } from "./utils/commandSearch";
+import {
+  buildDailyContinuousDates,
+  dailyContinuousBlockTop,
+  dailyContinuousCanvasHeight,
+  dailyContinuousSlotCount,
+  dailyContinuousSlotLabel,
+  dailyContinuousTargetFromContentY,
+  getContinuousTimelineDateForOffset,
+} from "./utils/continuousTimeline";
 import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProjectCompletion, workflowStatusForPatch } from "./utils/productivityModel";
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
@@ -42,6 +51,10 @@ import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, 
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
 import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
+import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
+import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingActionButton, SettingDivider, SettingComingSoon, SettingDescription } from "./components/SettingsControls";
+import { getDefaultSettings } from "./defaultSettings";
+import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
@@ -159,7 +172,26 @@ type SchedulePreview = {
 type AutoScheduleState = "idle" | "generating" | "preview" | "committing" | "error";
 type TimelineFocusSource = "schedule" | "autoschedule" | "recurrence" | "placement";
 type TimelineFocusTarget = { date: string; startTime?: string; taskId?: string; source: TimelineFocusSource };
-type SettingsSection = "page" | "ai" | "mcp" | "plugins" | "account" | "features" | "shortcuts";
+type SettingsSection =
+  | "general"
+  | "appearance"
+  | "execution"
+  | "planning"
+  | "templates"
+  | "habits"
+  | "metrics"
+  | "widget"
+  | "data"
+  | "shortcuts"
+  | "ai"
+  | "mcp"
+  | "plugins"
+  | "account"
+  | "advanced"
+  // Legacy aliases kept so persisted utilityPanel.section values from older
+  // builds still resolve to a sensible default instead of rendering nothing.
+  | "page"
+  | "features";
 type PlacementPreview = {
   taskId: string;
   date: string;
@@ -330,10 +362,6 @@ type BuiltInScheduleTemplateSlot = {
   end: string;
   titleZh: string;
   titleEn: string;
-};
-type ScheduleTemplateDraftSlot = BuiltInScheduleTemplateSlot & {
-  selected: boolean;
-  title: string;
 };
 type ScheduleTemplateApplySlot = {
   title: string;
@@ -679,9 +707,24 @@ function dateDiff(a: string, b: string) {
   return Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
 }
 
+/**
+ * Duration in minutes between two HH:MM time strings, treating the end as
+ * strictly later than the start. When `end` is numerically ≤ `start` the end
+ * is assumed to fall on the following day (cross-midnight), so a 23:30→00:30
+ * span yields 60 minutes instead of -1380. Mirrors the helper in
+ * `timelineGeometry.ts` so cross-midnight blocks render and resize correctly.
+ */
+function spanDurationMinutes(startTime: string, endTime: string) {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  let diff = end - start;
+  if (diff <= 0) diff += 24 * 60;
+  return diff;
+}
+
 function taskDuration(task: Task) {
   if (task.scheduledStart && task.scheduledEnd) {
-    return Math.max(timeToMinutes(task.scheduledEnd) - timeToMinutes(task.scheduledStart), SLOT_MINUTES);
+    return Math.max(spanDurationMinutes(task.scheduledStart, task.scheduledEnd), SLOT_MINUTES);
   }
   return Math.max(Math.round((task.estimatedHours || 0.5) * 60), SLOT_MINUTES);
 }
@@ -1530,6 +1573,361 @@ function YearCalendarOverview({
   );
 }
 
+/* ============================================================
+ * Desktop Widget — a single-row "now playing" task strip rendered
+ * in a frameless, transparent, always-on-top Electron BrowserWindow
+ * (loaded with ?widget=1). It is a pure IPC client: it holds NO
+ * task data of its own and never reads PlannerData. All truth stays
+ * in the main window's React store; the widget sends action requests
+ * via desktopApi.widget.sendAction and receives WidgetSnapshot pushes
+ * via onSnapshot. Cosmetic prefs (opacity / time color / task-title
+ * color) are widget-local and persisted in the widget window's own
+ * localStorage so they never touch main-app settings.
+ * ============================================================ */
+
+const WIDGET_POSITION_KEY = "navopath-widget-position";
+const WIDGET_PREFS_KEY = "navopath-widget-prefs";
+
+/** Strip window base size; expanded when the "more" menu is open. */
+const WIDGET_STRIP_W = 640;
+const WIDGET_STRIP_H = 76;
+const WIDGET_EXPANDED_H = 340;
+
+type WidgetColorMode = "default" | "project" | "red" | "green" | "blue" | "white";
+type WidgetOpacity = 1 | 0.9 | 0.8 | 0.7 | 0.6;
+type WidgetMenuView = null | "main" | "quickAdd" | "opacity" | "timeColor" | "taskColor";
+
+interface WidgetDisplayPrefs {
+  opacity: WidgetOpacity;
+  timeColorMode: WidgetColorMode;
+  taskTitleColorMode: WidgetColorMode;
+}
+
+const DEFAULT_WIDGET_PREFS: WidgetDisplayPrefs = {
+  opacity: 1,
+  timeColorMode: "default",
+  taskTitleColorMode: "default",
+};
+
+const WIDGET_COLOR_PRESETS: Record<Exclude<WidgetColorMode, "default" | "project">, string> = {
+  red: "#C96F5B",
+  green: "#7EA172",
+  blue: "#6E8DA6",
+  white: "#FFFFFF",
+};
+
+const WIDGET_OPACITY_OPTIONS: WidgetOpacity[] = [1, 0.9, 0.8, 0.7, 0.6];
+
+const WIDGET_COLOR_MODE_OPTIONS_ZH: Array<{ value: WidgetColorMode; label: string }> = [
+  { value: "default", label: "默认正文色" },
+  { value: "project", label: "跟随项目色" },
+  { value: "red", label: "红色" },
+  { value: "green", label: "绿色" },
+  { value: "blue", label: "蓝色" },
+  { value: "white", label: "白色" },
+];
+const WIDGET_COLOR_MODE_OPTIONS_EN: Array<{ value: WidgetColorMode; label: string }> = [
+  { value: "default", label: "Default ink" },
+  { value: "project", label: "Follow project" },
+  { value: "red", label: "Red" },
+  { value: "green", label: "Green" },
+  { value: "blue", label: "Blue" },
+  { value: "white", label: "White" },
+];
+
+function resolveWidgetColor(mode: WidgetColorMode, projectColor: string): string {
+  if (mode === "default") return "var(--widget-ink)";
+  if (mode === "project") return projectColor;
+  return WIDGET_COLOR_PRESETS[mode];
+}
+
+function loadWidgetPrefs(): WidgetDisplayPrefs {
+  try {
+    const raw = localStorage.getItem(WIDGET_PREFS_KEY);
+    if (!raw) return { ...DEFAULT_WIDGET_PREFS };
+    const parsed = JSON.parse(raw) as Partial<WidgetDisplayPrefs>;
+    return { ...DEFAULT_WIDGET_PREFS, ...parsed };
+  } catch {
+    return { ...DEFAULT_WIDGET_PREFS };
+  }
+}
+
+function saveWidgetPrefs(prefs: WidgetDisplayPrefs): void {
+  try { localStorage.setItem(WIDGET_PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
+}
+
+function formatWidgetTimer(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function WidgetApp() {
+  const [snapshot, setSnapshot] = useState<WidgetSnapshot | null>(null);
+  const [localElapsed, setLocalElapsed] = useState(0);
+  const [prefs, setPrefs] = useState<WidgetDisplayPrefs>(() => loadWidgetPrefs());
+  const [menuView, setMenuView] = useState<WidgetMenuView>(null);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [toast, setToast] = useState("");
+  const [alwaysOnTop, setAlwaysOnTop] = useState(true);
+  const lang = snapshot?.lang || detectSystemLanguage();
+
+  // Subscribe to snapshot pushes from the main window.
+  useEffect(() => {
+    const unsubscribe = window.desktopApi?.widget?.onSnapshot((s) => {
+      setSnapshot(s);
+      setAlwaysOnTop(s.alwaysOnTop);
+      setLocalElapsed(s.elapsedSeconds);
+    });
+    // Request the initial snapshot.
+    window.desktopApi?.widget?.sendAction({ type: "requestSnapshot" });
+    return unsubscribe;
+  }, []);
+
+  // Local 1-second tick for smooth timer display while running.
+  useEffect(() => {
+    if (!snapshot?.timerRunning) return;
+    const id = window.setInterval(() => setLocalElapsed((p) => p + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [snapshot?.timerRunning]);
+
+  // Restore window position from localStorage on mount.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(WIDGET_POSITION_KEY);
+      if (saved) {
+        const pos = JSON.parse(saved);
+        if (typeof pos.x === "number" && typeof pos.y === "number") {
+          void window.desktopApi?.widget?.setPosition(pos.x, pos.y);
+        }
+      }
+    } catch { /* ignore */ }
+    // Debounced save on move/resize via polling getPosition.
+    const interval = window.setInterval(() => {
+      void window.desktopApi?.widget?.getPosition().then((pos) => {
+        if (!pos) return;
+        try { localStorage.setItem(WIDGET_POSITION_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+      });
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  // Grow the window while the "more" menu is open so the dropdown is not
+  // clipped by the tight strip bounds; shrink back when closed.
+  useEffect(() => {
+    void window.desktopApi?.widget?.setSize(WIDGET_STRIP_W, menuView ? WIDGET_EXPANDED_H : WIDGET_STRIP_H);
+  }, [menuView]);
+
+  const sendAction = useCallback((action: WidgetAction) => {
+    window.desktopApi?.widget?.sendAction(action);
+  }, []);
+
+  const updatePrefs = useCallback((patch: Partial<WidgetDisplayPrefs>) => {
+    setPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      saveWidgetPrefs(next);
+      return next;
+    });
+  }, []);
+
+  const handleQuickAdd = useCallback(() => {
+    const title = quickTitle.trim();
+    if (!title) return;
+    sendAction({ type: "quickAdd", title });
+    setQuickTitle("");
+    setMenuView(null);
+    setToast(lang === "zh" ? "已添加到今日候选" : "Added to today's candidates");
+    window.setTimeout(() => setToast(""), 2200);
+  }, [quickTitle, sendAction, lang]);
+
+  const handleTimerToggle = useCallback(() => {
+    if (!snapshot) return;
+    if (snapshot.timerRunning) {
+      sendAction({ type: "timerPause" });
+    } else if (snapshot.taskId) {
+      sendAction({ type: "timerResume" });
+    }
+    // No task — nothing to start; the button is disabled in this state.
+  }, [snapshot, sendAction]);
+
+  const toggleAlwaysOnTop = useCallback(() => {
+    const next = !alwaysOnTop;
+    setAlwaysOnTop(next);
+    sendAction({ type: "setAlwaysOnTop", enabled: next });
+  }, [alwaysOnTop, sendAction]);
+
+  const resetPosition = useCallback(() => {
+    try { localStorage.removeItem(WIDGET_POSITION_KEY); } catch { /* ignore */ }
+    sendAction({ type: "resetPosition" });
+    setMenuView(null);
+  }, [sendAction]);
+
+  const closeWidget = useCallback(() => {
+    void window.desktopApi?.widget?.close();
+  }, []);
+
+  const hasTask = Boolean(snapshot?.taskId);
+  const zh = lang === "zh";
+  const projectColor = snapshot?.taskProjectColor || "var(--widget-accent)";
+  const statusLabel = hasTask ? (zh ? "正在做" : "Working") : (zh ? "空闲" : "Idle");
+  const statusColor = hasTask ? projectColor : "var(--widget-muted)";
+  const taskTitle = hasTask ? (snapshot?.taskTitle || "") : (zh ? "暂无进行中的任务" : "No active task");
+  const taskTitleColor = hasTask ? resolveWidgetColor(prefs.taskTitleColorMode, projectColor) : "var(--widget-muted)";
+  const timerColor = resolveWidgetColor(prefs.timeColorMode, projectColor);
+  const timerRunning = Boolean(snapshot?.timerRunning);
+  const colorModeOptions = zh ? WIDGET_COLOR_MODE_OPTIONS_ZH : WIDGET_COLOR_MODE_OPTIONS_EN;
+
+  return (
+    <div className="df-widget-root" data-lang={lang} style={{ opacity: prefs.opacity }}>
+      <div className="df-widget-strip" role="status" aria-live="polite">
+        <span className="df-widget-status" style={{ color: statusColor }}>{statusLabel}</span>
+        <span className="df-widget-task-title" style={{ color: taskTitleColor }} title={taskTitle}>{taskTitle}</span>
+        <span className="df-widget-timer" style={{ color: timerColor }}>{formatWidgetTimer(localElapsed)}</span>
+        <button
+          type="button"
+          className="df-widget-icon-btn"
+          aria-label={timerRunning ? (zh ? "暂停" : "Pause") : (zh ? "播放" : "Play")}
+          onClick={handleTimerToggle}
+          disabled={!hasTask}
+        >
+          {timerRunning ? "⏸" : "▶"}
+        </button>
+        <button
+          type="button"
+          className="df-widget-icon-btn"
+          aria-label={zh ? "更多" : "More"}
+          aria-expanded={menuView !== null}
+          onClick={() => setMenuView(menuView ? null : "main")}
+        >⋯</button>
+        <div className="df-widget-accent-line" style={{ background: projectColor }} />
+      </div>
+
+      {menuView !== null && (
+        <>
+          <div className="df-widget-menu-overlay" onClick={() => setMenuView(null)} />
+          <div className="df-widget-menu" role="menu">
+            {menuView === "main" && (
+              <>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={closeWidget}>
+                  <span>{zh ? "关闭小组件" : "Close widget"}</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={toggleAlwaysOnTop}>
+                  <span>{zh ? "切换置顶" : "Toggle always-on-top"}</span>
+                  <span className="df-widget-menu-check">{alwaysOnTop ? "✓" : ""}</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("quickAdd")}>
+                  <span>{zh ? "快速添加任务" : "Quick add task"}</span>
+                  <span className="df-widget-menu-chevron">›</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("opacity")}>
+                  <span>{zh ? "透明度" : "Opacity"}</span>
+                  <span className="df-widget-menu-value">{Math.round(prefs.opacity * 100)}%</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("timeColor")}>
+                  <span>{zh ? "时间颜色" : "Time color"}</span>
+                  <span className="df-widget-menu-chevron">›</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("taskColor")}>
+                  <span>{zh ? "任务名颜色" : "Task title color"}</span>
+                  <span className="df-widget-menu-chevron">›</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={resetPosition}>
+                  <span>{zh ? "重置位置" : "Reset position"}</span>
+                </button>
+              </>
+            )}
+
+            {menuView === "quickAdd" && (
+              <div className="df-widget-menu-sub">
+                <button type="button" className="df-widget-menu-back" onClick={() => setMenuView("main")}>
+                  <span aria-hidden>‹</span><span>{zh ? "返回" : "Back"}</span>
+                </button>
+                <div className="df-widget-menu-sub-title">{zh ? "快速添加任务" : "Quick add task"}</div>
+                <form className="df-widget-quick-add" onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }}>
+                  <input
+                    type="text"
+                    className="df-widget-input"
+                    placeholder={zh ? "添加任务..." : "Add a task..."}
+                    value={quickTitle}
+                    onChange={(e) => setQuickTitle(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" className="df-widget-btn df-widget-btn-accent" disabled={!quickTitle.trim()}>{zh ? "添加" : "Add"}</button>
+                </form>
+              </div>
+            )}
+
+            {menuView === "opacity" && (
+              <WidgetOptionSubmenu
+                title={zh ? "透明度" : "Opacity"}
+                backLabel={zh ? "返回" : "Back"}
+                onBack={() => setMenuView("main")}
+                options={WIDGET_OPACITY_OPTIONS.map((v) => ({ value: String(v), label: `${Math.round(v * 100)}%` }))}
+                selected={String(prefs.opacity)}
+                onSelect={(v) => updatePrefs({ opacity: Number(v) as WidgetOpacity })}
+              />
+            )}
+
+            {menuView === "timeColor" && (
+              <WidgetOptionSubmenu
+                title={zh ? "时间颜色" : "Time color"}
+                backLabel={zh ? "返回" : "Back"}
+                onBack={() => setMenuView("main")}
+                options={colorModeOptions}
+                selected={prefs.timeColorMode}
+                onSelect={(v) => updatePrefs({ timeColorMode: v as WidgetColorMode })}
+              />
+            )}
+
+            {menuView === "taskColor" && (
+              <WidgetOptionSubmenu
+                title={zh ? "任务名颜色" : "Task title color"}
+                backLabel={zh ? "返回" : "Back"}
+                onBack={() => setMenuView("main")}
+                options={colorModeOptions}
+                selected={prefs.taskTitleColorMode}
+                onSelect={(v) => updatePrefs({ taskTitleColorMode: v as WidgetColorMode })}
+              />
+            )}
+          </div>
+        </>
+      )}
+
+      {toast && <div className="df-widget-toast">{toast}</div>}
+    </div>
+  );
+}
+
+function WidgetOptionSubmenu({ title, backLabel, onBack, options, selected, onSelect }: {
+  title: string;
+  backLabel: string;
+  onBack: () => void;
+  options: Array<{ value: string; label: string }>;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="df-widget-menu-sub">
+      <button type="button" className="df-widget-menu-back" onClick={onBack}>
+        <span aria-hidden>‹</span><span>{backLabel}</span>
+      </button>
+      <div className="df-widget-menu-sub-title">{title}</div>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className="df-widget-menu-item"
+          onClick={() => onSelect(opt.value)}
+        >
+          <span>{opt.label}</span>
+          <span className="df-widget-menu-check">{selected === opt.value ? "✓" : ""}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const isWorkspaceRoute = window.location.pathname === "/app" || window.location.pathname.startsWith("/app/") || Boolean(window.desktopApi);
   const [data, setData] = useState<PlannerData | null>(null);
@@ -1546,6 +1944,7 @@ function App() {
   const [compactViewMenuOpen, setCompactViewMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
+  const [visibleTimelineDate, setVisibleTimelineDate] = useState(todayIso());
   const [drag, setDrag] = useState<DragState>(null);
   const [dragOverlay, setDragOverlay] = useState<UnifiedDragSnapshot | null>(null);
   const [dragOverlayTask, setDragOverlayTask] = useState<{ task: Task; variant: "candidate" | "allDay" | "scheduled" } | null>(null);
@@ -1580,6 +1979,12 @@ function App() {
   const monthScrollRef = useRef<HTMLDivElement>(null);
   const monthAnchorOffsetRef = useRef<number | null>(null);
   const [monthFocus, setMonthFocus] = useState("");
+  // Continuous-timeline infinite scroll: records the pre-shift scrollTop and the
+  // number of bands shifted so a useLayoutEffect can restore the viewport after
+  // the centered date window recomputes. `continuousPrependLockRef` prevents the
+  // scroll listener from re-triggering a shift while one is already in flight.
+  const continuousScrollRestoreRef = useRef<{ oldScrollTop: number; shiftBands: number } | null>(null);
+  const continuousPrependLockRef = useRef(false);
 
   useLayoutEffect(() => {
     const container = monthScrollRef.current;
@@ -1595,6 +2000,25 @@ function App() {
     const selectedWeek = selectedCell?.closest<HTMLElement>("[data-week-anchor]");
     if (selectedWeek) container.scrollTop = Math.max(0, selectedWeek.offsetTop - container.clientHeight * 0.32);
     setMonthFocus(selectedDate.slice(0, 7));
+  }, [selectedDate, timelineView]);
+
+  // Continuous-timeline infinite scroll: after the centered date window shifts
+  // (prepend/append), restore the viewport so the user does not perceive a jump.
+  // The centered window keeps a constant band count, so scrollHeight is unchanged;
+  // we only translate scrollTop by the shifted band count × day height.
+  useLayoutEffect(() => {
+    const restore = continuousScrollRestoreRef.current;
+    if (!restore) return;
+    const container = timelineRef.current;
+    if (!container) return;
+    continuousScrollRestoreRef.current = null;
+    const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const next = restore.oldScrollTop + restore.shiftBands * dayHeight;
+    container.scrollTop = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, next));
+    // Release the lock on the next frame so the scroll event triggered by this
+    // scrollTop assignment does not re-enter the prepend/append branch.
+    const frame = window.requestAnimationFrame(() => { continuousPrependLockRef.current = false; });
+    return () => window.cancelAnimationFrame(frame);
   }, [selectedDate, timelineView]);
   const [pendingTimelineFocus, setPendingTimelineFocus] = useState<TimelineFocusTarget | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview>(null);
@@ -1616,7 +2040,7 @@ function App() {
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
   const [habitPanel, setHabitPanel] = useState<"overview" | "detail" | null>(null);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
-  const [settingsSectionTarget, setSettingsSectionTarget] = useState<SettingsSection>("page");
+  const [settingsSectionTarget, setSettingsSectionTarget] = useState<SettingsSection>("general");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [toast, setToast] = useState("");
@@ -1766,6 +2190,14 @@ function App() {
     document.addEventListener("keydown", closeCompactLayer);
     return () => document.removeEventListener("keydown", closeCompactLayer);
   }, [quickAddOpen]);
+
+  useEffect(() => {
+    if (settings?.featureHabitsEnabled === false && habitPanel) {
+      setHabitPanel(null);
+      setEditingHabitId(null);
+    }
+  }, [settings?.featureHabitsEnabled]);
+
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -1781,9 +2213,6 @@ function App() {
       suppressBlockClickTimerRef.current = null;
     }, SUPPRESS_CLICK_AFTER_DRAG_MS);
   }, []);
-  const crossDayWheelRef = useRef<{ key: string; at: number } | null>(null);
-  const crossDayTouchRef = useRef<{ y: number; atTop: boolean; atBottom: boolean } | null>(null);
-
   useEffect(() => {
     const scrollElement = timelineRef.current;
     if (!allDayDragDate || !scrollElement) return;
@@ -2348,30 +2777,33 @@ function App() {
     if (lastTimelineAutoScrollKeyRef.current === autoScrollKey) return;
     lastTimelineAutoScrollKeyRef.current = autoScrollKey;
 
-    // When no tasks exist for the visible dates, park at the top so
-    // the 0:00 marker sits directly beneath the all-day bar with no
-    // wasted blank area.  Task creation triggers a focus scroll instead.
-    const visibleDays = getVisibleDays(timelineView as TimelineViewMode, selectedDate);
-    const hasVisibleTasks = expandedVisibleTimelineTasks.some(
-      (t) => t.scheduledDate && visibleDays.includes(t.scheduledDate),
-    );
-    if (!hasVisibleTasks) {
-      timelineRef.current.scrollTop = 0;
-      return;
-    }
-
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const fallbackMinutes = 9 * 60;
     const targetMinutes = selectedDate === todayIso() && currentMinutes >= 0 && currentMinutes <= 24 * 60
       ? currentMinutes
       : fallbackMinutes;
-    let diff = targetMinutes - dayStartHour * 60;
-    if (diff < 0) diff += 24 * 60;
-    const targetTop = (diff / SLOT_MINUTES) * SLOT_HEIGHT;
     const container = timelineRef.current;
-    container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.42);
-  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour]);
+    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, 7 * effectColumnCount)[0] || selectedDate;
+    const effectTop = (date: string, time: string) => {
+      const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
+      const bandIndex = Math.floor(offset / effectColumnCount);
+      let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
+      if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+      return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+    };
+    const targetTop = effectEnabled
+      ? effectTop(selectedDate, minutesToTime(targetMinutes))
+      : (() => {
+          let diff = targetMinutes - dayStartHour * 60;
+          if (diff < 0) diff += 24 * 60;
+          return (diff / SLOT_MINUTES) * SLOT_HEIGHT;
+        })();
+    container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
+  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour, settings?.continuousCrossDayScroll]);
 
   // Scroll timeline to day start time when the setting changes
   const prevDayStartRef = useRef<string>("");
@@ -2393,7 +2825,7 @@ function App() {
     prevDayStartRef.current = dayStart;
   }, [settings?.dayStartTime, mode, lang, dayStartHour]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (mode !== "execute" || !pendingTimelineFocus) return;
     const targetDate = pendingTimelineFocus.date;
     const visibleDays = getVisibleDays(timelineView === "weekly" ? "weekly" : (timelineView === "3day" ? "3day" : "daily"), selectedDate);
@@ -2407,13 +2839,76 @@ function App() {
     const targetMinutes = pendingTimelineFocus.startTime
       ? timeToMinutes(pendingTimelineFocus.startTime)
       : Math.max(TIMELINE_START * 60, 9 * 60);
-    const targetTop = ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-    container.scrollTo({
-      top: Math.max(0, targetTop - container.clientHeight * 0.32),
-      behavior: "smooth",
+    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, 7 * effectColumnCount)[0] || selectedDate;
+    const effectTop = (date: string, time: string) => {
+      const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
+      const bandIndex = Math.floor(offset / effectColumnCount);
+      let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
+      if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+      return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+    };
+    const targetTop = effectEnabled
+      ? effectTop(targetDate, minutesToTime(targetMinutes))
+      : ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+    const nextScrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = nextScrollTop;
+      setPendingTimelineFocus(null);
     });
-    setPendingTimelineFocus(null);
-  }, [mode, pendingTimelineFocus, selectedDate, timelineView]);
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, pendingTimelineFocus, selectedDate, timelineView, dayStartHour, settings?.continuousCrossDayScroll]);
+
+  useEffect(() => {
+    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+    if (mode !== "execute" || !effectEnabled) {
+      setVisibleTimelineDate(selectedDate);
+      return;
+    }
+    const scrollElement = timelineRef.current;
+    if (!scrollElement) return;
+    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+    const effectDates = buildDailyContinuousDates(effectAnchorDate, true, 7 * effectColumnCount);
+    const effectStartDate = effectDates[0] || selectedDate;
+    const effectBandCount = Math.max(1, Math.ceil(effectDates.length / effectColumnCount));
+    const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const bufferBands = Math.max(1, Math.floor(effectBandCount / 4));
+    // Label-only update: safe to call on init (no state shift, no loop risk).
+    const updateVisibleLabel = () => {
+      const centerY = scrollElement.scrollTop + scrollElement.clientHeight / 2;
+      const bandIndex = Math.max(0, Math.min(effectBandCount - 1, Math.floor(centerY / dayHeight)));
+      const nextDate = getContinuousTimelineDateForOffset(effectStartDate, bandIndex, effectColumnCount);
+      setVisibleTimelineDate((current) => current === nextDate ? current : nextDate);
+    };
+    // Full scroll handler: label + infinite-scroll prepend/append. Only invoked
+    // on real scroll events, never on effect init, so mount-time scrollTop=0
+    // cannot trigger a setSelectedDate feedback loop.
+    const handleTimelineScroll = () => {
+      updateVisibleLabel();
+      if (continuousPrependLockRef.current) return;
+      // Guard: if the container isn't scrollable (not laid out yet or content
+      // fits), skip prepend/append entirely to avoid a compensation clamp loop.
+      if (scrollElement.scrollHeight <= scrollElement.clientHeight) return;
+      const distanceFromBottom = scrollElement.scrollHeight - scrollElement.clientHeight - scrollElement.scrollTop;
+      if (scrollElement.scrollTop < dayHeight && effectBandCount > 1) {
+        // Near top — prepend earlier bands.
+        continuousPrependLockRef.current = true;
+        continuousScrollRestoreRef.current = { oldScrollTop: scrollElement.scrollTop, shiftBands: bufferBands };
+        setSelectedDate(addDays(selectedDate, -bufferBands * effectColumnCount));
+      } else if (distanceFromBottom < dayHeight && effectBandCount > 1) {
+        // Near bottom — append later bands.
+        continuousPrependLockRef.current = true;
+        continuousScrollRestoreRef.current = { oldScrollTop: scrollElement.scrollTop, shiftBands: -bufferBands };
+        setSelectedDate(addDays(selectedDate, bufferBands * effectColumnCount));
+      }
+    };
+    updateVisibleLabel();
+    scrollElement.addEventListener("scroll", handleTimelineScroll, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", handleTimelineScroll);
+  }, [mode, settings?.continuousCrossDayScroll, timelineView, selectedDate]);
 
   useEffect(() => {
     if (!placementPreview) return;
@@ -2908,8 +3403,11 @@ function App() {
 
   const today = todayIso();
   const timelineDate = selectedDate;
-  const isViewingToday = timelineDate === today;
-  const showBackToNow = timelineDate !== today || timelineView !== "daily";
+  const continuousTimelineEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
+  const timelineColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+  const timelineWindowAnchorDate = continuousTimelineEnabled ? visibleTimelineDate : timelineDate;
+  const isViewingToday = timelineWindowAnchorDate === today;
+  const showBackToNow = timelineDate !== today || timelineWindowAnchorDate !== today || timelineView !== "daily";
   const projects = data?.projects || [];
   const tasks = data?.tasks || [];
   const events = data?.events || [];
@@ -2994,13 +3492,24 @@ function App() {
     return m;
   }, [schedulePreviews, tasks]);
 
-  const visibleTimelineDates = useMemo(() => {
-    if (timelineView === "daily") return new Set([timelineDate]);
-    if (timelineView === "3day" || timelineView === "weekly") {
-      return new Set(getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate));
-    }
-    return new Set<string>();
+  const continuousAnchorDate = useMemo(() => {
+    if (timelineView === "weekly") return getVisibleDays("weekly", timelineDate)[0];
+    return timelineDate;
   }, [timelineDate, timelineView]);
+  const continuousTimelineDates = useMemo(() => {
+    if (!continuousTimelineEnabled) {
+      if (timelineView === "daily") return [timelineDate];
+      if (timelineView === "3day" || timelineView === "weekly") return getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
+      return [];
+    }
+    return buildDailyContinuousDates(continuousAnchorDate, true, 7 * timelineColumnCount);
+  }, [continuousAnchorDate, continuousTimelineEnabled, timelineColumnCount, timelineDate, timelineView]);
+  const continuousTimelineStartDate = continuousTimelineDates[0] || timelineDate;
+  const continuousTimelineBandCount = Math.max(1, Math.ceil(continuousTimelineDates.length / timelineColumnCount));
+  const visibleTimelineDates = useMemo(() => new Set(continuousTimelineDates), [continuousTimelineDates]);
+  const dailyTimelineDates = continuousTimelineDates;
+  const dailyTimelineCanvasHeight = dailyContinuousCanvasHeight(continuousTimelineBandCount, SLOT_HEIGHT);
+  const dailyTimelineSlotCount = dailyContinuousSlotCount(continuousTimelineBandCount);
 
   function getTimelineRangeFor(view: TimelineView, anchorDate: string) {
     if (view === "daily") return [anchorDate];
@@ -3202,11 +3711,11 @@ function App() {
   // Previews are appended but not in data.tasks yet.
   const scheduledTasks = useMemo(
     () => {
-      const expanded = expandedVisibleTimelineTasks.filter((task) => task.scheduledDate === timelineDate);
-      const virtual = previewTasks.filter((task) => task.scheduledDate === timelineDate);
+      const expanded = expandedVisibleTimelineTasks.filter((task) => dailyTimelineDates.includes(task.scheduledDate || ""));
+      const virtual = previewTasks.filter((task) => dailyTimelineDates.includes(task.scheduledDate || ""));
       return [...expanded, ...virtual].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
     },
-    [expandedVisibleTimelineTasks, timelineDate, previewTasks],
+    [expandedVisibleTimelineTasks, dailyTimelineDates, previewTasks],
   );
   // Measure daily canvas width for conflict layout.
   // Must be placed AFTER scheduledTasks declaration (above) so it can
@@ -3249,24 +3758,17 @@ function App() {
   // Conflict layout: maps taskId → { index, count } for overlapping tasks
   const conflictLayout = useMemo(() => {
     const map = new Map<string, { index: number; count: number }>();
-    if (timelineView === "daily") {
-      computeConflictLayout(scheduledTasks).forEach((v, k) => map.set(k, v));
-    } else {
-      const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
-      const dayTasks: Task[] = expandedVisibleTimelineTasks.filter((task) => threeDates.includes(task.scheduledDate || ""));
-      dayTasks.sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+    if (timelineView !== "month") {
       const byDate = new Map<string, Task[]>();
-      for (const t of dayTasks) {
-        const d = t.scheduledDate || "";
-        if (!byDate.has(d)) byDate.set(d, []);
-        byDate.get(d)!.push(t);
+      for (const task of scheduledTasks) {
+        const date = task.scheduledDate || "";
+        if (!byDate.has(date)) byDate.set(date, []);
+        byDate.get(date)!.push(task);
       }
-      for (const [, group] of byDate) {
-        computeConflictLayout(group).forEach((v, k) => map.set(k, v));
-      }
+      for (const [, group] of byDate) computeConflictLayout(group).forEach((v, k) => map.set(k, v));
     }
     return map;
-  }, [expandedVisibleTimelineTasks, timelineDate, timelineView, scheduledTasks]);
+  }, [timelineView, scheduledTasks]);
 
   // Debug: conflict layout info
   useEffect(() => {
@@ -3765,6 +4267,125 @@ function App() {
     showToast(t(lang, "toast.addedToCandidates"));
   }
 
+  /** Quick-add entry point used by the desktop widget (title comes from IPC). */
+  function widgetQuickAdd(title: string) {
+    if (!data || !title.trim()) return;
+    const targetDate = today;
+    const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, "");
+    const task = makeTask({
+      ...defaultForm("task"),
+      title,
+      projectId: "",
+      dueDate: targetDate,
+      estimatedHours: estimatedMinutes / 60,
+    });
+    void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
+    showToast(t(lang, "toast.addedToCandidates"));
+  }
+
+  /** Build a WidgetSnapshot from the current live React state. */
+  function buildWidgetSnapshot(): WidgetSnapshot {
+    const task = timerTask || headerTask;
+    const project = task?.projectId ? projects.find((p) => String(p.id) === String(task.projectId)) || null : null;
+    return {
+      taskId: task?.id,
+      taskTitle: task?.title || "",
+      taskProjectColor: project?.color,
+      elapsedSeconds: timerElapsed,
+      timerRunning,
+      candidateCount: todayCandidates.length,
+      lang,
+      alwaysOnTop: settings?.widgetAlwaysOnTop !== false,
+    };
+  }
+
+  /**
+   * Process an action request relayed from the desktop widget. Reads the
+   * latest state via refs so the handler stays correct even though the
+   * IPC listener is registered once.
+   */
+  function handleWidgetAction(action: WidgetAction) {
+    switch (action.type) {
+      case "requestSnapshot":
+        window.desktopApi?.widget?.pushSnapshot(buildWidgetSnapshot());
+        break;
+      case "quickAdd":
+        widgetQuickAdd(action.title);
+        break;
+      case "timerStart":
+        if (action.taskId) startTimer(action.taskId);
+        else if (headerTask) startTimer(headerTask.id);
+        break;
+      case "timerPause":
+        pauseTimer();
+        break;
+      case "timerResume":
+        resumeTimer();
+        break;
+      case "timerStop":
+        stopAndSaveTimer();
+        break;
+      case "complete":
+        if (action.taskId) toggleTaskDone(action.taskId);
+        else if (headerTask) toggleTaskDone(headerTask.id);
+        break;
+      case "setAlwaysOnTop":
+        void window.desktopApi?.widget?.setAlwaysOnTop(action.enabled);
+        void saveSettings({ widgetAlwaysOnTop: action.enabled });
+        break;
+      case "resetPosition":
+        try { localStorage.removeItem("navopath-widget-position"); } catch { /* ignore */ }
+        // Re-center: the widget window will fall back to its default position.
+        void window.desktopApi?.widget?.setPosition(80, 80);
+        break;
+    }
+  }
+
+  // Keep a ref to the latest action handler so the IPC listener (registered
+  // once) always calls the current closure with up-to-date state.
+  const widgetActionHandlerRef = useRef(handleWidgetAction);
+  widgetActionHandlerRef.current = handleWidgetAction;
+
+  // Register the widget action listener once. Desktop-only.
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    const unsubscribe = window.desktopApi.widget.onAction((action) => {
+      widgetActionHandlerRef.current(action);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Push a fresh snapshot to the widget whenever relevant state changes so
+  // the widget stays in sync without polling (timer ticks, task complete,
+  // quick add, candidate changes). Throttled to avoid flooding on rapid
+  // timer ticks (every second).
+  const widgetSnapshotRef = useRef<number>(0);
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    const now = Date.now();
+    if (now - widgetSnapshotRef.current < 400) return; // throttle
+    widgetSnapshotRef.current = now;
+    window.desktopApi.widget.pushSnapshot(buildWidgetSnapshot());
+  }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, lang]);
+
+  // Auto-open the widget on launch if the user opted in. Runs once.
+  const widgetAutoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (widgetAutoOpenedRef.current) return;
+    if (!window.desktopApi?.widget) return;
+    if (settings?.widgetOpenOnLaunch !== true) return;
+    if (settings?.featureWidgetEnabled === false) return;
+    widgetAutoOpenedRef.current = true;
+    void window.desktopApi.widget.open();
+  }, [settings?.widgetOpenOnLaunch, settings?.featureWidgetEnabled]);
+
+  // Apply always-on-top setting to an existing widget window when it changes.
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    if (settings?.widgetAlwaysOnTop === undefined) return;
+    void window.desktopApi.widget.setAlwaysOnTop(settings.widgetAlwaysOnTop !== false);
+  }, [settings?.widgetAlwaysOnTop]);
+
   function createQuickProject() {
     if (!data || !quickProjectTitle.trim()) return;
     const snapshot = projectSnapshot(data.projects, quickProjectTitle, quickProjectColor);
@@ -4016,9 +4637,57 @@ function App() {
     return () => document.removeEventListener("scroll", onScroll, { capture: true });
   }, []);
 
+  function dailyTargetFromPointer(clientY: number) {
+    const gridEl = timelineCanvasRef.current;
+    if (!gridEl) return { date: timelineDate, startTime: "09:00", endTime: "09:15", dayIndex: 0, minutes: 9 * 60 };
+    return dailyContinuousTargetFromContentY({
+      contentY: clientY - gridEl.getBoundingClientRect().top,
+      anchorDate: continuousTimelineStartDate,
+      dayStartHour,
+      dayCount: continuousTimelineBandCount,
+    });
+  }
+
+  function continuousDateOffset(date: string) {
+    return Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${continuousTimelineStartDate}T00:00:00`).getTime()) / 86400000);
+  }
+
+  function continuousTimedTop(date: string, startTime: string) {
+    const offset = continuousDateOffset(date);
+    const bandIndex = Math.floor(offset / timelineColumnCount);
+    let minutesFromDayStart = timeToMinutes(startTime) - dayStartHour * 60;
+    if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+    return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+  }
+
+  function continuousPointerTarget(clientX: number, clientY: number, gridElement: HTMLElement) {
+    const rect = gridElement.getBoundingClientRect();
+    const columnWidth = rect.width / timelineColumnCount;
+    const columnIndex = Math.min(Math.max(Math.floor((clientX - rect.left) / columnWidth), 0), timelineColumnCount - 1);
+    const pxPerMinute = SLOT_HEIGHT / SLOT_MINUTES;
+    const snappedFromTop = Math.min(
+      continuousTimelineBandCount * 24 * 60 - SLOT_MINUTES,
+      Math.max(0, Math.round(((clientY - rect.top) / pxPerMinute) / SLOT_MINUTES) * SLOT_MINUTES),
+    );
+    const bandIndex = Math.floor(snappedFromTop / (24 * 60));
+    const minutesFromDayStart = snappedFromTop % (24 * 60);
+    const minutes = (dayStartHour * 60 + minutesFromDayStart) % (24 * 60);
+    const startTime = minutesToTime(minutes);
+    return {
+      date: addDays(continuousTimelineStartDate, bandIndex * timelineColumnCount + columnIndex),
+      startTime,
+      endTime: addMinutes(startTime, SLOT_MINUTES),
+      dayIndex: columnIndex,
+      minutes,
+    };
+  }
+
   function slotFromPointer(clientY: number, offsetMinutes = 0, clientX?: number) {
     const { gridEl, scrollEl, visDays } = getDropGridAndDays();
     if (!gridEl || !scrollEl) return "09:00";
+    if (timelineView === "daily" && settings?.continuousCrossDayScroll !== false) {
+      return minutesToTime(clampSlot(dailyTargetFromPointer(clientY).minutes - offsetMinutes));
+    }
     const rect = gridEl.getBoundingClientRect();
     const target = pointerToDateTime({
       clientX: clientX ?? rect.left + rect.width / 2,
@@ -4029,6 +4698,59 @@ function App() {
       startHour: dayStartHour,
     });
     return minutesToTime(clampSlot(target.minutes - offsetMinutes));
+  }
+
+  /**
+   * Unified pointer → {date, startTime} resolver for timeline drag/drop/resize.
+   *
+   * In continuous cross-day mode the date MUST come from the Y band index
+   * (via `continuousPointerTarget`), never from `currentDate`/`timelineDate`.
+   * In non-continuous mode the date comes from the X column via
+   * `getDropTargetFromPointer`. Both paths return the snapped slot time.
+   */
+  function resolveDropTarget(clientX: number, clientY: number): { date: string; startTime: string; minutes: number } | null {
+    const { gridEl, scrollEl, visDays } = getDropGridAndDays();
+    if (!gridEl) return null;
+    if (continuousTimelineEnabled) {
+      const target = continuousPointerTarget(clientX, clientY, gridEl);
+      return { date: target.date, startTime: target.startTime, minutes: target.minutes };
+    }
+    if (!scrollEl) return null;
+    const target = getDropTargetFromPointer({
+      clientX,
+      clientY,
+      gridElement: gridEl,
+      scrollElement: scrollEl,
+      visibleDays: visDays,
+      startHour: dayStartHour,
+    });
+    return { date: target.date, startTime: target.startTime, minutes: target.minutes };
+  }
+
+  /**
+   * Subtract a pointer offset (in minutes) from a {date, time} pair, rolling
+   * the date backwards when the subtraction crosses midnight. Used by drag to
+   * keep the grabbed point under the cursor when the pointer sits near 00:00.
+   */
+  function subtractOffsetFromDateTime(date: string, time: string, offsetMinutes: number): { date: string; startTime: string } {
+    let total = timeToMinutes(time) - offsetMinutes;
+    let dayShift = 0;
+    while (total < 0) {
+      total += 24 * 60;
+      dayShift -= 1;
+    }
+    const snapped = clampSlot(total);
+    return { date: addDays(date, dayShift), startTime: minutesToTime(snapped) };
+  }
+
+  /**
+   * Continuous absolute minutes (from `continuousTimelineStartDate`) for a
+   * `{date, time}` point. Used by resize to compute durations across midnight
+   * without the `end - start` negative-wrap bug.
+   */
+  function dateTimeToContinuousAbs(date: string, time: string): number {
+    const offset = continuousDateOffset(date);
+    return offset * 24 * 60 + timeToMinutes(time);
   }
 
   function pointerOutsideTimeline(clientX: number, clientY: number) {
@@ -4381,11 +5103,13 @@ function App() {
   }
 
   function openHabitDetail(habitId: string) {
+    if (!settings || settings.featureHabitsEnabled === false) return;
     setEditingHabitId(habitId);
     setHabitPanel("detail");
   }
 
   function openHabitOverview() {
+    if (!settings || settings.featureHabitsEnabled === false) return;
     setEditingHabitId(null);
     setHabitPanel("overview");
   }
@@ -4461,6 +5185,7 @@ function App() {
   }
 
   function beginHabitDrag(event: React.PointerEvent, habit: Habit) {
+    if (!settings || settings.featureHabitsEnabled === false) return;
     const target = event.target as HTMLElement;
     if (event.button !== 0 || target.closest("button,input,textarea,select,a")) return;
     const pointerId = event.pointerId;
@@ -4579,7 +5304,9 @@ function App() {
   }
 
   function getDropGridAndDays(): { gridEl: HTMLElement | null; scrollEl: HTMLElement | null; visDays: string[] } {
-    const visDays = getVisibleDays(timelineView === "weekly" ? "weekly" : timelineView === "3day" ? "3day" : "daily", timelineDate);
+    const visDays = timelineView === "daily"
+      ? dailyTimelineDates
+      : getVisibleDays(timelineView === "weekly" ? "weekly" : timelineView === "3day" ? "3day" : "daily", timelineDate);
     if (timelineView === "3day" || timelineView === "weekly") {
       const gridEl = timeGridRef.current || document.querySelector('.df-time-grid');
       const scrollEl = timelineRef.current;
@@ -4597,7 +5324,9 @@ function App() {
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
         if ((!records || records.length === 0) && task.id === recordId && task.scheduledStart) {
-          const duration = timeToMinutes(task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task))) - timeToMinutes(task.scheduledStart);
+          // Cross-midnight spans (e.g. 23:30→00:30) must keep their 60m duration
+          // instead of collapsing to a negative / wrap-broken value.
+          const duration = spanDurationMinutes(task.scheduledStart, task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)));
           return {
             ...task,
             scheduledDate: newDate || task.scheduledDate,
@@ -4612,8 +5341,8 @@ function App() {
         const updated = [...records];
         const oldEnd = updated[idx].scheduledEnd;
         const oldStart = updated[idx].scheduledStart;
-        const duration = timeToMinutes(oldEnd) - timeToMinutes(oldStart);
-        const newEnd = minutesToTime(timeToMinutes(newStart) + duration);
+        const duration = spanDurationMinutes(oldStart, oldEnd);
+        const newEnd = addMinutes(newStart, duration);
         updated[idx] = {
           ...updated[idx],
           scheduledStart: newStart,
@@ -4765,20 +5494,15 @@ function App() {
       const outsideTimeline = pointerOutsideTimeline(moveEvent.clientX, moveEvent.clientY);
       setDrag((current) => current && current.taskId === task.id ? { ...current, pointer: { x: moveEvent.clientX, y: moveEvent.clientY }, outsideTimeline } : current);
       if (!outsideTimeline) {
-        const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-        if (gridEl && scrollEl) {
-          const target = getDropTargetFromPointer({
-            clientX: moveEvent.clientX,
-            clientY: moveEvent.clientY,
-            gridElement: gridEl,
-            scrollElement: scrollEl,
-            visibleDays: visDays,
-            startHour: dayStartHour,
-            debugLabel: `block-move-${timelineView}`,
-          });
-          const adjustedTime = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
-          dragTargetDateRef.current = target.date;
-          setHoverSlot(adjustedTime);
+        // Continuous cross-day mode MUST derive the date from the Y band index
+        // (continuousPointerTarget), not from currentDate/X column. The offset
+        // is subtracted in absolute time so dragging across midnight keeps the
+        // grabbed point under the cursor instead of snapping back to day 0.
+        const pointerTarget = resolveDropTarget(moveEvent.clientX, moveEvent.clientY);
+        if (pointerTarget) {
+          const adjusted = subtractOffsetFromDateTime(pointerTarget.date, pointerTarget.startTime, offsetMinutes);
+          dragTargetDateRef.current = adjusted.date;
+          setHoverSlot(adjusted.startTime);
         }
       } else {
         setHoverSlot("");
@@ -4837,21 +5561,14 @@ function App() {
         } else if (isEvent && droppedOutsideTimeline) {
           // Outside the timeline but not over the candidate shelf: cancel the move.
         } else {
-          const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-          if (gridEl && scrollEl) {
-            const target = getDropTargetFromPointer({
-              clientX: upEvent.clientX,
-              clientY: upEvent.clientY,
-              gridElement: gridEl,
-              scrollElement: scrollEl,
-              visibleDays: visDays,
-              startHour: dayStartHour,
-              debugLabel: `block-up-${timelineView}`,
-            });
-            dragTargetDateRef.current = target.date;
-            const nextStart = minutesToTime(clampSlot(timeToMinutes(target.startTime) - offsetMinutes));
-            if (isEvent) moveEventOccurrence(task.id, nextStart, target.date);
-            else moveTimelineRecord(task.id, nextStart, target.date);
+          // Same continuous-aware resolution as the move handler: date comes
+          // from Y band in cross-day mode, offset subtracted in absolute time.
+          const pointerTarget = resolveDropTarget(upEvent.clientX, upEvent.clientY);
+          if (pointerTarget) {
+            const adjusted = subtractOffsetFromDateTime(pointerTarget.date, pointerTarget.startTime, offsetMinutes);
+            dragTargetDateRef.current = adjusted.date;
+            if (isEvent) moveEventOccurrence(task.id, adjusted.startTime, adjusted.date);
+            else moveTimelineRecord(task.id, adjusted.startTime, adjusted.date);
           } else {
             const nextStart = slotFromPointer(upEvent.clientY, offsetMinutes, upEvent.clientX);
             if (isEvent) moveEventOccurrence(task.id, nextStart);
@@ -4907,37 +5624,51 @@ function App() {
     setDragCreate(null);
     document.body.classList.add("df-resizing");
     setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)) });
-    const move = (moveEvent: MouseEvent) => {
-      const slot = slotFromPointer(moveEvent.clientY, 0, moveEvent.clientX);
-      const slotMin = timeToMinutes(slot);
-      const start = timeToMinutes(task.scheduledStart);
-      const end = timeToMinutes(task.scheduledEnd);
+
+    // Resize works in continuous absolute minutes (relative to
+    // `continuousTimelineStartDate`) so that dragging the bottom handle past
+    // midnight yields a 60m duration instead of clamping to the end of day.
+    // The same math also works in non-continuous mode because the absolute
+    // coordinate reduces to within-day minutes when the anchor == visible date.
+    const taskAnchorDate = task.scheduledDate || timelineWindowAnchorDate;
+    const origStart = task.scheduledStart || "09:00";
+    const origDuration = taskDuration(task);
+    const startAbs = dateTimeToContinuousAbs(taskAnchorDate, origStart);
+    const endAbs = startAbs + origDuration;
+
+    const computeResize = (clientX: number, clientY: number): { nextStart: string; nextEnd: string; nextDuration: number; nextStartDate: string } => {
+      const pointerTarget = resolveDropTarget(clientX, clientY);
+      const fallbackSlot = slotFromPointer(clientY, 0, clientX);
+      const pointerAbs = pointerTarget
+        ? dateTimeToContinuousAbs(pointerTarget.date, pointerTarget.startTime)
+        : startAbs + timeToMinutes(fallbackSlot) - timeToMinutes(origStart);
       if (edge === "start") {
-        const nextStart = Math.min(slotMin, end - SLOT_MINUTES);
-        setResizePreview({ taskId: task.id, start: minutesToTime(nextStart), end: task.scheduledEnd || minutesToTime(end) });
-      } else {
-        const nextEnd = Math.max(slotMin, start + SLOT_MINUTES);
-        setResizePreview({ taskId: task.id, start: task.scheduledStart || minutesToTime(start), end: minutesToTime(nextEnd) });
+        const newStartAbs = Math.min(pointerAbs, endAbs - SLOT_MINUTES);
+        const newDuration = Math.max(SLOT_MINUTES, endAbs - newStartAbs);
+        // addMinutes wraps mod 24h; if start moved backwards across midnight,
+        // roll the scheduled date back by the number of crossed days.
+        const dayShift = Math.floor((timeToMinutes(origStart) + (newStartAbs - startAbs)) / (24 * 60));
+        const nextStart = addMinutes(origStart, newStartAbs - startAbs);
+        const nextEnd = addMinutes(nextStart, newDuration);
+        return { nextStart, nextEnd, nextDuration: newDuration, nextStartDate: addDays(taskAnchorDate, dayShift) };
       }
+      const newEndAbs = Math.max(pointerAbs, startAbs + SLOT_MINUTES);
+      const newDuration = Math.max(SLOT_MINUTES, newEndAbs - startAbs);
+      const nextEnd = addMinutes(origStart, newDuration);
+      return { nextStart: origStart, nextEnd, nextDuration: newDuration, nextStartDate: taskAnchorDate };
+    };
+
+    const move = (moveEvent: MouseEvent) => {
+      const { nextStart, nextEnd } = computeResize(moveEvent.clientX, moveEvent.clientY);
+      setResizePreview({ taskId: task.id, start: nextStart, end: nextEnd });
     };
     const up = (upEvent: MouseEvent) => {
       if (!data) return;
-      const slot = slotFromPointer(upEvent.clientY, 0, upEvent.clientX);
-      const slotMin = timeToMinutes(slot);
-      const start = timeToMinutes(task.scheduledStart);
-      const end = timeToMinutes(task.scheduledEnd);
+      const { nextStart, nextEnd, nextDuration, nextStartDate } = computeResize(upEvent.clientX, upEvent.clientY);
+      const durationHours = nextDuration / 60;
       const now = new Date().toISOString();
-      let nextData = data;
       if (isEventDisplayTask(task)) {
-        if (edge === "start") {
-          const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
-          const nextEnd = task.scheduledEnd || minutesToTime(end);
-          resizeEventOccurrence(task.id, nextStart, nextEnd);
-        } else {
-          const nextStart = task.scheduledStart || minutesToTime(start);
-          const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
-          resizeEventOccurrence(task.id, nextStart, nextEnd);
-        }
+        resizeEventOccurrence(task.id, nextStart, nextEnd);
         setResizePreview(null);
         document.body.classList.remove("df-resizing");
         window.removeEventListener("mousemove", move);
@@ -4947,47 +5678,38 @@ function App() {
         }, 0);
         return;
       }
-      if (edge === "start") {
-        const nextStart = minutesToTime(Math.min(slotMin, end - SLOT_MINUTES));
-        const nextEnd = task.scheduledEnd || minutesToTime(end);
-        const durationHours = (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60;
-        nextData = {
-          ...data,
-          tasks: data.tasks.map((t) => {
-            const records = t.timelineRecords;
-            if ((!records || records.length === 0) && t.id === task.id) {
-              return { ...t, scheduledStart: nextStart, scheduledEnd: nextEnd, estimatedHours: durationHours, updatedAt: now };
-            }
-            if (!records) return t;
-            const idx = records.findIndex((r) => r.id === task.id);
-            if (idx === -1) return t;
-            const updated = [...records];
-            updated[idx] = { ...updated[idx], scheduledStart: nextStart, scheduledEnd: nextEnd };
-            return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
-          }),
-        };
-        showToast(t(lang, "toast.durationAdjusted"));
-      } else {
-        const nextStart = task.scheduledStart || minutesToTime(start);
-        const nextEnd = minutesToTime(Math.max(slotMin, start + SLOT_MINUTES));
-        const durationHours = (timeToMinutes(nextEnd) - timeToMinutes(nextStart)) / 60;
-        nextData = {
-          ...data,
-          tasks: data.tasks.map((t) => {
-            const records = t.timelineRecords;
-            if ((!records || records.length === 0) && t.id === task.id) {
-              return { ...t, scheduledStart: nextStart, scheduledEnd: nextEnd, estimatedHours: durationHours, updatedAt: now };
-            }
-            if (!records) return t;
-            const idx = records.findIndex((r) => r.id === task.id);
-            if (idx === -1) return t;
-            const updated = [...records];
-            updated[idx] = { ...updated[idx], scheduledStart: nextStart, scheduledEnd: nextEnd };
-            return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
-          }),
-        };
-        showToast(t(lang, "toast.durationAdjusted"));
-      }
+      // Start-edge resize may shift the scheduled date when the new start
+      // crosses midnight backwards; end-edge resize keeps the start (and
+      // therefore the date) fixed.
+      const moveStartDate = edge === "start";
+      const nextData = {
+        ...data,
+        tasks: data.tasks.map((t) => {
+          const records = t.timelineRecords;
+          if ((!records || records.length === 0) && t.id === task.id) {
+            return {
+              ...t,
+              scheduledStart: nextStart,
+              scheduledEnd: nextEnd,
+              scheduledDate: moveStartDate ? nextStartDate : t.scheduledDate,
+              estimatedHours: durationHours,
+              updatedAt: now,
+            };
+          }
+          if (!records) return t;
+          const idx = records.findIndex((r) => r.id === task.id);
+          if (idx === -1) return t;
+          const updated = [...records];
+          updated[idx] = {
+            ...updated[idx],
+            scheduledStart: nextStart,
+            scheduledEnd: nextEnd,
+            scheduledDate: moveStartDate ? nextStartDate : updated[idx].scheduledDate,
+          };
+          return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
+        }),
+      };
+      showToast(t(lang, "toast.durationAdjusted"));
       // Direct setData for immediate visual update, saveData for persistence
       dataRef.current = nextData;
       setData(nextData);
@@ -5562,85 +6284,19 @@ function App() {
     persistAiMessage(messageId, { actionState: "rejected", actions: [] });
   }
 
-  function shiftTimelineAtScrollBoundary(direction: -1 | 1, scrollElement: HTMLElement) {
-    if (settings?.continuousCrossDayScroll !== false && timelineView !== "month") {
-      const key = `${timelineView}:${selectedDate}:${direction}`;
-      const now = Date.now();
-      if (crossDayWheelRef.current?.key === key && now - crossDayWheelRef.current.at < 520) return true;
-      crossDayWheelRef.current = { key, at: now };
-      setSelectedDate((date) => addDays(date, direction));
-      window.setTimeout(() => {
-        const nextScroll = timelineRef.current;
-        if (!nextScroll) return;
-        nextScroll.scrollTop = direction > 0 ? 0 : Math.max(0, nextScroll.scrollHeight - nextScroll.clientHeight - 1);
-      }, 0);
-      return true;
-    }
-    return false;
-  }
-
   function handleTimelinePanelWheel(event: React.WheelEvent<HTMLElement>) {
     if (event.ctrlKey || event.metaKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
     const target = event.target as HTMLElement;
     if (target.closest("input,textarea,select,[contenteditable=true],.df-drawer,.df-utility-panel,.df-project-popover-portal")) return;
     const scrollElement = timelineView === "month" ? monthScrollRef.current : timelineRef.current;
     if (!scrollElement) return;
-    const maxScroll = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
-    const atTop = scrollElement.scrollTop <= 1;
-    const atBottom = scrollElement.scrollTop >= maxScroll - 1;
-    const direction: -1 | 1 = event.deltaY < 0 ? -1 : 1;
-    const wantsBoundary = direction < 0 ? atTop : atBottom;
     const insideScroll = scrollElement.contains(target);
 
-    if (insideScroll) {
-      if ((maxScroll <= 0 || wantsBoundary) && shiftTimelineAtScrollBoundary(direction, scrollElement)) {
-        event.preventDefault();
-      }
-      return;
-    }
+    if (insideScroll) return;
 
-    if (maxScroll <= 0) {
-      if (shiftTimelineAtScrollBoundary(direction, scrollElement)) event.preventDefault();
-      return;
-    }
-
-    if (wantsBoundary && shiftTimelineAtScrollBoundary(direction, scrollElement)) {
-      event.preventDefault();
-      return;
-    }
-
-    scrollElement.scrollTop = Math.min(maxScroll, Math.max(0, scrollElement.scrollTop + event.deltaY));
-  }
-
-  function handleTimelineTouchStart(event: React.TouchEvent<HTMLElement>) {
-    if (timelineView === "month") {
-      crossDayTouchRef.current = null;
-      return;
-    }
-    const scrollElement = timelineRef.current;
-    if (!scrollElement || event.touches.length !== 1) {
-      crossDayTouchRef.current = null;
-      return;
-    }
     const maxScroll = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
-    crossDayTouchRef.current = {
-      y: event.touches[0].clientY,
-      atTop: scrollElement.scrollTop <= 1 || maxScroll <= 0,
-      atBottom: scrollElement.scrollTop >= maxScroll - 1 || maxScroll <= 0,
-    };
-  }
-
-  function handleTimelineTouchMove(event: React.TouchEvent<HTMLElement>) {
-    const state = crossDayTouchRef.current;
-    const scrollElement = timelineRef.current;
-    if (!state || !scrollElement || event.touches.length !== 1) return;
-    const deltaY = event.touches[0].clientY - state.y;
-    if (Math.abs(deltaY) < 42) return;
-    const direction: -1 | 1 = deltaY > 0 ? -1 : 1;
-    const atBoundary = direction < 0 ? state.atTop : state.atBottom;
-    if (!atBoundary || !shiftTimelineAtScrollBoundary(direction, scrollElement)) return;
-    if (event.cancelable) event.preventDefault();
-    crossDayTouchRef.current = null;
+    if (maxScroll <= 0) return;
+    scrollElement.scrollTop = Math.min(maxScroll, Math.max(0, scrollElement.scrollTop + event.deltaY));
   }
 
   function beginShelfDrag(event: React.PointerEvent, task: Task, source: "candidate" | "allDay") {
@@ -5725,14 +6381,20 @@ function App() {
         return;
       }
       setAllDayDragDate("");
-      const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-      if (!gridEl || !scrollEl) return;
-      const rect = scrollEl.getBoundingClientRect();
-      const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
-      if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
-      if (pointerEvent.clientY < rect.top + 48) scrollEl.scrollTop -= 18;
-      else if (pointerEvent.clientY > rect.bottom - 48) scrollEl.scrollTop += 18;
-      const target = getDropTargetFromPointer({ clientX: pointerEvent.clientX, clientY: pointerEvent.clientY, gridElement: gridEl, scrollElement: scrollEl, visibleDays: visDays, startHour: dayStartHour });
+      // Candidate -> timeline drag must NOT mutate timeline scroll position or
+      // change the current date. The continuous cross-day canvas spans 7 days
+      // of vertical space already; `resolveDropTarget` re-reads the grid rect
+      // on every move so manual wheel-scroll during a drag still maps correctly.
+      // Use the continuous-aware resolver (date-from-Y band) instead of the
+      // single-day `getDropTargetFromPointer`, matching `beginBlockDrag`.
+      const scrollEl = timelineRef.current;
+      if (scrollEl) {
+        const rect = scrollEl.getBoundingClientRect();
+        const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
+        if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
+      }
+      const target = resolveDropTarget(pointerEvent.clientX, pointerEvent.clientY);
+      if (!target) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
       dragTargetDateRef.current = target.date;
       dropTime = target.startTime;
       setHoverSlot(target.startTime);
@@ -6337,8 +6999,13 @@ function App() {
   }
 
   function goToNow() {
-    setSelectedDate(todayIso());
+    const now = new Date();
+    const nowDate = todayIso();
+    const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setSelectedDate(nowDate);
+    setVisibleTimelineDate(nowDate);
     setTimelineView("daily");
+    setPendingTimelineFocus({ date: nowDate, startTime: nowTime, source: "schedule" });
   }
 
   function openSettingsSection(section: SettingsSection) {
@@ -6491,7 +7158,7 @@ function App() {
   const onboardingStep = (settings.onboardingStep || "add") as OnboardingStep;
   const habits = data.habits || [];
   const habitDailyStates = data.habitDailyStates || [];
-  const hasActiveHabits = habits.some((habit) => !habit.archived);
+  const hasActiveHabits = settings.featureHabitsEnabled !== false && habits.some((habit) => !habit.archived);
   const draggedTask = drag
     ? tasks.find((task) => task.id === drag.taskId)
       || recordToTaskMap.get(drag.taskId)
@@ -6611,7 +7278,7 @@ function App() {
       )}
 
       {mode === "execute" ? (
-        <main className={`df-execute${candidatePanelCollapsed ? " candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
+        <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button className={compactExecuteView === "tasks" ? "active" : ""} onClick={() => setCompactExecuteView("tasks")}>{lang === "zh" ? "任务" : "Tasks"}</button>
@@ -6639,7 +7306,11 @@ function App() {
               </nav>
             )}
           </div>
-          <section className={`df-candidate-panel${compactExecuteView === "tasks" ? " compact-active" : " compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`} aria-hidden={compactLayout && compactExecuteView !== "tasks"} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+          <CandidatePanelShell
+            className={`${compactExecuteView === "tasks" ? "compact-active" : "compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`}
+            ariaHidden={compactLayout && compactExecuteView !== "tasks"}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
             if (taskId) {
@@ -6663,15 +7334,25 @@ function App() {
               </div>
             ) : (
               <>
-            <div className="df-panel-title">
-              <h2>{t(lang, "candidate.title")}</h2>
-              <div>
+            <CandidatePanelHeader
+              title={t(lang, "candidate.title")}
+              actions={<>
                 {(timelineView === "3day" || timelineView === "weekly" || timelineView === "month") && (
                   <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => { setCandidatePanelCollapsed(true); setFullscreen(false); }} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
                 )}
                 <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
+                {settings.featureTemplatesEnabled !== false && (
                 <button className="df-icon-action df-icon-template" data-tip={lang === "zh" ? "日程模版" : "Schedule Template"} aria-label={lang === "zh" ? "日程模版" : "Schedule Template"} onClick={() => setScheduleTemplateOpen(true)}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2M16 4V2M8 13h3M8 17h6"/></svg></button>
+                )}
+                {Boolean(window.desktopApi?.widget) && settings.featureWidgetEnabled !== false && (
+                  <button
+                    className="df-icon-action"
+                    data-tip={lang === "zh" ? "桌面小组件" : "Desktop widget"}
+                    aria-label={lang === "zh" ? "桌面小组件" : "Desktop widget"}
+                    onClick={() => void window.desktopApi?.widget?.open()}
+                  ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/></svg></button>
+                )}
                 {!settings.hideAi && (
                   <button
                     className={`df-icon-action df-ai-plan-title-icon ${autoScheduleState === "generating" || autoScheduleState === "committing" ? "thinking" : ""}`}
@@ -6687,8 +7368,9 @@ function App() {
                     </svg>
                   </button>
                 )}
-              </div>
-            </div>
+              </>
+            }
+            />
             {focusTask && (
               <div className="df-active-task-chip" style={focusProject?.color ? { ["--timer-project-color" as string]: focusProject.color } as React.CSSProperties : undefined}>
                 <button className="df-active-task-chip-main" onClick={() => openTaskEdit(focusTask)}>
@@ -6713,30 +7395,6 @@ function App() {
                 </span>
               </div>
             )}
-            {!settings.hideAi && <div className="df-candidate-ai-planner-legacy" style={{ display: "none" }} aria-hidden="true">
-              <button className={`df-ai-plan ${autoScheduleState === "generating" ? "thinking" : ""} ${autoScheduleState === "committing" ? "committing" : ""}`} data-tip={drawerOpen ? t(lang, "timeline.aiPlanToday") : t(lang, "timeline.planningSuggestion")} aria-label={t(lang, "timeline.aiPlanToday")} disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen} onClick={() => void planMyDay()}>
-                {autoScheduleState === "generating" ? <><i />{t(lang, "timeline.analyzing")}</>
-                  : autoScheduleState === "committing" ? <><i />{t(lang, "timeline.adopting")}</>
-                  : autoScheduleState === "preview" ? t(lang, "timeline.regenerate")
-                  : t(lang, "timeline.planningSuggestion")}
-              </button>
-              <button className={`df-ai-plan-toggle ${aiPlanMenuOpen ? "active" : ""}`} aria-label={t(lang, "timeline.aiPlanningSettings")} onClick={(event) => {
-                event.stopPropagation();
-                setAiPlanMenuOpen((open) => !open);
-              }}><span className="df-ai-plan-chevron" aria-hidden="true" /></button>
-              {schedulePreviews.length > 0 && autoScheduleState === "preview" && <>
-                <button className="df-ai-plan-confirm" onClick={() => acceptAllPreviews()} title={t(lang, "timeline.adoptAll")}>✓</button>
-                <button className="df-ai-plan-cancel" onClick={() => cancelAutoSchedule()} title={t(lang, "timeline.cancelPreview")}>✕</button>
-              </>}
-              {autoScheduleState === "preview" && schedulePreviews.length > 0 && (
-                <span className="df-ai-plan-summary">{`${t(lang, "timeline.previewPlan").replace("X", String(schedulePreviews.length))}`}</span>
-              )}
-              {aiPlanMenuOpen && <span className="df-ai-plan-menu open" onClick={(event) => event.stopPropagation()}>
-                <label>{t(lang, "timeline.source")}<select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">{t(lang, "timeline.fromCandidates")}</option><option value="all">{t(lang, "timeline.allUnfinished")}</option></select></label>
-                <label>{t(lang, "timeline.scope")}<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option></select></label>
-                <label>{t(lang, "timeline.strategy")}<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="alternativeProject">{t(lang, "timeline.alternateByProject")}</option><option value="byProject">{t(lang, "timeline.scheduleByProject")}</option><option value="longShort">{t(lang, "timeline.alternateLongShort")}</option><option value="random">{t(lang, "timeline.random")}</option></select></label>
-              </span>}
-            </div>}
             <div className="df-candidate-list">
               {visibleCandidates.length === 0 && !hasActiveHabits ? (
                 <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span></div>
@@ -6762,7 +7420,7 @@ function App() {
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
                         {tasks.map((task) => {
-                          const dropHere = candidateDropTarget?.taskId === task.id;
+                          const dropHere = drag?.source === "candidate" && candidateDropTarget?.taskId === task.id;
                           return (
                             <div
                               key={task.id}
@@ -6781,26 +7439,28 @@ function App() {
               ) : visibleCandidates.map((task) => (
                 <div
                   key={task.id}
-                  className={`df-candidate-task-row${candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                  className={`df-candidate-task-row${drag?.source === "candidate" && candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
                   data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
                 >
-                  {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  {drag?.source === "candidate" && candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
                   <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />
-                  {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  {drag?.source === "candidate" && candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
                 </div>
               ))}
-              <HabitCandidateCard
-                habits={habits}
-                habitDailyStates={habitDailyStates}
-                today={today}
-                lang={lang}
-                onToggle={toggleHabitDaily}
-                onPointerDragStart={beginHabitDrag}
-                onFocusScheduled={focusHabitSchedule}
-                onEditHabit={openHabitDetail}
-                onOpenOverview={openHabitOverview}
-                isClickSuppressed={() => suppressBlockClickRef.current}
-              />
+              {settings.featureHabitsEnabled !== false && (
+                <HabitCandidateCard
+                  habits={habits}
+                  habitDailyStates={habitDailyStates}
+                  today={today}
+                  lang={lang}
+                  onToggle={toggleHabitDaily}
+                  onPointerDragStart={beginHabitDrag}
+                  onFocusScheduled={focusHabitSchedule}
+                  onEditHabit={openHabitDetail}
+                  onOpenOverview={openHabitOverview}
+                  isClickSuppressed={() => suppressBlockClickRef.current}
+                />
+              )}
             </div>
             <form className="df-quick-add" onSubmit={(event) => {
               event.preventDefault();
@@ -6825,7 +7485,7 @@ function App() {
             </form>
               </>
             )}
-          </section>
+          </CandidatePanelShell>
 
           <section
             className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`}
@@ -6833,8 +7493,6 @@ function App() {
             id="df-execute-timeline"
             data-cross-day-scroll={settings.continuousCrossDayScroll !== false ? "true" : "false"}
             onWheelCapture={handleTimelinePanelWheel}
-            onTouchStart={handleTimelineTouchStart}
-            onTouchMove={handleTimelineTouchMove}
           >
             {yearOverviewOpen ? (
               <YearCalendarOverview
@@ -6911,11 +7569,11 @@ function App() {
                   </button>
                 )}
                 {(timelineView === "3day" || timelineView === "weekly") ? (() => {
-                  const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
+                  const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineWindowAnchorDate);
                   const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                  const canvasHeight = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
-                  const slotCount = ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
-                  const multiDayScheduledTasks = [...expandedVisibleTimelineTasks.filter((task) => threeDates.includes(task.scheduledDate || "")), ...previewTasks.filter((task) => threeDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+                  const canvasHeight = continuousTimelineEnabled ? dailyTimelineCanvasHeight : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+                  const slotCount = continuousTimelineEnabled ? dailyTimelineSlotCount : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
+                  const multiDayScheduledTasks = [...expandedVisibleTimelineTasks.filter((task) => continuousTimelineDates.includes(task.scheduledDate || "")), ...previewTasks.filter((task) => continuousTimelineDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
                   return (
                     <div className={`df-timeline-3day ${timelineView === "weekly" ? "df-week-view" : ""}`} style={{ "--df-day-columns": String(threeDates.length) } as CSSProperties}>
                       <div className="df-timeline-3day-top">
@@ -7008,9 +7666,10 @@ function App() {
                                 const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                                 const isHour = minutes % 60 === 0;
                                 const isMajor = minutes % (6 * 60) === 0;
+                                const label = continuousTimelineEnabled ? dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour }) : hourLabel(minutes);
                                 return (
                                   <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}>
-                                    {isHour ? <span>{hourLabel(minutes)}</span> : null}
+                                    {isHour ? <span>{label}</span> : null}
                                   </div>
                                 );
                               })}
@@ -7022,7 +7681,7 @@ function App() {
                               const gridEl = colsContainerRef.current;
                               const scrollEl = timelineRef.current;
                               if (gridEl && scrollEl) {
-                                const target = getDropTargetFromPointer({
+                                const target = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : getDropTargetFromPointer({
                                   clientX: event.clientX, clientY: event.clientY,
                                   gridElement: gridEl,
                                   scrollElement: scrollEl,
@@ -7041,7 +7700,7 @@ function App() {
                                 const gridEl = colsContainerRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (gridEl && scrollEl) {
-                                  const target = getDropTargetFromPointer({
+                                  const target = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : getDropTargetFromPointer({
                                     clientX: event.clientX, clientY: event.clientY,
                                     gridElement: gridEl,
                                     scrollElement: scrollEl,
@@ -7078,7 +7737,7 @@ function App() {
                                 const gridEl = timeGridRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (!gridEl || !scrollEl) return;
-                                const startTarget = pointerToDateTime({
+                                const startTarget = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : pointerToDateTime({
                                   clientX: event.clientX, clientY: event.clientY,
                                   gridElement: gridEl, scrollElement: scrollEl,
                                   visibleDays: threeDates,
@@ -7090,11 +7749,12 @@ function App() {
                                 const moveHandler = (moveEvent: MouseEvent) => {
                                   if (Math.abs(moveEvent.clientY - event.clientY) < 6) return;
                                   hasMoved = true;
-                                  const currentTarget = pointerToDateTime({
+                                  const currentTarget = continuousTimelineEnabled ? continuousPointerTarget(moveEvent.clientX, moveEvent.clientY, gridEl) : pointerToDateTime({
                                     clientX: moveEvent.clientX, clientY: moveEvent.clientY,
                                     gridElement: gridEl, scrollElement: scrollEl,
                                     visibleDays: threeDates,
                                   });
+                                  if (currentTarget.date !== startTarget.date) return;
                                   let s = startMinutes, e = currentTarget.minutes;
                                   if (s > e) { const t = s; s = e; e = t; }
                                   s = Math.max(s, TIMELINE_START * 60);
@@ -7103,8 +7763,8 @@ function App() {
                                   const gridRect = gridEl.getBoundingClientRect();
                                   const cw = gridRect.width / threeDates.length;
                                   const gut = timelineView === "weekly" ? 5 : 8;
-                                  const startPx = ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-                                  const endPx = ((e - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+                                  const startPx = continuousTimelineEnabled ? continuousTimedTop(startTarget.date, minutesToTime(s)) : ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+                                  const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
                                   setDragCreate({
                                     date: startTarget.date, dayIndex: startDayIndex,
                                     startMinutes: s, endMinutes: e,
@@ -7144,7 +7804,7 @@ function App() {
                                 const gridEl = timeGridRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (!gridEl || !scrollEl) return;
-                                const target = pointerToDateTime({
+                                const target = continuousTimelineEnabled ? continuousPointerTarget(event.clientX, event.clientY, gridEl) : pointerToDateTime({
                                   clientX: event.clientX,
                                   clientY: event.clientY,
                                   gridElement: gridEl,
@@ -7174,7 +7834,6 @@ function App() {
                                   top: event.clientY,
                                   left: popLeft,
                                   width: popWidth,
-                                  lastProjectId: lastQuickAddProjectIdRef.current || undefined,
                                 });
                               }}
                             >
@@ -7207,7 +7866,8 @@ function App() {
                               {/* Layer 3: Event blocks — absolutely positioned on the time-grid */}
                               <div className="df-event-blocks-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
                                 {multiColWidth > 0 && multiDayScheduledTasks.map((task) => {
-                                  const dayIndex = threeDates.indexOf(task.scheduledDate || "");
+                                  const dayOffset = continuousDateOffset(task.scheduledDate || "");
+                                  const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(task.scheduledDate || "");
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   const gap = timelineView === "weekly" ? 3 : 4;
@@ -7229,7 +7889,7 @@ function App() {
                                     }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
                                     }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)}
-                                      extraStyle={{ position: "absolute", left, width, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
+                                      extraStyle={{ position: "absolute", left, width, top: continuousTimelineEnabled ? continuousTimedTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00") : undefined, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                                       onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       viewMode={timelineView}
@@ -7242,18 +7902,20 @@ function App() {
                                 {/* Preview block during drag */}
                                 {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && (() => {
                                   const tgtDate = dragTargetDateRef.current || threeDates[0];
-                                  const dayIndex = threeDates.indexOf(tgtDate);
+                                  const dayOffset = continuousDateOffset(tgtDate);
+                                  const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(tgtDate);
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
                                     <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
-                                      extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2 }}
+                                      extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, top: continuousTimelineEnabled ? continuousTimedTop(tgtDate, hoverSlot) : undefined }}
                                       dayStartHour={dayStartHour}
                                     />
                                   );
                                 })()}
                                 {multiColWidth > 0 && placementPreviewTask && placementPreview && (() => {
-                                  const dayIndex = threeDates.indexOf(placementPreview.date);
+                                  const dayOffset = continuousDateOffset(placementPreview.date);
+                                  const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(placementPreview.date);
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
@@ -7265,6 +7927,7 @@ function App() {
                                         position: "absolute",
                                         left: dayIndex * multiColWidth + gutter,
                                         width: multiColWidth - gutter * 2,
+                                        top: continuousTimelineEnabled ? continuousTimedTop(placementPreview.date, placementPreview.startTime) : undefined,
                                         ["--df-preview" as any]: "1",
                                       } as CSSProperties}
                                       dayStartHour={dayStartHour}
@@ -7273,9 +7936,17 @@ function App() {
                                 })()}
                                 {/* Now line — only in today's column in multi-day view */}
                                 {(() => {
-                                  const todayIdx = threeDates.indexOf(today);
-                                  if (todayIdx === -1 || multiColWidth <= 0) return null;
-                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth }} lang={lang} />;
+                                  // Render the now-line whenever today is inside the visible
+                                  // date range, regardless of whether infinite cross-day
+                                  // scrolling is enabled. In continuous mode the range is the
+                                  // 7-day vertical canvas; in non-continuous mode it is the
+                                  // 3-day/week window derived from `threeDates`.
+                                  if (!continuousTimelineDates.includes(today) || multiColWidth <= 0) return null;
+                                  const todayOffset = continuousDateOffset(today);
+                                  const todayIdx = continuousTimelineEnabled ? ((todayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(today);
+                                  if (todayIdx === -1) return null;
+                                  const now = new Date();
+                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth, top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} lang={lang} dayStartHour={dayStartHour} />;
                                 })()}
                                 {/* Empty state */}
                                 {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
@@ -7468,14 +8139,20 @@ function App() {
                   );
                 })() : (
                   <div className="df-timeline-daily">
-                    <div className={`df-date-title df-date-title-compact${timelineDate === today ? " today" : ""}`}>
-                      <span className="df-date-num">{(() => { const d = new Date(`${timelineDate}T00:00:00`); return d.getDate(); })()}</span>
+                    <div className={`df-date-title df-date-title-compact${timelineWindowAnchorDate === today ? " today" : ""}`}>
+                      <span className="df-date-num">{(() => { const d = new Date(`${timelineWindowAnchorDate}T00:00:00`); return d.getDate(); })()}</span>
                       <span className="df-date-sep"></span>
-                      <span className="df-date-wd">{(() => { const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const d = new Date(`${timelineDate}T00:00:00`); return weekdayShort[d.getDay()]; })()}</span>
+                      <span className="df-date-wd">
+                        {(() => {
+                          const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                          const d = new Date(`${timelineWindowAnchorDate}T00:00:00`);
+                          return weekdayShort[d.getDay()];
+                        })()}
+                      </span>
                     </div>
                     <div
-                      className={`df-timeline-allday${allDayDragDate === timelineDate && drag ? " drag-over" : ""}`}
-                      data-all-day-date={timelineDate}
+                      className={`df-timeline-allday${allDayDragDate === timelineWindowAnchorDate && drag ? " drag-over" : ""}`}
+                      data-all-day-date={timelineWindowAnchorDate}
                       onDragEnter={(e) => { e.preventDefault(); setAllDayDragOver(true); }}
                       onDragOver={(e) => { e.preventDefault(); if (!allDayDragOver) setAllDayDragOver(true); }}
                       onDragLeave={(e) => {
@@ -7490,7 +8167,7 @@ function App() {
                         setAllDayDragOver(false);
                         setAllDayDragDate("");
                         const taskId = e.dataTransfer.getData("taskId") || drag?.taskId;
-                        if (taskId) makeAllDay(taskId, timelineDate);
+                        if (taskId) makeAllDay(taskId, timelineWindowAnchorDate);
                       }}
                     >
                       <span className="df-timeline-allday-label">{t(lang, "timeline.allDay")}</span>
@@ -7500,19 +8177,26 @@ function App() {
                           if ((event.target as HTMLElement).closest(".df-all-day-block,.df-all-day-quick")) return;
                           const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
                           const gutter = 6;
-                          setAllDayQuickAdd({ date: timelineDate, left: rect.left + gutter, top: rect.top + 4, width: rect.width - gutter * 2, dayIndex: 0 });
+                          setAllDayQuickAdd({ date: timelineWindowAnchorDate, left: rect.left + gutter, top: rect.top + 4, width: rect.width - gutter * 2, dayIndex: 0 });
                         }}
                       >
                         {allDayQuickAdd && !drag && (
                           <AllDayQuickAddPopover add={allDayQuickAdd} projects={projects} onSave={(title) => createAllDayTask(title, allDayQuickAdd.date, null)} onCancel={() => setAllDayQuickAdd(null)} />
                         )}
-                        {allDayDragDate === timelineDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
-                        {[...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineDate), ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineDate)].map((task) => (
+                        {allDayDragDate === timelineWindowAnchorDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
+                        {[
+                          ...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineWindowAnchorDate),
+                          ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineWindowAnchorDate),
+                        ].map((task) => (
                           <AllDayBlock key={task.id} task={task} dragging={drag?.source === "allDay" && drag.taskId === task.id} projectName={projectName(task)} projects={projects} onEdit={() => { if (!suppressBlockClickRef.current) openTaskEdit(task); }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />
                         ))}
                       </div>
                     </div>
-                    <div className="df-timeline-scroll" ref={timelineRef} onDragOver={(event) => {
+                    <TimelineCanvas
+                      scrollRef={timelineRef}
+                      canvasRef={timelineCanvasRef}
+                      height={dailyTimelineCanvasHeight}
+                      onScrollDragOver={(event) => {
                       event.preventDefault();
                       const gridEl = timelineCanvasRef.current;
                       const scrollEl = timelineRef.current;
@@ -7525,10 +8209,11 @@ function App() {
                           startHour: dayStartHour,
                           debugLabel: "drag-daily",
                         });
-                        dragTargetDateRef.current = target.date;
-                        setHoverSlot(target.startTime);
+                        const dailyTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : target;
+                        dragTargetDateRef.current = dailyTarget.date;
+                        setHoverSlot(dailyTarget.startTime);
                       }
-                    }} onDrop={(event) => {
+                    }} onScrollDrop={(event) => {
                       event.preventDefault();
                       const taskId = event.dataTransfer.getData("taskId") || drag?.taskId;
                       if (taskId) {
@@ -7542,15 +8227,15 @@ function App() {
                             visibleDays: [timelineDate],
                             startHour: dayStartHour,
                           });
-                          dragTargetDateRef.current = target.date;
-                          scheduleTask(taskId, target.startTime);
+                          const dailyTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : target;
+                          dragTargetDateRef.current = dailyTarget.date;
+                          scheduleTask(taskId, dailyTarget.startTime);
                         } else {
                           scheduleTask(taskId, hoverSlot || slotFromPointer(event.clientY, 0, event.clientX));
                         }
                       }
-                    }} onDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}>
-                      <div ref={timelineCanvasRef} className="df-timeline-canvas" style={{ height: `${((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT}px` }}
-                        onMouseDown={(event) => {
+                    }} onScrollDragLeave={() => { setHoverSlot(""); dragTargetDateRef.current = ""; }}
+                      onCanvasMouseDown={(event) => {
                           if (drag || resizePreview || autoScheduleState === "generating") return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
                           if ((event.target as HTMLElement).closest(".df-all-day-block,.df-all-day-quick")) return;
@@ -7563,7 +8248,9 @@ function App() {
                             visibleDays: [timelineDate],
                             startHour: dayStartHour,
                           });
-                          const startMinutes = startTarget.minutes;
+                          const dailyStartTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : startTarget;
+                          const startMinutes = dailyStartTarget.minutes;
+                          const startDate = dailyStartTarget.date;
                           const snap = SLOT_MINUTES;
                           let hasMoved = false;
                           const moveHandler = (moveEvent: MouseEvent) => {
@@ -7575,17 +8262,19 @@ function App() {
                               visibleDays: [timelineDate],
                               startHour: dayStartHour,
                             });
-                            let s = startMinutes, e = currentTarget.minutes;
+                            const dailyCurrentTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(moveEvent.clientY) : currentTarget;
+                            if (dailyCurrentTarget.date !== startDate) return;
+                            let s = startMinutes, e = dailyCurrentTarget.minutes;
                             if (s > e) { const t = s; s = e; e = t; }
                             s = Math.max(s, TIMELINE_START * 60);
                             e = Math.min(e, TIMELINE_END * 60 - SLOT_MINUTES);
                             if (e - s < SLOT_MINUTES * 2) e = s + SLOT_MINUTES * 2;
                             const gridRect = gridEl.getBoundingClientRect();
-                            const startPx = ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-                            const endPx = ((e - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+                            const startPx = continuousTimedTop(startDate, minutesToTime(s));
+                            const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
                             const gut = 8;
                             setDragCreate({
-                              date: timelineDate, dayIndex: 0,
+                              date: startDate, dayIndex: 0,
                               startMinutes: s, endMinutes: e,
                               top: startPx, height: endPx - startPx,
                               left: gut, width: gridRect.width - gut * 2,
@@ -7614,13 +8303,14 @@ function App() {
                           window.addEventListener("mouseup", upHandler);
                           window.addEventListener("keydown", keyHandler);
                         }}
-                        onClick={(event) => {
+                        onCanvasClick={(event) => {
                           if (dragCreateSuppressClickRef.current) { dragCreateSuppressClickRef.current = false; return; }
                           if (suppressBlockClickRef.current) return;
                           if (drag || resizePreview) return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
                           if (floatingTimeAdd) { setFloatingTimeAdd(null); return; }
                           const startTime = slotFromPointer(event.clientY, 0, event.clientX);
+                          const target = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : { date: timelineDate };
                           const endTime = addMinutes(startTime, 30);
                           const maxEnd = minutesToTime(TIMELINE_END * 60);
                           const clampedEnd = timeToMinutes(endTime) > TIMELINE_END * 60 ? maxEnd : endTime;
@@ -7628,29 +8318,36 @@ function App() {
                           const colLeft = canvasRect ? canvasRect.left + 8 : event.clientX;
                           const colWidth = canvasRect ? canvasRect.width - 16 : 300;
                           setFloatingTimeAdd({
-                            date: timelineDate,
+                            date: target.date,
                             startTime,
                             endTime: clampedEnd,
                             top: event.clientY,
                             left: colLeft,
                             width: colWidth,
-                            lastProjectId: lastQuickAddProjectIdRef.current || undefined,
                           });
-                        }}>
-                        {Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1 }).map((_, index) => {
+                        }}
+                    >
+                        {Array.from({ length: dailyTimelineSlotCount }).map((_, index) => {
                           const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                           const isHour = minutes % 60 === 0;
                           const isMajor = minutes % (6 * 60) === 0;
-                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{isHour ? hourLabel(minutes) : ""}</span></div>;
+                          const label = dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour });
+                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{label}</span></div>;
                         })}
-                        {isViewingToday && <NowLine lang={lang} dayStartHour={dayStartHour} />}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} />}
-                        {placementPreviewTask && placementPreview && placementPreview.date === timelineDate && (
+                        {/* Now line — renders whenever today is inside the visible date range.
+                            In non-continuous daily mode the range is [timelineDate], so this
+                            evaluates to true only when viewing today. In continuous mode the
+                            range is the 7-day vertical canvas. Position uses `dayStartHour`
+                            in non-continuous mode (via NowLine's internal timeBlockTop) and
+                            the continuous absolute coordinate in continuous mode. */}
+                        {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
                             startTime={placementPreview.startTime}
                             duration={placementPreview.durationMinutes}
-                            extraStyle={{ ["--df-preview" as any]: "1" } as CSSProperties}
+                            extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(placementPreview.date, placementPreview.startTime) : undefined, ["--df-preview" as any]: "1" } as CSSProperties}
                             dayStartHour={dayStartHour}
                           />
                         )}
@@ -7666,7 +8363,8 @@ function App() {
                           const cs = innerW > 0 ? computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap, "daily") : null;
                           const left = cs ? cs.left : baseLeft;
                           const width = cs ? cs.width : innerW;
-                          const extraStyle: CSSProperties | undefined = innerW > 0 ? { left, width } : undefined;
+                          const top = continuousTimedTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00");
+                          const extraStyle: CSSProperties | undefined = innerW > 0 ? { left, width, top } : { top };
 
                           const isPreview = previewIdByClonedId.has(task.id);
                           return (
@@ -7716,8 +8414,7 @@ function App() {
                             )}
                           </div>
                         )}
-                      </div>
-                    </div>
+                    </TimelineCanvas>
                   </div>
                 )}
               </div>
@@ -7732,10 +8429,10 @@ function App() {
             </div>
             </>}
           </section>
-        </main>
+        </ExecutionSplitLayout>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} />
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} featureMetrics={settings.featureMetricsEnabled !== false} dayStartTime={settings.dayStartTime} metricsRangePreset={settings.metricsRangePreset} metricsGroupBy={settings.metricsGroupBy} metricsDisplayMetric={settings.metricsDisplayMetric} metricsIncludeHabits={settings.metricsIncludeHabits} metricsCompletionFilter={settings.metricsCompletionFilter} metricsCustomStart={settings.metricsCustomStart} metricsCustomEnd={settings.metricsCustomEnd} onMetricsSettingsChange={(patch) => void saveSettings(patch)} />
         </Suspense>
       )}
 
@@ -7758,8 +8455,8 @@ function App() {
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} />}
-      {habitPanel && data && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => { setUtilityPanel(null); setScheduleTemplateOpen(true); }} />}
+      {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
       {focusOverlayMode && (
         <div className="df-focus-overlay" style={focusProject?.color ? { ["--focus-accent" as string]: focusProject.color } as React.CSSProperties : undefined}>
           <div className="df-focus-topbar">
@@ -7915,6 +8612,13 @@ function FloatingShelfDragPreview({ task, pointer, candidateTarget, lang }: { ta
   return <div className={`df-floating-unschedule df-floating-shelf-drag${candidateTarget ? " candidate-target" : ""}`} style={{ left: pointer.x + 14, top: pointer.y + 14 }}><strong>{task.title}</strong><span>{hint}</span></div>;
 }
 
+// Visual parity debug switch. When true, the template modal body renders
+// placeholder content using the execution page's EXACT wrapper hierarchy
+// (df-timeline-panel > df-timeline-body > df-timeline-content > df-timeline-daily
+// > df-date-title + TimelineCanvas). If the debug layout still differs from the
+// execution page, the problem is the modal frame, not the template data.
+const TEMPLATE_VISUAL_PARITY_DEBUG = false;
+
 function ScheduleTemplateModal({
   lang,
   date,
@@ -7932,135 +8636,270 @@ function ScheduleTemplateModal({
   onApply: (slots: ScheduleTemplateApplySlot[], conflictCount: number) => void;
   onClose: () => void;
 }) {
+  // Template mode = execution-page interaction model applied to date-less
+  // template periods. Left list visually corresponds to 今日候选; right
+  // timeline editor visually corresponds to the execution timeline. Periods
+  // store only { title, startMinutes, durationMinutes } and never pollute the
+  // real task store until Apply.
   type TemplateKey = `builtin:${BuiltInScheduleTemplateId}` | `custom:${string}` | "draft:new";
+  type TemplatePeriod = { id: string; title: string; startMinutes: number; durationMinutes: number };
+  // Adapter isolates template-period data from the real task store. The
+  // template timeline operates purely on TemplatePeriod drafts via this
+  // interface; real scheduled tasks are only created on Apply.
+  type TimelineAdapter<T> = {
+    getId: (item: T) => string;
+    getTitle: (item: T) => string;
+    getStartMinutes: (item: T) => number;
+    getDurationMinutes: (item: T) => number;
+    createAt: (startMinutes: number) => void;
+    updateTime: (id: string, startMinutes: number, durationMinutes: number) => void;
+    updateTitle: (id: string, title: string) => void;
+    delete: (id: string) => void;
+  };
+  // NOTE: `zh` must be declared before any useState that calls helpers (e.g.
+  // makeBuiltInPeriods → slotToPeriod) which reference `zh`. Declaring it
+  // after the useState lines triggers a Temporal Dead Zone ReferenceError
+  // because the useState initializer runs during mount, before `zh` is
+  // initialized.
+  const zh = lang === "zh";
   const [templateKey, setTemplateKey] = useState<TemplateKey>("builtin:school");
   const [templateName, setTemplateName] = useState("");
-  const [slots, setSlots] = useState<ScheduleTemplateDraftSlot[]>(() => makeBuiltInDraft("school"));
+  const [periods, setPeriods] = useState<TemplatePeriod[]>(() => makeBuiltInPeriods("school"));
   const [templateNotice, setTemplateNotice] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [dragState, setDragState] = useState<{ periodId: string; mode: "move" | "resize-top" | "resize-bottom"; originY: number; originStart: number; originDuration: number } | null>(null);
+  const [creatingState, setCreatingState] = useState<{ startMinutes: number; currentMinutes: number } | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const zh = lang === "zh";
+  const timelineRef = useRef<HTMLDivElement>(null);
+
+  // ── Template list drag-to-reorder ──
+  // Reuses the shared usePointerReorder hook, which mirrors Today's Candidate
+  // drag feel (pointer capture, 5px threshold, half-height before/after,
+  // is-dragging-source placeholder, .df-list-insertion-line indicator).
+  // Only custom templates are draggable; built-ins are read-only/fixed and the
+  // "+ new template" affordance is a separate button. Custom order persists
+  // via onSaveCustomTemplates (the prop drives display order, so no local
+  // order state is needed).
+  const templateReorder = usePointerReorder<ListRow>({
+    getId: (row) => row.kind === "builtin" ? `builtin:${row.id}` : row.kind === "custom" ? `custom:${row.id}` : "draft:new",
+    selector: "[data-template-row-key]",
+    attrName: "templateRowKey",
+    onReorder: (dragKey, targetKey, position) => {
+      if (!dragKey.startsWith("custom:") || !targetKey.startsWith("custom:")) return;
+      const dragId = dragKey.replace("custom:", "");
+      const targetId = targetKey.replace("custom:", "");
+      const dragged = customTemplates.find((t) => t.id === dragId);
+      if (!dragged) return;
+      const without = customTemplates.filter((t) => t.id !== dragId);
+      const idx = without.findIndex((t) => t.id === targetId);
+      if (idx < 0) return;
+      without.splice(position === "before" ? idx : idx + 1, 0, dragged);
+      onSaveCustomTemplates(without);
+    },
+  });
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        if (dragState || creatingState || renamingId || editingPeriodId) {
+          setDragState(null);
+          setCreatingState(null);
+          setRenamingId(null);
+          setEditingPeriodId(null);
+        } else if (templateReorder.drag) {
+          templateReorder.cancelDrag();
+        } else {
+          onClose();
+        }
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, dragState, creatingState, renamingId, editingPeriodId, templateReorder.drag, templateReorder.cancelDrag]);
 
-  function makeBuiltInDraft(id: BuiltInScheduleTemplateId) {
-    return SCHEDULE_TEMPLATES[id].slots.map((slot) => ({
-      ...slot,
-      selected: false,
-      title: "",
-    }));
+  // ── Period factory helpers ──
+  function slotToPeriod(slot: BuiltInScheduleTemplateSlot): TemplatePeriod {
+    const startMinutes = timeToMinutes(slot.start);
+    const endMinutes = timeToMinutes(slot.end);
+    return {
+      id: slot.id || uid("period"),
+      title: zh ? slot.labelZh : slot.labelEn,
+      startMinutes,
+      durationMinutes: Math.max(SLOT_MINUTES, endMinutes - startMinutes),
+    };
   }
 
-  function makeCustomDraft(template: ScheduleTemplate) {
+  function makeBuiltInPeriods(id: BuiltInScheduleTemplateId): TemplatePeriod[] {
+    return SCHEDULE_TEMPLATES[id].slots.map(slotToPeriod);
+  }
+
+  function makeCustomPeriods(template: ScheduleTemplate): TemplatePeriod[] {
     return template.slots.map((slot, index) => ({
-      id: slot.id || uid("slot"),
-      labelZh: slot.label || `第 ${index + 1} 段`,
-      labelEn: slot.label || `Period ${index + 1}`,
-      start: slot.start || "09:00",
-      end: slot.end || "10:00",
-      titleZh: "填写任务目标",
-      titleEn: "Goal for this block",
-      selected: false,
-      title: "",
+      id: slot.id || uid("period"),
+      title: slot.label || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
+      startMinutes: timeToMinutes(slot.start || "09:00"),
+      durationMinutes: Math.max(SLOT_MINUTES, timeToMinutes(slot.end || "10:00") - timeToMinutes(slot.start || "09:00")),
     }));
   }
 
-  function makeBlankCustomDraft() {
+  function makeBlankPeriods(): TemplatePeriod[] {
     return [
-      {
-        id: uid("slot"),
-        labelZh: zh ? "第一段" : "Period 1",
-        labelEn: zh ? "第一段" : "Period 1",
-        start: "09:00",
-        end: "10:00",
-        titleZh: "填写任务目标",
-        titleEn: "Goal for this block",
-        selected: false,
-        title: "",
-      },
-      {
-        id: uid("slot"),
-        labelZh: zh ? "第二段" : "Period 2",
-        labelEn: zh ? "第二段" : "Period 2",
-        start: "10:15",
-        end: "11:15",
-        titleZh: "填写任务目标",
-        titleEn: "Goal for this block",
-        selected: false,
-        title: "",
-      },
+      { id: uid("period"), title: zh ? "第一段" : "Period 1", startMinutes: 9 * 60, durationMinutes: 60 },
+      { id: uid("period"), title: zh ? "第二段" : "Period 2", startMinutes: 10 * 60 + 15, durationMinutes: 60 },
     ];
   }
 
   function changeTemplate(key: TemplateKey) {
     setTemplateKey(key);
     setTemplateNotice("");
+    setRenamingId(null);
+    setEditingPeriodId(null);
     if (key.startsWith("builtin:")) {
       const id = key.replace("builtin:", "") as BuiltInScheduleTemplateId;
       setTemplateName("");
-      setSlots(makeBuiltInDraft(id));
+      setPeriods(makeBuiltInPeriods(id));
+      return;
+    }
+    if (key === "draft:new") {
+      setTemplateName("");
+      setPeriods(makeBlankPeriods());
       return;
     }
     const id = key.replace("custom:", "");
     const template = customTemplates.find((item) => item.id === id);
     if (!template) return;
     setTemplateName(template.title);
-    setSlots(makeCustomDraft(template));
+    setPeriods(makeCustomPeriods(template));
   }
 
-  function updateSlot(slotId: string, patch: Partial<ScheduleTemplateDraftSlot>) {
-    setSlots((current) => current.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+  // ── Period editing ──
+  function updatePeriod(periodId: string, patch: Partial<TemplatePeriod>) {
+    setPeriods((current) => current.map((p) => p.id === periodId ? { ...p, ...patch } : p));
     setTemplateNotice("");
   }
 
-  function addSlot() {
-    setSlots((current) => {
-      const last = current[current.length - 1];
-      const start = last?.end && validTime(last.end) ? last.end : "09:00";
-      const end = addMinutes(start, 45);
-      const index = current.length + 1;
-      return [...current, {
-        id: `custom-${Date.now().toString(36)}-${index}`,
-        labelZh: `第 ${index} 段`,
-        labelEn: `Period ${index}`,
-        start,
-        end,
-        titleZh: "填写任务目标",
-        titleEn: "Goal for this block",
-        selected: true,
-        title: "",
-      }];
-    });
-  }
-
-  function removeSlot(slotId: string) {
-    setSlots((current) => current.filter((slot) => slot.id !== slotId));
+  function removePeriod(periodId: string) {
+    setPeriods((current) => current.filter((p) => p.id !== periodId));
+    setEditingPeriodId(null);
     setTemplateNotice("");
   }
 
+  // ── Timeline pointer interactions ──
+  const TIMELINE_TOTAL_MINUTES = 24 * 60;
+  const TIMELINE_TOTAL_SLOTS = TIMELINE_TOTAL_MINUTES / SLOT_MINUTES;
+  const TIMELINE_HEIGHT = TIMELINE_TOTAL_SLOTS * SLOT_HEIGHT;
+
+  function pointerToMinutes(clientY: number): number {
+    const el = timelineRef.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    const raw = ((clientY - rect.top) / rect.height) * TIMELINE_TOTAL_MINUTES;
+    const snapped = Math.round(raw / SLOT_MINUTES) * SLOT_MINUTES;
+    return Math.max(0, Math.min(TIMELINE_TOTAL_MINUTES - SLOT_MINUTES, snapped));
+  }
+
+  // Adapter over TemplatePeriod drafts — isolates template data from the real
+  // task store. The template timeline operates purely through this interface;
+  // real scheduled tasks are only created on Apply.
+  const templatePeriodAdapter: TimelineAdapter<TemplatePeriod> = {
+    getId: (p) => p.id,
+    getTitle: (p) => p.title,
+    getStartMinutes: (p) => p.startMinutes,
+    getDurationMinutes: (p) => p.durationMinutes,
+    createAt: (startMinutes) => {
+      const id = uid("period");
+      setPeriods((prev) => [...prev, { id, title: "", startMinutes, durationMinutes: SLOT_MINUTES * 2 }]);
+      setEditingPeriodId(id);
+      setEditingTitle("");
+    },
+    updateTime: (id, startMinutes, durationMinutes) => {
+      setPeriods((prev) => prev.map((p) => (p.id === id ? { ...p, startMinutes, durationMinutes } : p)));
+    },
+    updateTitle: (id, title) => {
+      setPeriods((prev) => prev.map((p) => (p.id === id ? { ...p, title } : p)));
+    },
+    delete: (id) => removePeriod(id),
+  };
+
+  function handleTimelinePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("[data-template-period]")) return;
+    const startMinutes = pointerToMinutes(event.clientY);
+    setCreatingState({ startMinutes, currentMinutes: startMinutes + SLOT_MINUTES });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function handleTimelinePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (creatingState) {
+      const current = pointerToMinutes(event.clientY);
+      setCreatingState((prev) => prev ? { ...prev, currentMinutes: Math.max(current, prev.startMinutes + SLOT_MINUTES) } : prev);
+      return;
+    }
+    if (!dragState) return;
+    const el = timelineRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const deltaMinutes = Math.round(((event.clientY - dragState.originY) / rect.height) * TIMELINE_TOTAL_MINUTES / SLOT_MINUTES) * SLOT_MINUTES;
+    if (dragState.mode === "move") {
+      const nextStart = Math.max(0, Math.min(TIMELINE_TOTAL_MINUTES - dragState.originDuration, dragState.originStart + deltaMinutes));
+      updatePeriod(dragState.periodId, { startMinutes: nextStart });
+    } else if (dragState.mode === "resize-top") {
+      const maxStart = dragState.originStart + dragState.originDuration - SLOT_MINUTES;
+      const nextStart = Math.max(0, Math.min(maxStart, dragState.originStart + deltaMinutes));
+      const nextDuration = dragState.originDuration - (nextStart - dragState.originStart);
+      updatePeriod(dragState.periodId, { startMinutes: nextStart, durationMinutes: nextDuration });
+    } else if (dragState.mode === "resize-bottom") {
+      const nextDuration = Math.max(SLOT_MINUTES, dragState.originDuration + deltaMinutes);
+      const cappedDuration = Math.min(nextDuration, TIMELINE_TOTAL_MINUTES - dragState.originStart);
+      updatePeriod(dragState.periodId, { durationMinutes: cappedDuration });
+    }
+  }
+
+  function handleTimelinePointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (creatingState) {
+      const start = creatingState.startMinutes;
+      const end = creatingState.currentMinutes;
+      if (end > start) {
+        const newPeriod: TemplatePeriod = {
+          id: uid("period"),
+          title: zh ? "新时间段" : "New period",
+          startMinutes: start,
+          durationMinutes: end - start,
+        };
+        setPeriods((current) => [...current, newPeriod]);
+        setEditingPeriodId(newPeriod.id);
+        setEditingTitle(newPeriod.title);
+      }
+      setCreatingState(null);
+    }
+    if (dragState) setDragState(null);
+    try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* ignore */ }
+  }
+
+  function beginPeriodDrag(event: React.PointerEvent<HTMLElement>, period: TemplatePeriod, mode: "move" | "resize-top" | "resize-bottom") {
+    event.stopPropagation();
+    setDragState({ periodId: period.id, mode, originY: event.clientY, originStart: period.startMinutes, originDuration: period.durationMinutes });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  // ── Save / delete / duplicate / rename ──
   function currentTemplateTitle() {
     return templateName.trim();
   }
 
-  function slotLabel(slot: ScheduleTemplateDraftSlot) {
-    return (zh ? slot.labelZh : slot.labelEn).trim() || (zh ? "时间段" : "Period");
-  }
-
   function templateSlotsForSave() {
-    return slots
-      .filter((slot) => validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
-      .map((slot, index) => ({
-        id: slot.id || uid("slot"),
-        label: slotLabel(slot) || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
-        start: slot.start,
-        end: slot.end,
+    return periods
+      .filter((p) => p.durationMinutes >= SLOT_MINUTES && p.startMinutes + p.durationMinutes <= TIMELINE_TOTAL_MINUTES)
+      .map((p, index) => ({
+        id: p.id,
+        label: p.title.trim() || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
+        start: minutesToTime(p.startMinutes),
+        end: minutesToTime(p.startMinutes + p.durationMinutes),
       }));
   }
 
@@ -8101,13 +8940,26 @@ function ScheduleTemplateModal({
   function createCustomTemplate() {
     setTemplateKey("draft:new");
     setTemplateName("");
-    setSlots(makeBlankCustomDraft());
+    setPeriods(makeBlankPeriods());
     setTemplateNotice(zh ? "正在编辑新模板：先填写模板名称，再保存到自定义模板列表。" : "Editing a new template: name it before saving to Custom templates.");
   }
 
-  function deleteCustomTemplate() {
-    if (!templateKey.startsWith("custom:")) return;
-    deleteCustomTemplateById(templateKey.replace("custom:", ""));
+  function duplicateCustomTemplate(id: string) {
+    const template = customTemplates.find((item) => item.id === id);
+    if (!template) return;
+    const nowIso = new Date().toISOString();
+    const created: ScheduleTemplate = {
+      id: uid("template"),
+      title: template.title + (zh ? " 副本" : " copy"),
+      slots: template.slots.map((slot) => ({ ...slot, id: uid("slot") })),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    onSaveCustomTemplates([...customTemplates, created]);
+    setTemplateKey(`custom:${created.id}`);
+    setTemplateName(created.title);
+    setPeriods(makeCustomPeriods(created));
+    setTemplateNotice(zh ? "已复制模板。" : "Template duplicated.");
   }
 
   function deleteCustomTemplateById(id: string) {
@@ -8115,15 +8967,37 @@ function ScheduleTemplateModal({
     if (!template) return;
     const ok = window.confirm(zh ? `删除“${template.title}”？已生成的任务不会受影响。` : `Delete "${template.title}"? Existing tasks will not be changed.`);
     if (!ok) return;
-    onSaveCustomTemplates(customTemplates.filter((template) => template.id !== id));
+    onSaveCustomTemplates(customTemplates.filter((t) => t.id !== id));
     if (templateKey === `custom:${id}`) {
       setTemplateKey("builtin:school");
       setTemplateName("");
-      setSlots(makeBuiltInDraft("school"));
+      setPeriods(makeBuiltInPeriods("school"));
     }
     setTemplateNotice(zh ? "模板已删除。" : "Template deleted.");
   }
 
+  function startRename(template: ScheduleTemplate) {
+    setRenamingId(template.id);
+    setRenameDraft(template.title);
+  }
+
+  function commitRename() {
+    if (!renamingId) return;
+    const nextTitle = renameDraft.trim();
+    if (!nextTitle) { setRenamingId(null); return; }
+    const nowIso = new Date().toISOString();
+    onSaveCustomTemplates(customTemplates.map((t) => t.id === renamingId ? { ...t, title: nextTitle, updatedAt: nowIso } : t));
+    if (templateKey === `custom:${renamingId}`) setTemplateName(nextTitle);
+    setRenamingId(null);
+  }
+
+  function commitPeriodTitle(periodId: string) {
+    const trimmed = editingTitle.trim();
+    if (trimmed) updatePeriod(periodId, { title: trimmed });
+    setEditingPeriodId(null);
+  }
+
+  // ── Conflict detection (existing schedule on `date`) ──
   const existingIntervals = useMemo(() => {
     const intervals: Array<{ start: number; end: number }> = [];
     for (const task of tasks) {
@@ -8138,25 +9012,58 @@ function ScheduleTemplateModal({
     return intervals;
   }, [date, tasks]);
 
-  const applySlots = slots
-    .filter((slot) => slot.selected && validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start))
-    .map((slot) => ({ title: slot.title.trim() || slotLabel(slot), start: slot.start, end: slot.end }));
-  const invalidCount = slots.filter((slot) => slot.selected && (!validTime(slot.start) || !validTime(slot.end) || timeToMinutes(slot.end) <= timeToMinutes(slot.start))).length;
-  const conflictCount = applySlots.filter((slot) => {
-    const start = timeToMinutes(slot.start);
-    const end = timeToMinutes(slot.end);
+  const validPeriods = periods.filter((p) => p.durationMinutes >= SLOT_MINUTES && p.startMinutes + p.durationMinutes <= TIMELINE_TOTAL_MINUTES);
+  const conflictCount = validPeriods.filter((p) => {
+    const start = p.startMinutes;
+    const end = p.startMinutes + p.durationMinutes;
     return existingIntervals.some((item) => start < item.end && end > item.start);
   }).length;
+  const applySlots: ScheduleTemplateApplySlot[] = validPeriods
+    .filter((p) => !existingIntervals.some((item) => p.startMinutes < item.end && p.startMinutes + p.durationMinutes > item.start))
+    .map((p) => ({
+      title: p.title.trim() || (zh ? "模板时间段" : "Template block"),
+      start: minutesToTime(p.startMinutes),
+      end: minutesToTime(p.startMinutes + p.durationMinutes),
+    }));
+
   const activeBuiltInId = templateKey.startsWith("builtin:") ? templateKey.replace("builtin:", "") as BuiltInScheduleTemplateId : null;
   const activeCustom = templateKey.startsWith("custom:") ? customTemplates.find((item) => item.id === templateKey.replace("custom:", "")) : null;
-  const templateDescription = activeBuiltInId
-    ? (zh ? SCHEDULE_TEMPLATES[activeBuiltInId].descriptionZh : SCHEDULE_TEMPLATES[activeBuiltInId].descriptionEn)
-    : (zh ? "先编辑模板名称和 Period 时间，保存为模板；每天使用时再勾选要添加的 Period 并填写当天目标。" : "Edit the template name and periods, save it, then choose which periods to add and fill daily goals when using it.");
-  const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString(zh ? "zh-CN" : "en-US", {
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  });
+
+  // ── Template list rows (built-in + custom + new) ──
+  type ListRow =
+    | { kind: "builtin"; id: BuiltInScheduleTemplateId; title: string; periodCount: number; span: string }
+    | { kind: "custom"; id: string; title: string; periodCount: number; span: string }
+    | { kind: "draft"; title: string; periodCount: number; span: string };
+
+  // Template list metadata: period count only — no start/end time range,
+  // per spec ("去掉具体起止时间, 保留时间段数量").
+  function rowCount(periodCount: number): string {
+    if (periodCount === 0) return zh ? "无时间段" : "No periods";
+    return `${periodCount} ${zh ? "个时间段" : "blocks"}`;
+  }
+
+  const listRows: ListRow[] = [
+    ...(Object.keys(SCHEDULE_TEMPLATES) as BuiltInScheduleTemplateId[]).map((id) => ({
+      kind: "builtin" as const,
+      id,
+      title: zh ? SCHEDULE_TEMPLATES[id].labelZh : SCHEDULE_TEMPLATES[id].labelEn,
+      periodCount: SCHEDULE_TEMPLATES[id].slots.length,
+      span: rowCount(SCHEDULE_TEMPLATES[id].slots.length),
+    })),
+    ...customTemplates.map((t) => ({
+      kind: "custom" as const,
+      id: t.id,
+      title: t.title,
+      periodCount: t.slots.length,
+      span: rowCount(t.slots.length),
+    })),
+    ...(templateKey === "draft:new" ? [{
+      kind: "draft" as const,
+      title: zh ? "新模板草稿" : "New draft",
+      periodCount: periods.length,
+      span: rowCount(periods.length),
+    }] : []),
+  ];
 
   const portalTarget = document.getElementById("df-portal-target") || document.body;
 
@@ -8169,130 +9076,256 @@ function ScheduleTemplateModal({
         aria-labelledby="df-template-modal-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="df-template-modal-head">
-          <div>
-            <span className="df-template-kicker">{formattedDate}</span>
-            <h2 id="df-template-modal-title" ref={titleRef} tabIndex={-1}>{zh ? "模板模式" : "Template mode"}</h2>
-            <p>{zh ? "选择固定时间节点，勾选要添加的段落，并填写当天任务目标。" : "Pick fixed time blocks, keep the ones you need, and fill in today's goals."}</p>
-          </div>
-          <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
-        </header>
+        <button type="button" className="df-template-close" onClick={onClose} aria-label={zh ? "关闭模板模式" : "Close template mode"}>×</button>
 
-        <div className="df-template-tabs" role="tablist" aria-label={zh ? "日程模板" : "Schedule templates"}>
-          {(Object.keys(SCHEDULE_TEMPLATES) as BuiltInScheduleTemplateId[]).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={templateKey === `builtin:${id}`}
-              className={templateKey === `builtin:${id}` ? "active" : ""}
-              onClick={() => changeTemplate(`builtin:${id}`)}
-            >
-              {zh ? SCHEDULE_TEMPLATES[id].labelZh : SCHEDULE_TEMPLATES[id].labelEn}
-            </button>
-          ))}
-          {customTemplates.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              role="tab"
-              aria-selected={templateKey === `custom:${template.id}`}
-              className={templateKey === `custom:${template.id}` ? "active" : ""}
-              onClick={() => changeTemplate(`custom:${template.id}`)}
-            >
-              {template.title}
-            </button>
-          ))}
-          {templateKey === "draft:new" && <button type="button" role="tab" aria-selected className="active">{zh ? "新模板草稿" : "New draft"}</button>}
-          <button type="button" className="df-template-new-tab" onClick={createCustomTemplate}>{zh ? "新建模板" : "New template"}</button>
-        </div>
-
-        <div className="df-template-note">
-          <span>{templateDescription}</span>
-          <div className="df-template-note-actions">
-            <input className="df-template-name-input" value={templateName} onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }} aria-label={zh ? "模板名称" : "Template name"} placeholder={zh ? "模板名称" : "Template name"} />
-            <button type="button" onClick={() => {
-              if (activeBuiltInId) setSlots(makeBuiltInDraft(activeBuiltInId));
-              else if (activeCustom) setSlots(makeCustomDraft(activeCustom));
-              else setSlots(makeBlankCustomDraft());
-              setTemplateNotice("");
-            }}>{zh ? "恢复当前模板" : "Reset current"}</button>
-            <button type="button" onClick={addSlot}>{zh ? "新增 Period" : "Add period"}</button>
-            <button type="button" onClick={saveCurrentTemplate}>{activeBuiltInId ? (zh ? "保存为模板" : "Save as template") : (zh ? "保存为模板" : "Save as template")}</button>
-            {activeCustom && <button type="button" className="danger" onClick={deleteCustomTemplate}>{zh ? "删除模板" : "Delete"}</button>}
-          </div>
-        </div>
-        {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
-
-        {customTemplates.length > 0 && (
-          <section className="df-template-manager" aria-label={zh ? "自定义模板管理" : "Custom template management"}>
-            <div className="df-template-manager-head">
-              <strong>{zh ? "自定义模板" : "Custom templates"}</strong>
-              <span>{zh ? `${customTemplates.length} 个` : `${customTemplates.length} saved`}</span>
-            </div>
-            <div className="df-template-manager-list">
-              {customTemplates.map((template) => (
-                <div key={template.id} className={`df-template-manager-row${templateKey === `custom:${template.id}` ? " active" : ""}`}>
-                  <button type="button" className="df-template-manager-select" onClick={() => changeTemplate(`custom:${template.id}`)}>
-                    <span>{template.title}</span>
-                    <small>{template.slots.length} {zh ? "个时间段" : "blocks"}</small>
-                  </button>
-                  <button type="button" className="df-template-manager-delete" onClick={() => deleteCustomTemplateById(template.id)}>
-                    {zh ? "删除" : "Delete"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="df-template-use-hint">
-          {zh ? "使用模板时，勾选左侧“加入当天”就会把这个 Period 加入当天时间轴；当天目标可选，不填时会使用 Period 名称。" : "When using a template, check Add today to include that period in today's timeline. The daily goal is optional; the period name is used when it is blank."}
-        </div>
-
-        <div className="df-template-slots">
-          {slots.map((slot) => {
-            const validRange = validTime(slot.start) && validTime(slot.end) && timeToMinutes(slot.end) > timeToMinutes(slot.start);
-            return (
-              <div key={slot.id} className={`df-template-slot${slot.selected ? " selected" : ""}${!validRange ? " invalid" : ""}`}>
-                <label className="df-template-check">
-                  <input type="checkbox" checked={slot.selected} onChange={(event) => updateSlot(slot.id, { selected: event.target.checked })} />
-                  <span>{zh ? "加入当天" : "Add today"}</span>
-                </label>
-                <div className="df-template-slot-meta">
-                  <input className="df-template-label-input" type="text" value={zh ? slot.labelZh : slot.labelEn} onChange={(event) => updateSlot(slot.id, zh ? { labelZh: event.target.value, labelEn: event.target.value } : { labelEn: event.target.value, labelZh: event.target.value })} aria-label={zh ? "节点名称" : "Block label"} />
-                  <div>
-                    <input type="text" inputMode="numeric" maxLength={5} value={slot.start} onFocus={() => updateSlot(slot.id, { selected: true })} onChange={(event) => updateSlot(slot.id, { start: event.target.value, selected: true })} placeholder="HH:MM" aria-label={zh ? `${slot.labelZh}开始时间` : `${slot.labelEn} start time`} />
-                    <span>–</span>
-                    <input type="text" inputMode="numeric" maxLength={5} value={slot.end} onFocus={() => updateSlot(slot.id, { selected: true })} onChange={(event) => updateSlot(slot.id, { end: event.target.value, selected: true })} placeholder="HH:MM" aria-label={zh ? `${slot.labelZh}结束时间` : `${slot.labelEn} end time`} />
+        {TEMPLATE_VISUAL_PARITY_DEBUG ? (
+          <ExecutionSplitLayout className="df-template-shell">
+            {/* Debug left: real CandidatePanelShell with placeholder candidate rows */}
+            <CandidatePanelShell ariaLabel={zh ? "今日候选（debug）" : "Today's candidates (debug)"}>
+              <CandidatePanelHeader title={<span>{zh ? "今日候选" : "Today"}</span>} />
+              <div className="df-candidate-list">
+                <CandidateBlock mode="template" title={zh ? "示例任务 A" : "Sample task A"} meta="09:00–10:00" />
+                <CandidateBlock mode="template" title={zh ? "示例任务 B" : "Sample task B"} meta="30m" />
+                <CandidateBlock mode="template" title={zh ? "示例任务 C" : "Sample task C"} meta="2h" />
+              </div>
+            </CandidatePanelShell>
+            {/* Debug right: EXACT execution-page wrapper hierarchy
+                df-timeline-panel > df-timeline-body > df-timeline-content >
+                df-timeline-daily > df-date-title + TimelineCanvas.
+                If this looks wrong inside the modal, the modal frame is the problem. */}
+            <section className="df-timeline-panel" id="df-template-timeline-debug">
+              <div className="df-timeline-body">
+                <div className="df-timeline-content">
+                  <div className="df-timeline-daily">
+                    <div className="df-date-title df-date-title-compact today">
+                      <span className="df-date-num">{new Date().getDate()}</span>
+                      <span className="df-date-sep" />
+                      <span className="df-date-wd">{zh ? "今天" : "Today"}</span>
+                    </div>
+                    <TimelineCanvas height={TIMELINE_HEIGHT} scrollRef={timelineRef}>
+                      {Array.from({ length: 96 }).map((_, index) => {
+                        const minutes = index * SLOT_MINUTES;
+                        const isHour = minutes % 60 === 0;
+                        const isMajor = minutes % (6 * 60) === 0;
+                        const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+                        const mm = String(minutes % 60).padStart(2, "0");
+                        return (
+                          <div key={index} className={`df-slot ${isHour ? "hour" : "quarter"}${isMajor ? " major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }}>
+                            <span>{hh}:{mm}</span>
+                          </div>
+                        );
+                      })}
+                    </TimelineCanvas>
                   </div>
                 </div>
-                <input
-                  className="df-template-goal"
-                  value={slot.title}
-                  onFocus={() => updateSlot(slot.id, { selected: true })}
-                  onChange={(event) => updateSlot(slot.id, { title: event.target.value, selected: true })}
-                  placeholder={zh ? "当天目标（可选）" : "Daily goal (optional)"}
-                  aria-label={zh ? `${slot.labelZh}任务目标` : `${slot.labelEn} goal`}
-                />
-                <button type="button" className="df-template-slot-remove" onClick={() => removeSlot(slot.id)} aria-label={zh ? `删除 ${slot.labelZh}` : `Remove ${slot.labelEn}`}>×</button>
               </div>
-            );
-          })}
-        </div>
+            </section>
+          </ExecutionSplitLayout>
+        ) : (
+        <ExecutionSplitLayout className="df-template-shell">
+          {/* ── Left: shared CandidatePanelShell (same component as execution page) ── */}
+          <CandidatePanelShell ariaLabel={zh ? "模板列表" : "Template list"}>
+            <CandidatePanelHeader
+              title={<span id="df-template-modal-title" ref={titleRef} tabIndex={-1}>{zh ? "模板" : "Templates"}</span>}
+              actions={
+                <button type="button" className="df-icon-action df-icon-template-new" data-tip={zh ? "新建模板" : "New template"} aria-label={zh ? "新建模板" : "New template"} onClick={createCustomTemplate}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+              }
+            />
+            <div className="df-candidate-list">
+              {listRows.map((row) => {
+                const key = row.kind === "builtin" ? `builtin:${row.id}` : row.kind === "custom" ? `custom:${row.id}` : "draft:new";
+                const isActive = templateKey === key;
+                const isRenaming = row.kind === "custom" && renamingId === row.id;
+                // Only custom templates are reorder-draggable; built-ins are read-only and the
+                // draft row is a transient selection state (not a persistable list item).
+                const draggable = row.kind === "custom" && !isRenaming;
+                const insertion = templateReorder.insertion;
+                const showInsertionBefore = draggable && insertion && insertion.id === key && insertion.position === "before";
+                const showInsertionAfter = draggable && insertion && insertion.id === key && insertion.position === "after";
+                return (
+                  <React.Fragment key={key}>
+                    {showInsertionBefore ? <div className="df-list-insertion-line" aria-hidden="true" /> : null}
+                  <CandidateBlock
+                    mode="template"
+                    selected={isActive}
+                    title={isRenaming ? undefined : row.title}
+                    meta={row.span}
+                    badge={row.kind === "builtin" ? (zh ? "默认" : "Built-in") : undefined}
+                    dataAttrs={draggable ? { "template-row-key": key } : undefined}
+                    onPointerDown={draggable ? (e) => templateReorder.beginDrag(e, row) : undefined}
+                    onClick={() => { if (templateReorder.suppressedRef.current) return; changeTemplate(key as TemplateKey); }}
+                    onDoubleClick={(e) => { if (row.kind === "custom") { e.stopPropagation(); startRename(customTemplates.find((t) => t.id === row.id)!); } }}
+                  >
+                    {isRenaming ? (
+                      <input
+                        className="df-template-list-rename"
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      />
+                    ) : null}
+                    {row.kind === "custom" && !isRenaming ? (
+                      <span className="df-candidate-block-actions" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                        <button type="button" className="df-icon-action" data-tip={zh ? "重命名" : "Rename"} aria-label={zh ? "重命名" : "Rename"} onClick={() => startRename(customTemplates.find((t) => t.id === row.id)!)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+                        <button type="button" className="df-icon-action" data-tip={zh ? "复制" : "Duplicate"} aria-label={zh ? "复制" : "Duplicate"} onClick={() => duplicateCustomTemplate(row.id)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                        <button type="button" className="df-icon-action" data-tip={zh ? "删除" : "Delete"} aria-label={zh ? "删除" : "Delete"} onClick={() => deleteCustomTemplateById(row.id)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+                      </span>
+                    ) : null}
+                  </CandidateBlock>
+                    {showInsertionAfter ? <div className="df-list-insertion-line" aria-hidden="true" /> : null}
+                  </React.Fragment>
+                );
+              })}
+              {/* New-template entry — small, narrow, centered button (not a full card). */}
+              <div className="df-template-new-row">
+                <button type="button" className="df-template-new-btn" onClick={createCustomTemplate}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  <span>{zh ? "新建模板" : "New template"}</span>
+                </button>
+              </div>
+            </div>
+          </CandidatePanelShell>
+
+          {/* ── Right: real df-timeline-panel shell (same class as execution page) ──
+              Uses the SAME df-timeline-body > df-timeline-content > df-timeline-daily
+              wrapper hierarchy as the execution page so the flex layout path is
+              identical and the TimelineCanvas fills/scales correctly. */}
+          <section className="df-timeline-panel" id="df-template-timeline">
+            <div className="df-timeline-body">
+              <div className="df-timeline-content">
+            <div className="df-timeline-daily">
+              {/* Compact template-name bar — replaces the old big date-title + allday region.
+                  Keeps the shell layout intact: no giant title, no separate title row. */}
+              <div className="df-template-name-bar">
+                {(activeCustom || templateKey === "draft:new") ? (
+                  <input
+                    className="df-template-name-inline"
+                    value={templateName}
+                    onChange={(event) => { setTemplateName(event.target.value); setTemplateNotice(""); }}
+                    aria-label={zh ? "模板名称" : "Template name"}
+                    placeholder={zh ? "模板名称…" : "Template name…"}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  />
+                ) : activeBuiltInId ? (
+                  <span className="df-template-name-readonly">{zh ? "默认模板（不可重命名）" : "Built-in template (read-only)"}</span>
+                ) : null}
+                <span className="df-template-name-meta">{rowCount(periods.length)}</span>
+              </div>
+              <TimelineCanvas
+                scrollRef={timelineRef}
+                height={TIMELINE_HEIGHT}
+                onCanvasPointerDown={handleTimelinePointerDown}
+                onCanvasPointerMove={handleTimelinePointerMove}
+                onCanvasPointerUp={handleTimelinePointerUp}
+                onCanvasPointerCancel={handleTimelinePointerUp}
+              >
+                  {Array.from({ length: 96 }).map((_, index) => {
+                    const minutes = index * SLOT_MINUTES;
+                    const isHour = minutes % 60 === 0;
+                    const isMajor = minutes % (6 * 60) === 0;
+                    const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+                    const mm = String(minutes % 60).padStart(2, "0");
+                    return (
+                      <div
+                        key={index}
+                        className={`df-slot ${isHour ? "hour" : "quarter"}${isMajor ? " major" : ""}`}
+                        style={{ top: `${index * SLOT_HEIGHT}px` }}
+                      >
+                        <span>{hh}:{mm}</span>
+                      </div>
+                    );
+                  })}
+                  {periods.map((period) => {
+                    const top = (period.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT;
+                    const height = Math.max(SLOT_HEIGHT, (period.durationMinutes / SLOT_MINUTES) * SLOT_HEIGHT);
+                    const isEditing = editingPeriodId === period.id;
+                    return (
+                      <TimelineEventBlock
+                        key={period.id}
+                        mode="template"
+                        title={period.title}
+                        className="df-template-period-block"
+                        style={{ position: "absolute", left: "8px", right: "8px", top: `${top}px`, height: `${height}px` }}
+                        dataAttrs={{ "template-period": "true" }}
+                        onPointerDown={(e) => beginPeriodDrag(e, period, "move")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!dragState && !templateReorder.suppressedRef.current) {
+                            setEditingPeriodId(period.id);
+                            setEditingTitle(period.title);
+                          }
+                        }}
+                        onResizeStart={(edge) => (e) => beginPeriodDrag(e, period, edge === "top" ? "resize-top" : "resize-bottom")}
+                        onDelete={() => removePeriod(period.id)}
+                        editing={isEditing}
+                        editingTitle={editingTitle}
+                        onTitleChange={setEditingTitle}
+                        onTitleCommit={() => commitPeriodTitle(period.id)}
+                        onTitleCancel={() => setEditingPeriodId(null)}
+                        lang={lang}
+                      />
+                    );
+                  })}
+                  {creatingState && (
+                    <div
+                      className="df-time-block df-template-period-creating"
+                      style={{
+                        position: "absolute",
+                        left: "8px",
+                        right: "8px",
+                        top: `${(creatingState.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT}px`,
+                        height: `${Math.max(SLOT_HEIGHT, ((creatingState.currentMinutes - creatingState.startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT)}px`,
+                      }}
+                    />
+                  )}
+              </TimelineCanvas>
+            </div>
+              </div>
+            </div>
+          </section>
+        </ExecutionSplitLayout>
+        )}
+
+        {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
+
+        {/* Template-list drag overlay — reuses TaskDragLayer (same component as
+            Today's Candidate drag overlay) with a real CandidateBlock clone so
+            the dragged row keeps its exact card styling. */}
+        {templateReorder.drag && (
+          <TaskDragLayer
+            pointer={templateReorder.drag.pointer}
+            sourceRect={templateReorder.drag.sourceRect}
+            offset={templateReorder.drag.offset}
+          >
+            <CandidateBlock
+              mode="template"
+              title={templateReorder.drag.item.title}
+              meta={templateReorder.drag.item.span}
+              badge={templateReorder.drag.item.kind === "builtin" ? (zh ? "默认" : "Built-in") : undefined}
+            />
+          </TaskDragLayer>
+        )}
 
         <footer className="df-template-modal-actions">
-          <div className="df-template-summary">
-            <strong>{zh ? `将添加 ${applySlots.length} 个时间块` : `${applySlots.length} blocks ready`}</strong>
-            <span>
-              {conflictCount > 0
-                ? (zh ? `${conflictCount} 个时间段与现有安排重叠，仍会添加。` : `${conflictCount} blocks overlap existing schedule and will still be added.`)
-                : (zh ? "勾选有效 Period 后即可应用到当天。" : "Checked valid periods can be applied to the day.")}
-              {invalidCount > 0 ? (zh ? ` ${invalidCount} 个时间段无效，将跳过。` : ` ${invalidCount} invalid blocks will be skipped.`) : ""}
+          {conflictCount > 0 && (
+            <span className="df-template-conflict-note">
+              {zh ? `${conflictCount} 个时间段与现有安排重叠，将跳过。` : `${conflictCount} blocks overlap existing schedule and will be skipped.`}
             </span>
-          </div>
+          )}
+          {activeCustom || templateKey === "draft:new" ? (
+            <button type="button" className="secondary" onClick={saveCurrentTemplate}>{zh ? "保存" : "Save"}</button>
+          ) : null}
           <button type="button" className="secondary" onClick={onClose}>{zh ? "取消" : "Cancel"}</button>
-          <button type="button" className="primary" disabled={applySlots.length === 0} onClick={() => onApply(applySlots, conflictCount)}>{zh ? "应用到当天" : "Apply to day"}</button>
+          <button
+            type="button"
+            className="primary"
+            disabled={applySlots.length === 0}
+            onClick={() => onApply(applySlots, conflictCount)}
+          >{zh ? `应用到今天${applySlots.length > 0 ? ` (${applySlots.length})` : ""}` : `Apply to today${applySlots.length > 0 ? ` (${applySlots.length})` : ""}`}</button>
         </footer>
       </section>
     </div>,
@@ -8302,9 +9335,8 @@ function ScheduleTemplateModal({
 
 /** Floating quick-add popup for time-slot clicks on day / 3-day / week views. */
 function FloatingTimeAddInput({ add, projects, onSave, onCancel }: { add: NonNullable<FloatingTimeAdd>; projects: Project[]; onSave: (title: string, projectId: string | null) => void; onCancel: () => void }) {
-  const lastProject = add.lastProjectId ? projects.find((p) => p.id === add.lastProjectId) : null;
-  const [input, setInput] = useState(lastProject ? `#${lastProject.title} ` : "");
-  const [selectedProject, setSelectedProject] = useState<Project | null>(lastProject ?? null);
+  const [input, setInput] = useState("");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectQuery, setProjectQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -8625,20 +9657,6 @@ function HabitCandidateCard(props: {
       title={(
         <span className="df-habit-card-title">
           <strong>{props.lang === "zh" ? "习惯" : "Habits"}</strong>
-          <button
-            type="button"
-            className="df-habit-candidate-settings"
-            aria-label={props.lang === "zh" ? "打开习惯设置" : "Open habit settings"}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onOpenOverview();
-            }}
-          >
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <circle cx="10" cy="10" r="2.4" />
-              <path d="M10 3.5v2M10 14.5v2M4.4 5.6l1.4 1.4M14.2 13l1.4 1.4M3.5 10h2M14.5 10h2M4.4 14.4 5.8 13M14.2 7l1.4-1.4" />
-            </svg>
-          </button>
         </span>
       )}
       count={`${completed}/${active.length}`}
@@ -8776,42 +9794,56 @@ function HabitOverviewBody(props: {
   const mondayOffset = (baseDate.getDay() + 6) % 7;
   const weekStart = addDays(baseDay, -mondayOffset);
   const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  const weekRange = `${weekDays[0].slice(5).replace("-", "/")} - ${weekDays[6].slice(5).replace("-", "/")}`;
+  const fmt = (iso: string) => iso.slice(5).replace("-", "/");
+  const weekRange = `${fmt(weekDays[0])} - ${fmt(weekDays[6])}`;
+  const weekdayShort = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00`);
+    return zh
+      ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][d.getDay()]
+      : d.toLocaleDateString("en-US", { weekday: "short" });
+  };
+  const dayNum = (iso: string) => iso.slice(8);
   return (
     <>
-      <section className="df-habit-week-board" aria-label={zh ? "习惯周视图" : "Habit week view"}>
-        <div className="df-habit-week-toolbar">
-          <div>
+      <section className="df-habit-overview" aria-label={zh ? "习惯周视图" : "Habit week view"}>
+        <header className="df-habit-overview-toolbar">
+          <div className="df-habit-overview-range">
             <strong>{weekRange}</strong>
             <span>{zh ? `${metrics.todayCompleted}/${metrics.active} 今日完成` : `${metrics.todayCompleted}/${metrics.active} complete today`}</span>
           </div>
-          <div className="df-habit-week-actions">
-            <button type="button" aria-label={zh ? "上一周" : "Previous week"} onClick={() => setWeekOffset((value) => value - 1)}>‹</button>
-            <button type="button" className="df-habit-week-today" onClick={() => setWeekOffset(0)}>{zh ? "今天" : "Today"}</button>
-            <button type="button" aria-label={zh ? "下一周" : "Next week"} onClick={() => setWeekOffset((value) => value + 1)}>›</button>
-            <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
+          <div className="df-habit-overview-actions">
+            <button type="button" className="df-habit-nav" aria-label={zh ? "上一周" : "Previous week"} onClick={() => setWeekOffset((value) => value - 1)}>‹</button>
+            <button type="button" className="df-habit-nav" onClick={() => setWeekOffset(0)}>{zh ? "今天" : "Today"}</button>
+            <button type="button" className="df-habit-nav" aria-label={zh ? "下一周" : "Next week"} onClick={() => setWeekOffset((value) => value + 1)}>›</button>
+            <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "+ 新增习惯" : "+ New habit"}</button>
           </div>
-        </div>
-        <div className="df-habit-week-table">
-          <div className="df-habit-week-header">
-            <span>{zh ? "习惯" : "Habit"}</span>
-            {weekDays.map((day) => {
-              const date = new Date(`${day}T00:00:00`);
-              const label = date.toLocaleDateString(zh ? "zh-CN" : "en-US", { weekday: "short" });
-              return <span key={day} className={day === props.today ? "today" : ""}><b>{label}</b><small>{day.slice(8)}</small></span>;
-            })}
+        </header>
+
+        <div className="df-habit-overview-table" role="grid">
+          <div className="df-habit-overview-thead" role="row">
+            <span className="df-habit-overview-th-label" role="columnheader">{zh ? "习惯" : "Habit"}</span>
+            {weekDays.map((day) => (
+              <span
+                key={day}
+                className={`df-habit-overview-th-day${day === props.today ? " is-today" : ""}`}
+                role="columnheader"
+              >
+                <b>{weekdayShort(day)}</b>
+                <small>{dayNum(day)}</small>
+              </span>
+            ))}
           </div>
+
           {metrics.perHabit.length === 0 ? (
-            <div className="df-habit-week-empty">
+            <div className="df-habit-overview-empty">
               <span>{zh ? "还没有启用习惯。" : "No active habits yet."}</span>
-              <button type="button" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
+              <button type="button" className="df-habit-overview-add" onClick={props.onCreateHabit}>{zh ? "新增习惯" : "New habit"}</button>
             </div>
           ) : metrics.perHabit.map((item) => (
-            <div key={item.habit.id} className="df-habit-week-row">
-              <button type="button" className="df-habit-week-name" onClick={() => props.onEditHabit(item.habit.id)}>
-                <span className={`df-habit-overview-dot${item.completedToday ? " done" : ""}${item.plannedToday ? " planned" : ""}`} />
-                <strong>{item.habit.title}</strong>
-                <small>{item.habit.defaultDurationMinutes || 20}m</small>
+            <div key={item.habit.id} className="df-habit-overview-trow" role="row">
+              <button type="button" className="df-habit-overview-name" onClick={() => props.onEditHabit(item.habit.id)}>
+                <span className="df-habit-overview-name-text">{item.habit.title}</span>
+                <small className="df-habit-overview-duration">{item.habit.defaultDurationMinutes || 20}m</small>
               </button>
               {weekDays.map((day) => {
                 const state = props.dailyStates.find((entry) => entry.habitId === item.habit.id && entry.date === day);
@@ -8822,12 +9854,12 @@ function HabitOverviewBody(props: {
                   <button
                     type="button"
                     key={`${item.habit.id}-${day}`}
-                    className={`df-habit-week-cell${due ? " due" : ""}${completed ? " done" : ""}${planned ? " planned" : ""}`}
+                    className={`df-habit-overview-cell${day === props.today ? " is-today" : ""}${completed ? " is-done" : ""}${planned ? " is-planned" : ""}${due ? " is-due" : ""}`}
                     aria-pressed={completed}
                     aria-label={`${completed ? (zh ? "取消完成" : "Mark incomplete") : (zh ? "完成" : "Mark complete")} ${item.habit.title} ${day}`}
                     onClick={() => props.onToggleDay(item.habit.id, day, !completed)}
                   >
-                    <span aria-hidden="true" />
+                    <span className="df-habit-overview-dot" aria-hidden="true" />
                   </button>
                 );
               })}
@@ -8836,34 +9868,48 @@ function HabitOverviewBody(props: {
         </div>
       </section>
 
-      <section className="df-settings-group df-habit-list-group">
-        <button type="button" className="df-habit-list-toggle" aria-expanded={listOpen} onClick={() => setListOpen((open) => !open)}>
-          <span>{zh ? "已归档习惯" : "Archived Habits"}</span>
+      <section className="df-habit-overview-archived">
+        <button type="button" className="df-habit-overview-archived-toggle" aria-expanded={listOpen} onClick={() => setListOpen((open) => !open)}>
+          <span>{zh ? "已禁用的习惯" : "Disabled Habits"}</span>
           <small>{props.archivedHabits.length}</small>
-          <i aria-hidden="true">{listOpen ? "−" : "+"}</i>
+          <i aria-hidden="true" className="df-habit-overview-chevron">{listOpen ? "▾" : "▸"}</i>
         </button>
-        {props.archivedHabits.length === 0 && listOpen ? (
-          <p className="df-habit-empty">{zh ? "暂无已归档习惯。" : "No archived habits."}</p>
-        ) : listOpen ? (
-          <ul className="df-habit-overview-list">
-            {props.archivedHabits.map((habit) => (
-              <li key={habit.id} className="df-habit-overview-row">
-                <button type="button" className="df-habit-overview-title" onClick={() => props.onEditHabit(habit.id)}>
-                  <span className="df-habit-overview-dot" />
-                  {habit.title}
-                </button>
-                <button
-                  type="button"
-                  className="df-habit-archive-toggle"
-                  onClick={() => props.onArchive(habit.id, false)}
-                  title={zh ? "恢复" : "Restore"}
-                >
-                  {zh ? "恢复" : "Restore"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {listOpen && (
+          props.archivedHabits.length === 0 ? (
+            <p className="df-habit-overview-archived-empty">{zh ? "暂无已禁用习惯。" : "No disabled habits."}</p>
+          ) : (
+            <ul className="df-habit-overview-archived-list">
+              {props.archivedHabits.map((habit) => (
+                <li key={habit.id} className="df-habit-overview-archived-row">
+                  <button type="button" className="df-habit-overview-archived-name" onClick={() => props.onEditHabit(habit.id)} title={zh ? "查看 / 编辑" : "View / Edit"}>
+                    <span className="df-habit-overview-archived-title">{habit.title}</span>
+                    <small>{habit.defaultDurationMinutes || 20}m</small>
+                  </button>
+                  <div className="df-habit-overview-archived-tools">
+                    <button
+                      type="button"
+                      className="df-habit-overview-tool"
+                      onClick={() => props.onEditHabit(habit.id)}
+                      title={zh ? "编辑" : "Edit"}
+                      aria-label={zh ? "编辑" : "Edit"}
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11z"/><path d="M9.5 4l2.5 2.5"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="df-habit-overview-tool"
+                      onClick={() => props.onArchive(habit.id, false)}
+                      title={zh ? "恢复启用" : "Restore"}
+                      aria-label={zh ? "恢复启用" : "Restore"}
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8a5 5 0 1 1 1.5 3.5"/><path d="M3 4v4h4"/></svg>
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )
+        )}
       </section>
     </>
   );
@@ -9705,16 +10751,14 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const start = preview?.start || task.scheduledStart || "09:00";
   const computedDuration = taskDuration(task);
   let end = preview?.end || task.scheduledEnd || addMinutes(start, computedDuration);
-  
+
   const endMinutesValue = timeToMinutes(end);
   const startMinutesValue = timeToMinutes(start);
-  let calculatedDurationMinutes = endMinutesValue - startMinutesValue;
-  
-  if (calculatedDurationMinutes <= 0) {
-    end = addMinutes(start, computedDuration);
-    calculatedDurationMinutes = computedDuration;
-  }
-  
+  // Cross-midnight spans (e.g. 23:30→00:30) must read as 60m, not -1380.
+  // `spanDurationMinutes` treats end ≤ start as next-day; we only fall back to the
+  // task's estimated duration when the stored end is missing or >24h (bad data).
+  let calculatedDurationMinutes = spanDurationMinutes(start, end);
+
   if (calculatedDurationMinutes > 24 * 60) {
     end = addMinutes(start, computedDuration);
     calculatedDurationMinutes = computedDuration;
@@ -9989,7 +11033,13 @@ function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties;
   const minutes = now.getHours() * 60 + now.getMinutes();
   if (minutes < 0 || minutes > 24 * 60) return null;
   const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, dayStartHour);
-  return <div className="df-now-line" style={{ top, ...extraStyle }} />;
+  // Merge so an `undefined` top from extraStyle (non-continuous mode) does NOT
+  // clobber the computed, day-start-aware top. Continuous mode supplies a real
+  // top via extraStyle and wins; non-continuous mode omits it and the computed
+  // top is used.
+  const mergedStyle: CSSProperties = { ...extraStyle };
+  if (mergedStyle.top === undefined) mergedStyle.top = top;
+  return <div className="df-now-line" style={mergedStyle} />;
 }
 
 function EditDrawer(props: {
@@ -11334,11 +12384,19 @@ function PluginRuntimePanel({ settings, data, onSave, onSaveData, lang }: { sett
   );
 }
 
-function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang }: { kind: "settings" | "about"; settings: Settings; initialSection?: SettingsSection; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language }) {
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>(initialSection || "page");
+function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang, onOpenScheduleTemplates }: { kind: "settings" | "about"; settings: Settings; initialSection?: SettingsSection; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language; onOpenScheduleTemplates?: () => void }) {
+  // Map any persisted legacy section id ("page" / "features") onto the new
+  // canonical category so older builds land on a real settings group instead
+  // of an empty panel.
+  const resolvedInitial: SettingsSection = initialSection === "page" ? "general" : initialSection === "features" ? "planning" : (initialSection || "general");
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>(resolvedInitial);
   useEffect(() => {
-    if (initialSection) setSettingsSection(initialSection);
+    if (initialSection) setSettingsSection(resolvedInitial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSection]);
+  const [confirmResetSettings, setConfirmResetSettings] = useState(false);
+  const [confirmClearLocalData, setConfirmClearLocalData] = useState(false);
+  const [clearLocalDataPhrase, setClearLocalDataPhrase] = useState("");
   const [pluginConfigDialogId, setPluginConfigDialogId] = useState<string | null>(null);
   const [pluginConfigDraft, setPluginConfigDraft] = useState<Record<string, unknown>>({});
   // Force a re-render of the plugin list when activation state changes (the
@@ -11555,83 +12613,386 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
         {kind === "settings" ? (
           <div className="df-utility-body df-settings-shell">
             <nav className="df-settings-nav" aria-label={lang === "zh" ? "设置分区" : "Settings sections"}>
-              {([['page', lang === 'zh' ? '页面' : 'Page'], ['features', lang === 'zh' ? '功能' : 'Features'], ['shortcuts', lang === 'zh' ? '快捷键' : 'Shortcuts'], ['ai', 'Navo AI'], ['mcp', 'MCP'], ['plugins', lang === 'zh' ? '插件' : 'Plugins'], ['account', lang === 'zh' ? '账户' : 'Account']] as const).map(([id, label]) => (
+              {([
+                ['general', lang === 'zh' ? '通用' : 'General'],
+                ['appearance', lang === 'zh' ? '外观' : 'Appearance'],
+                ['execution', lang === 'zh' ? '执行' : 'Execution'],
+                ['planning', lang === 'zh' ? '规划' : 'Planning'],
+                ['templates', lang === 'zh' ? '模板' : 'Templates'],
+                ['habits', lang === 'zh' ? '习惯' : 'Habits'],
+                ['metrics', lang === 'zh' ? '指标' : 'Metrics'],
+                ['widget', lang === 'zh' ? '桌面小组件' : 'Widget'],
+                ['data', lang === 'zh' ? '数据与备份' : 'Data & Backup'],
+                ['shortcuts', lang === 'zh' ? '快捷键' : 'Shortcuts'],
+                ['ai', 'Navo AI'],
+                ['mcp', 'MCP'],
+                ['plugins', lang === 'zh' ? '插件' : 'Plugins'],
+                ['account', lang === 'zh' ? '账户' : 'Account'],
+                ['advanced', lang === 'zh' ? '高级' : 'Advanced'],
+              ] as const).map(([id, label]) => (
                 <button type="button" key={id} className={settingsSection === id ? "active" : ""} aria-current={settingsSection === id ? "page" : undefined} onClick={() => setSettingsSection(id)}>{label}</button>
               ))}
             </nav>
             <div className="df-settings-content">
-            {settingsSection === "page" && <section className="df-settings-group"><h3>{lang === "zh" ? "页面" : "Page"}</h3>
-            <label className="df-utility-select">
-              {t(lang, "settings.uiMode")}
-              <select value={settings.theme} onChange={(event) => onSave({ theme: event.target.value as Settings["theme"] })}>
-                <option value="dark">{t(lang, "settings.dark")}</option>
-                <option value="light">{t(lang, "settings.light")}</option>
-              </select>
-            </label>
-            <label className="df-utility-select">
-              {t(lang, "settings.language")}
-              <select value={settings.language || lang} onChange={(event) => onSave({ language: event.target.value as Language })}>
-                <option value="zh">中文</option>
-                <option value="en">English</option>
-              </select>
-            </label>
-            <label className="df-utility-select">
-              {lang === "zh" ? "字体风格" : "Typography"}
-              <select value={settings.typographyStyle || "editorial"} onChange={(event) => onSave({ typographyStyle: event.target.value as Settings["typographyStyle"] })}>
-                <option value="editorial">{lang === "zh" ? "编辑衬线" : "Editorial Serif"}</option>
-                <option value="balanced">{lang === "zh" ? "平衡混排" : "Balanced"}</option>
-                <option value="sans">{lang === "zh" ? "现代无衬线" : "Modern Sans"}</option>
-              </select>
-            </label>
-            <label className="df-utility-select">{t(lang, "settings.defaultView")}<select value={settings.defaultTimelineView || "daily"} onChange={(event) => onSave({ defaultTimelineView: event.target.value as Settings["defaultTimelineView"] })}><option value="daily">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="weekly">{viewLabel(lang, "weekly")}</option><option value="month">{viewLabel(lang, "month")}</option></select></label>
-            <label className="df-utility-select">{lang === "zh" ? "一天开始时间" : "Day start time"}<input type="time" value={settings.dayStartTime || "00:00"} onChange={(event) => onSave({ dayStartTime: event.target.value })} /></label>
-            <label className="df-utility-range">{lang === "zh" ? "时间轴字体大小" : "Timeline font size"}<input type="range" min="0.85" max="1.3" step="0.05" value={settings.timelineFontScale ?? 1} onChange={(event) => onSave({ timelineFontScale: Number(event.target.value) })} /><span className="df-utility-range-value">{Math.round((settings.timelineFontScale ?? 1) * 100)}%</span></label>
-            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.taskBlockFill)} onChange={(event) => onSave({ taskBlockFill: event.target.checked })} />{lang === "zh" ? "任务块颜色填充（以归属项目色整块填充）" : "Fill task block with project color"}</label>
-            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideCompleted)} onChange={(event) => onSave({ hideCompleted: event.target.checked })} />{t(lang, "settings.hideCompleted")}</label>
-            <div className="df-settings-divider" />
-            <div className="df-settings-subhead">{lang === "zh" ? "强调色" : "Accent Colors"}</div>
-            <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
-            <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
-            <button className="df-settings-reset-accent" onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复主题默认点缀色" : "Restore theme accent defaults"}</button>
-            <button className="df-settings-about" onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}</button>
-            </section>}
-            {settingsSection === "features" && <section className="df-settings-group"><h3>{lang === "zh" ? "功能" : "Features"}</h3>
-            <label className="df-utility-check">
-              <input type="checkbox" checked={settings.featureKanbanViewEnabled !== false} onChange={(e) => onSave({ featureKanbanViewEnabled: e.target.checked })} />
-              <span>{lang === "zh" ? "启用看板视图 (Kanban)" : "Enable Kanban view"}</span>
-            </label>
-            <label className="df-utility-check">
-              <input type="checkbox" checked={settings.featureQuadrantViewEnabled !== false} onChange={(e) => onSave({ featureQuadrantViewEnabled: e.target.checked })} />
-              <span>{lang === "zh" ? "启用四象限视图" : "Enable Eisenhower matrix view"}</span>
-            </label>
-            <label className="df-utility-check">
-              <input type="checkbox" checked={settings.featureListViewEnabled !== false} onChange={(e) => onSave({ featureListViewEnabled: e.target.checked })} />
-              <span>{lang === "zh" ? "启用列表视图" : "Enable list view"}</span>
-            </label>
-            <label className="df-utility-check">
-              <input type="checkbox" checked={settings.continuousCrossDayScroll !== false} onChange={(e) => onSave({ continuousCrossDayScroll: e.target.checked })} />
-              <span>{lang === "zh" ? "无限跨天滚动" : "Continuous cross-day scroll"}</span>
-            </label>
-            <hr />
-            <label className="df-utility-select">
-              {lang === "zh" ? "默认专注模式" : "Default focus mode"}
-              <select value={settings.focusModeDefault || "flowtime"} onChange={(e) => onSave({ focusModeDefault: e.target.value as "stopwatch" | "pomodoro" | "flowtime" })}>
-                <option value="stopwatch">{lang === "zh" ? "秒表" : "Stopwatch"}</option>
-                <option value="pomodoro">Pomodoro</option>
-                <option value="flowtime">Flowtime</option>
-              </select>
-            </label>
-            <label className="df-utility-select">
-              {lang === "zh" ? "空闲阈值" : "Idle threshold"}
-              <select value={String(settings.idleThresholdMinutes ?? 5)} onChange={(e) => onSave({ idleThresholdMinutes: Number(e.target.value) })}>
-                <option value="3">3 {lang === "zh" ? "分钟" : "min"}</option>
-                <option value="5">5 {lang === "zh" ? "分钟" : "min"}</option>
-                <option value="10">10 {lang === "zh" ? "分钟" : "min"}</option>
-                <option value="15">15 {lang === "zh" ? "分钟" : "min"}</option>
-                <option value="0">{lang === "zh" ? "关闭" : "Off"}</option>
-              </select>
-            </label>
-            </section>}
+            {settingsSection === "general" && <SettingSection title={lang === "zh" ? "通用" : "General"} description={lang === "zh" ? "影响时间轴、指标、模板与跨天任务的基础设置。" : "Foundational preferences that affect the timeline, metrics, templates, and cross-day tasks."}>
+              <SettingRow
+                title={lang === "zh" ? "一天开始时间" : "Day start time"}
+                description={lang === "zh" ? "决定时间轴的起始分界，影响跨天滚动与统计范围。" : "Sets the boundary used by the timeline, cross-day scroll, and metric ranges."}
+                control={<SettingTextInput type="time" value={settings.dayStartTime || "00:00"} ariaLabel={lang === "zh" ? "一天开始时间" : "Day start time"} onChange={(value) => onSave({ dayStartTime: value })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "默认打开页面" : "Default page"}
+                description={lang === "zh" ? "启动时优先进入执行或规划。" : "Choose whether the app opens on Execution or Planning."}
+                control={<SettingSelect<Settings["activeMode"]>
+                  value={settings.activeMode}
+                  ariaLabel={lang === "zh" ? "默认打开页面" : "Default page"}
+                  onChange={(value) => onSave({ activeMode: value })}
+                  options={[
+                    { value: "execute", label: lang === "zh" ? "执行" : "Execution" },
+                    { value: "planning", label: lang === "zh" ? "规划" : "Planning" },
+                  ]}
+                />}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "默认任务时长" : "Default task duration"}
+                description={lang === "zh" ? "用于快速添加和时间轴点击创建任务。" : "Used by quick-add and click-to-create on the timeline."}
+              />
+              <SettingRow
+                title={lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}
+                description={lang === "zh" ? "重新触发首次使用引导流程。" : "Re-trigger the first-run onboarding flow."}
+                control={<SettingActionButton onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始" : "Restart"}</SettingActionButton>}
+              />
+            </SettingSection>}
+
+            {settingsSection === "appearance" && <SettingSection title={lang === "zh" ? "外观" : "Appearance"} description={lang === "zh" ? "纸面风格、字体与点缀色。" : "Paper surface, typography, and accent color."}>
+              <SettingRow
+                title={t(lang, "settings.uiMode")}
+                control={<SettingSelect<Settings["theme"]>
+                  value={settings.theme}
+                  ariaLabel={t(lang, "settings.uiMode")}
+                  onChange={(value) => onSave({ theme: value })}
+                  options={[
+                    { value: "light", label: t(lang, "settings.light") },
+                    { value: "dark", label: t(lang, "settings.dark") },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={t(lang, "settings.language")}
+                control={<SettingSelect<Language>
+                  value={settings.language || lang}
+                  ariaLabel={t(lang, "settings.language")}
+                  onChange={(value) => onSave({ language: value })}
+                  options={[
+                    { value: "zh", label: "中文" },
+                    { value: "en", label: "English" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "字体风格" : "Typography"}
+                control={<SettingSelect<Settings["typographyStyle"]>
+                  value={settings.typographyStyle || "editorial"}
+                  ariaLabel={lang === "zh" ? "字体风格" : "Typography"}
+                  onChange={(value) => onSave({ typographyStyle: value })}
+                  options={[
+                    { value: "editorial", label: lang === "zh" ? "编辑衬线" : "Editorial Serif" },
+                    { value: "balanced", label: lang === "zh" ? "平衡混排" : "Balanced" },
+                    { value: "sans", label: lang === "zh" ? "现代无衬线" : "Modern Sans" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "时间轴字体大小" : "Timeline font size"}
+                description={lang === "zh" ? "调整时间轴任务标题字号。" : "Scale the timeline task title font size."}
+                control={
+                  <span className="df-settings-number-wrap">
+                    <input
+                      type="range"
+                      className="df-settings-range"
+                      min={0.85}
+                      max={1.3}
+                      step={0.05}
+                      value={settings.timelineFontScale ?? 1}
+                      aria-label={lang === "zh" ? "时间轴字体大小" : "Timeline font size"}
+                      onChange={(event) => onSave({ timelineFontScale: Number(event.target.value) })}
+                    />
+                    <span className="df-settings-number-suffix">{Math.round((settings.timelineFontScale ?? 1) * 100)}%</span>
+                  </span>
+                }
+              />
+              <SettingRow
+                title={lang === "zh" ? "任务块颜色填充" : "Fill task block with project color"}
+                description={lang === "zh" ? "以归属项目色整块填充（开启）或仅描边（关闭）。" : "Fill the whole block with project color (on) or use a thin outline (off)."}
+                control={<SettingToggle checked={Boolean(settings.taskBlockFill)} ariaLabel={lang === "zh" ? "任务块颜色填充" : "Fill task block with project color"} onChange={(next) => onSave({ taskBlockFill: next })} />}
+              />
+              <SettingRow
+                title={t(lang, "settings.hideCompleted")}
+                description={lang === "zh" ? "在时间轴上隐藏已完成任务。" : "Hide completed tasks from the timeline."}
+                control={<SettingToggle checked={Boolean(settings.hideCompleted)} ariaLabel={t(lang, "settings.hideCompleted")} onChange={(next) => onSave({ hideCompleted: next })} />}
+              />
+              <SettingDivider />
+              <SettingDescription>{lang === "zh" ? "强调色：仅作为细线、勾选与当前时间标记的点缀色，不主导布局。" : "Accent colors: used only for fine rules, checkboxes, and the current-time marker — never as dominant fills."}</SettingDescription>
+              <div className="df-settings-accent-row">
+                <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
+                <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
+              </div>
+              <SettingRow
+                title={lang === "zh" ? "恢复默认点缀色" : "Restore default accent colors"}
+                control={<SettingActionButton onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "深色模式跟随系统" : "Match system dark mode"}
+                description={lang === "zh" ? "当前仅支持手动切换浅色 / 深色。" : "Currently only manual light / dark switching is wired."}
+                note={lang === "zh" ? "即将支持" : "Coming soon"}
+              />
+            </SettingSection>}
+
+            {settingsSection === "execution" && <SettingSection title={lang === "zh" ? "执行" : "Execution"} description={lang === "zh" ? "时间轴与执行页行为。" : "Timeline and execution-page behavior."}>
+              <SettingRow
+                title={lang === "zh" ? "默认时间轴视图" : "Default timeline view"}
+                control={<SettingSelect<NonNullable<Settings["defaultTimelineView"]>>
+                  value={settings.defaultTimelineView || "daily"}
+                  ariaLabel={lang === "zh" ? "默认时间轴视图" : "Default timeline view"}
+                  onChange={(value) => onSave({ defaultTimelineView: value })}
+                  options={[
+                    { value: "daily", label: viewLabel(lang, "daily") },
+                    { value: "3day", label: viewLabel(lang, "3day") },
+                    { value: "weekly", label: viewLabel(lang, "weekly") },
+                    { value: "month", label: viewLabel(lang, "month") },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "开启无限跨天滚动" : "Continuous cross-day scroll"}
+                description={lang === "zh" ? "时间轴可连续滚动到前后日期。" : "The timeline scrolls continuously across days."}
+                control={<SettingToggle checked={settings.continuousCrossDayScroll !== false} ariaLabel={lang === "zh" ? "无限跨天滚动" : "Continuous cross-day scroll"} onChange={(next) => onSave({ continuousCrossDayScroll: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "默认专注模式" : "Default focus mode"}
+                description={lang === "zh" ? "进入专注时默认使用的计时方式。" : "Timer mode used when entering focus."}
+                control={<SettingSelect<NonNullable<Settings["focusModeDefault"]>>
+                  value={settings.focusModeDefault || "flowtime"}
+                  ariaLabel={lang === "zh" ? "默认专注模式" : "Default focus mode"}
+                  onChange={(value) => onSave({ focusModeDefault: value })}
+                  options={[
+                    { value: "stopwatch", label: lang === "zh" ? "秒表" : "Stopwatch" },
+                    { value: "pomodoro", label: "Pomodoro" },
+                    { value: "flowtime", label: "Flowtime" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "空闲阈值" : "Idle threshold"}
+                description={lang === "zh" ? "超过该时长未操作视为空闲，0 表示关闭。" : "Idle minutes before the timer auto-pauses; 0 disables."}
+                control={<SettingSelect<string>
+                  value={String(settings.idleThresholdMinutes ?? 5)}
+                  ariaLabel={lang === "zh" ? "空闲阈值" : "Idle threshold"}
+                  onChange={(value) => onSave({ idleThresholdMinutes: Number(value) })}
+                  options={[
+                    { value: "3", label: `3 ${lang === "zh" ? "分钟" : "min"}` },
+                    { value: "5", label: `5 ${lang === "zh" ? "分钟" : "min"}` },
+                    { value: "10", label: `10 ${lang === "zh" ? "分钟" : "min"}` },
+                    { value: "15", label: `15 ${lang === "zh" ? "分钟" : "min"}` },
+                    { value: "0", label: lang === "zh" ? "关闭" : "Off" },
+                  ]}
+                />}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "显示现在时间线" : "Show now line"}
+                description={lang === "zh" ? "当前版本始终显示，可配置项即将支持。" : "Always shown in this build; a toggle is coming soon."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "点击空白处创建任务" : "Click blank to create task"}
+                description={lang === "zh" ? "在时间轴空白处点击直接新建时间段。" : "Click an empty timeline slot to create a new scheduled task."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "拖拽吸附间隔" : "Drag snap interval"}
+                description={lang === "zh" ? "拖动任务时按指定分钟数对齐。" : "Snap dragged tasks to a minute grid."}
+              />
+            </SettingSection>}
+
+            {settingsSection === "planning" && <SettingSection title={lang === "zh" ? "规划" : "Planning"} description={lang === "zh" ? "规划页视图与可见性。" : "Planning-page views and visibility."}>
+              <SettingRow
+                title={lang === "zh" ? "启用看板视图" : "Enable Kanban view"}
+                control={<SettingToggle checked={settings.featureKanbanViewEnabled !== false} ariaLabel={lang === "zh" ? "启用看板视图" : "Enable Kanban view"} onChange={(next) => onSave({ featureKanbanViewEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "启用四象限视图" : "Enable Eisenhower matrix view"}
+                control={<SettingToggle checked={settings.featureQuadrantViewEnabled !== false} ariaLabel={lang === "zh" ? "启用四象限视图" : "Enable Eisenhower matrix view"} onChange={(next) => onSave({ featureQuadrantViewEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "启用列表视图" : "Enable list view"}
+                control={<SettingToggle checked={settings.featureListViewEnabled !== false} ariaLabel={lang === "zh" ? "启用列表视图" : "Enable list view"} onChange={(next) => onSave({ featureListViewEnabled: next })} />}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "默认规划视图" : "Default planning view"}
+                description={lang === "zh" ? "进入规划页时默认展开的视图。" : "View shown when entering the planning page."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "显示已完成任务" : "Show completed tasks"}
+                description={lang === "zh" ? "在规划树中显示已完成的任务。" : "Show completed tasks in the planning tree."}
+              />
+            </SettingSection>}
+
+            {settingsSection === "templates" && <SettingSection title={lang === "zh" ? "模板" : "Templates"} description={lang === "zh" ? "把可复用的时间段模板应用到今天。" : "Apply reusable time-block templates to today."}>
+              <SettingRow
+                title={lang === "zh" ? "启用模板功能" : "Enable templates"}
+                description={lang === "zh" ? "关闭后隐藏今日候选顶栏的「模板」入口。" : "When off, the Templates button in the today-candidate header is hidden."}
+                control={<SettingToggle checked={settings.featureTemplatesEnabled !== false} ariaLabel={lang === "zh" ? "启用模板功能" : "Enable templates"} onChange={(next) => onSave({ featureTemplatesEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "管理模板" : "Manage templates"}
+                description={lang === "zh" ? "打开模板编辑弹窗，新建或编辑时间段模板。" : "Open the template editor to create or edit time-block templates."}
+                control={<SettingActionButton onClick={() => onOpenScheduleTemplates?.()} disabled={!onOpenScheduleTemplates}>{lang === "zh" ? "打开模板" : "Open templates"}</SettingActionButton>}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "默认模板" : "Default template"}
+                description={lang === "zh" ? "选择一个模板作为「应用到今天」的默认值。" : "Pick a template to apply by default."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "应用冲突处理" : "Conflict handling"}
+                description={lang === "zh" ? "跳过冲突时间段 / 每次询问 / 仍然添加。" : "Skip conflicting slots / ask each time / add anyway."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "新建时间段默认时长" : "Default period duration"}
+                description={lang === "zh" ? "在模板编辑器中新建时间段时的默认持续时长。" : "Default duration used when creating a new period in the template editor."}
+              />
+            </SettingSection>}
+
+            {settingsSection === "habits" && <SettingSection title={lang === "zh" ? "习惯" : "Habits"} description={lang === "zh" ? "每日 / 每周重复行为的开关与显示。" : "Toggles and visibility for daily / weekly recurring behaviors."}>
+              <SettingRow
+                title={lang === "zh" ? "启用习惯功能" : "Enable habits"}
+                description={lang === "zh" ? "关闭后隐藏今日候选中的习惯区与习惯入口。" : "When off, the habits area in today's candidates and habit entries are hidden."}
+                control={<SettingToggle checked={settings.featureHabitsEnabled !== false} ariaLabel={lang === "zh" ? "启用习惯功能" : "Enable habits"} onChange={(next) => onSave({ featureHabitsEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "在今日候选中显示习惯区" : "Show habits in today's candidates"}
+                description={lang === "zh" ? "与「启用习惯功能」共用同一开关。" : "Shares the same toggle as Enable habits."}
+                control={<SettingToggle checked={settings.featureHabitsEnabled !== false} disabled={settings.featureHabitsEnabled === false} ariaLabel={lang === "zh" ? "在今日候选中显示习惯区" : "Show habits in today's candidates"} onChange={(next) => onSave({ featureHabitsEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "习惯是否计入指标" : "Include habits in metrics"}
+                description={lang === "zh" ? "控制指标页是否统计习惯时间。" : "Control whether metrics include habit time."}
+                control={<SettingSelect<NonNullable<Settings["metricsIncludeHabits"]>>
+                  value={settings.metricsIncludeHabits || "include"}
+                  ariaLabel={lang === "zh" ? "习惯是否计入指标" : "Include habits in metrics"}
+                  onChange={(value) => onSave({ metricsIncludeHabits: value })}
+                  options={[
+                    { value: "include", label: lang === "zh" ? "计入" : "Include" },
+                    { value: "exclude", label: lang === "zh" ? "排除" : "Exclude" },
+                    { value: "only", label: lang === "zh" ? "仅习惯" : "Habits only" },
+                  ]}
+                />}
+              />
+            </SettingSection>}
+
+            {settingsSection === "metrics" && <SettingSection title={lang === "zh" ? "指标" : "Metrics"} description={lang === "zh" ? "规划页指标视图的默认范围与分组。" : "Default range and grouping for the planning-page metrics view."}>
+              <SettingRow
+                title={lang === "zh" ? "启用指标视图" : "Enable metrics view"}
+                description={lang === "zh" ? "关闭后隐藏规划页的「指标」视图入口。" : "When off, the Metrics entry in the planning view switcher is hidden."}
+                control={<SettingToggle checked={settings.featureMetricsEnabled !== false} ariaLabel={lang === "zh" ? "启用指标视图" : "Enable metrics view"} onChange={(next) => onSave({ featureMetricsEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "默认时间范围" : "Default time range"}
+                control={<SettingSelect<NonNullable<Settings["metricsRangePreset"]>>
+                  value={settings.metricsRangePreset || "today"}
+                  ariaLabel={lang === "zh" ? "默认时间范围" : "Default time range"}
+                  onChange={(value) => onSave({ metricsRangePreset: value })}
+                  options={[
+                    { value: "today", label: lang === "zh" ? "今天" : "Today" },
+                    { value: "thisWeek", label: lang === "zh" ? "本周" : "This week" },
+                    { value: "thisMonth", label: lang === "zh" ? "本月" : "This month" },
+                    { value: "all", label: lang === "zh" ? "全部" : "All time" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "默认分组" : "Default grouping"}
+                control={<SettingSelect<NonNullable<Settings["metricsGroupBy"]>>
+                  value={settings.metricsGroupBy || "project"}
+                  ariaLabel={lang === "zh" ? "默认分组" : "Default grouping"}
+                  onChange={(value) => onSave({ metricsGroupBy: value })}
+                  options={[
+                    { value: "project", label: lang === "zh" ? "项目" : "Project" },
+                    { value: "customCategory", label: lang === "zh" ? "自定义分类" : "Custom category" },
+                    { value: "tag", label: lang === "zh" ? "标签" : "Tag" },
+                    { value: "importance", label: lang === "zh" ? "重要程度" : "Importance" },
+                    { value: "urgency", label: lang === "zh" ? "紧急程度" : "Urgency" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "默认显示指标" : "Default display metric"}
+                control={<SettingSelect<NonNullable<Settings["metricsDisplayMetric"]>>
+                  value={settings.metricsDisplayMetric || "percentage"}
+                  ariaLabel={lang === "zh" ? "默认显示指标" : "Default display metric"}
+                  onChange={(value) => onSave({ metricsDisplayMetric: value })}
+                  options={[
+                    { value: "percentage", label: lang === "zh" ? "占比" : "Percentage" },
+                    { value: "duration", label: lang === "zh" ? "时长" : "Duration" },
+                    { value: "taskCount", label: lang === "zh" ? "任务数" : "Task count" },
+                    { value: "completionRate", label: lang === "zh" ? "完成率" : "Completion rate" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "习惯是否计入统计" : "Include habits in metrics"}
+                control={<SettingSelect<NonNullable<Settings["metricsIncludeHabits"]>>
+                  value={settings.metricsIncludeHabits || "include"}
+                  ariaLabel={lang === "zh" ? "习惯是否计入统计" : "Include habits in metrics"}
+                  onChange={(value) => onSave({ metricsIncludeHabits: value })}
+                  options={[
+                    { value: "include", label: lang === "zh" ? "计入" : "Include" },
+                    { value: "exclude", label: lang === "zh" ? "排除" : "Exclude" },
+                    { value: "only", label: lang === "zh" ? "仅习惯" : "Habits only" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "完成状态筛选" : "Completion filter"}
+                control={<SettingSelect<NonNullable<Settings["metricsCompletionFilter"]>>
+                  value={settings.metricsCompletionFilter || "all"}
+                  ariaLabel={lang === "zh" ? "完成状态筛选" : "Completion filter"}
+                  onChange={(value) => onSave({ metricsCompletionFilter: value })}
+                  options={[
+                    { value: "all", label: lang === "zh" ? "全部" : "All" },
+                    { value: "completed", label: lang === "zh" ? "仅已完成" : "Completed only" },
+                    { value: "incomplete", label: lang === "zh" ? "仅未完成" : "Incomplete only" },
+                  ]}
+                />}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "未安排时间是否显示" : "Show unscheduled time"}
+                description={lang === "zh" ? "在指标中显示未安排的空白时间段。" : "Surface unscheduled empty time in metrics."}
+              />
+            </SettingSection>}
+
+            {settingsSection === "widget" && <SettingSection
+              title={lang === "zh" ? "桌面小组件" : "Desktop Widget"}
+              description={Boolean(window.desktopApi?.widget)
+                ? (lang === "zh" ? "桌面端置顶小窗。" : "Always-on-top desktop mini panel.")
+                : (lang === "zh" ? "桌面端启用后可用。当前环境未检测到桌面端。" : "Available on the desktop build. No desktop runtime detected in this environment.")}
+            >
+              <SettingRow
+                title={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"}
+                description={lang === "zh" ? "置顶小窗快速查看正在做、快速添加任务与计时。" : "Always-on-top mini panel for current task, quick add and timer."}
+                control={<SettingToggle checked={settings.featureWidgetEnabled !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"} onChange={(next) => onSave({ featureWidgetEnabled: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "启动时自动打开" : "Open widget on launch"}
+                control={<SettingToggle checked={settings.widgetOpenOnLaunch === true} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "启动时自动打开" : "Open widget on launch"} onChange={(next) => onSave({ widgetOpenOnLaunch: next })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "始终置顶" : "Always on top"}
+                control={<SettingToggle checked={settings.widgetAlwaysOnTop !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "始终置顶" : "Always on top"} onChange={(next) => { onSave({ widgetAlwaysOnTop: next }); void window.desktopApi?.widget?.setAlwaysOnTop(next); }} />}
+              />
+              <SettingComingSoon title={lang === "zh" ? "显示正在做" : "Show current task"} description={lang === "zh" ? "在小组件中显示当前正在进行的任务。" : "Show the active task in the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+              <SettingComingSoon title={lang === "zh" ? "显示快速添加" : "Show quick add"} description={lang === "zh" ? "在小组件中提供快速添加任务入口。" : "Quick-add entry inside the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+              <SettingComingSoon title={lang === "zh" ? "显示计时器" : "Show timer"} description={lang === "zh" ? "在小组件中显示专注计时器。" : "Focus timer inside the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+              <SettingComingSoon title={lang === "zh" ? "紧凑模式" : "Compact mode"} description={lang === "zh" ? "缩小小组件尺寸。" : "Shrink the widget to a compact size."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+              <SettingComingSoon title={lang === "zh" ? "重置位置" : "Reset position"} description={lang === "zh" ? "把小组件恢复到默认屏幕位置。" : "Restore the widget to its default screen position."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+            </SettingSection>}
             {settingsSection === "shortcuts" && <section className="df-settings-group"><h3>{lang === "zh" ? "快捷键" : "Shortcuts"}</h3>
               <p className="df-settings-desc">{lang === "zh" ? "固定快捷键参考。本版本暂不支持自定义。" : "Fixed shortcut reference. Custom shortcuts are not enabled in this version."}</p>
               <div className="df-shortcut-reference">
@@ -11753,6 +13114,48 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               <div className="df-settings-subhead">{lang === "zh" ? "已启用工具" : "Enabled tools"}</div>
               <PluginRuntimePanel settings={settings} data={data} onSave={onSave} onSaveData={onSaveData} lang={lang} />
             </section>}
+            {settingsSection === "data" && <SettingSection
+              title={lang === "zh" ? "数据与备份" : "Data & Backup"}
+              description={lang === "zh" ? "导出、导入与本地数据清理。导入会覆盖当前数据，请谨慎操作。" : "Export, import, and local-data cleanup. Importing overwrites current data — proceed with care."}
+            >
+              <SettingRow
+                title={lang === "zh" ? "导出为 JSON" : "Export as JSON"}
+                description={lang === "zh" ? "包含任务、项目、习惯、时间记录与设置的完整备份。" : "Full backup including tasks, projects, habits, time entries, and settings."}
+                control={<SettingActionButton onClick={() => exportDataAsJson(data, settings)}>{lang === "zh" ? "导出" : "Export"}</SettingActionButton>}
+              />
+              <SettingRow
+                title={lang === "zh" ? "导出任务为 CSV" : "Export tasks as CSV"}
+                description={lang === "zh" ? "仅导出任务列表，便于表格工具查看。" : "Export the task list only, for use in spreadsheet tools."}
+                control={<SettingActionButton onClick={() => exportTasksAsCsv(data)}>{lang === "zh" ? "导出 CSV" : "Export CSV"}</SettingActionButton>}
+              />
+              <SettingDivider />
+              <SettingRow
+                title={lang === "zh" ? "导入 JSON（完整数据）" : "Import JSON (full data)"}
+                description={lang === "zh" ? "覆盖当前所有数据与设置。" : "Overwrites all current data and settings."}
+                control={<SettingActionButton onClick={() => {
+                  if (confirm(lang === "zh" ? "导入 JSON 将覆盖当前所有数据，确定要继续吗？" : "Importing JSON will overwrite all current data. Are you sure you want to continue?")) {
+                    importDataFromJson();
+                  }
+                }}>{lang === "zh" ? "导入" : "Import"}</SettingActionButton>}
+              />
+              <SettingRow
+                title={lang === "zh" ? "导入任务 CSV" : "Import tasks CSV"}
+                description={lang === "zh" ? "把 CSV 中的任务合并到当前数据。" : "Merge tasks from a CSV file into the current data."}
+                control={<SettingActionButton onClick={() => importTasksFromCsv()}>{lang === "zh" ? "导入 CSV" : "Import CSV"}</SettingActionButton>}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "自动备份" : "Automatic backups"}
+                description={lang === "zh" ? "定期把数据快照保存到本地。" : "Periodically save a local data snapshot."}
+              />
+              <SettingSection title={lang === "zh" ? "危险操作" : "Danger zone"} tone="danger">
+                <SettingRow
+                  title={lang === "zh" ? "清空本地数据" : "Clear local data"}
+                  description={lang === "zh" ? "删除当前浏览器 / 桌面端的所有本地数据（任务、项目、习惯、时间记录、设置）。云端数据不受影响。" : "Removes all local data on this browser / desktop build (tasks, projects, habits, time entries, settings). Cloud data is unaffected."}
+                  control={<SettingActionButton tone="danger" onClick={() => setConfirmClearLocalData(true)}>{lang === "zh" ? "清空…" : "Clear…"}</SettingActionButton>}
+                />
+              </SettingSection>
+            </SettingSection>}
+
             {settingsSection === "account" && <section className="df-settings-group"><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
                 <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
@@ -11770,30 +13173,37 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
               <DesktopUpdateControl lang={lang} />
               <AutoLaunchToggle lang={lang} />
-              <div className="df-settings-divider" />
-              <div className="df-settings-subhead">{lang === "zh" ? "数据导出" : "Data Export"}</div>
-              <button className="df-settings-export" onClick={() => exportDataAsJson(data, settings)}>
-                {lang === "zh" ? "导出为 JSON（完整数据）" : "Export as JSON (Full Data)"}
-              </button>
-              <button className="df-settings-export" onClick={() => exportTasksAsCsv(data)}>
-                {lang === "zh" ? "导出任务为 CSV" : "Export Tasks as CSV"}
-              </button>
-              <div className="df-settings-divider" />
-              <div className="df-settings-subhead">{lang === "zh" ? "数据导入" : "Data Import"}</div>
-              <button className="df-settings-export" onClick={() => {
-                if (confirm(lang === "zh" ? "导入 JSON 将覆盖当前所有数据，确定要继续吗？" : "Importing JSON will overwrite all current data. Are you sure you want to continue?")) {
-                  importDataFromJson();
-                }
-              }}>
-                {lang === "zh" ? "导入 JSON（完整数据）" : "Import JSON (Full Data)"}
-              </button>
-              <button className="df-settings-export" onClick={() => {
-                importTasksFromCsv();
-              }}>
-                {lang === "zh" ? "导入任务 CSV" : "Import Tasks CSV"}
-              </button>
               <AccountMoreSection lang={lang} onShowAbout={onShowAbout} onSignOut={onSignOut} onDeleteAccount={onDeleteAccount} />
             </section>}
+
+            {settingsSection === "advanced" && <SettingSection
+              title={lang === "zh" ? "高级" : "Advanced"}
+              description={lang === "zh" ? "调试、实验与恢复选项。修改前请确认你了解影响范围。" : "Debug, experimental, and recovery options. Only change these if you understand the impact."}
+            >
+              <SettingComingSoon
+                title={lang === "zh" ? "开发者模式" : "Developer mode"}
+                description={lang === "zh" ? "显示调试面板与内部状态。" : "Show the debug panel and internal state."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "显示调试信息" : "Show debug info"}
+                description={lang === "zh" ? "在工作区显示性能与状态标记。" : "Surface performance and status markers in the workspace."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "实验功能" : "Experimental features"}
+                description={lang === "zh" ? "尚未稳定的功能开关。" : "Unstabilized feature toggles."}
+              />
+              <SettingComingSoon
+                title={lang === "zh" ? "性能模式" : "Performance mode"}
+                description={lang === "zh" ? "降低动效与重渲染以适配低端设备。" : "Reduce motion and re-renders for lower-end devices."}
+              />
+              <SettingSection title={lang === "zh" ? "危险操作" : "Danger zone"} tone="danger">
+                <SettingRow
+                  title={lang === "zh" ? "重置所有设置" : "Reset all settings"}
+                  description={lang === "zh" ? "把所有设置项恢复为默认值。任务、项目、习惯、时间记录等数据不会删除。" : "Restore every setting to its default. Tasks, projects, habits, and time entries are not affected."}
+                  control={<SettingActionButton tone="danger" onClick={() => setConfirmResetSettings(true)}>{lang === "zh" ? "重置…" : "Reset…"}</SettingActionButton>}
+                />
+              </SettingSection>
+            </SettingSection>}
             </div>
           </div>
         ) : (
@@ -11891,6 +13301,57 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
           document.body,
         );
       })()}
+      {confirmResetSettings && createPortal(
+        <div className="df-dialog-overlay" role="presentation" onMouseDown={() => setConfirmResetSettings(false)}>
+          <section className="df-dialog" role="dialog" aria-modal="true" aria-labelledby="df-reset-settings-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="df-reset-settings-title">{lang === "zh" ? "重置所有设置" : "Reset all settings"}</h2>
+            <p className="df-settings-desc">{lang === "zh" ? "这将把所有设置项恢复为默认值。任务、项目、习惯、时间记录等数据不会删除。此操作无法撤销。" : "This restores every setting to its default. Tasks, projects, habits, and time entries are not affected. This cannot be undone."}</p>
+            <div className="df-dialog-actions">
+              <button type="button" className="df-dialog-secondary" onClick={() => setConfirmResetSettings(false)}>{lang === "zh" ? "取消" : "Cancel"}</button>
+              <button type="button" className="df-dialog-danger" onClick={() => { onSave(getDefaultSettings()); setConfirmResetSettings(false); }}>{lang === "zh" ? "重置" : "Reset"}</button>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
+      {confirmClearLocalData && createPortal(
+        <div className="df-dialog-overlay" role="presentation" onMouseDown={() => setConfirmClearLocalData(false)}>
+          <section className="df-dialog" role="dialog" aria-modal="true" aria-labelledby="df-clear-local-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="df-clear-local-title">{lang === "zh" ? "清空本地数据" : "Clear local data"}</h2>
+            <p className="df-settings-desc">{lang === "zh" ? "这将删除当前浏览器 / 桌面端的所有本地数据（任务、项目、习惯、时间记录、设置）。云端数据不受影响。此操作无法撤销。" : "This removes all local data on this browser / desktop build (tasks, projects, habits, time entries, settings). Cloud data is unaffected. This cannot be undone."}</p>
+            <label className="df-utility-confirm-phrase">
+              <span>{lang === "zh" ? "请输入 DELETE 以确认" : "Type DELETE to confirm"}</span>
+              <input type="text" value={clearLocalDataPhrase} onChange={(event) => setClearLocalDataPhrase(event.target.value)} placeholder="DELETE" />
+            </label>
+            <div className="df-dialog-actions">
+              <button type="button" className="df-dialog-secondary" onClick={() => { setConfirmClearLocalData(false); setClearLocalDataPhrase(""); }}>{lang === "zh" ? "取消" : "Cancel"}</button>
+              <button type="button" className="df-dialog-danger" disabled={clearLocalDataPhrase !== "DELETE"} onClick={() => {
+                try {
+                  // Wipe only NavoPath-owned local entries; Supabase auth
+                  // session keys (sb-*) are preserved so the user stays
+                  // signed in and the cloud profile is re-fetched.
+                  const preserve: string[] = [];
+                  const toRemove: string[] = [];
+                  for (let i = 0; i < localStorage.length; i += 1) {
+                    const key = localStorage.key(i);
+                    if (!key) continue;
+                    if (key.startsWith("sb-") || key.startsWith("supabase")) { preserve.push(key); continue; }
+                    toRemove.push(key);
+                  }
+                  for (const key of toRemove) localStorage.removeItem(key);
+                } catch (err) {
+                  console.error("Failed to clear local data:", err);
+                }
+                setConfirmClearLocalData(false);
+                setClearLocalDataPhrase("");
+                // Hard reload so the app re-bootstraps from a clean state.
+                window.location.href = window.location.pathname;
+              }}>{lang === "zh" ? "清空" : "Clear"}</button>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }
@@ -11982,15 +13443,57 @@ function PluginGuidePage() {
 }
 
 
+// ── Shared layout shells: imported from ./components/ExecutionSharedLayout ──
+// The six shared components (ExecutionSplitLayout, CandidatePanelShell,
+// CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock)
+// are imported at the top of this file (line 54). Both the execution page
+// and ScheduleTemplateModal render through these imported components, so
+// reuse is enforced by the ES-module import graph — not by being in the
+// same file scope.
+
+
+// ── AppErrorBoundary: permanent top-level error boundary ──
+// Catches React render errors and displays the error message + stack so the
+// user sees a diagnostic screen instead of a blank white window. Without this,
+// any uncaught render error in the App tree unmounts the entire root and
+// leaves the Electron window blank.
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[AppErrorBoundary]", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      const message = String(this.state.error?.message || this.state.error);
+      const stack = String(this.state.error?.stack || "");
+      return (
+        <div style={{ padding: 24, fontFamily: "monospace", fontSize: 13, whiteSpace: "pre-wrap", color: "#C96F5B", background: "#fff", minHeight: "100vh" }}>
+          <h2 style={{ color: "#C96F5B", margin: "0 0 12px" }}>Render Error</h2>
+          <pre>{message}</pre>
+          {stack && <pre style={{ marginTop: 12, color: "#666" }}>{stack}</pre>}
+          <button onClick={() => window.location.reload()} style={{ marginTop: 12, padding: "6px 12px", fontSize: 14 }}>Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const rootElement = document.getElementById("root")!;
 const rootKey = "__plannerRoot";
 const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
 const root = rootWindow[rootKey] ?? createRoot(rootElement);
 rootWindow[rootKey] = root;
+const isWidgetRoute = new URLSearchParams(window.location.search).get("widget") === "1";
 root.render(
-  window.location.pathname === "/changelog"
-    ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
-    : window.location.pathname === "/plugin-guide"
-      ? <PluginGuidePage />
-    : <App />,
+  isWidgetRoute
+    ? <WidgetApp />
+    : window.location.pathname === "/changelog"
+      ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
+      : window.location.pathname === "/plugin-guide"
+        ? <PluginGuidePage />
+      : <AppErrorBoundary><App /></AppErrorBoundary>,
 );

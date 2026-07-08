@@ -59,6 +59,54 @@ export function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(n, max));
 }
 
+/**
+ * Duration in minutes between two HH:MM time strings, treating the end as
+ * strictly later than the start. When `end` is numerically ≤ `start` the end
+ * is assumed to fall on the following day (cross-midnight), so a 23:30→00:30
+ * span yields 60 minutes instead of -1380.
+ *
+ * Use this anywhere a duration is derived from `scheduledStart`/`scheduledEnd`
+ * so cross-midnight timeline blocks render and resize correctly.
+ */
+export function durationMinutes(startTime: string, endTime: string): number {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  let diff = end - start;
+  if (diff <= 0) diff += 24 * 60;
+  return diff;
+}
+
+/**
+ * Absolute minutes of a `{date, time}` point relative to `anchorDate`'s start
+ * of day. Used to convert scheduled date+time into the continuous vertical
+ * coordinate used by infinite cross-day scrolling.
+ */
+export function dateTimeToAbsoluteMinutes(date: string, time: string, anchorDate: string): number {
+  const dayIndex = Math.round(
+    (new Date(`${date}T00:00:00`).getTime() - new Date(`${anchorDate}T00:00:00`).getTime()) / 86400000,
+  );
+  return dayIndex * 24 * 60 + timeToMinutes(time);
+}
+
+/**
+ * Inverse of `dateTimeToAbsoluteMinutes`: turn continuous absolute minutes
+ * (relative to `anchorDate`) back into a `{date, time}` pair. Handles values
+ * that fall on later days (band index > 0) by advancing the date.
+ */
+export function absoluteMinutesToDateTime(
+  absoluteMinutes: number,
+  anchorDate: string,
+): { date: string; time: string } {
+  const safeMinutes = ((absoluteMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const dayOffset = Math.floor(absoluteMinutes / (24 * 60));
+  return { date: addDays(anchorDate, dayOffset), time: minutesToTime(safeMinutes) };
+}
+
+/** Snap an absolute-minutes value to the timeline grid. */
+export function snapMinutes(minutes: number, snap = SLOT_MINUTES): number {
+  return Math.round(minutes / snap) * snap;
+}
+
 // ── 1. Visible Days ──
 
 export type TimelineViewMode = "daily" | "3day" | "weekly";
@@ -239,6 +287,8 @@ export function timeBlockTop(startTime: string, startHour = TIMELINE_START, hour
 }
 
 export function timeBlockHeight(startTime: string, endTime: string, startHour = TIMELINE_START, hourHeight = HOUR_HEIGHT): number {
-  const dur = Math.max(timeToMinutes(endTime) - timeToMinutes(startTime), SLOT_MINUTES);
+  // Cross-midnight spans (e.g. 23:30→00:30) must keep their full 60m height
+  // instead of collapsing to the SLOT_MINUTES fallback.
+  const dur = Math.max(durationMinutes(startTime, endTime), SLOT_MINUTES);
   return Math.max((dur / 60) * hourHeight, SLOT_HEIGHT);
 }

@@ -206,18 +206,27 @@ describe("TaskBlock shared component contract", () => {
     const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
     const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
 
-    expect(main).toContain("df-habit-week-toolbar");
+    // Habit overview was refactored from `df-habit-week-*` to the borderless
+    // `df-habit-overview-*` table layout. Assert the new class names so this
+    // test tracks the post-refactor contract instead of the removed CSS.
+    expect(main).toContain("df-habit-overview-toolbar");
     expect(main).toContain("df-habit-overview-add");
-    expect(main).toContain("df-habit-candidate-settings");
-    expect(css).toContain(".df-habit-week-table");
+    // The small square settings button next to the "习惯" title was intentionally
+    // removed; the habit overview is now opened by clicking the habit card itself
+    // (TaskGroup onClick → onOpenOverview). Assert the button class is gone.
+    expect(main).not.toContain("df-habit-candidate-settings");
+    expect(css).toContain(".df-habit-overview-table");
   });
 
-  it("routes continuous cross-day wheel navigation through a boundary helper", () => {
+  it("renders continuous cross-day scroll as one vertical daily timeline", () => {
     const main = readFileSync(resolve(__dirname, "../main.tsx"), "utf8");
 
-    expect(main).toContain("shiftTimelineAtScrollBoundary");
-    expect(main).toContain("settings.continuousCrossDayScroll !== false");
+    expect(main).toContain("buildDailyContinuousDates");
+    expect(main).toContain("dailyContinuousTargetFromContentY");
+    expect(main).toContain("dailyContinuousBlockTop");
     expect(main).toContain("data-cross-day-scroll");
+    expect(main).not.toContain("shiftTimelineAtScrollBoundary");
+    expect(main).not.toContain("scrollTop = direction > 0 ? 0");
   });
 
   it("uses a shared pointer-event drag system for Planning views", () => {
