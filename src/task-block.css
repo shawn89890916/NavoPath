@@ -809,7 +809,7 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
-  margin: 8px 10px 4px;
+  margin: 8px 10px 7px;
   padding: 6px 10px;
   border: 1px solid var(--task-border);
   border-bottom: 2px solid var(--timer-project-color, var(--task-project-color, var(--accent-active)));

@@ -4497,6 +4497,18 @@ body.df-timeline-pointer-drag * {
   transition: background 120ms ease;
 }
 
+/* Defensive: guarantee no stray dashed/outline/border on the candidate list
+   in normal (non-dragging, non-onboarding) state. Any dashed visual must be
+   gated by an explicit state class (.onboarding-step-drag, .is-dragging,
+   .drop-active). Prevents leftover drop placeholders from occupying space. */
+.df-app:not(.onboarding-step-drag):not(.is-dragging) .df-candidate-list {
+  outline: none;
+  border: none;
+}
+.df-app .df-candidate-list > .df-candidate-task-row:first-child {
+  margin-top: 0;
+}
+
 .df-app .df-candidate-task-row:hover {
   background: var(--paper-note);
 }
