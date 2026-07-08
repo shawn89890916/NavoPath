@@ -21,6 +21,7 @@
 - 修复今日候选任务卡外侧仍露出淡粉/淡红面板底色的问题：经运行时 DOM 与 computed style 检查，真实元素不是 placeholder/drop zone/selected state，而是 `.df-candidate-panel` 的纸面背景透过透明 `.df-candidate-task-row` 暴露出来；原因是 `.df-task-card` 在 flex row 中按内容收缩，未填满整行。现在候选列表内的任务卡设为 `flex: 1 1 auto; width: 100%; min-width: 0`，外层 wrapper 继续只做结构容器、不参与视觉，卡片外侧不再露出额外色块，项目色左侧细条和拖拽插入线保持不变。
 
 ### 改进
+- 桌面置顶小组件的「更多」菜单进一步收敛为简约设置面板：保留关闭小组件、切换置顶、背景颜色、透明度、字体颜色、强调颜色、恢复默认外观与重置位置；背景、透明度、字体和强调色会即时生效并持久化到小组件本地设置中。
 - 未实现的设置项（如默认任务时长、点击空白创建任务、拖拽吸附间隔、桌面小组件的显示正在做 / 快速添加 / 计时器 / 紧凑模式、开发者模式等）统一显示为「即将支持」禁用行，不再出现只改 UI 不接实际状态的假开关。
 - 原「页面」「功能」两个旧分区已移除，内容按真实归属迁移到通用 / 外观 / 执行 / 规划 / 模板 / 习惯 / 指标 / 桌面小组件等新分类；旧版本持久化的分区标识会自动映射到对应新分类，不会落到空白面板。
 - 收紧执行页左侧「今日候选」任务卡之间的垂直间距：候选行垂直内边距由 9px 调整为 7px，卡片间视觉间隙从约 18px 收紧到约 14px，列表更紧凑但不拥挤。
@@ -51,6 +52,7 @@
 - Fixed the remaining pale pink/red panel surface showing outside today-candidate task cards: runtime DOM and computed-style inspection showed the real element was not a placeholder, drop zone, selected state, or drag residue. It was the `.df-candidate-panel` paper background showing through the transparent `.df-candidate-task-row` because the `.df-task-card` flex child was shrinking to content width instead of filling the row. Candidate-list task cards now use `flex: 1 1 auto; width: 100%; min-width: 0`, keeping the outer wrapper structural and invisible while preventing exposed side blocks. The project-color left rule and in-drag insertion line behavior are unchanged.
 
 ### Improved
+- Desktop always-on-top widget "More" menu refined into a minimal settings panel: Close widget, Toggle always-on-top, Background color, Opacity, Font color, Accent color, Reset appearance, and Reset position. Background, opacity, font, and accent changes apply instantly and persist in widget-local settings.
 - Unimplemented settings (e.g. default task duration, click-blank-to-create-task, drag snap interval, widget show-current-task / quick-add / timer / compact mode, developer mode) now render as disabled "Coming soon" rows instead of fake toggles that only change UI without wiring real state.
 - The legacy "Page" and "Features" sections are removed; their contents are migrated to the new categories by real ownership. Persisted section ids from older builds are auto-mapped to the matching new category so they never land on an empty panel.
 - Tightened the vertical spacing between today-candidate task cards on the execution page: candidate row vertical padding went from 9px to 7px, reducing the visual gap from ~18px to ~14px for a denser but not cramped list.

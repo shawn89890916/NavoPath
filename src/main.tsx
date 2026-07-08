@@ -1589,22 +1589,28 @@ const WIDGET_POSITION_KEY = "navopath-widget-position";
 const WIDGET_PREFS_KEY = "navopath-widget-prefs";
 
 /** Strip window base size; expanded when the "more" menu is open. */
-const WIDGET_STRIP_W = 640;
-const WIDGET_STRIP_H = 76;
-const WIDGET_EXPANDED_H = 340;
+const WIDGET_STRIP_W = 704;
+const WIDGET_STRIP_H = 96;
+const WIDGET_EXPANDED_H = 390;
 
 type WidgetColorMode = "default" | "project" | "red" | "green" | "blue" | "white";
 type WidgetOpacity = 1 | 0.9 | 0.8 | 0.7 | 0.6;
 type WidgetMenuView = null | "main" | "quickAdd" | "opacity" | "timeColor" | "taskColor";
 
 interface WidgetDisplayPrefs {
-  opacity: WidgetOpacity;
-  timeColorMode: WidgetColorMode;
-  taskTitleColorMode: WidgetColorMode;
+  backgroundColor: string;
+  opacity: number;
+  fontColor: string;
+  accentColor: string;
+  timeColorMode?: WidgetColorMode;
+  taskTitleColorMode?: WidgetColorMode;
 }
 
 const DEFAULT_WIDGET_PREFS: WidgetDisplayPrefs = {
-  opacity: 1,
+  backgroundColor: "#FBF9FF",
+  opacity: 0.96,
+  fontColor: "#3F3A35",
+  accentColor: "#00D91A",
   timeColorMode: "default",
   taskTitleColorMode: "default",
 };
@@ -1635,10 +1641,40 @@ const WIDGET_COLOR_MODE_OPTIONS_EN: Array<{ value: WidgetColorMode; label: strin
   { value: "white", label: "White" },
 ];
 
-function resolveWidgetColor(mode: WidgetColorMode, projectColor: string): string {
-  if (mode === "default") return "var(--widget-ink)";
+function resolveWidgetColor(mode: WidgetColorMode | undefined, projectColor: string): string {
+  if (!mode || mode === "default") return "var(--widget-ink)";
   if (mode === "project") return projectColor;
   return WIDGET_COLOR_PRESETS[mode];
+}
+
+function normalizeWidgetHex(value: unknown, fallback: string): string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+}
+
+function normalizeWidgetOpacity(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_WIDGET_PREFS.opacity;
+  return Math.min(1, Math.max(0.35, parsed));
+}
+
+function normalizeWidgetPrefs(value: Partial<WidgetDisplayPrefs>): WidgetDisplayPrefs {
+  return {
+    backgroundColor: normalizeWidgetHex(value.backgroundColor, DEFAULT_WIDGET_PREFS.backgroundColor),
+    opacity: normalizeWidgetOpacity(value.opacity),
+    fontColor: normalizeWidgetHex(value.fontColor, DEFAULT_WIDGET_PREFS.fontColor),
+    accentColor: normalizeWidgetHex(value.accentColor, DEFAULT_WIDGET_PREFS.accentColor),
+    timeColorMode: value.timeColorMode || DEFAULT_WIDGET_PREFS.timeColorMode,
+    taskTitleColorMode: value.taskTitleColorMode || DEFAULT_WIDGET_PREFS.taskTitleColorMode,
+  };
+}
+
+function hexToRgbTriplet(hex: string): string {
+  const clean = hex.replace("#", "");
+  return [
+    Number.parseInt(clean.slice(0, 2), 16),
+    Number.parseInt(clean.slice(2, 4), 16),
+    Number.parseInt(clean.slice(4, 6), 16),
+  ].join(" ");
 }
 
 function loadWidgetPrefs(): WidgetDisplayPrefs {
@@ -1646,7 +1682,7 @@ function loadWidgetPrefs(): WidgetDisplayPrefs {
     const raw = localStorage.getItem(WIDGET_PREFS_KEY);
     if (!raw) return { ...DEFAULT_WIDGET_PREFS };
     const parsed = JSON.parse(raw) as Partial<WidgetDisplayPrefs>;
-    return { ...DEFAULT_WIDGET_PREFS, ...parsed };
+    return normalizeWidgetPrefs({ ...DEFAULT_WIDGET_PREFS, ...parsed });
   } catch {
     return { ...DEFAULT_WIDGET_PREFS };
   }
@@ -1725,7 +1761,7 @@ function WidgetApp() {
 
   const updatePrefs = useCallback((patch: Partial<WidgetDisplayPrefs>) => {
     setPrefs((prev) => {
-      const next = { ...prev, ...patch };
+      const next = normalizeWidgetPrefs({ ...prev, ...patch });
       saveWidgetPrefs(next);
       return next;
     });
@@ -1769,7 +1805,7 @@ function WidgetApp() {
 
   const hasTask = Boolean(snapshot?.taskId);
   const zh = lang === "zh";
-  const projectColor = snapshot?.taskProjectColor || "var(--widget-accent)";
+  const projectColor = prefs.accentColor || snapshot?.taskProjectColor || "var(--widget-accent)";
   const statusLabel = hasTask ? (zh ? "正在做" : "Working") : (zh ? "空闲" : "Idle");
   const statusColor = hasTask ? projectColor : "var(--widget-muted)";
   const taskTitle = hasTask ? (snapshot?.taskTitle || "") : (zh ? "暂无进行中的任务" : "No active task");
@@ -1777,16 +1813,22 @@ function WidgetApp() {
   const timerColor = resolveWidgetColor(prefs.timeColorMode, projectColor);
   const timerRunning = Boolean(snapshot?.timerRunning);
   const colorModeOptions = zh ? WIDGET_COLOR_MODE_OPTIONS_ZH : WIDGET_COLOR_MODE_OPTIONS_EN;
+  const widgetStyle = {
+    "--widget-bg-rgb": hexToRgbTriplet(prefs.backgroundColor),
+    "--widget-opacity": String(prefs.opacity),
+    "--widget-ink": prefs.fontColor,
+    "--widget-accent": projectColor,
+  } as CSSProperties;
 
   return (
-    <div className="df-widget-root" data-lang={lang} style={{ opacity: prefs.opacity }}>
+    <div className="df-widget-root" data-lang={lang} style={widgetStyle}>
       <div className="df-widget-strip" role="status" aria-live="polite">
         <span className="df-widget-status" style={{ color: statusColor }}>{statusLabel}</span>
         <span className="df-widget-task-title" style={{ color: taskTitleColor }} title={taskTitle}>{taskTitle}</span>
         <span className="df-widget-timer" style={{ color: timerColor }}>{formatWidgetTimer(localElapsed)}</span>
         <button
           type="button"
-          className="df-widget-icon-btn"
+          className={`df-widget-icon-btn df-widget-play-btn ${timerRunning ? "is-paused" : ""}`}
           aria-label={timerRunning ? (zh ? "暂停" : "Pause") : (zh ? "播放" : "Play")}
           onClick={handleTimerToggle}
           disabled={!hasTask}
@@ -1795,7 +1837,7 @@ function WidgetApp() {
         </button>
         <button
           type="button"
-          className="df-widget-icon-btn"
+          className="df-widget-icon-btn df-widget-more-btn"
           aria-label={zh ? "更多" : "More"}
           aria-expanded={menuView !== null}
           onClick={() => setMenuView(menuView ? null : "main")}
@@ -1816,19 +1858,39 @@ function WidgetApp() {
                   <span>{zh ? "切换置顶" : "Toggle always-on-top"}</span>
                   <span className="df-widget-menu-check">{alwaysOnTop ? "✓" : ""}</span>
                 </button>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("quickAdd")}>
+                <label className="df-widget-setting-row">
+                  <span>{zh ? "背景颜色" : "Background"}</span>
+                  <input type="color" value={prefs.backgroundColor} onChange={(e) => updatePrefs({ backgroundColor: e.target.value })} />
+                </label>
+                <label className="df-widget-setting-row df-widget-setting-range">
+                  <span>{zh ? "透明度" : "Opacity"}</span>
+                  <output>{Math.round(prefs.opacity * 100)}%</output>
+                  <input type="range" min="0.35" max="1" step="0.01" value={prefs.opacity} onChange={(e) => updatePrefs({ opacity: Number(e.target.value) })} />
+                </label>
+                <label className="df-widget-setting-row">
+                  <span>{zh ? "字体颜色" : "Font color"}</span>
+                  <input type="color" value={prefs.fontColor} onChange={(e) => updatePrefs({ fontColor: e.target.value })} />
+                </label>
+                <label className="df-widget-setting-row">
+                  <span>{zh ? "强调颜色" : "Accent"}</span>
+                  <input type="color" value={prefs.accentColor} onChange={(e) => updatePrefs({ accentColor: e.target.value })} />
+                </label>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => updatePrefs(DEFAULT_WIDGET_PREFS)}>
+                  <span>{zh ? "恢复默认外观" : "Reset appearance"}</span>
+                </button>
+                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("quickAdd")}>
                   <span>{zh ? "快速添加任务" : "Quick add task"}</span>
                   <span className="df-widget-menu-chevron">›</span>
                 </button>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("opacity")}>
+                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("opacity")}>
                   <span>{zh ? "透明度" : "Opacity"}</span>
                   <span className="df-widget-menu-value">{Math.round(prefs.opacity * 100)}%</span>
                 </button>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("timeColor")}>
+                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("timeColor")}>
                   <span>{zh ? "时间颜色" : "Time color"}</span>
                   <span className="df-widget-menu-chevron">›</span>
                 </button>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("taskColor")}>
+                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("taskColor")}>
                   <span>{zh ? "任务名颜色" : "Task title color"}</span>
                   <span className="df-widget-menu-chevron">›</span>
                 </button>
@@ -1875,7 +1937,7 @@ function WidgetApp() {
                 backLabel={zh ? "返回" : "Back"}
                 onBack={() => setMenuView("main")}
                 options={colorModeOptions}
-                selected={prefs.timeColorMode}
+                selected={prefs.timeColorMode || "default"}
                 onSelect={(v) => updatePrefs({ timeColorMode: v as WidgetColorMode })}
               />
             )}
@@ -1886,7 +1948,7 @@ function WidgetApp() {
                 backLabel={zh ? "返回" : "Back"}
                 onBack={() => setMenuView("main")}
                 options={colorModeOptions}
-                selected={prefs.taskTitleColorMode}
+                selected={prefs.taskTitleColorMode || "default"}
                 onSelect={(v) => updatePrefs({ taskTitleColorMode: v as WidgetColorMode })}
               />
             )}

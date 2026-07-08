@@ -3264,3 +3264,183 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   z-index: 10;
   white-space: nowrap;
 }
+
+/* Compact desktop widget, matching the single-row "more on the right" strip. */
+.df-widget-root {
+  --widget-bg: rgb(var(--widget-bg-rgb, 251 249 255) / var(--widget-opacity, 0.96));
+  --widget-border: color-mix(in srgb, var(--widget-ink) 13%, transparent);
+  --widget-muted: color-mix(in srgb, var(--widget-ink) 66%, transparent);
+  --widget-surface-muted: color-mix(in srgb, var(--widget-ink) 7%, transparent);
+  padding: 10px 0 0 0;
+  font-size: 14px;
+}
+
+.df-widget-strip {
+  width: 704px;
+  height: 78px;
+  gap: 16px;
+  padding: 0 18px 0 22px;
+  border-radius: 10px;
+  background: var(--widget-bg);
+  border: 1px solid var(--widget-border);
+  box-shadow: none;
+}
+
+.df-widget-accent-line {
+  height: 4px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  background: var(--widget-accent);
+}
+
+.df-widget-status,
+.df-widget-task-title {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.df-widget-task-title {
+  color: var(--widget-ink);
+}
+
+.df-widget-timer {
+  margin-left: auto;
+  min-width: 62px;
+  text-align: right;
+  color: var(--widget-muted);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.df-widget-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: var(--widget-muted);
+}
+
+.df-widget-icon-btn:hover:not(:disabled) {
+  background: var(--widget-surface-muted);
+  color: var(--widget-ink);
+}
+
+.df-widget-play-btn > span {
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-left: 13px solid currentColor;
+}
+
+.df-widget-play-btn {
+  font-size: 0;
+}
+
+.df-widget-play-btn::before {
+  content: "";
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-left: 13px solid currentColor;
+}
+
+.df-widget-play-btn.is-paused > span {
+  width: 13px;
+  height: 18px;
+  margin-left: 0;
+  border: 0;
+  background:
+    linear-gradient(currentColor, currentColor) left / 5px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) right / 5px 100% no-repeat;
+}
+
+.df-widget-play-btn.is-paused::before {
+  width: 13px;
+  height: 18px;
+  margin-left: 0;
+  border: 0;
+  background:
+    linear-gradient(currentColor, currentColor) left / 5px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) right / 5px 100% no-repeat;
+}
+
+.df-widget-more-btn {
+  gap: 6px;
+  font-size: 0;
+}
+
+.df-widget-more-btn::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 11px 0 0 currentColor, 22px 0 0 currentColor;
+}
+
+.df-widget-more-btn > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.df-widget-menu {
+  top: 88px;
+  right: 0;
+  min-width: 256px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgb(var(--widget-bg-rgb, 251 249 255) / 0.98);
+  box-shadow: 0 16px 36px rgba(39, 35, 30, 0.18);
+}
+
+.df-widget-menu-item,
+.df-widget-setting-row {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.df-widget-setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  color: var(--widget-ink);
+  -webkit-app-region: no-drag;
+}
+
+.df-widget-setting-row input[type="color"] {
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--widget-border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.df-widget-setting-row output {
+  color: var(--widget-muted);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.df-widget-setting-range input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--widget-accent);
+}
+
+.df-widget-legacy-menu-item {
+  display: none;
+}

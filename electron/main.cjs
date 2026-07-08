@@ -1262,8 +1262,8 @@ function createWidgetWindow() {
     : path.join(__dirname, "..", "public", "navopath-icon.png");
 
   widgetWindow = new BrowserWindow({
-    width: 640,
-    height: 76,
+    width: 704,
+    height: 96,
     title: "NavoPath",
     icon: iconPath,
     alwaysOnTop: true,
