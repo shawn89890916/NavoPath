@@ -4875,6 +4875,9 @@ body.df-timeline-pointer-drag * {
    own background, border, border-radius, and left project accent are untouched. */
 .df-app .df-candidate-list .df-task-card,
 .df-app .df-candidate-list .df-candidate-task-row .df-task-card {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   margin-bottom: 0 !important;
 }
 

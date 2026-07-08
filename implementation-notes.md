@@ -1032,6 +1032,42 @@ Refine the existing template modal (already built on shared execution-page compo
 - `npm test -- --run`: 18 files, 101 tests passed.
 - Manual parity: left list still uses `CandidatePanelShell` + `CandidateBlock`; right timeline still uses `TimelineCanvas` + `TimelineEventBlock` + global `.df-slot` / `.df-timeline-canvas` CSS; modal frame still only provides overlay + close + footer; no template-specific layout CSS was reintroduced.
 
+## Candidate Pink Background Root Cause
+
+### DOM
+- Pink background element tag: `SECTION`
+- Pink background element className: `df-candidate-panel compact-inactive`
+- Pink background element data attributes: `data-reuse="candidate-panel-shell"`
+- Parent element className: `df-app mode-execute theme-light type-editorial`
+- Child task card className: `df-task-block df-task-block--candidate df-task-block--appearance-calm df-task-block--priority-normal df-task-card`
+
+### Computed style
+- background-color: `rgb(250, 249, 245)` on `.df-candidate-panel`; it reads as the pale pink/red block when exposed around the task card.
+- padding: `.df-candidate-panel` `18px`; `.df-candidate-task-row` `0px`; `.df-task-card` `14px 16px`.
+- margin: `.df-candidate-panel` `0px`; `.df-candidate-task-row` `0px`; `.df-task-card` `0px`.
+- min-height: `.df-candidate-panel` `auto`; `.df-candidate-task-row` `auto`; `.df-task-card` `64px`.
+- border: `.df-candidate-panel` `1px solid color(srgb 0.345098 0.301961 0.239216 / 0.13)`; `.df-candidate-task-row` `0px none`; `.df-task-card` has the task-block border with project-colored left rule.
+- border-radius: `.df-candidate-panel` `4px`; `.df-candidate-task-row` `0px`; `.df-task-card` `6px`.
+- display: `.df-candidate-panel` `flex`; `.df-candidate-list` `flex`; `.df-candidate-task-row` `flex`; `.df-task-card` `block`.
+- position: `.df-candidate-panel` `static`; `.df-candidate-task-row` `relative`; `.df-task-card` `relative`.
+
+### CSS source
+- CSS selector causing pink background: `.df-app:not(.theme-dark) .df-candidate-panel` / `.df-app .df-candidate-panel` supplies the panel paper surface; `.df-app .df-candidate-task-row` is transparent; `.df-app .df-candidate-list .df-task-card` previously did not force the card to fill the row.
+- CSS file: `src/app-redesign.css`
+- Line number if available: `.df-candidate-task-row` at line 4860; `.df-candidate-list .df-task-card` at line 4876; `.df-candidate-list` at line 4886.
+
+### State source
+- Is it from selected state: no. Runtime inspection found no `.df-candidate-task-row[data-active="true"]`, `.df-task-card.is-selected`, or `data-task-selected="true"` element.
+- Is it from drag state: no. `bodyClasses` was empty and `.df-app` did not include `is-dragging`.
+- Is it from drop target state: no. No `.df-candidate-panel.drop-active`, `.is-drop-container-active`, or `.df-candidate-task-row.is-candidate-drop` was present.
+- Is it from hover state: no. The inspected row was resting; row background was transparent.
+- Is it from source placeholder: no. The task card had no `data-drag-state="source-placeholder"`.
+- Is it from active task wrapper: no. `.df-active-task-chip` is a separate header chip above the list.
+- Is it from reorder placeholder: no. `.df-list-insertion-line` was not present.
+
+### Root cause
+- Exact root cause: the visible "pink block" is the candidate panel paper surface showing through a transparent structural wrapper because `.df-candidate-task-row` is wider than its child `.df-task-card`, while the task card was allowed to shrink to content width. Runtime measurements showed the first row at `370px` wide while its `.df-task-card` was only `353px` wide, leaving exposed `.df-candidate-panel` background outside the task card. The fix makes `.df-candidate-list .df-task-card` fill its row with `flex: 1 1 auto; width: 100%; min-width: 0;`, so the wrapper remains structural and transparent but no longer exposes a colored panel block beside task cards.
+
 ## Candidate Ghost Placeholder Debug
 
 Investigation of the residual "ghost block" under the first today-candidate task. Per spec: do NOT adjust spacing — find the placeholder/drop-zone/source-placeholder that still renders or occupies layout when not dragging, and force it to render only during an active drag.
