@@ -134,6 +134,7 @@ export function CandidateBlock({
   onClick,
   onDoubleClick,
   onPointerDown,
+  dataAttrs,
   children,
 }: {
   mode: "template" | "template-new";
@@ -146,6 +147,9 @@ export function CandidateBlock({
   onClick?: React.MouseEventHandler<HTMLElement>;
   onDoubleClick?: React.MouseEventHandler<HTMLElement>;
   onPointerDown?: React.PointerEventHandler<HTMLElement>;
+  /** Forwarded to TaskBlock so callers can attach data-* attributes used as
+   *  drag/drop selectors (e.g. data-template-row-key for sortable reorder). */
+  dataAttrs?: Record<string, string | undefined>;
   children?: React.ReactNode;
 }) {
   return (
@@ -158,6 +162,7 @@ export function CandidateBlock({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onPointerDown={onPointerDown}
+      dataAttrs={dataAttrs}
       main={
         <span className="df-candidate-block-content">
           {children}

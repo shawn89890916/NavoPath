@@ -54,6 +54,7 @@ import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDur
 import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
 import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingActionButton, SettingDivider, SettingComingSoon, SettingDescription } from "./components/SettingsControls";
 import { getDefaultSettings } from "./defaultSettings";
+import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
@@ -8518,6 +8519,32 @@ function ScheduleTemplateModal({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // ── Template list drag-to-reorder ──
+  // Reuses the shared usePointerReorder hook, which mirrors Today's Candidate
+  // drag feel (pointer capture, 5px threshold, half-height before/after,
+  // is-dragging-source placeholder, .df-list-insertion-line indicator).
+  // Only custom templates are draggable; built-ins are read-only/fixed and the
+  // "+ new template" affordance is a separate button. Custom order persists
+  // via onSaveCustomTemplates (the prop drives display order, so no local
+  // order state is needed).
+  const templateReorder = usePointerReorder<ListRow>({
+    getId: (row) => row.kind === "builtin" ? `builtin:${row.id}` : row.kind === "custom" ? `custom:${row.id}` : "draft:new",
+    selector: "[data-template-row-key]",
+    attrName: "templateRowKey",
+    onReorder: (dragKey, targetKey, position) => {
+      if (!dragKey.startsWith("custom:") || !targetKey.startsWith("custom:")) return;
+      const dragId = dragKey.replace("custom:", "");
+      const targetId = targetKey.replace("custom:", "");
+      const dragged = customTemplates.find((t) => t.id === dragId);
+      if (!dragged) return;
+      const without = customTemplates.filter((t) => t.id !== dragId);
+      const idx = without.findIndex((t) => t.id === targetId);
+      if (idx < 0) return;
+      without.splice(position === "before" ? idx : idx + 1, 0, dragged);
+      onSaveCustomTemplates(without);
+    },
+  });
+
   useEffect(() => { titleRef.current?.focus(); }, []);
 
   useEffect(() => {
@@ -8528,6 +8555,8 @@ function ScheduleTemplateModal({
           setCreatingState(null);
           setRenamingId(null);
           setEditingPeriodId(null);
+        } else if (templateReorder.drag) {
+          templateReorder.cancelDrag();
         } else {
           onClose();
         }
@@ -8535,7 +8564,7 @@ function ScheduleTemplateModal({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose, dragState, creatingState, renamingId, editingPeriodId]);
+  }, [onClose, dragState, creatingState, renamingId, editingPeriodId, templateReorder.drag, templateReorder.cancelDrag]);
 
   // ── Period factory helpers ──
   function slotToPeriod(slot: BuiltInScheduleTemplateSlot): TemplatePeriod {
@@ -8850,11 +8879,11 @@ function ScheduleTemplateModal({
     | { kind: "custom"; id: string; title: string; periodCount: number; span: string }
     | { kind: "draft"; title: string; periodCount: number; span: string };
 
-  function rowSpan(periodCount: number, slots: { start: string; end: string }[]): string {
-    if (slots.length === 0) return zh ? "无时间段" : "No periods";
-    const starts = slots.map((s) => timeToMinutes(s.start)).sort((a, b) => a - b);
-    const ends = slots.map((s) => timeToMinutes(s.end)).sort((a, b) => a - b);
-    return `${periodCount} ${zh ? "个时间段" : "blocks"} · ${minutesToTime(starts[0])}–${minutesToTime(ends[ends.length - 1])}`;
+  // Template list metadata: period count only — no start/end time range,
+  // per spec ("去掉具体起止时间, 保留时间段数量").
+  function rowCount(periodCount: number): string {
+    if (periodCount === 0) return zh ? "无时间段" : "No periods";
+    return `${periodCount} ${zh ? "个时间段" : "blocks"}`;
   }
 
   const listRows: ListRow[] = [
@@ -8863,20 +8892,20 @@ function ScheduleTemplateModal({
       id,
       title: zh ? SCHEDULE_TEMPLATES[id].labelZh : SCHEDULE_TEMPLATES[id].labelEn,
       periodCount: SCHEDULE_TEMPLATES[id].slots.length,
-      span: rowSpan(SCHEDULE_TEMPLATES[id].slots.length, SCHEDULE_TEMPLATES[id].slots),
+      span: rowCount(SCHEDULE_TEMPLATES[id].slots.length),
     })),
     ...customTemplates.map((t) => ({
       kind: "custom" as const,
       id: t.id,
       title: t.title,
       periodCount: t.slots.length,
-      span: rowSpan(t.slots.length, t.slots),
+      span: rowCount(t.slots.length),
     })),
     ...(templateKey === "draft:new" ? [{
       kind: "draft" as const,
       title: zh ? "新模板草稿" : "New draft",
       periodCount: periods.length,
-      span: rowSpan(periods.length, periods.map((p) => ({ start: minutesToTime(p.startMinutes), end: minutesToTime(p.startMinutes + p.durationMinutes) }))),
+      span: rowCount(periods.length),
     }] : []),
   ];
 
@@ -8951,15 +8980,24 @@ function ScheduleTemplateModal({
                 const key = row.kind === "builtin" ? `builtin:${row.id}` : row.kind === "custom" ? `custom:${row.id}` : "draft:new";
                 const isActive = templateKey === key;
                 const isRenaming = row.kind === "custom" && renamingId === row.id;
+                // Only custom templates are reorder-draggable; built-ins are read-only and the
+                // draft row is a transient selection state (not a persistable list item).
+                const draggable = row.kind === "custom" && !isRenaming;
+                const insertion = templateReorder.insertion;
+                const showInsertionBefore = draggable && insertion && insertion.id === key && insertion.position === "before";
+                const showInsertionAfter = draggable && insertion && insertion.id === key && insertion.position === "after";
                 return (
+                  <React.Fragment key={key}>
+                    {showInsertionBefore ? <div className="df-list-insertion-line" aria-hidden="true" /> : null}
                   <CandidateBlock
-                    key={key}
                     mode="template"
                     selected={isActive}
                     title={isRenaming ? undefined : row.title}
                     meta={row.span}
                     badge={row.kind === "builtin" ? (zh ? "默认" : "Built-in") : undefined}
-                    onClick={() => changeTemplate(key as TemplateKey)}
+                    dataAttrs={draggable ? { "template-row-key": key } : undefined}
+                    onPointerDown={draggable ? (e) => templateReorder.beginDrag(e, row) : undefined}
+                    onClick={() => { if (templateReorder.suppressedRef.current) return; changeTemplate(key as TemplateKey); }}
                     onDoubleClick={(e) => { if (row.kind === "custom") { e.stopPropagation(); startRename(customTemplates.find((t) => t.id === row.id)!); } }}
                   >
                     {isRenaming ? (
@@ -8971,27 +9009,28 @@ function ScheduleTemplateModal({
                         onBlur={commitRename}
                         onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
                         onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
                       />
                     ) : null}
                     {row.kind === "custom" && !isRenaming ? (
-                      <span className="df-candidate-block-actions" onClick={(e) => e.stopPropagation()}>
+                      <span className="df-candidate-block-actions" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
                         <button type="button" className="df-icon-action" data-tip={zh ? "重命名" : "Rename"} aria-label={zh ? "重命名" : "Rename"} onClick={() => startRename(customTemplates.find((t) => t.id === row.id)!)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
                         <button type="button" className="df-icon-action" data-tip={zh ? "复制" : "Duplicate"} aria-label={zh ? "复制" : "Duplicate"} onClick={() => duplicateCustomTemplate(row.id)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                         <button type="button" className="df-icon-action" data-tip={zh ? "删除" : "Delete"} aria-label={zh ? "删除" : "Delete"} onClick={() => deleteCustomTemplateById(row.id)}><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
                       </span>
                     ) : null}
                   </CandidateBlock>
+                    {showInsertionAfter ? <div className="df-list-insertion-line" aria-hidden="true" /> : null}
+                  </React.Fragment>
                 );
               })}
-              {/* New-template row — same CandidateBlock primitive */}
-              <CandidateBlock
-                mode="template-new"
-                selected={templateKey === "draft:new"}
-                title={zh ? "新建" : "New"}
-                meta={zh ? "创建一个空白模板" : "Create a blank template"}
-                icon="+"
-                onClick={createCustomTemplate}
-              />
+              {/* New-template entry — small, narrow, centered button (not a full card). */}
+              <div className="df-template-new-row">
+                <button type="button" className="df-template-new-btn" onClick={createCustomTemplate}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  <span>{zh ? "新建模板" : "New template"}</span>
+                </button>
+              </div>
             </div>
           </CandidatePanelShell>
 
@@ -9018,7 +9057,7 @@ function ScheduleTemplateModal({
                 ) : activeBuiltInId ? (
                   <span className="df-template-name-readonly">{zh ? "默认模板（不可重命名）" : "Built-in template (read-only)"}</span>
                 ) : null}
-                <span className="df-template-name-meta">{rowSpan(periods.length, periods.map((p) => ({ start: minutesToTime(p.startMinutes), end: minutesToTime(p.startMinutes + p.durationMinutes) })))}</span>
+                <span className="df-template-name-meta">{rowCount(periods.length)}</span>
               </div>
               <TimelineCanvas
                 scrollRef={timelineRef}
@@ -9048,21 +9087,18 @@ function ScheduleTemplateModal({
                     const top = (period.startMinutes / SLOT_MINUTES) * SLOT_HEIGHT;
                     const height = Math.max(SLOT_HEIGHT, (period.durationMinutes / SLOT_MINUTES) * SLOT_HEIGHT);
                     const isEditing = editingPeriodId === period.id;
-                    const startStr = minutesToTime(period.startMinutes);
-                    const endStr = minutesToTime(period.startMinutes + period.durationMinutes);
                     return (
                       <TimelineEventBlock
                         key={period.id}
                         mode="template"
                         title={period.title}
-                        timeRange={`${startStr}–${endStr}`}
                         className="df-template-period-block"
                         style={{ position: "absolute", left: "8px", right: "8px", top: `${top}px`, height: `${height}px` }}
                         dataAttrs={{ "template-period": "true" }}
                         onPointerDown={(e) => beginPeriodDrag(e, period, "move")}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!dragState) {
+                          if (!dragState && !templateReorder.suppressedRef.current) {
                             setEditingPeriodId(period.id);
                             setEditingTitle(period.title);
                           }
@@ -9099,6 +9135,24 @@ function ScheduleTemplateModal({
         )}
 
         {templateNotice && <div className="df-template-status" role="status">{templateNotice}</div>}
+
+        {/* Template-list drag overlay — reuses TaskDragLayer (same component as
+            Today's Candidate drag overlay) with a real CandidateBlock clone so
+            the dragged row keeps its exact card styling. */}
+        {templateReorder.drag && (
+          <TaskDragLayer
+            pointer={templateReorder.drag.pointer}
+            sourceRect={templateReorder.drag.sourceRect}
+            offset={templateReorder.drag.offset}
+          >
+            <CandidateBlock
+              mode="template"
+              title={templateReorder.drag.item.title}
+              meta={templateReorder.drag.item.span}
+              badge={templateReorder.drag.item.kind === "builtin" ? (zh ? "默认" : "Built-in") : undefined}
+            />
+          </TaskDragLayer>
+        )}
 
         <footer className="df-template-modal-actions">
           {conflictCount > 0 && (

@@ -20,6 +20,18 @@
   --paper-note: color-mix(in srgb, var(--accent-active) 8%, transparent);
   --paper-note-strong: color-mix(in srgb, var(--accent-active) 14%, transparent);
   --paper-float-shadow: 0 20px 48px rgba(20,18,15,.18);
+  /* SettingToggle hand-drawn paper switch tokens. Off uses a deep brick
+     red, on uses a deep olive green — both muted to sit on the paper
+     surface, never neon. The crayon texture is simulated with layered
+     radial gradients (paper grain) over the fill color. */
+  --toggle-off-fill: #8E4B46;
+  --toggle-off-fill-deep: #6F3A36;
+  --toggle-on-fill: #5D7A52;
+  --toggle-on-fill-deep: #465E3E;
+  --toggle-border: var(--paper-rule-strong);
+  --toggle-border-hover: var(--accent-active);
+  --toggle-thumb-bg: var(--surface-main);
+  --toggle-thumb-border: var(--paper-rule-strong);
   min-height: 100vh;
   color: var(--text-main);
   font-family: var(--paper-sans);
@@ -441,31 +453,64 @@
   background: transparent;
 }
 
-/* SettingToggle: a clear paper switch. Off state uses a muted paper
-   track so it is visibly "off" (not an empty box); on state uses sage
-   accent so it is visibly "on". Disabled dims the whole control.
-   Sized 44x24 with an 18px knob for an unambiguous state. */
+/* SettingToggle: a hand-drawn paper switch. The track carries a deep
+   brick-red fill when off and a deep olive-green fill when on, each
+   overlaid with faint radial-grain layers so it reads as crayon on
+   paper rather than a flat SaaS pill. The thumb stays paper-white
+   with a clear border so it separates cleanly from the fill. */
 .df-settings-toggle {
   position: relative;
   flex: 0 0 auto;
   width: 44px;
   height: 24px;
-  border: 1px solid var(--paper-rule-strong);
+  border: 1px solid var(--toggle-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--text-main) 12%, transparent);
   cursor: pointer;
   padding: 0;
-  transition: border-color var(--paper-motion), background-color var(--paper-motion);
+  /* Off = deep brick red. Layered grain simulates crayon/paper tooth:
+     two fine radial speckle layers + a soft vertical shade so the
+     fill is never a dead flat block. */
+  background-color: var(--toggle-off-fill);
+  background-image:
+    radial-gradient(circle at 22% 38%, rgba(255,255,255,.10) 0 .6px, transparent .8px),
+    radial-gradient(circle at 70% 66%, rgba(0,0,0,.12) 0 .5px, transparent .7px),
+    radial-gradient(circle at 48% 22%, rgba(255,255,255,.06) 0 .4px, transparent .6px),
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.10));
+  background-size: 9px 9px, 12px 12px, 7px 7px, 100% 100%;
+  background-repeat: repeat, repeat, repeat, no-repeat;
+  transition: border-color var(--paper-motion), background-color var(--paper-motion), transform var(--paper-motion);
 }
-.df-settings-toggle:hover { border-color: var(--accent-active); }
-.df-settings-toggle:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+.df-settings-toggle:hover {
+  border-color: var(--toggle-border-hover);
+  background-color: var(--toggle-off-fill-deep);
+}
+.df-settings-toggle:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.df-settings-toggle:focus-visible {
+  outline: 1px solid var(--accent-active);
+  outline-offset: 2px;
+}
 .df-settings-toggle[data-state="on"] {
-  background: color-mix(in srgb, var(--navo-sage) 78%, transparent);
-  border-color: var(--navo-sage);
+  background-color: var(--toggle-on-fill);
+  background-image:
+    radial-gradient(circle at 22% 38%, rgba(255,255,255,.10) 0 .6px, transparent .8px),
+    radial-gradient(circle at 70% 66%, rgba(0,0,0,.12) 0 .5px, transparent .7px),
+    radial-gradient(circle at 48% 22%, rgba(255,255,255,.06) 0 .4px, transparent .6px),
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.10));
 }
-.df-settings-toggle[data-state="on"]:hover { border-color: var(--navo-sage); }
+.df-settings-toggle[data-state="on"]:hover {
+  border-color: var(--toggle-on-fill);
+  background-color: var(--toggle-on-fill-deep);
+}
+/* Disabled dims but keeps the fill so you can still tell on from off. */
 .df-settings-toggle[data-disabled="true"],
-.df-settings-toggle:disabled { cursor: not-allowed; opacity: .45; }
+.df-settings-toggle:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+.df-settings-toggle[data-disabled="true"]:active,
+.df-settings-toggle:disabled:active { transform: none; }
 .df-settings-toggle-knob {
   position: absolute;
   top: 2px;
@@ -473,14 +518,20 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--surface-main);
-  border: 1px solid var(--paper-rule-strong);
+  background: var(--toggle-thumb-bg);
+  border: 1px solid var(--toggle-thumb-border);
+  /* A whisper of paper grain on the thumb so it does not look like
+     a plastic bead against the crayon track. */
+  background-image: radial-gradient(circle at 35% 30%, rgba(0,0,0,.04) 0 .4px, transparent .6px);
+  background-size: 6px 6px;
+  background-repeat: repeat;
+  box-shadow: 0 1px 0 rgba(0,0,0,.06);
   transition: transform var(--paper-motion), background-color var(--paper-motion), border-color var(--paper-motion);
 }
 .df-settings-toggle[data-state="on"] .df-settings-toggle-knob {
   transform: translateX(20px);
-  background: var(--surface-main);
-  border-color: color-mix(in srgb, var(--navo-sage) 30%, var(--surface-main));
+  background: var(--toggle-thumb-bg);
+  border-color: var(--toggle-on-fill-deep);
 }
 
 /* SettingSelect / SettingTextInput / SettingNumberInput: native controls

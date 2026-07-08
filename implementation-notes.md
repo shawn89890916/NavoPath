@@ -980,3 +980,54 @@ Every SettingRow that does not have a real backing field is rendered as `Setting
 - Footer: change to `display: flex; justify-content: flex-end; gap: 12px;` with the conflict note using `margin-right: auto` so it sits on the left while the action group right-aligns.
 - Right panel: wrap the `df-timeline-daily` in `df-timeline-body` > `df-timeline-content` so the template timeline uses the SAME flex layout path as the execution page.
 - Add `TEMPLATE_VISUAL_PARITY_DEBUG` flag: when on, the modal body renders placeholder content using the execution page's EXACT wrapper hierarchy (`df-timeline-panel` > `df-timeline-body` > `df-timeline-content` > `df-timeline-daily` > `df-date-title` + `TimelineCanvas`), to verify the modal frame does not break the execution layout.
+
+## Template Page Refinement (bold titles, no inline time, new-template button, drag reorder)
+
+### Goal
+Refine the existing template modal (already built on shared execution-page components) so it reads as a quieter, more execution-page-like surface: bold the primary template text, drop redundant inline time strings, replace the third-card-style "new template" row with a small centered add button, and let users reorder custom templates by dragging — reusing today-candidate's pointer-capture reorder feel, not a second hand-rolled system.
+
+### Reused components / logic (no second drag system invented)
+- New shared hook: `src/usePointerReorder.ts` — a generic pointer-capture reorder hook parameterized by `{ getId, selector, attrName, onReorder, threshold }`. It mirrors the feel of `beginShelfDrag` (5px threshold, `setPointerCapture`, `elementFromPoint + closest(selector)`, half-height before/after judgment, `is-dragging-source` source placeholder, `df-list-insertion-line` insertion indicator, click suppression via `suppressedRef + setTimeout(0)`). The template list is its first consumer; today-candidate's own `beginShelfDrag` was the reference, not a parallel reimplementation.
+- `CandidateBlock` (`src/components/ExecutionSharedLayout.tsx`) gained a `dataAttrs` prop forwarded to `TaskBlock`, so each template row attaches `data-template-row-key` as the drag/drop selector anchor. No new visual primitive was created.
+- Drag overlay: `TaskDragLayer` (`src/unifiedDrag.tsx`) is reused to render a real `CandidateBlock` snapshot during the drag — the same overlay component already used by planning views.
+- Insertion indicator: the existing `.df-list-insertion-line` CSS rule (`src/app-redesign.css`) is reused verbatim — no template-specific insertion style was added.
+- Source placeholder: the existing `.is-dragging-source` class (`src/components/TaskBlock.tsx` / `task-block.css`) is reused — the hook toggles it on the source row during drag.
+- Timeline drag/resize: untouched. `beginPeriodDrag` and the period resize handlers still operate on draft `TemplatePeriod[]` via `templatePeriodAdapter`, isolated from real tasks. The new list-reorder hook does not touch period data.
+
+### Template list reorder wiring
+- `ScheduleTemplateModal` calls `usePointerReorder<ListRow>({ getId, selector: "[data-template-row-key]", attrName: "templateRowKey", onReorder })`.
+- `getId` maps a `ListRow` to a stable key: `builtin:<id>` for built-in templates, `custom:<id>` for user templates, `draft:new` for the unsaved new-template draft row.
+- `onReorder(dragId, targetId, position)` only fires when both ids start with `custom:` — built-in templates and the draft row are not draggable, so they stay anchored. The dragged custom template is spliced out and reinserted before/after the target, then `onSaveCustomTemplates(reorderedWithoutDraft)` persists the new order to `PlannerData.scheduleTemplates` (the existing save path — no new persistence code).
+- Each custom row sets `draggable = row.kind === "custom" && !isRenaming` and attaches `onPointerDown={templateReorder.beginDrag}` plus `dataAttrs={{ "template-row-key": key }}`. Built-in / draft rows omit both, so they are inert to pointer reorder.
+- Rename input and per-row action buttons stop pointer propagation (`onPointerDown={(e) => e.stopPropagation()}`) so clicking them does not start a drag.
+- Row `onClick` checks `templateReorder.suppressedRef.current` and bails out if a drag just ended — preventing a drag-release from selecting / opening a different template.
+- Escape key path: `templateReorder.cancelDrag()` is wired into the modal's existing Escape handler so pressing Esc during a drag cancels it cleanly.
+- Drag overlay: when `templateReorder.drag` is non-null, a `TaskDragLayer` portal renders a `CandidateBlock mode="template"` snapshot (title + meta + badge) at the pointer position — same overlay component used by planning drag.
+
+### Template card content changes (information density reduction)
+- Left list `meta`: was `rowSpan(periodCount, slots)` → `"8 个时间段 · 08:00–20:15"`. Now `rowCount(periodCount)` → `"8 个时间段"`. The explicit `08:00–20:15` time range is removed from every list row (built-in, custom, draft).
+- Top name-bar `meta` (current template header above the timeline): same `rowCount(periods.length)` swap — no time range in the header.
+- Right timeline period blocks: `TimelineEventBlock` no longer receives `timeRange`. The `startStr`/`endStr` locals that computed `"08:00–08:45"` are deleted. The block body now renders only the title (`<span className="df-time-block-title">`). The block's vertical position and height still encode the time range visually via the timeline grid, so the explicit text is redundant.
+
+### Bold title hierarchy
+- Left list template name: `.df-candidate-block--template .df-candidate-block-title { font-weight: 700 }`. Meta stays at 400 so only the primary text is emphasized.
+- Right timeline period title: `.df-time-block-title { font-weight: 700 }` (was 600).
+- Top current-template name: `.df-template-name-readonly { font-weight: 600; font-size: 13px; color: var(--text-main) }` (was 500 / 12px / `--text-muted`) — promoted to a clearer header weight without breaking the panel title hierarchy.
+- New-template button label: `font: 600 12px` — emphasized enough to read as the action label, but lighter than a card title.
+- Time text: NOT bolded (and is now removed from period blocks entirely; left-list time text is also removed).
+
+### New-template button redesign
+- Replaced the previous `CandidateBlock mode="template-new"` (which looked like a third template card) with a dedicated small centered button:
+  - Container: `.df-template-new-row { display: flex; justify-content: center; padding: 10px 8px 6px }` — horizontally centered, narrow.
+  - Button: `.df-template-new-btn` — `inline-flex`, `padding: 5px 14px`, `border: 1px dashed var(--paper-rule)`, `border-radius: 8px`, `font: 600 12px`, with a 14×14 SVG `+` icon and the label `新建模板` / `New template`. Hover adds a faint paper-tint background; no fill, no shadow, no scale.
+- The long "创建一个空白模板" description is gone — only the concise button label remains.
+- The button is visibly narrower and shorter than a template card, reads as a standalone add entry (similar to "add habit" / "add task" light entries), and stays within the NavoPath paper aesthetic.
+
+### Drag affordance styling
+- `.df-candidate-block--template[data-template-row-key] { cursor: grab; touch-action: none }` and `:active { cursor: grabbing }` — only draggable (custom) rows get the grab cursor, since built-in / draft rows do not set the attribute.
+- No persistent ghost placeholder / dashed box is rendered in the resting state. The insertion line appears only during an active drag, and the source row collapses to the `is-dragging-source` placeholder only while dragged.
+
+### Verification
+- `npm run build`: 514 modules transformed, exit 0.
+- `npm test -- --run`: 18 files, 101 tests passed.
+- Manual parity: left list still uses `CandidatePanelShell` + `CandidateBlock`; right timeline still uses `TimelineCanvas` + `TimelineEventBlock` + global `.df-slot` / `.df-timeline-canvas` CSS; modal frame still only provides overlay + close + footer; no template-specific layout CSS was reintroduced.
