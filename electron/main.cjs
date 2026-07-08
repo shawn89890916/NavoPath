@@ -1262,15 +1262,17 @@ function createWidgetWindow() {
     : path.join(__dirname, "..", "public", "navopath-icon.png");
 
   widgetWindow = new BrowserWindow({
-    width: 320,
-    height: 240,
-    minWidth: 280,
-    minHeight: 180,
-    title: "NavoPath Widget",
+    width: 640,
+    height: 76,
+    title: "NavoPath",
     icon: iconPath,
     alwaysOnTop: true,
-    frame: true,
-    resizable: true,
+    frame: false,
+    resizable: false,
+    transparent: true,
+    autoHideMenuBar: true,
+    backgroundColor: "#00000000",
+    hasShadow: false,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -1321,6 +1323,12 @@ ipcMain.handle("widget:get-position", () => {
   const [x, y] = widgetWindow.getPosition();
   const [width, height] = widgetWindow.getSize();
   return { x, y, width, height };
+});
+ipcMain.handle("widget:set-size", (_event, width, height) => {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    try { widgetWindow.setSize(Math.round(width), Math.round(height)); } catch { /* ignore invalid size */ }
+  }
+  return true;
 });
 
 // Relay: widget renderer → main window (action requests)

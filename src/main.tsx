@@ -1574,15 +1574,87 @@ function YearCalendarOverview({
 }
 
 /* ============================================================
- * Desktop Widget — a compact always-on-top mini panel rendered in
- * a separate Electron BrowserWindow (loaded with ?widget=1). It is
- * a pure IPC client: it holds NO task data of its own and never
- * reads PlannerData. All truth stays in the main window's React
- * store; the widget sends action requests via desktopApi.widget.
- * sendAction and receives WidgetSnapshot pushes via onSnapshot.
+ * Desktop Widget — a single-row "now playing" task strip rendered
+ * in a frameless, transparent, always-on-top Electron BrowserWindow
+ * (loaded with ?widget=1). It is a pure IPC client: it holds NO
+ * task data of its own and never reads PlannerData. All truth stays
+ * in the main window's React store; the widget sends action requests
+ * via desktopApi.widget.sendAction and receives WidgetSnapshot pushes
+ * via onSnapshot. Cosmetic prefs (opacity / time color / task-title
+ * color) are widget-local and persisted in the widget window's own
+ * localStorage so they never touch main-app settings.
  * ============================================================ */
 
 const WIDGET_POSITION_KEY = "navopath-widget-position";
+const WIDGET_PREFS_KEY = "navopath-widget-prefs";
+
+/** Strip window base size; expanded when the "more" menu is open. */
+const WIDGET_STRIP_W = 640;
+const WIDGET_STRIP_H = 76;
+const WIDGET_EXPANDED_H = 340;
+
+type WidgetColorMode = "default" | "project" | "red" | "green" | "blue" | "white";
+type WidgetOpacity = 1 | 0.9 | 0.8 | 0.7 | 0.6;
+type WidgetMenuView = null | "main" | "quickAdd" | "opacity" | "timeColor" | "taskColor";
+
+interface WidgetDisplayPrefs {
+  opacity: WidgetOpacity;
+  timeColorMode: WidgetColorMode;
+  taskTitleColorMode: WidgetColorMode;
+}
+
+const DEFAULT_WIDGET_PREFS: WidgetDisplayPrefs = {
+  opacity: 1,
+  timeColorMode: "default",
+  taskTitleColorMode: "default",
+};
+
+const WIDGET_COLOR_PRESETS: Record<Exclude<WidgetColorMode, "default" | "project">, string> = {
+  red: "#C96F5B",
+  green: "#7EA172",
+  blue: "#6E8DA6",
+  white: "#FFFFFF",
+};
+
+const WIDGET_OPACITY_OPTIONS: WidgetOpacity[] = [1, 0.9, 0.8, 0.7, 0.6];
+
+const WIDGET_COLOR_MODE_OPTIONS_ZH: Array<{ value: WidgetColorMode; label: string }> = [
+  { value: "default", label: "默认正文色" },
+  { value: "project", label: "跟随项目色" },
+  { value: "red", label: "红色" },
+  { value: "green", label: "绿色" },
+  { value: "blue", label: "蓝色" },
+  { value: "white", label: "白色" },
+];
+const WIDGET_COLOR_MODE_OPTIONS_EN: Array<{ value: WidgetColorMode; label: string }> = [
+  { value: "default", label: "Default ink" },
+  { value: "project", label: "Follow project" },
+  { value: "red", label: "Red" },
+  { value: "green", label: "Green" },
+  { value: "blue", label: "Blue" },
+  { value: "white", label: "White" },
+];
+
+function resolveWidgetColor(mode: WidgetColorMode, projectColor: string): string {
+  if (mode === "default") return "var(--widget-ink)";
+  if (mode === "project") return projectColor;
+  return WIDGET_COLOR_PRESETS[mode];
+}
+
+function loadWidgetPrefs(): WidgetDisplayPrefs {
+  try {
+    const raw = localStorage.getItem(WIDGET_PREFS_KEY);
+    if (!raw) return { ...DEFAULT_WIDGET_PREFS };
+    const parsed = JSON.parse(raw) as Partial<WidgetDisplayPrefs>;
+    return { ...DEFAULT_WIDGET_PREFS, ...parsed };
+  } catch {
+    return { ...DEFAULT_WIDGET_PREFS };
+  }
+}
+
+function saveWidgetPrefs(prefs: WidgetDisplayPrefs): void {
+  try { localStorage.setItem(WIDGET_PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
+}
 
 function formatWidgetTimer(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -1594,8 +1666,9 @@ function formatWidgetTimer(seconds: number): string {
 function WidgetApp() {
   const [snapshot, setSnapshot] = useState<WidgetSnapshot | null>(null);
   const [localElapsed, setLocalElapsed] = useState(0);
+  const [prefs, setPrefs] = useState<WidgetDisplayPrefs>(() => loadWidgetPrefs());
+  const [menuView, setMenuView] = useState<WidgetMenuView>(null);
   const [quickTitle, setQuickTitle] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [alwaysOnTop, setAlwaysOnTop] = useState(true);
   const lang = snapshot?.lang || detectSystemLanguage();
@@ -1640,8 +1713,22 @@ function WidgetApp() {
     return () => window.clearInterval(interval);
   }, []);
 
+  // Grow the window while the "more" menu is open so the dropdown is not
+  // clipped by the tight strip bounds; shrink back when closed.
+  useEffect(() => {
+    void window.desktopApi?.widget?.setSize(WIDGET_STRIP_W, menuView ? WIDGET_EXPANDED_H : WIDGET_STRIP_H);
+  }, [menuView]);
+
   const sendAction = useCallback((action: WidgetAction) => {
     window.desktopApi?.widget?.sendAction(action);
+  }, []);
+
+  const updatePrefs = useCallback((patch: Partial<WidgetDisplayPrefs>) => {
+    setPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      saveWidgetPrefs(next);
+      return next;
+    });
   }, []);
 
   const handleQuickAdd = useCallback(() => {
@@ -1649,6 +1736,7 @@ function WidgetApp() {
     if (!title) return;
     sendAction({ type: "quickAdd", title });
     setQuickTitle("");
+    setMenuView(null);
     setToast(lang === "zh" ? "已添加到今日候选" : "Added to today's candidates");
     window.setTimeout(() => setToast(""), 2200);
   }, [quickTitle, sendAction, lang]);
@@ -1659,19 +1747,9 @@ function WidgetApp() {
       sendAction({ type: "timerPause" });
     } else if (snapshot.taskId) {
       sendAction({ type: "timerResume" });
-    } else if (snapshot.taskId === undefined) {
-      // No task — nothing to start.
     }
+    // No task — nothing to start; the button is disabled in this state.
   }, [snapshot, sendAction]);
-
-  const handleComplete = useCallback(() => {
-    if (!snapshot?.taskId) return;
-    sendAction({ type: "complete", taskId: snapshot.taskId });
-  }, [snapshot, sendAction]);
-
-  const handleStop = useCallback(() => {
-    sendAction({ type: "timerStop" });
-  }, [sendAction]);
 
   const toggleAlwaysOnTop = useCallback(() => {
     const next = !alwaysOnTop;
@@ -1682,6 +1760,7 @@ function WidgetApp() {
   const resetPosition = useCallback(() => {
     try { localStorage.removeItem(WIDGET_POSITION_KEY); } catch { /* ignore */ }
     sendAction({ type: "resetPosition" });
+    setMenuView(null);
   }, [sendAction]);
 
   const closeWidget = useCallback(() => {
@@ -1689,85 +1768,162 @@ function WidgetApp() {
   }, []);
 
   const hasTask = Boolean(snapshot?.taskId);
-  const displayElapsed = localElapsed;
   const zh = lang === "zh";
+  const projectColor = snapshot?.taskProjectColor || "var(--widget-accent)";
+  const statusLabel = hasTask ? (zh ? "正在做" : "Working") : (zh ? "空闲" : "Idle");
+  const statusColor = hasTask ? projectColor : "var(--widget-muted)";
+  const taskTitle = hasTask ? (snapshot?.taskTitle || "") : (zh ? "暂无进行中的任务" : "No active task");
+  const taskTitleColor = hasTask ? resolveWidgetColor(prefs.taskTitleColorMode, projectColor) : "var(--widget-muted)";
+  const timerColor = resolveWidgetColor(prefs.timeColorMode, projectColor);
+  const timerRunning = Boolean(snapshot?.timerRunning);
+  const colorModeOptions = zh ? WIDGET_COLOR_MODE_OPTIONS_ZH : WIDGET_COLOR_MODE_OPTIONS_EN;
 
   return (
-    <div className="df-widget-root" data-lang={lang}>
-      <div className="df-widget-header">
-        <span className="df-widget-brand">NavoPath</span>
+    <div className="df-widget-root" data-lang={lang} style={{ opacity: prefs.opacity }}>
+      <div className="df-widget-strip" role="status" aria-live="polite">
+        <span className="df-widget-status" style={{ color: statusColor }}>{statusLabel}</span>
+        <span className="df-widget-task-title" style={{ color: taskTitleColor }} title={taskTitle}>{taskTitle}</span>
+        <span className="df-widget-timer" style={{ color: timerColor }}>{formatWidgetTimer(localElapsed)}</span>
         <button
+          type="button"
+          className="df-widget-icon-btn"
+          aria-label={timerRunning ? (zh ? "暂停" : "Pause") : (zh ? "播放" : "Play")}
+          onClick={handleTimerToggle}
+          disabled={!hasTask}
+        >
+          {timerRunning ? "⏸" : "▶"}
+        </button>
+        <button
+          type="button"
           className="df-widget-icon-btn"
           aria-label={zh ? "更多" : "More"}
-          onClick={() => setMenuOpen((v) => !v)}
-        >⋮</button>
-        <button
-          className="df-widget-icon-btn"
-          aria-label={zh ? "关闭" : "Close"}
-          onClick={closeWidget}
-        >×</button>
+          aria-expanded={menuView !== null}
+          onClick={() => setMenuView(menuView ? null : "main")}
+        >⋯</button>
+        <div className="df-widget-accent-line" style={{ background: projectColor }} />
       </div>
 
-      {menuOpen && (
-        <div className="df-widget-menu">
-          <button onClick={toggleAlwaysOnTop}>
-            <span>{zh ? "始终置顶" : "Always on top"}</span>
-            <span className="df-widget-menu-check">{alwaysOnTop ? "✓" : ""}</span>
-          </button>
-          <button onClick={resetPosition}>{zh ? "重置位置" : "Reset position"}</button>
-          <button onClick={closeWidget}>{zh ? "关闭小组件" : "Close widget"}</button>
-        </div>
+      {menuView !== null && (
+        <>
+          <div className="df-widget-menu-overlay" onClick={() => setMenuView(null)} />
+          <div className="df-widget-menu" role="menu">
+            {menuView === "main" && (
+              <>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={closeWidget}>
+                  <span>{zh ? "关闭小组件" : "Close widget"}</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={toggleAlwaysOnTop}>
+                  <span>{zh ? "切换置顶" : "Toggle always-on-top"}</span>
+                  <span className="df-widget-menu-check">{alwaysOnTop ? "✓" : ""}</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("quickAdd")}>
+                  <span>{zh ? "快速添加任务" : "Quick add task"}</span>
+                  <span className="df-widget-menu-chevron">›</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("opacity")}>
+                  <span>{zh ? "透明度" : "Opacity"}</span>
+                  <span className="df-widget-menu-value">{Math.round(prefs.opacity * 100)}%</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("timeColor")}>
+                  <span>{zh ? "时间颜色" : "Time color"}</span>
+                  <span className="df-widget-menu-chevron">›</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => setMenuView("taskColor")}>
+                  <span>{zh ? "任务名颜色" : "Task title color"}</span>
+                  <span className="df-widget-menu-chevron">›</span>
+                </button>
+                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={resetPosition}>
+                  <span>{zh ? "重置位置" : "Reset position"}</span>
+                </button>
+              </>
+            )}
+
+            {menuView === "quickAdd" && (
+              <div className="df-widget-menu-sub">
+                <button type="button" className="df-widget-menu-back" onClick={() => setMenuView("main")}>
+                  <span aria-hidden>‹</span><span>{zh ? "返回" : "Back"}</span>
+                </button>
+                <div className="df-widget-menu-sub-title">{zh ? "快速添加任务" : "Quick add task"}</div>
+                <form className="df-widget-quick-add" onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }}>
+                  <input
+                    type="text"
+                    className="df-widget-input"
+                    placeholder={zh ? "添加任务..." : "Add a task..."}
+                    value={quickTitle}
+                    onChange={(e) => setQuickTitle(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" className="df-widget-btn df-widget-btn-accent" disabled={!quickTitle.trim()}>{zh ? "添加" : "Add"}</button>
+                </form>
+              </div>
+            )}
+
+            {menuView === "opacity" && (
+              <WidgetOptionSubmenu
+                title={zh ? "透明度" : "Opacity"}
+                backLabel={zh ? "返回" : "Back"}
+                onBack={() => setMenuView("main")}
+                options={WIDGET_OPACITY_OPTIONS.map((v) => ({ value: String(v), label: `${Math.round(v * 100)}%` }))}
+                selected={String(prefs.opacity)}
+                onSelect={(v) => updatePrefs({ opacity: Number(v) as WidgetOpacity })}
+              />
+            )}
+
+            {menuView === "timeColor" && (
+              <WidgetOptionSubmenu
+                title={zh ? "时间颜色" : "Time color"}
+                backLabel={zh ? "返回" : "Back"}
+                onBack={() => setMenuView("main")}
+                options={colorModeOptions}
+                selected={prefs.timeColorMode}
+                onSelect={(v) => updatePrefs({ timeColorMode: v as WidgetColorMode })}
+              />
+            )}
+
+            {menuView === "taskColor" && (
+              <WidgetOptionSubmenu
+                title={zh ? "任务名颜色" : "Task title color"}
+                backLabel={zh ? "返回" : "Back"}
+                onBack={() => setMenuView("main")}
+                options={colorModeOptions}
+                selected={prefs.taskTitleColorMode}
+                onSelect={(v) => updatePrefs({ taskTitleColorMode: v as WidgetColorMode })}
+              />
+            )}
+          </div>
+        </>
       )}
 
-      {/* 正在做 */}
-      <section className="df-widget-section">
-        <h3 className="df-widget-section-title">{zh ? "正在做" : "Working"}</h3>
-        {hasTask ? (
-          <div className="df-widget-current">
-            <div className="df-widget-task-row">
-              {snapshot?.taskProjectColor && (
-                <span className="df-widget-task-dot" style={{ background: snapshot.taskProjectColor }} />
-              )}
-              <span className="df-widget-task-title">{snapshot?.taskTitle}</span>
-            </div>
-            <div className="df-widget-timer-row">
-              <span className="df-widget-timer-display">{formatWidgetTimer(displayElapsed)}</span>
-              <div className="df-widget-timer-actions">
-                <button className="df-widget-btn" onClick={handleTimerToggle}>
-                  {snapshot?.timerRunning ? (zh ? "暂停" : "Pause") : (zh ? "继续" : "Resume")}
-                </button>
-                <button className="df-widget-btn" onClick={handleStop}>{zh ? "保存" : "Save"}</button>
-                <button className="df-widget-btn df-widget-btn-accent" onClick={handleComplete}>{zh ? "完成" : "Done"}</button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="df-widget-empty">
-            <p>{zh ? "当前没有正在做的任务" : "No active task"}</p>
-            <small>{zh ? `今日候选 ${snapshot?.candidateCount ?? 0} 项` : `${snapshot?.candidateCount ?? 0} candidates today`}</small>
-          </div>
-        )}
-      </section>
-
-      {/* 快速添加 */}
-      <section className="df-widget-section">
-        <h3 className="df-widget-section-title">{zh ? "快速添加" : "Quick add"}</h3>
-        <form
-          className="df-widget-quick-add"
-          onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }}
-        >
-          <input
-            type="text"
-            className="df-widget-input"
-            placeholder={zh ? "添加任务..." : "Add a task..."}
-            value={quickTitle}
-            onChange={(e) => setQuickTitle(e.target.value)}
-          />
-          <button type="submit" className="df-widget-btn" disabled={!quickTitle.trim()}>{zh ? "添加" : "Add"}</button>
-        </form>
-      </section>
-
       {toast && <div className="df-widget-toast">{toast}</div>}
+    </div>
+  );
+}
+
+function WidgetOptionSubmenu({ title, backLabel, onBack, options, selected, onSelect }: {
+  title: string;
+  backLabel: string;
+  onBack: () => void;
+  options: Array<{ value: string; label: string }>;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="df-widget-menu-sub">
+      <button type="button" className="df-widget-menu-back" onClick={onBack}>
+        <span aria-hidden>‹</span><span>{backLabel}</span>
+      </button>
+      <div className="df-widget-menu-sub-title">{title}</div>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className="df-widget-menu-item"
+          onClick={() => onSelect(opt.value)}
+        >
+          <span>{opt.label}</span>
+          <span className="df-widget-menu-check">{selected === opt.value ? "✓" : ""}</span>
+        </button>
+      ))}
     </div>
   );
 }

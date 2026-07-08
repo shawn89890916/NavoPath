@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("desktopApi", {
     setAlwaysOnTop: (enabled) => ipcRenderer.invoke("widget:set-always-on-top", Boolean(enabled)),
     setPosition: (x, y) => ipcRenderer.invoke("widget:set-position", Number(x), Number(y)),
     getPosition: () => ipcRenderer.invoke("widget:get-position"),
+    setSize: (width, height) => ipcRenderer.invoke("widget:set-size", Number(width), Number(height)),
     sendAction: (action) => ipcRenderer.send("widget:action", action),
     onSnapshot: (listener) => {
       const handler = (_event, snapshot) => listener(snapshot);

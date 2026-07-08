@@ -3000,8 +3000,9 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 }
 
 /* ============================================================
- * Desktop Widget — always-on-top mini panel (?widget=1 route)
- * Paper-like, compact, no dashboard/glow look. Desktop-only.
+ * Desktop Widget — single-row "now playing" task strip (?widget=1)
+ * Frameless + transparent window. Paper-like floating card, no
+ * dashboard/glow look, no brand header. Desktop-only.
  * ============================================================ */
 .df-widget-root {
   --widget-bg: var(--surface-card, var(--surface-main, #FBF9FF));
@@ -3009,144 +3010,60 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   --widget-ink: var(--text-main, #27231E);
   --widget-muted: var(--text-muted, #6B6358);
   --widget-accent: var(--accent-active, #7EA172);
+  --widget-surface-muted: color-mix(in srgb, var(--widget-muted) 12%, transparent);
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
   width: 100%;
-  min-height: 100vh;
-  padding: 10px 12px 12px;
-  background: var(--widget-bg);
+  height: 100vh;
+  background: transparent;
   color: var(--widget-ink);
   font-family: inherit;
   font-size: 13px;
-  -webkit-app-region: drag; /* allow dragging from empty areas */
+  padding: 6px 8px;
+  -webkit-app-region: drag; /* drag the window from the card background */
   user-select: none;
+  overflow: visible;
 }
 
-.df-widget-root .df-widget-header,
-.df-widget-root .df-widget-section,
-.df-widget-root .df-widget-menu,
-.df-widget-root .df-widget-toast {
-  -webkit-app-region: no-drag; /* but interactive zones stay clickable */
-}
-
-.df-widget-header {
+/* The horizontal task card. */
+.df-widget-strip {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--widget-border);
-  margin-bottom: 8px;
-}
-
-.df-widget-brand {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--widget-ink);
-  flex: 1 1 auto;
-}
-
-.df-widget-icon-btn {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--widget-muted);
-  font-size: 15px;
-  line-height: 1;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-.df-widget-icon-btn:hover {
-  background: color-mix(in srgb, var(--widget-muted) 14%, transparent);
-  color: var(--widget-ink);
-}
-
-.df-widget-menu {
-  position: absolute;
-  top: 34px;
-  right: 12px;
-  z-index: 5;
-  min-width: 140px;
-  padding: 4px;
+  gap: 14px;
+  height: 56px;
+  padding: 0 14px 0 18px;
+  border-radius: 12px;
   background: var(--widget-bg);
   border: 1px solid var(--widget-border);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(39, 35, 30, 0.10);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.df-widget-menu button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 8px;
-  border: none;
-  background: transparent;
-  color: var(--widget-ink);
-  font-size: 12px;
-  text-align: left;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.df-widget-menu button:hover {
-  background: color-mix(in srgb, var(--widget-muted) 12%, transparent);
-}
-.df-widget-menu-check {
-  color: var(--widget-accent);
-  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(39, 35, 30, 0.16);
+  overflow: hidden;
 }
 
-.df-widget-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 0;
-}
-.df-widget-section + .df-widget-section {
-  border-top: 1px solid var(--widget-border);
-}
-
-.df-widget-section-title {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--widget-muted);
-  text-transform: uppercase;
+/* Bottom accent line = current task's project color. */
+.df-widget-accent-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  background: var(--widget-accent);
+  pointer-events: none;
 }
 
-.df-widget-current {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.df-widget-task-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.df-widget-task-dot {
+.df-widget-status {
   flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 13px;
 }
+
 .df-widget-task-title {
   flex: 1 1 auto;
   min-width: 0;
+  font-weight: 650;
   font-size: 13px;
-  font-weight: 600;
   line-height: 1.3;
   color: var(--widget-ink);
   overflow: hidden;
@@ -3154,38 +3071,165 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   white-space: nowrap;
 }
 
-.df-widget-timer-row {
+.df-widget-timer {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--widget-ink);
+  white-space: nowrap;
+}
+
+.df-widget-icon-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--widget-muted);
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 120ms ease, color 120ms ease;
+}
+.df-widget-icon-btn:hover:not(:disabled) {
+  background: var(--widget-surface-muted);
+  color: var(--widget-ink);
+}
+.df-widget-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Click-catcher so clicking outside the menu (but inside the window) closes it. */
+.df-widget-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.df-widget-menu {
+  position: absolute;
+  top: 66px;
+  right: 8px;
+  z-index: 6;
+  min-width: 196px;
+  padding: 4px;
+  background: var(--widget-bg);
+  border: 1px solid var(--widget-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(39, 35, 30, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  -webkit-app-region: no-drag;
+}
+.df-widget-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.df-widget-timer-display {
-  font-variant-numeric: tabular-nums;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
   color: var(--widget-ink);
-  flex: 0 0 auto;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
 }
-.df-widget-timer-actions {
+.df-widget-menu-item:hover {
+  background: var(--widget-surface-muted);
+}
+.df-widget-menu-check {
+  color: var(--widget-accent);
+  font-weight: 700;
+}
+.df-widget-menu-value,
+.df-widget-menu-chevron {
+  color: var(--widget-muted);
+  font-size: 12px;
+}
+
+.df-widget-menu-sub {
   display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+}
+.df-widget-menu-back {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--widget-muted);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.df-widget-menu-back:hover {
+  color: var(--widget-ink);
+  background: var(--widget-surface-muted);
+}
+.df-widget-menu-sub-title {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--widget-muted);
+  text-transform: uppercase;
+}
+
+.df-widget-quick-add {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  padding: 4px 10px 6px;
+}
+.df-widget-input {
   flex: 1 1 auto;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--widget-border);
+  border-radius: 6px;
+  background: var(--widget-bg);
+  color: var(--widget-ink);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.df-widget-input:focus {
+  border-color: color-mix(in srgb, var(--widget-accent) 50%, var(--widget-border));
+}
+.df-widget-input::placeholder {
+  color: var(--widget-muted);
+  opacity: 0.7;
 }
 
 .df-widget-btn {
   flex: 0 0 auto;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border: 1px solid var(--widget-border);
   background: var(--widget-bg);
   color: var(--widget-ink);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
@@ -3202,49 +3246,6 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 }
 .df-widget-btn-accent:hover:not(:disabled) {
   background: color-mix(in srgb, var(--widget-accent) 10%, var(--widget-bg));
-}
-
-.df-widget-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 0;
-}
-.df-widget-empty p {
-  margin: 0;
-  font-size: 12px;
-  color: var(--widget-muted);
-}
-.df-widget-empty small {
-  font-size: 11px;
-  color: var(--widget-muted);
-  opacity: 0.8;
-}
-
-.df-widget-quick-add {
-  display: flex;
-  gap: 6px;
-  align-items: stretch;
-}
-.df-widget-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 5px 8px;
-  border: 1px solid var(--widget-border);
-  border-radius: 5px;
-  background: var(--widget-bg);
-  color: var(--widget-ink);
-  font-size: 12px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 120ms ease;
-}
-.df-widget-input:focus {
-  border-color: color-mix(in srgb, var(--widget-accent) 50%, var(--widget-border));
-}
-.df-widget-input::placeholder {
-  color: var(--widget-muted);
-  opacity: 0.7;
 }
 
 .df-widget-toast {

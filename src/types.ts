@@ -574,6 +574,7 @@ declare global {
         setAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
         setPosition: (x: number, y: number) => Promise<boolean>;
         getPosition: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
+        setSize: (width: number, height: number) => Promise<boolean>;
         /** Widget side: fire an action request to the main window (fire-and-forget). */
         sendAction: (action: WidgetAction) => void;
         /** Widget side: listen for snapshot pushes from the main window. */
