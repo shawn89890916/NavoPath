@@ -400,21 +400,28 @@
 
 /* SettingRow: a single fine-ruled row with a label column and a
    control column. No card, no fill, no hover surface — just paper
-   rhythm. */
+   rhythm. The control column keeps a stable min-width so selects and
+   toggles never get squeezed into an unreadable sliver. */
 .df-settings-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 18px;
-  min-height: 44px;
-  padding: 9px 0;
+  column-gap: 24px;
+  min-height: 52px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--paper-rule);
 }
 .df-settings-row:last-child { border-bottom: 0; }
 .df-settings-row-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .df-settings-row-title { color: var(--text-main); font: 500 13px/1.4 var(--paper-sans); }
 .df-settings-row-desc { color: var(--text-muted); font: 400 11px/1.45 var(--paper-sans); }
-.df-settings-row-control { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.df-settings-row-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 140px;
+}
 .df-settings-row[data-disabled="true"] .df-settings-row-title,
 .df-settings-row[data-disabled="true"] .df-settings-row-desc { color: var(--text-faint); }
 .df-settings-row[data-disabled="true"] .df-settings-row-control { opacity: .55; pointer-events: none; }
@@ -434,56 +441,165 @@
   background: transparent;
 }
 
-/* SettingToggle: a quiet paper switch. Ink track, accent knob when on.
-   No glow, no scale, no hover lift. */
+/* SettingToggle: a clear paper switch. Off state uses a muted paper
+   track so it is visibly "off" (not an empty box); on state uses sage
+   accent so it is visibly "on". Disabled dims the whole control.
+   Sized 44x24 with an 18px knob for an unambiguous state. */
 .df-settings-toggle {
   position: relative;
-  width: 34px; height: 18px;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 24px;
   border: 1px solid var(--paper-rule-strong);
   border-radius: 999px;
-  background: transparent;
+  background: color-mix(in srgb, var(--text-main) 12%, transparent);
   cursor: pointer;
   padding: 0;
   transition: border-color var(--paper-motion), background-color var(--paper-motion);
 }
 .df-settings-toggle:hover { border-color: var(--accent-active); }
-.df-settings-toggle.is-on { background: var(--accent-active); border-color: var(--accent-active); }
 .df-settings-toggle:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
-.df-settings-toggle:disabled { cursor: not-allowed; opacity: .5; }
+.df-settings-toggle[data-state="on"] {
+  background: color-mix(in srgb, var(--navo-sage) 78%, transparent);
+  border-color: var(--navo-sage);
+}
+.df-settings-toggle[data-state="on"]:hover { border-color: var(--navo-sage); }
+.df-settings-toggle[data-disabled="true"],
+.df-settings-toggle:disabled { cursor: not-allowed; opacity: .45; }
 .df-settings-toggle-knob {
   position: absolute;
-  top: 2px; left: 2px;
-  width: 12px; height: 12px;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform var(--paper-motion), background-color var(--paper-motion);
+  background: var(--surface-main);
+  border: 1px solid var(--paper-rule-strong);
+  transition: transform var(--paper-motion), background-color var(--paper-motion), border-color var(--paper-motion);
 }
-.df-settings-toggle.is-on .df-settings-toggle-knob { transform: translateX(16px); background: var(--surface-main); }
+.df-settings-toggle[data-state="on"] .df-settings-toggle-knob {
+  transform: translateX(20px);
+  background: var(--surface-main);
+  border-color: color-mix(in srgb, var(--navo-sage) 30%, var(--surface-main));
+}
 
 /* SettingSelect / SettingTextInput / SettingNumberInput: native controls
-   styled as quiet paper inputs. They reuse .df-utility-select /
-   .df-utility-input where the legacy styles already apply. */
-.df-settings-select.df-utility-select {
-  min-height: 30px;
-  padding: 4px 22px 4px 8px;
-  border: 1px solid var(--paper-rule);
+   styled as quiet paper inputs. Selects are standalone native <select>
+   elements (no df-utility-select wrapper class) so they keep a readable
+   width and never clip Chinese option labels like 今日 / 本月. */
+.df-settings-select {
+  min-width: 132px;
+  max-width: 220px;
+  height: 36px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--paper-rule-strong);
   border-radius: var(--paper-radius);
   background: var(--surface-card);
   color: var(--text-main);
-  font: 500 12px/1 var(--paper-sans);
+  font: 500 14px/36px var(--paper-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
   box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
+.df-settings-select:hover { border-color: var(--accent-active); }
+.df-settings-select:focus-visible {
+  outline: 1px solid var(--accent-active);
+  outline-offset: 2px;
+  border-color: var(--accent-active);
+}
+.df-settings-select:disabled { opacity: .5; cursor: not-allowed; }
+.df-settings-select option { color: var(--text-main); background: var(--surface-card); }
+
+/* The settings page lives inside .df-utility-panel, whose global
+   `select` rules set background/border/color with !important. Those
+   would wipe the custom dropdown arrow and override the paper sizing
+   above. These higher-specificity overrides restore the arrow and keep
+   the select readable. */
+.df-app .df-utility-panel .df-settings-select {
+  min-width: 132px !important;
+  max-width: 220px !important;
+  height: 36px !important;
+  padding: 0 30px 0 12px !important;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: var(--paper-radius) !important;
+  background-color: var(--surface-card) !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%) !important;
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px) !important;
+  background-size: 5px 5px, 5px 5px !important;
+  background-repeat: no-repeat !important;
+  color: var(--text-main) !important;
+  font: 500 14px/36px var(--paper-sans) !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  cursor: pointer !important;
+}
+.df-app .df-utility-panel .df-settings-select:hover {
+  border-color: var(--accent-active) !important;
+  background-color: var(--surface-card) !important;
+}
+.df-app .df-utility-panel .df-settings-select:focus-visible {
+  outline: 1px solid var(--accent-active) !important;
+  outline-offset: 2px !important;
+  border-color: var(--accent-active) !important;
+}
+.df-app .df-utility-panel .df-settings-select:disabled {
+  opacity: .5 !important;
+  cursor: not-allowed !important;
+}
+
 .df-settings-input.df-utility-input,
 .df-settings-number.df-utility-input {
-  min-height: 30px;
-  padding: 4px 8px;
-  border: 1px solid var(--paper-rule);
+  min-width: 96px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--paper-rule-strong);
   border-radius: var(--paper-radius);
   background: var(--surface-card);
   color: var(--text-main);
-  font: 500 12px/1 var(--paper-sans);
+  font: 500 14px/36px var(--paper-sans);
   box-shadow: none;
 }
+.df-app .df-utility-panel .df-settings-input,
+.df-app .df-utility-panel .df-settings-number {
+  min-width: 96px !important;
+  height: 36px !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: var(--paper-radius) !important;
+  background: var(--surface-card) !important;
+  color: var(--text-main) !important;
+  font: 500 14px/36px var(--paper-sans) !important;
+  box-shadow: none !important;
+}
+.df-app .df-utility-panel .df-settings-input:hover,
+.df-app .df-utility-panel .df-settings-number:hover { border-color: var(--accent-active) !important; }
+.df-app .df-utility-panel .df-settings-input:focus-visible,
+.df-app .df-utility-panel .df-settings-number:focus-visible {
+  outline: 1px solid var(--accent-active) !important;
+  outline-offset: 2px !important;
+  border-color: var(--accent-active) !important;
+}
+.df-app .df-utility-panel .df-settings-input:disabled,
+.df-app .df-utility-panel .df-settings-number:disabled { opacity: .5 !important; cursor: not-allowed !important; }
 .df-settings-number-wrap { display: inline-flex; align-items: center; gap: 8px; }
 .df-settings-number-suffix { color: var(--text-muted); font: 500 11px/1 var(--paper-mono); min-width: 32px; text-align: right; }
 .df-settings-range { width: 120px; accent-color: var(--accent-active); }
@@ -4795,8 +4911,67 @@ body.df-timeline-pointer-drag * {
 }
 
 .df-app .df-template-name-readonly {
+  color: var(--text-main);
+  font: 600 13px/1.4 var(--paper-sans);
+}
+
+/* ── Template list typography & new-template button ──
+   Template-entity primary text is bolded so the name reads as the main
+   information layer; metadata (period count) stays at normal weight. */
+.df-app .df-candidate-block--template .df-candidate-block-title {
+  font-weight: 700;
+}
+
+.df-app .df-candidate-block--template .df-candidate-block-meta {
+  font-weight: 400;
+}
+
+/* Draggable custom template rows get a grab cursor to signal reorderability.
+   Built-in / draft rows keep the default cursor. */
+.df-app .df-candidate-block--template[data-template-row-key] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.df-app .df-candidate-block--template[data-template-row-key]:active {
+  cursor: grabbing;
+}
+
+/* New-template entry: a small, narrow, horizontally-centered add button —
+   visually a standalone action affordance, NOT a third template card.
+   No large empty card, no long description text. */
+.df-app .df-template-new-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 8px 6px;
+}
+
+.df-app .df-template-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+  padding: 5px 14px;
+  border: 1px dashed var(--paper-rule);
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-muted);
-  font: 500 12px/1.4 var(--paper-sans);
+  font: 600 12px/1.2 var(--paper-sans);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.df-app .df-template-new-btn:hover {
+  background: var(--paper-note);
+  color: var(--text-main);
+  border-color: var(--paper-rule-strong, var(--paper-rule));
+}
+
+.df-app .df-template-new-btn:focus-visible {
+  outline: 2px solid var(--accent-active);
+  outline-offset: 1px;
 }
 
 /* Template timeline now uses the SAME global .df-slot / .df-timeline-canvas CSS
@@ -4855,7 +5030,7 @@ body.df-timeline-pointer-drag * {
 
 .df-app .df-time-block-title {
   color: var(--text-main);
-  font: 600 12px/1.25 var(--paper-sans);
+  font: 700 12px/1.25 var(--paper-sans);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

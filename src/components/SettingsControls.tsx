@@ -87,6 +87,8 @@ export function SettingToggle({
       aria-checked={checked}
       aria-label={ariaLabel}
       className={`df-settings-toggle${checked ? " is-on" : ""}`}
+      data-state={checked ? "on" : "off"}
+      data-disabled={disabled ? "true" : undefined}
       disabled={disabled}
       onClick={() => onChange(!checked)}
     >
@@ -110,7 +112,7 @@ export function SettingSelect<T extends string>({
 }) {
   return (
     <select
-      className="df-settings-select df-utility-select"
+      className="df-settings-select"
       value={value}
       aria-label={ariaLabel}
       disabled={disabled}
