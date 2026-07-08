@@ -23,15 +23,19 @@
   /* SettingToggle hand-drawn paper switch tokens. Off uses a deep brick
      red, on uses a deep olive green — both muted to sit on the paper
      surface, never neon. The crayon texture is simulated with layered
-     radial gradients (paper grain) over the fill color. */
-  --toggle-off-fill: #8E4B46;
-  --toggle-off-fill-deep: #6F3A36;
-  --toggle-on-fill: #5D7A52;
-  --toggle-on-fill-deep: #465E3E;
+     radial gradients (paper grain) over the fill color. Crucially the
+     thumb also takes the state color (slightly brighter than the track
+     so it stands out as a solid colored bead, never a white circle). */
+  --toggle-off-fill: #D68169;
+  --toggle-off-fill-deep: #B86A52;
+  --toggle-off-thumb: #E0967E;
+  --toggle-off-thumb-border: #9A5740;
+  --toggle-on-fill: #7EA071;
+  --toggle-on-fill-deep: #6A8F5E;
+  --toggle-on-thumb: #92B685;
+  --toggle-on-thumb-border: #5A7350;
   --toggle-border: var(--paper-rule-strong);
   --toggle-border-hover: var(--accent-active);
-  --toggle-thumb-bg: var(--surface-main);
-  --toggle-thumb-border: var(--paper-rule-strong);
   min-height: 100vh;
   color: var(--text-main);
   font-family: var(--paper-sans);
@@ -453,11 +457,13 @@
   background: transparent;
 }
 
-/* SettingToggle: a hand-drawn paper switch. The track carries a deep
-   brick-red fill when off and a deep olive-green fill when on, each
-   overlaid with faint radial-grain layers so it reads as crayon on
-   paper rather than a flat SaaS pill. The thumb stays paper-white
-   with a clear border so it separates cleanly from the fill. */
+/* SettingToggle: a hand-drawn paper switch. Both the track AND the
+   thumb take the state color — off = deep brick red, on = deep olive
+   green — so the state is obvious at a glance, not read from a faint
+   border. The thumb is a slightly brighter shade of the same hue so
+   it reads as a solid colored bead against the track, never a white
+   circle. A faint diagonal hatch (::before) gives a crayon/paper
+   tooth without becoming noise. */
 .df-settings-toggle {
   position: relative;
   flex: 0 0 auto;
@@ -467,18 +473,36 @@
   border-radius: 999px;
   cursor: pointer;
   padding: 0;
-  /* Off = deep brick red. Layered grain simulates crayon/paper tooth:
-     two fine radial speckle layers + a soft vertical shade so the
-     fill is never a dead flat block. */
+  /* Off = deep brick red. The track uses a vertical gradient (lighter
+     top, denser bottom) so the fill has depth instead of being a flat
+     block, plus two fine radial speckle layers for paper grain. */
   background-color: var(--toggle-off-fill);
   background-image:
     radial-gradient(circle at 22% 38%, rgba(255,255,255,.10) 0 .6px, transparent .8px),
     radial-gradient(circle at 70% 66%, rgba(0,0,0,.12) 0 .5px, transparent .7px),
-    radial-gradient(circle at 48% 22%, rgba(255,255,255,.06) 0 .4px, transparent .6px),
-    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.10));
-  background-size: 9px 9px, 12px 12px, 7px 7px, 100% 100%;
-  background-repeat: repeat, repeat, repeat, no-repeat;
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.12));
+  background-size: 9px 9px, 12px 12px, 100% 100%;
+  background-repeat: repeat, repeat, no-repeat;
   transition: border-color var(--paper-motion), background-color var(--paper-motion), transform var(--paper-motion);
+  overflow: hidden;
+}
+/* Diagonal hatch layer for a light crayon/paper tooth. Kept very
+   faint (opacity .26) and clipped to the track so it never reads as
+   noise or dirt. */
+.df-settings-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    -12deg,
+    rgba(255,255,255,.10) 0px,
+    rgba(255,255,255,.10) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  opacity: .26;
+  pointer-events: none;
 }
 .df-settings-toggle:hover {
   border-color: var(--toggle-border-hover);
@@ -496,8 +520,7 @@
   background-image:
     radial-gradient(circle at 22% 38%, rgba(255,255,255,.10) 0 .6px, transparent .8px),
     radial-gradient(circle at 70% 66%, rgba(0,0,0,.12) 0 .5px, transparent .7px),
-    radial-gradient(circle at 48% 22%, rgba(255,255,255,.06) 0 .4px, transparent .6px),
-    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.10));
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.12));
 }
 .df-settings-toggle[data-state="on"]:hover {
   border-color: var(--toggle-on-fill);
@@ -518,20 +541,30 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--toggle-thumb-bg);
-  border: 1px solid var(--toggle-thumb-border);
-  /* A whisper of paper grain on the thumb so it does not look like
-     a plastic bead against the crayon track. */
-  background-image: radial-gradient(circle at 35% 30%, rgba(0,0,0,.04) 0 .4px, transparent .6px);
-  background-size: 6px 6px;
-  background-repeat: repeat;
-  box-shadow: 0 1px 0 rgba(0,0,0,.06);
+  /* Thumb takes the OFF state color (brighter brick red) — never white. */
+  background: var(--toggle-off-thumb);
+  border: 1px solid var(--toggle-off-thumb-border);
+  /* A whisper of paper grain on the thumb so it does not look like a
+     plastic bead, plus a soft top highlight for a slight rounded feel. */
+  background-image:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,.14) 0 .5px, transparent .7px),
+    linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.10));
+  background-size: 6px 6px, 100% 100%;
+  background-repeat: repeat, no-repeat;
+  box-shadow: 0 1px 0 rgba(0,0,0,.10);
+  z-index: 1;
   transition: transform var(--paper-motion), background-color var(--paper-motion), border-color var(--paper-motion);
 }
+/* Thumb takes the ON state color (brighter olive green) and slides right. */
 .df-settings-toggle[data-state="on"] .df-settings-toggle-knob {
   transform: translateX(20px);
-  background: var(--toggle-thumb-bg);
-  border-color: var(--toggle-on-fill-deep);
+  background: var(--toggle-on-thumb);
+  border-color: var(--toggle-on-thumb-border);
+  background-image:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,.14) 0 .5px, transparent .7px),
+    linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.10));
+  background-size: 6px 6px, 100% 100%;
+  background-repeat: repeat, no-repeat;
 }
 
 /* SettingSelect / SettingTextInput / SettingNumberInput: native controls
@@ -4846,6 +4879,18 @@ body.df-timeline-pointer-drag * {
   margin-top: 0;
 }
 
+/* Defensive: candidate-list insertion lines must NEVER occupy layout space
+   unless a pointer drag is actually in progress. The body receives
+   .df-timeline-pointer-drag only while beginShelfDrag / beginBlockDrag is
+   active (added on first pointermove, removed in cleanup on
+   pointerup / pointercancel / Escape). This is a display:none fallback
+   (not opacity/visibility) so the element is removed from layout entirely
+   when not dragging — guarantees zero footprint even if React state ever
+   leaks a stale candidateDropTarget. */
+body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
+  display: none !important;
+}
+
 .df-app .df-candidate-task-row:hover {
   background: var(--paper-note);
 }
@@ -4910,21 +4955,6 @@ body.df-timeline-pointer-drag * {
   font: 700 9px/1 var(--paper-mono);
   letter-spacing: .04em;
   text-transform: uppercase;
-}
-
-.df-app .df-candidate-task-new {
-  border: 1px dashed var(--paper-accent-rule);
-  margin-top: 4px;
-}
-
-.df-app .df-candidate-task-new:hover {
-  border-color: var(--accent-active);
-  background: color-mix(in srgb, var(--accent-active) 6%, var(--surface-main));
-}
-
-.df-app .df-candidate-task-plus {
-  color: var(--accent-active);
-  font: 700 16px/1 var(--paper-sans);
 }
 
 /* Compact name editing bar — replaces the old big-title chrome. Sits at the

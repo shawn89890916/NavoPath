@@ -7420,7 +7420,7 @@ function App() {
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
                         {tasks.map((task) => {
-                          const dropHere = candidateDropTarget?.taskId === task.id;
+                          const dropHere = drag?.source === "candidate" && candidateDropTarget?.taskId === task.id;
                           return (
                             <div
                               key={task.id}
@@ -7439,12 +7439,12 @@ function App() {
               ) : visibleCandidates.map((task) => (
                 <div
                   key={task.id}
-                  className={`df-candidate-task-row${candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                  className={`df-candidate-task-row${drag?.source === "candidate" && candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
                   data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
                 >
-                  {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  {drag?.source === "candidate" && candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
                   <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />
-                  {candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                  {drag?.source === "candidate" && candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
                 </div>
               ))}
               {settings.featureHabitsEnabled !== false && (

@@ -1031,3 +1031,69 @@ Refine the existing template modal (already built on shared execution-page compo
 - `npm run build`: 514 modules transformed, exit 0.
 - `npm test -- --run`: 18 files, 101 tests passed.
 - Manual parity: left list still uses `CandidatePanelShell` + `CandidateBlock`; right timeline still uses `TimelineCanvas` + `TimelineEventBlock` + global `.df-slot` / `.df-timeline-canvas` CSS; modal frame still only provides overlay + close + footer; no template-specific layout CSS was reintroduced.
+
+## Candidate Ghost Placeholder Debug
+
+Investigation of the residual "ghost block" under the first today-candidate task. Per spec: do NOT adjust spacing — find the placeholder/drop-zone/source-placeholder that still renders or occupies layout when not dragging, and force it to render only during an active drag.
+
+### Ghost block DOM element
+- Element: `<div class="df-list-insertion-line" aria-hidden="true" />`
+- Rendered inside `.df-candidate-task-row`, immediately before and/or after the `<TaskCard>` for the task whose `task.id` matches `candidateDropTarget.taskId`.
+- There is exactly one such div per active drop target (either the "before" or the "after" slot, never both for the same task).
+
+### Component file
+- `src/main.tsx`, today-candidate list render block.
+- Grouped branch (groupByProject): lines 7422–7434 — `dropHere` variable + before/after insertion-line divs.
+- Flat branch: lines 7439–7449 — inline condition + before/after insertion-line divs.
+
+### CSS class
+- `.df-list-insertion-line` — defined in `src/app-redesign.css` at line 8018.
+
+### Computed height / margin / padding / background / border
+From `src/app-redesign.css:8018`:
+- height: 2px
+- margin: 0 2px
+- padding: 0 (not set, defaults to 0)
+- border-radius: 1px
+- background: accent color with pulsing opacity animation (`@keyframes` cycling opacity .4 → .55 → .4), reduced-motion disables the animation.
+- Net resting footprint when rendered: 2px tall + 2px left/right margin = occupies a visible 2px-high band inside the row.
+
+### Whether it is a drop zone
+- Yes. It is the candidate-reorder insertion indicator. It is purely visual (aria-hidden) — the actual drop detection lives in `beginShelfDrag` pointermove handler which sets `candidateDropTarget = { taskId, position }`.
+
+### Whether it is a placeholder
+- Yes — an insertion-line placeholder, not a source placeholder.
+
+### Whether it is drag source placeholder
+- No. The drag source placeholder is a separate mechanism: `TaskCard` receives `dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined}`, which TaskBlock renders as `data-drag-state="source-placeholder"`. The source-placeholder CSS in `src/task-block.css:1661` (dashed border + neutral tint + hidden children) only applies when that attribute is present. When not dragging, `drag` is null → `dragState` is `undefined` → attribute is not set → source-placeholder styles do not apply.
+
+### Whether it is rendered when not dragging
+- Before this fix: logically no, because `candidateDropTarget` is null at rest and the render condition was `candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before"`. However the condition did not also assert an active drag was in progress, so any stale/leaked `candidateDropTarget` state would have rendered the line.
+- After this fix: no, with belt-and-suspenders. Every render site now requires `drag?.source === "candidate"` AND `candidateDropTarget?.taskId === task.id` AND the matching position. A defensive CSS fallback (`display:none !important` keyed on `body:not(.df-timeline-pointer-drag)`) guarantees zero layout footprint even if React state ever leaks.
+
+### Root cause
+1. Primary: the insertion-line `<div>` is a 2px-tall pulsing band. While React state already gated it on `candidateDropTarget` (null at rest), the condition did not explicitly assert an active pointer drag, leaving a theoretical leak path if `candidateDropTarget` was ever set without a matching `drag`.
+2. Secondary hazard: dead CSS for an old dashed "new task" placeholder (`.df-candidate-task-new`, `.df-candidate-task-new:hover`, `.df-candidate-task-plus`) had no JSX usage but remained in the stylesheet — a future-ghost hazard if anyone re-wired the class.
+3. Not the cause (verified clean):
+   - TaskBlock source-placeholder: only applies with `data-drag-state="source-placeholder"`, which requires `drag` to be non-null. Clean.
+   - `.df-candidate-task-row` wrapper: default styling is `display:flex; padding:7px 8px; gap:8px` with no background/border/min-height. No stray ghost styling. Clean.
+   - `.is-candidate-drop` / `is-before` / `is-after` classes: searched — no matching CSS rules exist, so they add zero visual footprint. Clean.
+   - CandidatePanelShell / ExecutionSharedLayout: thin wrappers, no ghost elements. Clean.
+   - Habit section append drop zone: no separate append drop-zone element exists; habit card is rendered directly after the candidate list with no min-height placeholder. Clean.
+
+### Fix applied
+1. `src/main.tsx` — hardened 4 JSX conditions (grouped before/after + flat before/after) to require `drag?.source === "candidate"` in addition to `candidateDropTarget?.taskId === task.id`. This implements the user-approved `{isDragging && <Placeholder />}` pattern.
+2. `src/app-redesign.css:4890` — added defensive CSS fallback:
+   ```css
+   body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
+     display: none !important;
+   }
+   ```
+   `body.df-timeline-pointer-drag` is added only on first pointermove inside `beginShelfDrag`/`beginBlockDrag` and removed in the cleanup handler on pointerup / pointercancel / Escape. This is `display:none` (not opacity/visibility) so the element is removed from layout entirely.
+3. `src/app-redesign.css` — deleted dead CSS (`.df-candidate-task-new`, `:hover`, `.df-candidate-task-plus`) that had no JSX usage.
+
+### Why it no longer occupies space when not dragging
+- React layer: all four insertion-line render sites short-circuit to `null` because `drag?.source === "candidate"` is false when `drag` is null.
+- CSS layer: even if React state ever leaks a stale `candidateDropTarget`, the `body:not(.df-timeline-pointer-drag)` selector forces `display:none !important`, removing the element from layout (zero height, zero margin impact, not rendered).
+- Source-placeholder layer: unaffected — `dragState` is `undefined` at rest so `data-drag-state` is absent and the dashed source-placeholder CSS does not apply.
+- Drag still works: during an active drag, `body.df-timeline-pointer-drag` is present, `drag.source === "candidate"` is true, and `candidateDropTarget` is set by the pointermove handler — so the insertion line renders correctly and reorder/candidate-to-timeline drag is unaffected.
