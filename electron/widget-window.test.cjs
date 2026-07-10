@@ -189,6 +189,24 @@ test("closes the popover on blur and through the close IPC handler", async () =>
   assert.equal(windows[2].isDestroyed(), true);
 });
 
+test("delayed events from a closed popover cannot dismiss its replacement", async () => {
+  const { deps, handlers, windows } = makeDeps();
+  const service = createWidgetWindowService(deps);
+  service.registerIpc();
+  service.open();
+
+  await handlers.get("widget:toggle-popover")();
+  const oldPopover = windows[1];
+  await handlers.get("widget:close-popover")({ sender: "ipc-event" });
+  await handlers.get("widget:toggle-popover")();
+  const replacement = windows[2];
+
+  oldPopover.emit("blur");
+  oldPopover.emit("closed");
+
+  assert.equal(replacement.isDestroyed(), false);
+});
+
 test("closes the popover when the widget moves, resizes, or closes", async () => {
   for (const eventName of ["move", "resize", "closed"]) {
     const { deps, handlers, windows } = makeDeps();

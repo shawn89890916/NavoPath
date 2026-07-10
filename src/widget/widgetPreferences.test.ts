@@ -6,6 +6,7 @@ import {
   getWidgetLayout,
   migrateLegacyWidgetAppearance,
   normalizeWidgetAppearance,
+  restoreStoredWidgetBounds,
 } from "./widgetPreferences";
 
 describe("widget appearance", () => {
@@ -55,6 +56,14 @@ describe("widget appearance", () => {
 
 describe("widget geometry", () => {
   const workArea = { x: 0, y: 0, width: 1280, height: 720 };
+
+  it("restores valid persisted bounds and ignores malformed JSON", () => {
+    expect(restoreStoredWidgetBounds(
+      JSON.stringify({ x: 1200, y: -50, width: 2000, height: 40 }),
+      workArea,
+    )).toEqual({ x: 414, y: 0, width: 860, height: 84 });
+    expect(restoreStoredWidgetBounds("{malformed", workArea)).toBeNull();
+  });
 
   it("clamps restored bounds into the visible display work area", () => {
     expect(clampWidgetBounds({ x: 1200, y: -50, width: 2000, height: 40 }, workArea)).toEqual({

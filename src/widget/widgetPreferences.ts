@@ -67,6 +67,17 @@ export function clampWidgetBounds(bounds: WidgetBounds, workArea: WidgetBounds):
   };
 }
 
+export function restoreStoredWidgetBounds(raw: string | null, workArea: WidgetBounds): WidgetBounds | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as WidgetBounds | null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return clampWidgetBounds(parsed, workArea);
+  } catch {
+    return null;
+  }
+}
+
 export function getWidgetLayout(_width: number, height: number): "strip" | "stacked" {
   return height >= 132 ? "stacked" : "strip";
 }

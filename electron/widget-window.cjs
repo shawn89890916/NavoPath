@@ -89,8 +89,8 @@ function createWidgetWindowService(deps) {
       widgetWindow.loadURL(`${baseUrl}/app?widget=1`);
     }
     widgetWindow.once("ready-to-show", () => widgetWindow?.show());
-    widgetWindow.on("move", closePopover);
-    widgetWindow.on("resize", closePopover);
+    widgetWindow.on("move", () => closePopover());
+    widgetWindow.on("resize", () => closePopover());
     widgetWindow.on("closed", () => {
       closePopover();
       widgetWindow = null;
@@ -98,9 +98,8 @@ function createWidgetWindowService(deps) {
     return widgetWindow;
   }
 
-  function closePopover() {
-    if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.close();
-    popoverWindow = null;
+  function closePopover(target = popoverWindow) {
+    if (target && !target.isDestroyed()) target.close();
     return true;
   }
 
@@ -145,7 +144,7 @@ function createWidgetWindowService(deps) {
       popover.show();
       popover.focus();
     });
-    popover.on("blur", closePopover);
+    popover.on("blur", () => closePopover(popover));
     popover.on("closed", () => {
       if (popoverWindow === popover) popoverWindow = null;
     });
@@ -168,7 +167,7 @@ function createWidgetWindowService(deps) {
     deps.ipcMain.handle("widget:open", () => { open(); return true; });
     deps.ipcMain.handle("widget:close", () => { if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.close(); return true; });
     deps.ipcMain.handle("widget:toggle-popover", togglePopover);
-    deps.ipcMain.handle("widget:close-popover", closePopover);
+    deps.ipcMain.handle("widget:close-popover", () => closePopover());
     deps.ipcMain.handle("widget:set-always-on-top", (_event, enabled) => {
       if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.setAlwaysOnTop(Boolean(enabled));
       return true;

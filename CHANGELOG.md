@@ -3,12 +3,12 @@
 ## 2026-07-10 · 桌面小组件交互与响应式重构
 
 ### 修复
-- 桌面小组件采用更紧凑的 500 × 88 默认与重置尺寸，状态文字更小、更柔和，任务标题和时间更大、更醒目，并移除底部项目颜色条；窗口支持原生边缘缩放并记住尺寸和位置，窄窗或高窗会自动切换为两行布局，显示器或 DPI 变化后会保持在可见区域。“更多”控制在可关闭的独立浮层中打开，失焦、小组件移动、缩放或关闭时会自动收起，且始终不会改变小组件尺寸；透明度可在 0%–100% 间调整且只影响背景，文字和图标始终清晰。面板只保留置顶、透明度、重置位置和关闭，支持鼠标、触屏、键盘与 Esc。背景色、字体色和强调色位于“设置 > 桌面小组件”，旧版外观偏好会迁移一次，默认强调不再使用荧光绿色。
+- 桌面小组件采用更紧凑的 500 × 88 默认与重置尺寸，状态文字更小、更柔和，任务标题和时间更大、更醒目，并移除底部项目颜色条；窗口支持原生边缘缩放并记住尺寸和位置，用户将窗口高度增加到足够时会自动切换为两行布局，显示器或 DPI 变化后会保持在可见区域。“更多”控制在可关闭的独立浮层中打开，失焦、小组件移动、缩放或关闭时会自动收起，且始终不会改变小组件尺寸；透明度可在 0%–100% 间调整且只影响背景，文字和图标始终清晰。面板只保留置顶、透明度、重置位置和关闭，支持鼠标、触屏、键盘与 Esc。背景色、字体色和强调色位于“设置 > 桌面小组件”，旧版外观偏好会迁移一次，默认强调不再使用荧光绿色。
 
 ## 2026-07-10 · Desktop widget interaction and responsive layout rebuild
 
 ### Fixed
-- The desktop widget now uses a more compact 500 × 88 default and reset size, with smaller muted status text, larger task titles and times, and no project-color footer. The window supports native edge resizing and remembers its bounds; narrow or tall windows switch to a two-row layout, while display or DPI changes keep it visible. More controls open in a separate dismissible popover that automatically closes when focus leaves or the widget moves, resizes, or closes, and never changes the widget size. Opacity adjusts only the background from 0% to 100%, keeping text and icons unaffected and clear. The panel is reduced to always-on-top, opacity, reset position, and close, with mouse, touch, keyboard, and Escape support. Background, font, and accent colors live under Settings > Desktop Widget, legacy appearance preferences migrate once, and the default accent no longer uses neon green.
+- The desktop widget now uses a more compact 500 × 88 default and reset size, with smaller muted status text, larger task titles and times, and no project-color footer. The window supports native edge resizing and remembers its bounds; increasing the window height enough switches it to a two-row layout, while display or DPI changes keep it visible. More controls open in a separate dismissible popover that automatically closes when focus leaves or the widget moves, resizes, or closes, and never changes the widget size. Opacity adjusts only the background from 0% to 100%, keeping text and icons unaffected and clear. The panel is reduced to always-on-top, opacity, reset position, and close, with mouse, touch, keyboard, and Escape support. Background, font, and accent colors live under Settings > Desktop Widget, legacy appearance preferences migrate once, and the default accent no longer uses neon green.
 
 ## 2026-07-08 · 设置页统一迁移、模板弹窗按钮归位、候选列表间距精简与模板页排版收紧
 

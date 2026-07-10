@@ -51,6 +51,8 @@ describe("WidgetView", () => {
     expect(mainHtml).not.toContain("df-widget-accent-line");
 
     expect(popoverHtml).toContain("Always on top");
+    expect(popoverHtml).toContain('role="dialog"');
+    expect(popoverHtml).toContain('autofocus=""');
     expect(popoverHtml).toContain("Background opacity");
     expect(popoverHtml).toContain('min="0"');
     expect(popoverHtml).toContain('max="1"');
@@ -62,6 +64,13 @@ describe("WidgetView", () => {
     expect(opacityAction(2)).toEqual({ type: "updateAppearance", patch: { opacity: 1 } });
     expect(opacityAction(-1)).toEqual({ type: "updateAppearance", patch: { opacity: 0 } });
     expect(opacityAction(0.72)).toEqual({ type: "updateAppearance", patch: { opacity: 0.72 } });
+  });
+
+  it("restores and periodically persists widget bounds while mounted", () => {
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    expect(source).toContain('const WIDGET_BOUNDS_KEY = "navopath-widget-bounds"');
+    expect(source).toMatch(/getWorkArea\(\)[\s\S]*?restoreStoredWidgetBounds[\s\S]*?setBounds/);
+    expect(source).toMatch(/setInterval\([\s\S]*?getBounds\(\)[\s\S]*?localStorage\.setItem\(WIDGET_BOUNDS_KEY[\s\S]*?1200/);
   });
 
   it("keeps opacity on the paper shell and establishes the compact hierarchy", () => {

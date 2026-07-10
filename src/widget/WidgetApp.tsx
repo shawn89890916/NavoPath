@@ -6,9 +6,11 @@ import {
   hexToRgbTriplet,
   migrateLegacyWidgetAppearance,
   normalizeWidgetAppearance,
+  restoreStoredWidgetBounds,
 } from "./widgetPreferences";
 import "./widget.css";
 
+const WIDGET_BOUNDS_KEY = "navopath-widget-bounds";
 const LEGACY_WIDGET_PREFS_KEY = "navopath-widget-prefs";
 
 type WidgetApiWithPopover = NonNullable<NonNullable<Window["desktopApi"]>["widget"]> & {
@@ -104,8 +106,8 @@ export function WidgetPopoverView(props: WidgetPopoverViewProps) {
 
   return (
     <main className="df-widget-popover-root" data-lang={snapshot.lang} style={style}>
-      <section className="df-widget-popover-surface" aria-label={zh ? "小组件控制" : "Widget controls"}>
-        <button type="button" className="df-widget-popover-action" onClick={props.onToggleAlwaysOnTop}>
+      <section className="df-widget-popover-surface" role="dialog" aria-label={zh ? "小组件控制" : "Widget controls"}>
+        <button type="button" className="df-widget-popover-action" autoFocus onClick={props.onToggleAlwaysOnTop}>
           <span>{zh ? "始终置顶" : "Always on top"}</span>
           <span className="df-widget-popover-state" aria-hidden>{snapshot.alwaysOnTop ? "✓" : ""}</span>
         </button>
@@ -179,6 +181,26 @@ export function WidgetApp() {
     const updateLayout = () => setLayout(getWidgetLayout(window.innerWidth, window.innerHeight));
     window.addEventListener("resize", updateLayout);
     return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
+  useEffect(() => {
+    const api = getWidgetApi();
+    if (!api) return;
+    try {
+      const raw = localStorage.getItem(WIDGET_BOUNDS_KEY);
+      if (raw) {
+        void api.getWorkArea().then((workArea) => {
+          const restored = restoreStoredWidgetBounds(raw, workArea);
+          if (restored) return api.setBounds(restored);
+        });
+      }
+    } catch { /* Ignore unavailable storage. */ }
+    const poller = window.setInterval(() => {
+      void api.getBounds().then((bounds) => {
+        if (bounds) localStorage.setItem(WIDGET_BOUNDS_KEY, JSON.stringify(bounds));
+      });
+    }, 1200);
+    return () => window.clearInterval(poller);
   }, []);
 
   return (
