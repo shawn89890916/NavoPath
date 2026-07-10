@@ -1,9 +1,7 @@
-import React, { type CSSProperties, type Ref, useCallback, useEffect, useRef, useState } from "react";
-import type { WidgetAction, WidgetBounds, WidgetSnapshot } from "../types";
+import React, { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import type { WidgetAction, WidgetSnapshot } from "../types";
 import {
   DEFAULT_WIDGET_APPEARANCE,
-  clampWidgetBounds,
-  getExpandedWidgetBounds,
   getWidgetLayout,
   hexToRgbTriplet,
   migrateLegacyWidgetAppearance,
@@ -11,8 +9,16 @@ import {
 } from "./widgetPreferences";
 import "./widget.css";
 
-const WIDGET_BOUNDS_KEY = "navopath-widget-bounds";
 const LEGACY_WIDGET_PREFS_KEY = "navopath-widget-prefs";
+
+type WidgetApiWithPopover = NonNullable<NonNullable<Window["desktopApi"]>["widget"]> & {
+  togglePopover?: () => Promise<boolean>;
+  closePopover?: () => Promise<boolean>;
+};
+
+function getWidgetApi(): WidgetApiWithPopover | undefined {
+  return window.desktopApi?.widget as WidgetApiWithPopover | undefined;
+}
 
 function formatTimer(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -24,22 +30,15 @@ function formatTimer(seconds: number): string {
 }
 
 export function opacityAction(value: number): WidgetAction {
-  return { type: "updateAppearance", patch: { opacity: Math.min(1, Math.max(0.35, value)) } };
+  return { type: "updateAppearance", patch: { opacity: Math.min(1, Math.max(0, value)) } };
 }
 
 interface WidgetViewProps {
   snapshot: WidgetSnapshot;
   elapsedSeconds: number;
   layout: "strip" | "stacked";
-  panelOpen: boolean;
-  firstPanelActionRef?: Ref<HTMLButtonElement>;
   onToggleTimer: () => void;
-  onTogglePanel: () => void;
-  onClosePanel: () => void;
-  onToggleAlwaysOnTop: () => void;
-  onOpacityChange: (value: number) => void;
-  onResetPosition: () => void;
-  onCloseWidget: () => void;
+  onTogglePopover: () => void;
 }
 
 export function WidgetView(props: WidgetViewProps) {
@@ -54,7 +53,6 @@ export function WidgetView(props: WidgetViewProps) {
     "--widget-opacity": String(appearance.opacity),
     "--widget-ink": appearance.fontColor,
     "--widget-accent": appearance.accentColor,
-    "--widget-project": snapshot.taskProjectColor || appearance.accentColor,
   } as CSSProperties;
 
   return (
@@ -77,40 +75,56 @@ export function WidgetView(props: WidgetViewProps) {
             type="button"
             className="df-widget-icon-btn df-widget-more-btn"
             aria-label={zh ? "更多" : "More"}
-            aria-expanded={props.panelOpen}
-            aria-controls="df-widget-controls-panel"
-            onClick={props.onTogglePanel}
+            aria-haspopup="dialog"
+            onClick={props.onTogglePopover}
           />
         </div>
-        <span className="df-widget-accent-line" aria-hidden />
       </section>
+    </main>
+  );
+}
 
-      {props.panelOpen && (
-        <>
-          <button className="df-widget-panel-overlay" type="button" aria-label={zh ? "关闭更多设置" : "Close widget controls"} onClick={props.onClosePanel} />
-          <section id="df-widget-controls-panel" className="df-widget-panel" aria-label={zh ? "小组件控制" : "Widget controls"}>
-            <button ref={props.firstPanelActionRef} type="button" className="df-widget-panel-action" onClick={props.onToggleAlwaysOnTop}>
-              <span>{zh ? "始终置顶" : "Always on top"}</span>
-              <span className="df-widget-panel-state" aria-hidden>{snapshot.alwaysOnTop ? "✓" : ""}</span>
-            </button>
-            <label className="df-widget-opacity-row">
-              <span>{zh ? "透明度" : "Opacity"}</span>
-              <output>{Math.round(appearance.opacity * 100)}%</output>
-              <input
-                type="range"
-                min="0.35"
-                max="1"
-                step="0.01"
-                value={appearance.opacity}
-                aria-label={zh ? "小组件透明度" : "Widget opacity"}
-                onChange={(event) => props.onOpacityChange(Number(event.target.value))}
-              />
-            </label>
-            <button type="button" className="df-widget-panel-action" onClick={props.onResetPosition}>{zh ? "重置位置" : "Reset position"}</button>
-            <button type="button" className="df-widget-panel-action is-danger" onClick={props.onCloseWidget}>{zh ? "关闭小组件" : "Close widget"}</button>
-          </section>
-        </>
-      )}
+interface WidgetPopoverViewProps {
+  snapshot: WidgetSnapshot;
+  onToggleAlwaysOnTop: () => void;
+  onOpacityChange: (value: number) => void;
+  onResetPosition: () => void;
+  onCloseWidget: () => void;
+}
+
+export function WidgetPopoverView(props: WidgetPopoverViewProps) {
+  const { snapshot } = props;
+  const zh = snapshot.lang === "zh";
+  const appearance = normalizeWidgetAppearance(snapshot.appearance);
+  const style = {
+    "--widget-bg-rgb": hexToRgbTriplet(appearance.backgroundColor),
+    "--widget-ink": appearance.fontColor,
+    "--widget-accent": appearance.accentColor,
+  } as CSSProperties;
+
+  return (
+    <main className="df-widget-popover-root" data-lang={snapshot.lang} style={style}>
+      <section className="df-widget-popover-surface" aria-label={zh ? "小组件控制" : "Widget controls"}>
+        <button type="button" className="df-widget-popover-action" onClick={props.onToggleAlwaysOnTop}>
+          <span>{zh ? "始终置顶" : "Always on top"}</span>
+          <span className="df-widget-popover-state" aria-hidden>{snapshot.alwaysOnTop ? "✓" : ""}</span>
+        </button>
+        <label className="df-widget-opacity-row">
+          <span>{zh ? "背景透明度" : "Background opacity"}</span>
+          <output>{Math.round(appearance.opacity * 100)}%</output>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={appearance.opacity}
+            aria-label={zh ? "小组件背景透明度" : "Widget background opacity"}
+            onChange={(event) => props.onOpacityChange(Number(event.target.value))}
+          />
+        </label>
+        <button type="button" className="df-widget-popover-action" onClick={props.onResetPosition}>{zh ? "重置位置" : "Reset position"}</button>
+        <button type="button" className="df-widget-popover-action is-danger" onClick={props.onCloseWidget}>{zh ? "关闭小组件" : "Close widget"}</button>
+      </section>
     </main>
   );
 }
@@ -126,21 +140,15 @@ const EMPTY_SNAPSHOT: WidgetSnapshot = {
   appearanceConfigured: false,
 };
 
-export function WidgetApp() {
+function useWidgetSnapshot() {
   const [snapshot, setSnapshot] = useState<WidgetSnapshot>(EMPTY_SNAPSHOT);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [layout, setLayout] = useState<"strip" | "stacked">(() => getWidgetLayout(window.innerWidth, window.innerHeight));
-  const firstPanelActionRef = useRef<HTMLButtonElement>(null);
   const migrationAttemptedRef = useRef(false);
-  const autoExpansionRef = useRef<{ previousHeight: number; expandedHeight: number } | null>(null);
-  const send = useCallback((action: WidgetAction) => window.desktopApi?.widget?.sendAction(action), []);
+  const send = useCallback((action: WidgetAction) => getWidgetApi()?.sendAction(action), []);
 
   useEffect(() => {
-    const unsubscribe = window.desktopApi?.widget?.onSnapshot((next) => {
+    const unsubscribe = getWidgetApi()?.onSnapshot((next) => {
       const appearance = normalizeWidgetAppearance(next.appearance);
       setSnapshot({ ...next, appearance });
-      setElapsedSeconds(next.elapsedSeconds);
       if (!migrationAttemptedRef.current && !next.appearanceConfigured) {
         migrationAttemptedRef.current = true;
         const migrated = migrateLegacyWidgetAppearance(localStorage.getItem(LEGACY_WIDGET_PREFS_KEY), 0) || appearance;
@@ -150,6 +158,16 @@ export function WidgetApp() {
     send({ type: "requestSnapshot" });
     return unsubscribe;
   }, [send]);
+
+  return { snapshot, send };
+}
+
+export function WidgetApp() {
+  const { snapshot, send } = useWidgetSnapshot();
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [layout, setLayout] = useState<"strip" | "stacked">(() => getWidgetLayout(window.innerWidth, window.innerHeight));
+
+  useEffect(() => setElapsedSeconds(snapshot.elapsedSeconds), [snapshot.elapsedSeconds]);
 
   useEffect(() => {
     if (!snapshot.timerRunning) return;
@@ -163,73 +181,37 @@ export function WidgetApp() {
     return () => window.removeEventListener("resize", updateLayout);
   }, []);
 
-  useEffect(() => {
-    const api = window.desktopApi?.widget;
-    if (!api) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem(WIDGET_BOUNDS_KEY) || "null") as WidgetBounds | null;
-      if (saved) void api.getWorkArea().then((workArea) => api.setBounds(clampWidgetBounds(saved, workArea)));
-    } catch { /* Ignore invalid saved geometry. */ }
-    const poller = window.setInterval(() => {
-      void api.getBounds().then((bounds) => {
-        if (bounds) localStorage.setItem(WIDGET_BOUNDS_KEY, JSON.stringify(bounds));
-      });
-    }, 1200);
-    return () => window.clearInterval(poller);
-  }, []);
-
-  const openPanel = useCallback(async () => {
-    const api = window.desktopApi?.widget;
-    setPanelOpen(true);
-    if (!api) return;
-    const [current, workArea] = await Promise.all([api.getBounds(), api.getWorkArea()]);
-    if (!current) return;
-    const expansion = getExpandedWidgetBounds(current, workArea);
-    if (expansion.autoExpanded) {
-      autoExpansionRef.current = { previousHeight: expansion.previousHeight, expandedHeight: expansion.bounds.height };
-      await api.setBounds(expansion.bounds);
-    }
-  }, []);
-
-  const closePanel = useCallback(async () => {
-    setPanelOpen(false);
-    const api = window.desktopApi?.widget;
-    const expansion = autoExpansionRef.current;
-    autoExpansionRef.current = null;
-    if (!api || !expansion) return;
-    const current = await api.getBounds();
-    if (current?.height === expansion.expandedHeight) await api.setBounds({ ...current, height: expansion.previousHeight });
-  }, []);
-
-  useEffect(() => {
-    if (!panelOpen) return;
-    firstPanelActionRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") void closePanel();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel, panelOpen]);
-
-  const togglePanel = useCallback(() => {
-    if (panelOpen) void closePanel();
-    else void openPanel();
-  }, [closePanel, openPanel, panelOpen]);
-
   return (
     <WidgetView
       snapshot={snapshot}
       elapsedSeconds={elapsedSeconds}
       layout={layout}
-      panelOpen={panelOpen}
-      firstPanelActionRef={firstPanelActionRef}
       onToggleTimer={() => send({ type: snapshot.timerRunning ? "timerPause" : "timerResume" })}
-      onTogglePanel={togglePanel}
-      onClosePanel={() => { void closePanel(); }}
+      onTogglePopover={() => { void getWidgetApi()?.togglePopover?.(); }}
+    />
+  );
+}
+
+export function WidgetPopoverApp() {
+  const { snapshot, send } = useWidgetSnapshot();
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") void getWidgetApi()?.closePopover?.();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const closePopover = () => { void getWidgetApi()?.closePopover?.(); };
+
+  return (
+    <WidgetPopoverView
+      snapshot={snapshot}
       onToggleAlwaysOnTop={() => send({ type: "setAlwaysOnTop", enabled: !snapshot.alwaysOnTop })}
       onOpacityChange={(value) => send(opacityAction(value))}
-      onResetPosition={() => { send({ type: "resetPosition" }); void closePanel(); }}
-      onCloseWidget={() => { void window.desktopApi?.widget?.close(); }}
+      onResetPosition={() => { send({ type: "resetPosition" }); closePopover(); }}
+      onCloseWidget={() => { void getWidgetApi()?.close(); closePopover(); }}
     />
   );
 }

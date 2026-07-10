@@ -1,28 +1,35 @@
-html:has(.df-widget-root), body:has(.df-widget-root), #root:has(.df-widget-root) {
+html:has(.df-widget-root), body:has(.df-widget-root), #root:has(.df-widget-root),
+html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(.df-widget-popover-root) {
   width: 100vw !important; min-width: 0 !important; height: 100vh !important;
   margin: 0 !important; overflow: hidden !important; background: transparent !important;
 }
-.df-widget-root, .df-widget-root * { box-sizing: border-box; }
+.df-widget-root, .df-widget-root *, .df-widget-popover-root, .df-widget-popover-root * { box-sizing: border-box; }
 .df-widget-root {
-  --widget-bg: rgb(var(--widget-bg-rgb, 251 249 255) / var(--widget-opacity, .96));
   --widget-border: color-mix(in srgb, var(--widget-ink, #27231E) 16%, transparent);
   --widget-muted: color-mix(in srgb, var(--widget-ink, #27231E) 64%, transparent);
   --widget-wash: color-mix(in srgb, var(--widget-accent, #27231E) 7%, transparent);
   position: relative; width: 100vw; height: 100vh; padding: 6px; overflow: hidden;
   color: var(--widget-ink, #27231E); font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  user-select: none; container-type: size; -webkit-app-region: drag;
+  user-select: none; container-type: size; -webkit-app-region: no-drag;
 }
 .df-widget-card {
-  position: relative; z-index: 2; display: flex; align-items: center; gap: 14px;
+  position: relative; display: flex; align-items: center; gap: 14px;
   width: 100%; height: 100%; min-height: 72px; padding: 12px 14px 12px 20px; overflow: hidden;
-  border: 1px solid var(--widget-border); border-radius: 16px; background: var(--widget-bg);
-  box-shadow: 0 8px 24px rgb(39 35 30 / .13); -webkit-app-region: drag;
+  border-radius: 16px; -webkit-app-region: drag;
 }
+.df-widget-card::before {
+  content: ""; position: absolute; z-index: 0; inset: 0;
+  border: 1px solid var(--widget-border); border-radius: inherit;
+  background: rgb(var(--widget-bg-rgb, 251 249 255));
+  box-shadow: 0 8px 24px rgb(39 35 30 / .13);
+  opacity: var(--widget-opacity); pointer-events: none;
+}
+.df-widget-card > * { position: relative; z-index: 1; }
 .df-widget-task-copy { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1 1 auto; }
-.df-widget-status { flex: 0 0 auto; color: var(--widget-accent); font-size: clamp(13px, 2.6vw, 17px); font-weight: 750; white-space: nowrap; }
-.df-widget-task-title { min-width: 0; overflow: hidden; color: var(--widget-ink); font-size: clamp(14px, 3vw, 19px); font-weight: 720; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-.df-widget-controls { position: relative; z-index: 4; display: flex; align-items: center; gap: 4px; flex: 0 0 auto; -webkit-app-region: no-drag; }
-.df-widget-timer { min-width: 58px; margin-right: 4px; color: var(--widget-muted); font: 750 clamp(14px, 2.8vw, 18px)/1 "Cascadia Mono", Consolas, monospace; text-align: right; white-space: nowrap; }
+.df-widget-status { flex: 0 0 auto; color: var(--widget-muted); font-size: clamp(11px, 1.8vw, 12px); font-weight: 650; letter-spacing: .02em; white-space: nowrap; }
+.df-widget-task-title { min-width: 0; overflow: hidden; color: var(--widget-ink); font-size: clamp(18px, 3.6vw, 22px); font-weight: 720; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.df-widget-controls { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; -webkit-app-region: no-drag; }
+.df-widget-timer { min-width: 66px; margin-right: 4px; color: var(--widget-ink); font: 750 clamp(18px, 3.4vw, 22px)/1 "Cascadia Mono", Consolas, monospace; text-align: right; white-space: nowrap; }
 .df-widget-icon-btn {
   display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
   padding: 0; border: 1px solid transparent; border-radius: 11px; background: transparent;
@@ -30,37 +37,44 @@ html:has(.df-widget-root), body:has(.df-widget-root), #root:has(.df-widget-root)
   transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease;
   -webkit-app-region: no-drag;
 }
-.df-widget-icon-btn:hover:not(:disabled), .df-widget-panel-action:hover { border-color: var(--widget-border); background: var(--widget-wash); color: var(--widget-ink); }
-.df-widget-icon-btn:active:not(:disabled), .df-widget-panel-action:active { transform: translateY(1px); }
-.df-widget-icon-btn:focus-visible, .df-widget-panel-action:focus-visible, .df-widget-opacity-row input:focus-visible, .df-widget-panel-overlay:focus-visible { outline: 1px solid var(--widget-accent); outline-offset: 2px; }
+.df-widget-icon-btn:hover:not(:disabled), .df-widget-popover-action:hover { border-color: var(--widget-border); background: var(--widget-wash); color: var(--widget-ink); }
+.df-widget-icon-btn:active:not(:disabled), .df-widget-popover-action:active { transform: translateY(1px); }
+.df-widget-icon-btn:focus-visible, .df-widget-popover-action:focus-visible, .df-widget-opacity-row input:focus-visible { outline: 1px solid var(--widget-accent); outline-offset: 2px; }
 .df-widget-icon-btn:disabled { opacity: .32; cursor: not-allowed; }
 .df-widget-play-btn::before { content: ""; width: 0; height: 0; margin-left: 3px; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 11px solid currentColor; }
 .df-widget-play-btn.is-paused::before { width: 12px; height: 16px; margin-left: 0; border: 0; background: linear-gradient(currentColor, currentColor) left/4px 100% no-repeat, linear-gradient(currentColor, currentColor) right/4px 100% no-repeat; }
 .df-widget-more-btn::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor; box-shadow: 8px 0 currentColor, 16px 0 currentColor; transform: translateX(-8px); }
-.df-widget-accent-line { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; border-radius: 0 0 16px 16px; background: var(--widget-project); pointer-events: none; }
-.df-widget-panel-overlay { position: fixed; z-index: 3; inset: 0; padding: 0; border: 0; background: transparent; -webkit-app-region: no-drag; }
-.df-widget-panel {
-  position: absolute; z-index: 5; top: min(86px, calc(100% - 226px)); right: 8px;
-  display: flex; flex-direction: column; gap: 2px; width: min(280px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px); padding: 8px; overflow: auto; border: 1px solid var(--widget-border);
-  border-radius: 12px; background: rgb(var(--widget-bg-rgb, 251 249 255) / .99);
+
+.df-widget-popover-root {
+  --widget-border: color-mix(in srgb, var(--widget-ink, #27231E) 16%, transparent);
+  --widget-muted: color-mix(in srgb, var(--widget-ink, #27231E) 64%, transparent);
+  --widget-wash: color-mix(in srgb, var(--widget-accent, #27231E) 7%, transparent);
+  width: 100vw; height: 100vh; padding: 6px; overflow: hidden;
+  color: var(--widget-ink, #27231E); font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  user-select: none; -webkit-app-region: no-drag;
+}
+.df-widget-popover-surface {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%;
+  padding: 8px; overflow: auto; border: 1px solid var(--widget-border); border-radius: 12px;
+  background: rgb(var(--widget-bg-rgb, 251 249 255));
   box-shadow: 0 14px 32px rgb(39 35 30 / .16); -webkit-app-region: no-drag;
 }
-.df-widget-panel-action {
+.df-widget-popover-action {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px;
   padding: 9px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent;
   color: var(--widget-ink); font: 600 13px/1.3 inherit; text-align: left; cursor: pointer;
   touch-action: manipulation; transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease;
   -webkit-app-region: no-drag;
 }
-.df-widget-panel-action.is-danger { margin-top: 2px; border-top-color: color-mix(in srgb, #8E4B46 24%, transparent); border-radius: 0 0 9px 9px; color: #8E4B46; }
-.df-widget-panel-state { color: var(--widget-accent); font-weight: 800; }
-.df-widget-opacity-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 7px 12px; min-height: 64px; padding: 8px 12px; color: var(--widget-ink); font-size: 13px; font-weight: 600; -webkit-app-region: no-drag; }
+.df-widget-popover-action.is-danger { margin-top: 2px; border-top-color: color-mix(in srgb, #8E4B46 24%, transparent); border-radius: 0 0 9px 9px; color: #8E4B46; }
+.df-widget-popover-state { color: var(--widget-accent); font-weight: 800; }
+.df-widget-opacity-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; min-height: 72px; padding: 6px 12px; color: var(--widget-ink); font-size: 13px; font-weight: 600; -webkit-app-region: no-drag; }
 .df-widget-opacity-row output { color: var(--widget-muted); font: 12px "Cascadia Mono", Consolas, monospace; }
-.df-widget-root .df-widget-opacity-row input[type="range"] { grid-column: 1/-1; width: 100%; min-height: 28px; margin: 0; accent-color: var(--widget-accent); cursor: pointer; touch-action: pan-x; -webkit-app-region: no-drag; }
+.df-widget-popover-root .df-widget-opacity-row input[type="range"] { grid-column: 1/-1; width: 100%; min-height: 44px; margin: 0; accent-color: var(--widget-accent); cursor: pointer; touch-action: pan-x; -webkit-app-region: no-drag; }
+
 .df-widget-root[data-layout="stacked"] .df-widget-card { align-items: stretch; flex-direction: column; justify-content: center; gap: 8px; padding: 14px 14px 12px 18px; }
 .df-widget-root[data-layout="stacked"] .df-widget-task-copy, .df-widget-root[data-layout="stacked"] .df-widget-controls { width: 100%; }
 .df-widget-root[data-layout="stacked"] .df-widget-controls { justify-content: flex-end; }
 .df-widget-root[data-layout="stacked"] .df-widget-timer { margin-right: auto; text-align: left; }
-@media (pointer: coarse) { .df-widget-panel-action, .df-widget-icon-btn { min-height: 48px; } .df-widget-icon-btn { min-width: 48px; } }
-@media (prefers-reduced-motion: reduce) { .df-widget-root * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+@media (pointer: coarse) { .df-widget-popover-action, .df-widget-icon-btn { min-height: 48px; } .df-widget-icon-btn { min-width: 48px; } }
+@media (prefers-reduced-motion: reduce) { .df-widget-root *, .df-widget-popover-root * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
