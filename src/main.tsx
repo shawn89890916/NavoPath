@@ -52,7 +52,7 @@ import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate
 import { useInAppDialog } from "./InAppDialog";
 import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
 import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
-import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingActionButton, SettingDivider, SettingComingSoon, SettingDescription } from "./components/SettingsControls";
+import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingColorInput, SettingActionButton, SettingDivider, SettingComingSoon, SettingDescription } from "./components/SettingsControls";
 import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
@@ -60,6 +60,8 @@ import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
+import { WidgetApp } from "./widget/WidgetApp";
+import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -1572,424 +1574,6 @@ function YearCalendarOverview({
     </section>
   );
 }
-
-/* ============================================================
- * Desktop Widget — a single-row "now playing" task strip rendered
- * in a frameless, transparent, always-on-top Electron BrowserWindow
- * (loaded with ?widget=1). It is a pure IPC client: it holds NO
- * task data of its own and never reads PlannerData. All truth stays
- * in the main window's React store; the widget sends action requests
- * via desktopApi.widget.sendAction and receives WidgetSnapshot pushes
- * via onSnapshot. Cosmetic prefs (opacity / time color / task-title
- * color) are widget-local and persisted in the widget window's own
- * localStorage so they never touch main-app settings.
- * ============================================================ */
-
-const WIDGET_POSITION_KEY = "navopath-widget-position";
-const WIDGET_PREFS_KEY = "navopath-widget-prefs";
-
-/** Strip window base size; expanded when the "more" menu is open. */
-const WIDGET_STRIP_W = 704;
-const WIDGET_STRIP_H = 96;
-const WIDGET_EXPANDED_H = 390;
-
-type WidgetColorMode = "default" | "project" | "red" | "green" | "blue" | "white";
-type WidgetOpacity = 1 | 0.9 | 0.8 | 0.7 | 0.6;
-type WidgetMenuView = null | "main" | "quickAdd" | "opacity" | "timeColor" | "taskColor";
-
-interface WidgetDisplayPrefs {
-  backgroundColor: string;
-  opacity: number;
-  fontColor: string;
-  accentColor: string;
-  timeColorMode?: WidgetColorMode;
-  taskTitleColorMode?: WidgetColorMode;
-}
-
-const DEFAULT_WIDGET_PREFS: WidgetDisplayPrefs = {
-  backgroundColor: "#FBF9FF",
-  opacity: 0.96,
-  fontColor: "#3F3A35",
-  accentColor: "#00D91A",
-  timeColorMode: "default",
-  taskTitleColorMode: "default",
-};
-
-const WIDGET_COLOR_PRESETS: Record<Exclude<WidgetColorMode, "default" | "project">, string> = {
-  red: "#C96F5B",
-  green: "#7EA172",
-  blue: "#6E8DA6",
-  white: "#FFFFFF",
-};
-
-const WIDGET_OPACITY_OPTIONS: WidgetOpacity[] = [1, 0.9, 0.8, 0.7, 0.6];
-
-const WIDGET_COLOR_MODE_OPTIONS_ZH: Array<{ value: WidgetColorMode; label: string }> = [
-  { value: "default", label: "默认正文色" },
-  { value: "project", label: "跟随项目色" },
-  { value: "red", label: "红色" },
-  { value: "green", label: "绿色" },
-  { value: "blue", label: "蓝色" },
-  { value: "white", label: "白色" },
-];
-const WIDGET_COLOR_MODE_OPTIONS_EN: Array<{ value: WidgetColorMode; label: string }> = [
-  { value: "default", label: "Default ink" },
-  { value: "project", label: "Follow project" },
-  { value: "red", label: "Red" },
-  { value: "green", label: "Green" },
-  { value: "blue", label: "Blue" },
-  { value: "white", label: "White" },
-];
-
-function resolveWidgetColor(mode: WidgetColorMode | undefined, projectColor: string): string {
-  if (!mode || mode === "default") return "var(--widget-ink)";
-  if (mode === "project") return projectColor;
-  return WIDGET_COLOR_PRESETS[mode];
-}
-
-function normalizeWidgetHex(value: unknown, fallback: string): string {
-  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
-}
-
-function normalizeWidgetOpacity(value: unknown): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return DEFAULT_WIDGET_PREFS.opacity;
-  return Math.min(1, Math.max(0.35, parsed));
-}
-
-function normalizeWidgetPrefs(value: Partial<WidgetDisplayPrefs>): WidgetDisplayPrefs {
-  return {
-    backgroundColor: normalizeWidgetHex(value.backgroundColor, DEFAULT_WIDGET_PREFS.backgroundColor),
-    opacity: normalizeWidgetOpacity(value.opacity),
-    fontColor: normalizeWidgetHex(value.fontColor, DEFAULT_WIDGET_PREFS.fontColor),
-    accentColor: normalizeWidgetHex(value.accentColor, DEFAULT_WIDGET_PREFS.accentColor),
-    timeColorMode: value.timeColorMode || DEFAULT_WIDGET_PREFS.timeColorMode,
-    taskTitleColorMode: value.taskTitleColorMode || DEFAULT_WIDGET_PREFS.taskTitleColorMode,
-  };
-}
-
-function hexToRgbTriplet(hex: string): string {
-  const clean = hex.replace("#", "");
-  return [
-    Number.parseInt(clean.slice(0, 2), 16),
-    Number.parseInt(clean.slice(2, 4), 16),
-    Number.parseInt(clean.slice(4, 6), 16),
-  ].join(" ");
-}
-
-function loadWidgetPrefs(): WidgetDisplayPrefs {
-  try {
-    const raw = localStorage.getItem(WIDGET_PREFS_KEY);
-    if (!raw) return { ...DEFAULT_WIDGET_PREFS };
-    const parsed = JSON.parse(raw) as Partial<WidgetDisplayPrefs>;
-    return normalizeWidgetPrefs({ ...DEFAULT_WIDGET_PREFS, ...parsed });
-  } catch {
-    return { ...DEFAULT_WIDGET_PREFS };
-  }
-}
-
-function saveWidgetPrefs(prefs: WidgetDisplayPrefs): void {
-  try { localStorage.setItem(WIDGET_PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
-}
-
-function formatWidgetTimer(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function WidgetApp() {
-  const [snapshot, setSnapshot] = useState<WidgetSnapshot | null>(null);
-  const [localElapsed, setLocalElapsed] = useState(0);
-  const [prefs, setPrefs] = useState<WidgetDisplayPrefs>(() => loadWidgetPrefs());
-  const [menuView, setMenuView] = useState<WidgetMenuView>(null);
-  const [quickTitle, setQuickTitle] = useState("");
-  const [toast, setToast] = useState("");
-  const [alwaysOnTop, setAlwaysOnTop] = useState(true);
-  const lang = snapshot?.lang || detectSystemLanguage();
-
-  // Subscribe to snapshot pushes from the main window.
-  useEffect(() => {
-    const unsubscribe = window.desktopApi?.widget?.onSnapshot((s) => {
-      setSnapshot(s);
-      setAlwaysOnTop(s.alwaysOnTop);
-      setLocalElapsed(s.elapsedSeconds);
-    });
-    // Request the initial snapshot.
-    window.desktopApi?.widget?.sendAction({ type: "requestSnapshot" });
-    return unsubscribe;
-  }, []);
-
-  // Local 1-second tick for smooth timer display while running.
-  useEffect(() => {
-    if (!snapshot?.timerRunning) return;
-    const id = window.setInterval(() => setLocalElapsed((p) => p + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [snapshot?.timerRunning]);
-
-  // Restore window position from localStorage on mount.
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(WIDGET_POSITION_KEY);
-      if (saved) {
-        const pos = JSON.parse(saved);
-        if (typeof pos.x === "number" && typeof pos.y === "number") {
-          void window.desktopApi?.widget?.setPosition(pos.x, pos.y);
-        }
-      }
-    } catch { /* ignore */ }
-    // Debounced save on move/resize via polling getPosition.
-    const interval = window.setInterval(() => {
-      void window.desktopApi?.widget?.getPosition().then((pos) => {
-        if (!pos) return;
-        try { localStorage.setItem(WIDGET_POSITION_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
-      });
-    }, 1500);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  // Grow the window while the "more" menu is open so the dropdown is not
-  // clipped by the tight strip bounds; shrink back when closed.
-  useEffect(() => {
-    void window.desktopApi?.widget?.setSize(WIDGET_STRIP_W, menuView ? WIDGET_EXPANDED_H : WIDGET_STRIP_H);
-  }, [menuView]);
-
-  const sendAction = useCallback((action: WidgetAction) => {
-    window.desktopApi?.widget?.sendAction(action);
-  }, []);
-
-  const updatePrefs = useCallback((patch: Partial<WidgetDisplayPrefs>) => {
-    setPrefs((prev) => {
-      const next = normalizeWidgetPrefs({ ...prev, ...patch });
-      saveWidgetPrefs(next);
-      return next;
-    });
-  }, []);
-
-  const handleQuickAdd = useCallback(() => {
-    const title = quickTitle.trim();
-    if (!title) return;
-    sendAction({ type: "quickAdd", title });
-    setQuickTitle("");
-    setMenuView(null);
-    setToast(lang === "zh" ? "已添加到今日候选" : "Added to today's candidates");
-    window.setTimeout(() => setToast(""), 2200);
-  }, [quickTitle, sendAction, lang]);
-
-  const handleTimerToggle = useCallback(() => {
-    if (!snapshot) return;
-    if (snapshot.timerRunning) {
-      sendAction({ type: "timerPause" });
-    } else if (snapshot.taskId) {
-      sendAction({ type: "timerResume" });
-    }
-    // No task — nothing to start; the button is disabled in this state.
-  }, [snapshot, sendAction]);
-
-  const toggleAlwaysOnTop = useCallback(() => {
-    const next = !alwaysOnTop;
-    setAlwaysOnTop(next);
-    sendAction({ type: "setAlwaysOnTop", enabled: next });
-  }, [alwaysOnTop, sendAction]);
-
-  const resetPosition = useCallback(() => {
-    try { localStorage.removeItem(WIDGET_POSITION_KEY); } catch { /* ignore */ }
-    sendAction({ type: "resetPosition" });
-    setMenuView(null);
-  }, [sendAction]);
-
-  const closeWidget = useCallback(() => {
-    void window.desktopApi?.widget?.close();
-  }, []);
-
-  const hasTask = Boolean(snapshot?.taskId);
-  const zh = lang === "zh";
-  const projectColor = prefs.accentColor || snapshot?.taskProjectColor || "var(--widget-accent)";
-  const statusLabel = hasTask ? (zh ? "正在做" : "Working") : (zh ? "空闲" : "Idle");
-  const statusColor = hasTask ? projectColor : "var(--widget-muted)";
-  const taskTitle = hasTask ? (snapshot?.taskTitle || "") : (zh ? "暂无进行中的任务" : "No active task");
-  const taskTitleColor = hasTask ? resolveWidgetColor(prefs.taskTitleColorMode, projectColor) : "var(--widget-muted)";
-  const timerColor = resolveWidgetColor(prefs.timeColorMode, projectColor);
-  const timerRunning = Boolean(snapshot?.timerRunning);
-  const colorModeOptions = zh ? WIDGET_COLOR_MODE_OPTIONS_ZH : WIDGET_COLOR_MODE_OPTIONS_EN;
-  const widgetStyle = {
-    "--widget-bg-rgb": hexToRgbTriplet(prefs.backgroundColor),
-    "--widget-opacity": String(prefs.opacity),
-    "--widget-ink": prefs.fontColor,
-    "--widget-accent": projectColor,
-  } as CSSProperties;
-
-  return (
-    <div className="df-widget-root" data-lang={lang} style={widgetStyle}>
-      <div className="df-widget-strip" role="status" aria-live="polite">
-        <span className="df-widget-status" style={{ color: statusColor }}>{statusLabel}</span>
-        <span className="df-widget-task-title" style={{ color: taskTitleColor }} title={taskTitle}>{taskTitle}</span>
-        <span className="df-widget-timer" style={{ color: timerColor }}>{formatWidgetTimer(localElapsed)}</span>
-        <button
-          type="button"
-          className={`df-widget-icon-btn df-widget-play-btn ${timerRunning ? "is-paused" : ""}`}
-          aria-label={timerRunning ? (zh ? "暂停" : "Pause") : (zh ? "播放" : "Play")}
-          onClick={handleTimerToggle}
-          disabled={!hasTask}
-        >
-          {timerRunning ? "⏸" : "▶"}
-        </button>
-        <button
-          type="button"
-          className="df-widget-icon-btn df-widget-more-btn"
-          aria-label={zh ? "更多" : "More"}
-          aria-expanded={menuView !== null}
-          onClick={() => setMenuView(menuView ? null : "main")}
-        >⋯</button>
-        <div className="df-widget-accent-line" style={{ background: projectColor }} />
-      </div>
-
-      {menuView !== null && (
-        <>
-          <div className="df-widget-menu-overlay" onClick={() => setMenuView(null)} />
-          <div className="df-widget-menu" role="menu">
-            {menuView === "main" && (
-              <>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={closeWidget}>
-                  <span>{zh ? "关闭小组件" : "Close widget"}</span>
-                </button>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={toggleAlwaysOnTop}>
-                  <span>{zh ? "切换置顶" : "Toggle always-on-top"}</span>
-                  <span className="df-widget-menu-check">{alwaysOnTop ? "✓" : ""}</span>
-                </button>
-                <label className="df-widget-setting-row">
-                  <span>{zh ? "背景颜色" : "Background"}</span>
-                  <input type="color" value={prefs.backgroundColor} onChange={(e) => updatePrefs({ backgroundColor: e.target.value })} />
-                </label>
-                <label className="df-widget-setting-row df-widget-setting-range">
-                  <span>{zh ? "透明度" : "Opacity"}</span>
-                  <output>{Math.round(prefs.opacity * 100)}%</output>
-                  <input type="range" min="0.35" max="1" step="0.01" value={prefs.opacity} onChange={(e) => updatePrefs({ opacity: Number(e.target.value) })} />
-                </label>
-                <label className="df-widget-setting-row">
-                  <span>{zh ? "字体颜色" : "Font color"}</span>
-                  <input type="color" value={prefs.fontColor} onChange={(e) => updatePrefs({ fontColor: e.target.value })} />
-                </label>
-                <label className="df-widget-setting-row">
-                  <span>{zh ? "强调颜色" : "Accent"}</span>
-                  <input type="color" value={prefs.accentColor} onChange={(e) => updatePrefs({ accentColor: e.target.value })} />
-                </label>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={() => updatePrefs(DEFAULT_WIDGET_PREFS)}>
-                  <span>{zh ? "恢复默认外观" : "Reset appearance"}</span>
-                </button>
-                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("quickAdd")}>
-                  <span>{zh ? "快速添加任务" : "Quick add task"}</span>
-                  <span className="df-widget-menu-chevron">›</span>
-                </button>
-                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("opacity")}>
-                  <span>{zh ? "透明度" : "Opacity"}</span>
-                  <span className="df-widget-menu-value">{Math.round(prefs.opacity * 100)}%</span>
-                </button>
-                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("timeColor")}>
-                  <span>{zh ? "时间颜色" : "Time color"}</span>
-                  <span className="df-widget-menu-chevron">›</span>
-                </button>
-                <button type="button" className="df-widget-menu-item df-widget-legacy-menu-item" role="menuitem" onClick={() => setMenuView("taskColor")}>
-                  <span>{zh ? "任务名颜色" : "Task title color"}</span>
-                  <span className="df-widget-menu-chevron">›</span>
-                </button>
-                <button type="button" className="df-widget-menu-item" role="menuitem" onClick={resetPosition}>
-                  <span>{zh ? "重置位置" : "Reset position"}</span>
-                </button>
-              </>
-            )}
-
-            {menuView === "quickAdd" && (
-              <div className="df-widget-menu-sub">
-                <button type="button" className="df-widget-menu-back" onClick={() => setMenuView("main")}>
-                  <span aria-hidden>‹</span><span>{zh ? "返回" : "Back"}</span>
-                </button>
-                <div className="df-widget-menu-sub-title">{zh ? "快速添加任务" : "Quick add task"}</div>
-                <form className="df-widget-quick-add" onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }}>
-                  <input
-                    type="text"
-                    className="df-widget-input"
-                    placeholder={zh ? "添加任务..." : "Add a task..."}
-                    value={quickTitle}
-                    onChange={(e) => setQuickTitle(e.target.value)}
-                    autoFocus
-                  />
-                  <button type="submit" className="df-widget-btn df-widget-btn-accent" disabled={!quickTitle.trim()}>{zh ? "添加" : "Add"}</button>
-                </form>
-              </div>
-            )}
-
-            {menuView === "opacity" && (
-              <WidgetOptionSubmenu
-                title={zh ? "透明度" : "Opacity"}
-                backLabel={zh ? "返回" : "Back"}
-                onBack={() => setMenuView("main")}
-                options={WIDGET_OPACITY_OPTIONS.map((v) => ({ value: String(v), label: `${Math.round(v * 100)}%` }))}
-                selected={String(prefs.opacity)}
-                onSelect={(v) => updatePrefs({ opacity: Number(v) as WidgetOpacity })}
-              />
-            )}
-
-            {menuView === "timeColor" && (
-              <WidgetOptionSubmenu
-                title={zh ? "时间颜色" : "Time color"}
-                backLabel={zh ? "返回" : "Back"}
-                onBack={() => setMenuView("main")}
-                options={colorModeOptions}
-                selected={prefs.timeColorMode || "default"}
-                onSelect={(v) => updatePrefs({ timeColorMode: v as WidgetColorMode })}
-              />
-            )}
-
-            {menuView === "taskColor" && (
-              <WidgetOptionSubmenu
-                title={zh ? "任务名颜色" : "Task title color"}
-                backLabel={zh ? "返回" : "Back"}
-                onBack={() => setMenuView("main")}
-                options={colorModeOptions}
-                selected={prefs.taskTitleColorMode || "default"}
-                onSelect={(v) => updatePrefs({ taskTitleColorMode: v as WidgetColorMode })}
-              />
-            )}
-          </div>
-        </>
-      )}
-
-      {toast && <div className="df-widget-toast">{toast}</div>}
-    </div>
-  );
-}
-
-function WidgetOptionSubmenu({ title, backLabel, onBack, options, selected, onSelect }: {
-  title: string;
-  backLabel: string;
-  onBack: () => void;
-  options: Array<{ value: string; label: string }>;
-  selected: string;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <div className="df-widget-menu-sub">
-      <button type="button" className="df-widget-menu-back" onClick={onBack}>
-        <span aria-hidden>‹</span><span>{backLabel}</span>
-      </button>
-      <div className="df-widget-menu-sub-title">{title}</div>
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          className="df-widget-menu-item"
-          onClick={() => onSelect(opt.value)}
-        >
-          <span>{opt.label}</span>
-          <span className="df-widget-menu-check">{selected === opt.value ? "✓" : ""}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function App() {
   const isWorkspaceRoute = window.location.pathname === "/app" || window.location.pathname.startsWith("/app/") || Boolean(window.desktopApi);
   const [data, setData] = useState<PlannerData | null>(null);
@@ -4358,6 +3942,8 @@ function App() {
       candidateCount: todayCandidates.length,
       lang,
       alwaysOnTop: settings?.widgetAlwaysOnTop !== false,
+      appearance: normalizeWidgetAppearance(settings?.widgetAppearance),
+      appearanceConfigured: settings?.widgetAppearanceMigrated === true,
     };
   }
 
@@ -4395,10 +3981,15 @@ function App() {
         void window.desktopApi?.widget?.setAlwaysOnTop(action.enabled);
         void saveSettings({ widgetAlwaysOnTop: action.enabled });
         break;
+      case "updateAppearance":
+        void saveSettings({
+          widgetAppearance: normalizeWidgetAppearance({ ...settings?.widgetAppearance, ...action.patch }),
+          widgetAppearanceMigrated: true,
+        });
+        break;
       case "resetPosition":
-        try { localStorage.removeItem("navopath-widget-position"); } catch { /* ignore */ }
-        // Re-center: the widget window will fall back to its default position.
-        void window.desktopApi?.widget?.setPosition(80, 80);
+        try { localStorage.removeItem("navopath-widget-bounds"); } catch { /* ignore */ }
+        void window.desktopApi?.widget?.setBounds({ x: 80, y: 80 });
         break;
     }
   }
@@ -4421,14 +4012,10 @@ function App() {
   // the widget stays in sync without polling (timer ticks, task complete,
   // quick add, candidate changes). Throttled to avoid flooding on rapid
   // timer ticks (every second).
-  const widgetSnapshotRef = useRef<number>(0);
   useEffect(() => {
     if (!window.desktopApi?.widget) return;
-    const now = Date.now();
-    if (now - widgetSnapshotRef.current < 400) return; // throttle
-    widgetSnapshotRef.current = now;
     window.desktopApi.widget.pushSnapshot(buildWidgetSnapshot());
-  }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, lang]);
+  }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, settings?.widgetAppearance, settings?.widgetAppearanceMigrated, lang]);
 
   // Auto-open the widget on launch if the user opted in. Runs once.
   const widgetAutoOpenedRef = useRef(false);
@@ -12461,6 +12048,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
   const [clearLocalDataPhrase, setClearLocalDataPhrase] = useState("");
   const [pluginConfigDialogId, setPluginConfigDialogId] = useState<string | null>(null);
   const [pluginConfigDraft, setPluginConfigDraft] = useState<Record<string, unknown>>({});
+  const widgetAppearance = normalizeWidgetAppearance(settings.widgetAppearance);
   // Force a re-render of the plugin list when activation state changes (the
   // registry holds state outside React).
   const [, setPluginRefreshTick] = useState(0);
@@ -13038,7 +12626,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
             >
               <SettingRow
                 title={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"}
-                description={lang === "zh" ? "置顶小窗快速查看正在做、快速添加任务与计时。" : "Always-on-top mini panel for current task, quick add and timer."}
+                description={lang === "zh" ? "置顶小窗快速查看正在做与计时。" : "Always-on-top mini panel for the current task and timer."}
                 control={<SettingToggle checked={settings.featureWidgetEnabled !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"} onChange={(next) => onSave({ featureWidgetEnabled: next })} />}
               />
               <SettingRow
@@ -13049,11 +12637,26 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 title={lang === "zh" ? "始终置顶" : "Always on top"}
                 control={<SettingToggle checked={settings.widgetAlwaysOnTop !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "始终置顶" : "Always on top"} onChange={(next) => { onSave({ widgetAlwaysOnTop: next }); void window.desktopApi?.widget?.setAlwaysOnTop(next); }} />}
               />
-              <SettingComingSoon title={lang === "zh" ? "显示正在做" : "Show current task"} description={lang === "zh" ? "在小组件中显示当前正在进行的任务。" : "Show the active task in the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+              <SettingDivider />
+              <SettingRow
+                title={lang === "zh" ? "背景颜色" : "Background color"}
+                control={<SettingColorInput value={widgetAppearance.backgroundColor} ariaLabel={lang === "zh" ? "小组件背景颜色" : "Widget background color"} onChange={(backgroundColor) => onSave({ widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, backgroundColor }), widgetAppearanceMigrated: true })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "字体颜色" : "Font color"}
+                control={<SettingColorInput value={widgetAppearance.fontColor} ariaLabel={lang === "zh" ? "小组件字体颜色" : "Widget font color"} onChange={(fontColor) => onSave({ widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, fontColor }), widgetAppearanceMigrated: true })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "强调颜色" : "Accent color"}
+                description={lang === "zh" ? "用于状态、焦点和细标记。" : "Used for status, focus, and fine annotation marks."}
+                control={<SettingColorInput value={widgetAppearance.accentColor} ariaLabel={lang === "zh" ? "小组件强调颜色" : "Widget accent color"} onChange={(accentColor) => onSave({ widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, accentColor }), widgetAppearanceMigrated: true })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "恢复默认外观" : "Restore default appearance"}
+                control={<SettingActionButton onClick={() => onSave({ widgetAppearance: { ...DEFAULT_WIDGET_APPEARANCE }, widgetAppearanceMigrated: true })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
+              />
               <SettingComingSoon title={lang === "zh" ? "显示快速添加" : "Show quick add"} description={lang === "zh" ? "在小组件中提供快速添加任务入口。" : "Quick-add entry inside the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
-              <SettingComingSoon title={lang === "zh" ? "显示计时器" : "Show timer"} description={lang === "zh" ? "在小组件中显示专注计时器。" : "Focus timer inside the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
               <SettingComingSoon title={lang === "zh" ? "紧凑模式" : "Compact mode"} description={lang === "zh" ? "缩小小组件尺寸。" : "Shrink the widget to a compact size."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
-              <SettingComingSoon title={lang === "zh" ? "重置位置" : "Reset position"} description={lang === "zh" ? "把小组件恢复到默认屏幕位置。" : "Restore the widget to its default screen position."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
             </SettingSection>}
             {settingsSection === "shortcuts" && <section className="df-settings-group"><h3>{lang === "zh" ? "快捷键" : "Shortcuts"}</h3>
               <p className="df-settings-desc">{lang === "zh" ? "固定快捷键参考。本版本暂不支持自定义。" : "Fixed shortcut reference. Custom shortcuts are not enabled in this version."}</p>

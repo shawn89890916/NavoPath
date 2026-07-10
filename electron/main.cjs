@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nativeImage, screen } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createWidgetWindowService } = require("./widget-window.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -1249,96 +1250,33 @@ ipcMain.handle("backup:readLatest", () => {
 // ============================================================
 // Desktop widget window (always-on-top mini panel)
 // ============================================================
-let widgetWindow = null;
-
-function createWidgetWindow() {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    widgetWindow.show();
-    widgetWindow.focus();
-    return widgetWindow;
-  }
-  const iconPath = app.isPackaged
-    ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
-    : path.join(__dirname, "..", "public", "navopath-icon.png");
-
-  widgetWindow = new BrowserWindow({
-    width: 704,
-    height: 96,
-    title: "NavoPath",
-    icon: iconPath,
-    alwaysOnTop: true,
-    frame: false,
-    resizable: false,
-    transparent: true,
-    autoHideMenuBar: true,
-    backgroundColor: "#00000000",
-    hasShadow: false,
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Load the same renderer bundle with ?widget=1 so it mounts WidgetApp
-  // instead of the full App (no Supabase auth / data boot in the widget).
-  const localIndex = path.join(__dirname, "..", "dist", "index.html");
-  const useLocalFile = app.isPackaged || (fs.existsSync(localIndex) && !process.env.VITE_DEV_SERVER_URL);
-  if (useLocalFile) {
-    const indexPath = app.isPackaged
-      ? path.join(app.getAppPath(), "dist", "index.html")
-      : localIndex;
-    widgetWindow.loadFile(indexPath, { query: { widget: "1" } });
-  } else {
-    const configuredUrl = process.env.VITE_DEV_SERVER_URL || process.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
-    widgetWindow.loadURL(`${configuredUrl}/app?widget=1`);
-  }
-
-  widgetWindow.once("ready-to-show", () => widgetWindow?.show());
-  widgetWindow.on("closed", () => { widgetWindow = null; });
-  return widgetWindow;
-}
-
-ipcMain.handle("widget:open", () => {
-  createWidgetWindow();
-  return true;
+const widgetIconPath = app.isPackaged
+  ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
+  : path.join(__dirname, "..", "public", "navopath-icon.png");
+const widgetWindowService = createWidgetWindowService({
+  BrowserWindow,
+  app,
+  ipcMain,
+  screen,
+  fs,
+  path,
+  env: process.env,
+  preloadPath: path.join(__dirname, "preload.cjs"),
+  localIndexPath: path.join(__dirname, "..", "dist", "index.html"),
+  iconPath: widgetIconPath,
 });
-ipcMain.handle("widget:close", () => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.close();
-  return true;
-});
-ipcMain.handle("widget:set-always-on-top", (_event, enabled) => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.setAlwaysOnTop(Boolean(enabled));
-  return true;
-});
-ipcMain.handle("widget:set-position", (_event, x, y) => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    try { widgetWindow.setPosition(Math.round(x), Math.round(y)); } catch { /* ignore off-screen */ }
-  }
-  return true;
-});
-ipcMain.handle("widget:get-position", () => {
-  if (!widgetWindow || widgetWindow.isDestroyed()) return null;
-  const [x, y] = widgetWindow.getPosition();
-  const [width, height] = widgetWindow.getSize();
-  return { x, y, width, height };
-});
-ipcMain.handle("widget:set-size", (_event, width, height) => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    try { widgetWindow.setSize(Math.round(width), Math.round(height)); } catch { /* ignore invalid size */ }
-  }
-  return true;
-});
+widgetWindowService.registerIpc();
 
 // Relay: widget renderer → main window (action requests)
 ipcMain.on("widget:action", (_event, action) => {
+  const widgetWindow = widgetWindowService.getWindow();
   const main = BrowserWindow.getAllWindows().find((w) => w !== widgetWindow && !w.isDestroyed());
   if (main) main.webContents.send("widget:action", action);
 });
 
 // Relay: main window → widget renderer (snapshot pushes)
 ipcMain.on("widget:push-snapshot", (_event, snapshot) => {
+  const widgetWindow = widgetWindowService.getWindow();
   if (widgetWindow && !widgetWindow.isDestroyed()) {
     widgetWindow.webContents.send("widget:snapshot", snapshot);
   }

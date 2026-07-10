@@ -286,6 +286,21 @@ export interface PlannerData {
 
 export type Language = "en" | "zh";
 
+export interface WidgetAppearance {
+  backgroundColor: string;
+  fontColor: string;
+  accentColor: string;
+  opacity: number;
+  version: number;
+}
+
+export interface WidgetBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface Settings {
   activeMode: "execute" | "planning";
   defaultTimelineView?: "daily" | "3day" | "weekly" | "month";
@@ -360,6 +375,8 @@ export interface Settings {
   widgetAlwaysOnTop?: boolean;
   /** 启动时自动打开小组件。 */
   widgetOpenOnLaunch?: boolean;
+  widgetAppearance?: WidgetAppearance;
+  widgetAppearanceMigrated?: boolean;
   /** 最近一次成功同步时间（ISO 字符串）。 */
   lastSyncedAt?: string;
   /** 已启用（已安装并激活）的插件 ID 列表。 */
@@ -534,6 +551,8 @@ export interface WidgetSnapshot {
   lang: "zh" | "en";
   /** 小组件设置镜像。 */
   alwaysOnTop: boolean;
+  appearance: WidgetAppearance;
+  appearanceConfigured: boolean;
 }
 
 /** 小组件发往主窗口的动作请求。 */
@@ -546,6 +565,7 @@ export type WidgetAction =
   | { type: "timerStop" }
   | { type: "complete"; taskId?: string }
   | { type: "setAlwaysOnTop"; enabled: boolean }
+  | { type: "updateAppearance"; patch: Partial<WidgetAppearance> }
   | { type: "resetPosition" };
 
 declare global {
@@ -572,9 +592,9 @@ declare global {
         open: () => Promise<boolean>;
         close: () => Promise<boolean>;
         setAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
-        setPosition: (x: number, y: number) => Promise<boolean>;
-        getPosition: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
-        setSize: (width: number, height: number) => Promise<boolean>;
+        getBounds: () => Promise<WidgetBounds | null>;
+        setBounds: (bounds: Partial<WidgetBounds>) => Promise<boolean>;
+        getWorkArea: () => Promise<WidgetBounds>;
         /** Widget side: fire an action request to the main window (fire-and-forget). */
         sendAction: (action: WidgetAction) => void;
         /** Widget side: listen for snapshot pushes from the main window. */

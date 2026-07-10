@@ -1,4 +1,5 @@
 import type { Settings } from "./types";
+import { DEFAULT_WIDGET_APPEARANCE } from "./widget/widgetPreferences";
 
 /**
  * Canonical NavoPath default settings.
@@ -70,6 +71,8 @@ export const defaultSettings: Settings = {
   featureWidgetEnabled: true,
   widgetAlwaysOnTop: true,
   widgetOpenOnLaunch: false,
+  widgetAppearance: { ...DEFAULT_WIDGET_APPEARANCE },
+  widgetAppearanceMigrated: false,
 };
 
 /**
@@ -77,5 +80,9 @@ export const defaultSettings: Settings = {
  * settings back to factory defaults — never mutate the shared constant.
  */
 export function getDefaultSettings(): Settings {
-  return { ...defaultSettings, panelWidths: { ...defaultSettings.panelWidths } };
+  return {
+    ...defaultSettings,
+    panelWidths: { ...defaultSettings.panelWidths },
+    widgetAppearance: { ...DEFAULT_WIDGET_APPEARANCE },
+  };
 }

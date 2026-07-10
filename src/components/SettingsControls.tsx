@@ -195,6 +195,29 @@ export function SettingTextInput({
   );
 }
 
+export function SettingColorInput({
+  value,
+  onChange,
+  disabled,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <input
+      type="color"
+      className="df-settings-color-input"
+      value={value}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value.toUpperCase())}
+    />
+  );
+}
+
 export function SettingActionButton({
   children,
   onClick,

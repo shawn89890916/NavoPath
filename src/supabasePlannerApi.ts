@@ -74,7 +74,12 @@ const defaultSettings: Settings = {
   focusModeDefault: "stopwatch",
   featureKanbanViewEnabled: false,
   featureQuadrantViewEnabled: false,
-  featureListViewEnabled: false
+  featureListViewEnabled: false,
+  featureWidgetEnabled: true,
+  widgetAlwaysOnTop: true,
+  widgetOpenOnLaunch: false,
+  widgetAppearance: { backgroundColor: "#FBF9FF", fontColor: "#27231E", accentColor: "#27231E", opacity: 0.96, version: 1 },
+  widgetAppearanceMigrated: false,
 };
 
 function publicUser(user: User | null) {

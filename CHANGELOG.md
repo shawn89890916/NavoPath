@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 2026-07-10 · 桌面小组件交互与响应式重构
+
+### 修复
+- 重构桌面小组件的窗口与交互：现在可自由拖动边缘调整宽高，并记住尺寸和位置；窄窗或高窗会自动切换为两行布局，显示器或 DPI 变化后会把窗口保持在可见区域。“更多”面板固定在小组件内部，只保留置顶、透明度、重置位置和关闭，支持鼠标、触屏、键盘与 Esc，按钮触控区域、菜单行高和圆角均更清晰。背景色、字体色和强调色迁入“设置 > 桌面小组件”，旧版外观偏好会迁移一次，默认强调不再使用荧光绿色。
+
+## 2026-07-10 · Desktop widget interaction and responsive layout rebuild
+
+### Fixed
+- Rebuilt the desktop widget window and interactions. The widget can now be freely resized from its edges and remembers its bounds; narrow or tall windows switch to a two-row layout, while display or DPI changes keep the widget visible. The More panel stays inside the widget and is reduced to always-on-top, opacity, reset position, and close, with mouse, touch, keyboard, and Escape support plus clearer touch targets, row spacing, and rounded edges. Background, font, and accent colors now live under Settings > Desktop Widget, legacy appearance preferences migrate once, and the default accent no longer uses neon green.
+
 ## 2026-07-08 · 设置页统一迁移、模板弹窗按钮归位、候选列表间距精简与模板页排版收紧
 
 ### 新增

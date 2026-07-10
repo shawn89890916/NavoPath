@@ -711,6 +711,19 @@
 .df-settings-action--danger { border-color: #C96F5B; color: #C96F5B; }
 .df-settings-action--danger:hover { background: rgba(201, 111, 91, 0.06); }
 
+.df-settings-color-input {
+  width: 48px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-card);
+  cursor: pointer;
+}
+.df-settings-color-input:hover { border-color: var(--accent-active); }
+.df-settings-color-input:focus-visible { outline: 1px solid var(--accent-active); outline-offset: 2px; }
+.df-settings-color-input:disabled { opacity: .5; cursor: not-allowed; }
+
 /* SettingDivider: a single fine rule between sub-groups. */
 .df-settings-divider {
   border: 0;
