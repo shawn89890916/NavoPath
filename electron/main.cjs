@@ -1269,15 +1269,11 @@ widgetWindowService.registerIpc();
 
 // Relay: widget renderer → main window (action requests)
 ipcMain.on("widget:action", (_event, action) => {
-  const widgetWindow = widgetWindowService.getWindow();
-  const main = BrowserWindow.getAllWindows().find((w) => w !== widgetWindow && !w.isDestroyed());
+  const main = BrowserWindow.getAllWindows().find((w) => !widgetWindowService.ownsWindow(w) && !w.isDestroyed());
   if (main) main.webContents.send("widget:action", action);
 });
 
 // Relay: main window → widget renderer (snapshot pushes)
 ipcMain.on("widget:push-snapshot", (_event, snapshot) => {
-  const widgetWindow = widgetWindowService.getWindow();
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    widgetWindow.webContents.send("widget:snapshot", snapshot);
-  }
+  widgetWindowService.broadcastSnapshot(snapshot);
 });

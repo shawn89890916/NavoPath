@@ -591,6 +591,8 @@ declare global {
       widget?: {
         open: () => Promise<boolean>;
         close: () => Promise<boolean>;
+        togglePopover: () => Promise<boolean>;
+        closePopover: () => Promise<boolean>;
         setAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
         getBounds: () => Promise<WidgetBounds | null>;
         setBounds: (bounds: Partial<WidgetBounds>) => Promise<boolean>;

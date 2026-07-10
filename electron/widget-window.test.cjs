@@ -12,7 +12,8 @@ function makeDeps() {
       this.destroyed = false;
       this.events = new Map();
       this.bounds = { x: 80, y: 80, width: options.width, height: options.height };
-      this.webContents = { send() {} };
+      this.sent = [];
+      this.webContents = { send: (...args) => this.sent.push(args) };
       windows.push(this);
     }
     isDestroyed() { return this.destroyed; }
@@ -20,13 +21,16 @@ function makeDeps() {
     focus() { this.focused = true; }
     close() { this.destroyed = true; this.events.get("closed")?.(); }
     setAlwaysOnTop(value) { this.alwaysOnTop = value; }
+    setPosition(x, y) { this.bounds = { ...this.bounds, x, y }; }
     setBounds(bounds) { this.bounds = { ...this.bounds, ...bounds }; }
     setMaximumSize(width, height) { this.maximumSize = { width, height }; }
     getBounds() { return { ...this.bounds }; }
+    getSize() { return [this.bounds.width, this.bounds.height]; }
     loadFile(file, options) { this.loaded = { file, options }; }
     loadURL(url) { this.loaded = { url }; }
     once(name, listener) { this.events.set(name, listener); }
     on(name, listener) { this.events.set(name, listener); }
+    emit(name) { this.events.get(name)?.(); }
   }
 
   return {
@@ -144,4 +148,74 @@ test("restores bounds against the target display instead of the current display"
 
   assert.deepEqual(win.getBounds(), { x: 1500, y: 120, width: 700, height: 300 });
   assert.deepEqual(win.maximumSize, { width: 860, height: 756 });
+});
+
+test("toggles a separate fixed-size popover without changing widget bounds", async () => {
+  const { deps, handlers, windows } = makeDeps();
+  const service = createWidgetWindowService(deps);
+  service.registerIpc();
+  service.open();
+
+  await handlers.get("widget:toggle-popover")();
+
+  assert.equal(windows.length, 2);
+  assert.equal(windows[1].options.width, 280);
+  assert.equal(windows[1].options.height, 252);
+  assert.equal(windows[1].options.resizable, false);
+  assert.deepEqual(windows[0].getBounds(), { x: 80, y: 80, width: 500, height: 88 });
+  assert.deepEqual(windows[1].loaded.options.query, { widgetPopover: "1" });
+  assert.deepEqual(windows[1].getBounds(), { x: 300, y: 174, width: 280, height: 252 });
+  windows[1].emit("ready-to-show");
+  assert.equal(windows[1].shown, true);
+  assert.equal(windows[1].focused, true);
+
+  await handlers.get("widget:toggle-popover")();
+  assert.equal(windows[1].isDestroyed(), true);
+});
+
+test("closes the popover on blur and through the close IPC handler", async () => {
+  const { deps, handlers, windows } = makeDeps();
+  const service = createWidgetWindowService(deps);
+  service.registerIpc();
+  service.open();
+
+  await handlers.get("widget:toggle-popover")();
+  windows[1].emit("blur");
+  assert.equal(windows[1].isDestroyed(), true);
+
+  await handlers.get("widget:toggle-popover")();
+  assert.equal(windows.length, 3);
+  await handlers.get("widget:close-popover")();
+  assert.equal(windows[2].isDestroyed(), true);
+});
+
+test("closes the popover when the widget moves, resizes, or closes", async () => {
+  for (const eventName of ["move", "resize", "closed"]) {
+    const { deps, handlers, windows } = makeDeps();
+    const service = createWidgetWindowService(deps);
+    service.registerIpc();
+    const widget = service.open();
+    await handlers.get("widget:toggle-popover")();
+
+    widget.emit(eventName);
+
+    assert.equal(windows[1].isDestroyed(), true, eventName);
+  }
+});
+
+test("broadcasts snapshots to both live renderer windows and owns each", async () => {
+  const { deps, handlers, windows } = makeDeps();
+  const service = createWidgetWindowService(deps);
+  service.registerIpc();
+  service.open();
+  await handlers.get("widget:toggle-popover")();
+  const snapshot = { taskTitle: "Focus" };
+
+  service.broadcastSnapshot(snapshot);
+
+  assert.deepEqual(windows[0].sent, [["widget:snapshot", snapshot]]);
+  assert.deepEqual(windows[1].sent, [["widget:snapshot", snapshot]]);
+  assert.equal(service.ownsWindow(windows[0]), true);
+  assert.equal(service.ownsWindow(windows[1]), true);
+  assert.equal(service.ownsWindow({}), false);
 });

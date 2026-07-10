@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
   widget: {
     open: () => ipcRenderer.invoke("widget:open"),
     close: () => ipcRenderer.invoke("widget:close"),
+    togglePopover: () => ipcRenderer.invoke("widget:toggle-popover"),
+    closePopover: () => ipcRenderer.invoke("widget:close-popover"),
     setAlwaysOnTop: (enabled) => ipcRenderer.invoke("widget:set-always-on-top", Boolean(enabled)),
     getBounds: () => ipcRenderer.invoke("widget:get-bounds"),
     setBounds: (bounds) => ipcRenderer.invoke("widget:set-bounds", bounds),

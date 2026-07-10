@@ -60,7 +60,7 @@ import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
-import { WidgetApp } from "./widget/WidgetApp";
+import { WidgetApp, WidgetPopoverApp } from "./widget/WidgetApp";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
 import "./styles.css";
 import "./app-redesign.css";
@@ -3989,7 +3989,7 @@ function App() {
         break;
       case "resetPosition":
         try { localStorage.removeItem("navopath-widget-bounds"); } catch { /* ignore */ }
-        void window.desktopApi?.widget?.setBounds({ x: 80, y: 80 });
+        void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 500, height: 88 });
         break;
     }
   }
@@ -13152,9 +13152,12 @@ const rootKey = "__plannerRoot";
 const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
 const root = rootWindow[rootKey] ?? createRoot(rootElement);
 rootWindow[rootKey] = root;
+const isWidgetPopoverRoute = new URLSearchParams(window.location.search).get("widgetPopover") === "1";
 const isWidgetRoute = new URLSearchParams(window.location.search).get("widget") === "1";
 root.render(
-  isWidgetRoute
+  isWidgetPopoverRoute
+    ? <WidgetPopoverApp />
+    : isWidgetRoute
     ? <WidgetApp />
     : window.location.pathname === "/changelog"
       ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>

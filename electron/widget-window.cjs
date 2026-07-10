@@ -3,6 +3,8 @@ const WIDGET_MAX_WIDTH = 860;
 const WIDGET_MIN_HEIGHT = 84;
 const DEFAULT_WIDGET_WIDTH = 500;
 const DEFAULT_WIDGET_HEIGHT = 88;
+const POPOVER_WIDTH = 280;
+const POPOVER_HEIGHT = 252;
 const POPOVER_GAP = 6;
 const WINDOW_MARGIN = 6;
 
@@ -40,6 +42,7 @@ function positionPopover(widgetBounds, popoverSize, workArea) {
 
 function createWidgetWindowService(deps) {
   let widgetWindow = null;
+  let popoverWindow = null;
   let registered = false;
 
   function displayFor(bounds) {
@@ -86,8 +89,77 @@ function createWidgetWindowService(deps) {
       widgetWindow.loadURL(`${baseUrl}/app?widget=1`);
     }
     widgetWindow.once("ready-to-show", () => widgetWindow?.show());
-    widgetWindow.on("closed", () => { widgetWindow = null; });
+    widgetWindow.on("move", closePopover);
+    widgetWindow.on("resize", closePopover);
+    widgetWindow.on("closed", () => {
+      closePopover();
+      widgetWindow = null;
+    });
     return widgetWindow;
+  }
+
+  function closePopover() {
+    if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.close();
+    popoverWindow = null;
+    return true;
+  }
+
+  function togglePopover() {
+    if (popoverWindow && !popoverWindow.isDestroyed()) return closePopover();
+    if (!widgetWindow || widgetWindow.isDestroyed()) return false;
+    const popover = new deps.BrowserWindow({
+      width: POPOVER_WIDTH,
+      height: POPOVER_HEIGHT,
+      parent: widgetWindow,
+      title: "NavoPath",
+      icon: deps.iconPath,
+      alwaysOnTop: true,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      skipTaskbar: true,
+      autoHideMenuBar: true,
+      backgroundColor: "#00000000",
+      hasShadow: false,
+      show: false,
+      webPreferences: {
+        preload: deps.preloadPath,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+    popoverWindow = popover;
+    const workArea = displayFor(widgetWindow.getBounds()).workArea;
+    const [width, height] = popover.getSize();
+    const position = positionPopover(widgetWindow.getBounds(), { width, height }, workArea);
+    popover.setPosition(position.x, position.y);
+    const useLocalFile = deps.app.isPackaged || (deps.fs.existsSync(deps.localIndexPath) && !deps.env.VITE_DEV_SERVER_URL);
+    if (useLocalFile) {
+      popover.loadFile(deps.localIndexPath, { query: { widgetPopover: "1" } });
+    } else {
+      const baseUrl = deps.env.VITE_DEV_SERVER_URL || deps.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
+      popover.loadURL(`${baseUrl}/app?widgetPopover=1`);
+    }
+    popover.once("ready-to-show", () => {
+      if (popoverWindow !== popover || popover.isDestroyed()) return;
+      popover.show();
+      popover.focus();
+    });
+    popover.on("blur", closePopover);
+    popover.on("closed", () => {
+      if (popoverWindow === popover) popoverWindow = null;
+    });
+    return true;
+  }
+
+  function broadcastSnapshot(snapshot) {
+    for (const win of [widgetWindow, popoverWindow]) {
+      if (win && !win.isDestroyed()) win.webContents.send("widget:snapshot", snapshot);
+    }
+  }
+
+  function ownsWindow(win) {
+    return win === widgetWindow || win === popoverWindow;
   }
 
   function registerIpc() {
@@ -95,6 +167,8 @@ function createWidgetWindowService(deps) {
     registered = true;
     deps.ipcMain.handle("widget:open", () => { open(); return true; });
     deps.ipcMain.handle("widget:close", () => { if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.close(); return true; });
+    deps.ipcMain.handle("widget:toggle-popover", togglePopover);
+    deps.ipcMain.handle("widget:close-popover", closePopover);
     deps.ipcMain.handle("widget:set-always-on-top", (_event, enabled) => {
       if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.setAlwaysOnTop(Boolean(enabled));
       return true;
@@ -144,7 +218,15 @@ function createWidgetWindowService(deps) {
     }
   }
 
-  return { open, registerIpc, getWindow: () => widgetWindow };
+  return {
+    open,
+    registerIpc,
+    togglePopover,
+    closePopover,
+    broadcastSnapshot,
+    ownsWindow,
+    getWindow: () => widgetWindow,
+  };
 }
 
 module.exports = {
