@@ -57,12 +57,12 @@ describe("widget appearance", () => {
 describe("widget geometry", () => {
   const workArea = { x: 0, y: 0, width: 1280, height: 720 };
 
-  it("restores valid persisted bounds and ignores malformed JSON", () => {
-    expect(restoreStoredWidgetBounds(
-      JSON.stringify({ x: 1200, y: -50, width: 2000, height: 40 }),
-      workArea,
-    )).toEqual({ x: 414, y: 0, width: 860, height: 84 });
-    expect(restoreStoredWidgetBounds("{malformed", workArea)).toBeNull();
+  it("preserves complete finite bounds for Electron to restore on the target display", () => {
+    const secondaryDisplayBounds = { x: 1500, y: 120, width: 700, height: 300 };
+    expect(restoreStoredWidgetBounds(JSON.stringify(secondaryDisplayBounds))).toEqual(secondaryDisplayBounds);
+    expect(restoreStoredWidgetBounds("{malformed")).toBeNull();
+    expect(restoreStoredWidgetBounds(JSON.stringify({ x: 1500, y: 120, width: 700 }))).toBeNull();
+    expect(restoreStoredWidgetBounds(JSON.stringify({ x: 1500, y: 120, width: "700", height: 300 }))).toBeNull();
   });
 
   it("clamps restored bounds into the visible display work area", () => {

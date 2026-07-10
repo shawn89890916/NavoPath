@@ -188,12 +188,8 @@ export function WidgetApp() {
     if (!api) return;
     try {
       const raw = localStorage.getItem(WIDGET_BOUNDS_KEY);
-      if (raw) {
-        void api.getWorkArea().then((workArea) => {
-          const restored = restoreStoredWidgetBounds(raw, workArea);
-          if (restored) return api.setBounds(restored);
-        });
-      }
+      const restored = restoreStoredWidgetBounds(raw);
+      if (restored) void api.setBounds(restored);
     } catch { /* Ignore unavailable storage. */ }
     const poller = window.setInterval(() => {
       void api.getBounds().then((bounds) => {

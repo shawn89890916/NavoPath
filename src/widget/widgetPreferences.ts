@@ -67,12 +67,14 @@ export function clampWidgetBounds(bounds: WidgetBounds, workArea: WidgetBounds):
   };
 }
 
-export function restoreStoredWidgetBounds(raw: string | null, workArea: WidgetBounds): WidgetBounds | null {
+export function restoreStoredWidgetBounds(raw: string | null): WidgetBounds | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as WidgetBounds | null;
+    const parsed = JSON.parse(raw) as Partial<WidgetBounds> | null;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    return clampWidgetBounds(parsed, workArea);
+    const { x, y, width, height } = parsed;
+    if (![x, y, width, height].every((value) => typeof value === "number" && Number.isFinite(value))) return null;
+    return { x: x as number, y: y as number, width: width as number, height: height as number };
   } catch {
     return null;
   }

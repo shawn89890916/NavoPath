@@ -69,7 +69,8 @@ describe("WidgetView", () => {
   it("restores and periodically persists widget bounds while mounted", () => {
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
     expect(source).toContain('const WIDGET_BOUNDS_KEY = "navopath-widget-bounds"');
-    expect(source).toMatch(/getWorkArea\(\)[\s\S]*?restoreStoredWidgetBounds[\s\S]*?setBounds/);
+    expect(source).toMatch(/restoreStoredWidgetBounds\(raw\)[\s\S]*?setBounds\(restored\)/);
+    expect(source).not.toContain("getWorkArea()");
     expect(source).toMatch(/setInterval\([\s\S]*?getBounds\(\)[\s\S]*?localStorage\.setItem\(WIDGET_BOUNDS_KEY[\s\S]*?1200/);
   });
 
