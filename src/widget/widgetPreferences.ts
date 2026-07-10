@@ -4,7 +4,7 @@ export const WIDGET_APPEARANCE_VERSION = 1;
 export const WIDGET_MIN_WIDTH = 360;
 export const WIDGET_MAX_WIDTH = 860;
 export const WIDGET_MIN_HEIGHT = 84;
-export const WIDGET_MENU_MIN_HEIGHT = 320;
+export const WIDGET_DEFAULT_BOUNDS = { width: 500, height: 88 } as const;
 const WINDOW_MARGIN = 6;
 
 export const DEFAULT_WIDGET_APPEARANCE: WidgetAppearance = {
@@ -24,7 +24,7 @@ function normalizeHex(value: unknown, fallback: string): string {
 function normalizeOpacity(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_WIDGET_APPEARANCE.opacity;
-  return Math.min(1, Math.max(0.35, parsed));
+  return Math.min(1, Math.max(0, parsed));
 }
 
 export function normalizeWidgetAppearance(value?: Partial<WidgetAppearance> | null): WidgetAppearance {
@@ -46,17 +46,13 @@ export function migrateLegacyWidgetAppearance(raw: string | null, currentVersion
   }
 }
 
-export function getWidgetMaxHeight(workAreaHeight: number): number {
-  return Math.max(WIDGET_MENU_MIN_HEIGHT, Math.round(workAreaHeight * 0.7));
-}
-
 export function clampWidgetBounds(bounds: WidgetBounds, workArea: WidgetBounds): WidgetBounds {
   const safeX = Number.isFinite(bounds.x) ? bounds.x : workArea.x;
   const safeY = Number.isFinite(bounds.y) ? bounds.y : workArea.y;
-  const safeWidth = Number.isFinite(bounds.width) ? bounds.width : 620;
-  const safeHeight = Number.isFinite(bounds.height) ? bounds.height : 100;
+  const safeWidth = Number.isFinite(bounds.width) ? bounds.width : WIDGET_DEFAULT_BOUNDS.width;
+  const safeHeight = Number.isFinite(bounds.height) ? bounds.height : WIDGET_DEFAULT_BOUNDS.height;
   const maxWidth = Math.min(WIDGET_MAX_WIDTH, Math.max(WIDGET_MIN_WIDTH, workArea.width - WINDOW_MARGIN * 2));
-  const maxHeight = Math.min(getWidgetMaxHeight(workArea.height), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
+  const maxHeight = Math.min(Math.round(workArea.height * 0.7), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
   const width = Math.min(maxWidth, Math.max(WIDGET_MIN_WIDTH, Math.round(safeWidth)));
   const height = Math.min(maxHeight, Math.max(WIDGET_MIN_HEIGHT, Math.round(safeHeight)));
   const minX = workArea.x;
@@ -71,23 +67,8 @@ export function clampWidgetBounds(bounds: WidgetBounds, workArea: WidgetBounds):
   };
 }
 
-export function getExpandedWidgetBounds(
-  current: WidgetBounds,
-  workArea: WidgetBounds,
-  minimumHeight = WIDGET_MENU_MIN_HEIGHT,
-): { bounds: WidgetBounds; autoExpanded: boolean; previousHeight: number } {
-  if (current.height >= minimumHeight) {
-    return { bounds: clampWidgetBounds(current, workArea), autoExpanded: false, previousHeight: current.height };
-  }
-  return {
-    bounds: clampWidgetBounds({ ...current, height: minimumHeight }, workArea),
-    autoExpanded: true,
-    previousHeight: current.height,
-  };
-}
-
-export function getWidgetLayout(width: number, height: number): "strip" | "stacked" {
-  return width >= 520 && height < 140 ? "strip" : "stacked";
+export function getWidgetLayout(_width: number, height: number): "strip" | "stacked" {
+  return height >= 132 ? "stacked" : "strip";
 }
 
 export function hexToRgbTriplet(hex: string): string {

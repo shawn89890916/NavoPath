@@ -3,7 +3,6 @@ import {
   DEFAULT_WIDGET_APPEARANCE,
   WIDGET_APPEARANCE_VERSION,
   clampWidgetBounds,
-  getExpandedWidgetBounds,
   getWidgetLayout,
   migrateLegacyWidgetAppearance,
   normalizeWidgetAppearance,
@@ -23,6 +22,14 @@ describe("widget appearance", () => {
       accentColor: "#ABCDEF",
       opacity: 1,
       version: WIDGET_APPEARANCE_VERSION,
+    });
+    expect(normalizeWidgetAppearance({ opacity: -2 })).toEqual({
+      ...DEFAULT_WIDGET_APPEARANCE,
+      opacity: 0,
+    });
+    expect(normalizeWidgetAppearance({ opacity: 0 })).toEqual({
+      ...DEFAULT_WIDGET_APPEARANCE,
+      opacity: 0,
     });
   });
 
@@ -62,22 +69,15 @@ describe("widget geometry", () => {
     expect(clampWidgetBounds({ x: Number.NaN, y: Number.NaN, width: Number.NaN, height: Number.NaN }, workArea)).toEqual({
       x: 0,
       y: 0,
-      width: 620,
-      height: 100,
+      width: 500,
+      height: 88,
     });
   });
 
-  it("expands a short window for the panel without changing its width", () => {
-    expect(getExpandedWidgetBounds({ x: 80, y: 500, width: 540, height: 100 }, workArea, 320)).toEqual({
-      bounds: { x: 80, y: 394, width: 540, height: 320 },
-      autoExpanded: true,
-      previousHeight: 100,
-    });
-  });
-
-  it("uses the stacked layout for narrow or tall windows", () => {
+  it("uses the stacked layout only for tall windows", () => {
     expect(getWidgetLayout(700, 100)).toBe("strip");
-    expect(getWidgetLayout(480, 100)).toBe("stacked");
+    expect(getWidgetLayout(480, 100)).toBe("strip");
+    expect(getWidgetLayout(480, 132)).toBe("stacked");
     expect(getWidgetLayout(700, 180)).toBe("stacked");
   });
 });

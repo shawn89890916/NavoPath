@@ -1,6 +1,9 @@
 const WIDGET_MIN_WIDTH = 360;
 const WIDGET_MAX_WIDTH = 860;
 const WIDGET_MIN_HEIGHT = 84;
+const DEFAULT_WIDGET_WIDTH = 500;
+const DEFAULT_WIDGET_HEIGHT = 88;
+const POPOVER_GAP = 6;
 const WINDOW_MARGIN = 6;
 
 function maxHeightFor(workArea) {
@@ -10,8 +13,8 @@ function maxHeightFor(workArea) {
 function clampBounds(bounds, workArea) {
   const safeX = Number.isFinite(Number(bounds.x)) ? Number(bounds.x) : workArea.x;
   const safeY = Number.isFinite(Number(bounds.y)) ? Number(bounds.y) : workArea.y;
-  const safeWidth = Number.isFinite(Number(bounds.width)) ? Number(bounds.width) : 620;
-  const safeHeight = Number.isFinite(Number(bounds.height)) ? Number(bounds.height) : 100;
+  const safeWidth = Number.isFinite(Number(bounds.width)) ? Number(bounds.width) : DEFAULT_WIDGET_WIDTH;
+  const safeHeight = Number.isFinite(Number(bounds.height)) ? Number(bounds.height) : DEFAULT_WIDGET_HEIGHT;
   const maxWidth = Math.min(WIDGET_MAX_WIDTH, Math.max(WIDGET_MIN_WIDTH, workArea.width - WINDOW_MARGIN * 2));
   const maxHeight = Math.min(maxHeightFor(workArea), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
   const width = Math.min(maxWidth, Math.max(WIDGET_MIN_WIDTH, Math.round(safeWidth)));
@@ -22,6 +25,17 @@ function clampBounds(bounds, workArea) {
     width,
     height,
   };
+}
+
+function positionPopover(widgetBounds, popoverSize, workArea) {
+  const minX = workArea.x;
+  const maxX = workArea.x + workArea.width - popoverSize.width;
+  const x = Math.min(maxX, Math.max(minX, widgetBounds.x + widgetBounds.width - popoverSize.width));
+  const below = widgetBounds.y + widgetBounds.height + POPOVER_GAP;
+  const y = below + popoverSize.height <= workArea.y + workArea.height
+    ? below
+    : Math.max(workArea.y, widgetBounds.y - popoverSize.height - POPOVER_GAP);
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 function createWidgetWindowService(deps) {
@@ -40,8 +54,8 @@ function createWidgetWindowService(deps) {
     }
     const workArea = deps.screen.getPrimaryDisplay().workArea;
     widgetWindow = new deps.BrowserWindow({
-      width: 620,
-      height: 100,
+      width: DEFAULT_WIDGET_WIDTH,
+      height: DEFAULT_WIDGET_HEIGHT,
       minWidth: WIDGET_MIN_WIDTH,
       minHeight: WIDGET_MIN_HEIGHT,
       maxWidth: Math.min(WIDGET_MAX_WIDTH, workArea.width - WINDOW_MARGIN * 2),
@@ -133,4 +147,10 @@ function createWidgetWindowService(deps) {
   return { open, registerIpc, getWindow: () => widgetWindow };
 }
 
-module.exports = { clampBounds, createWidgetWindowService };
+module.exports = {
+  DEFAULT_WIDGET_HEIGHT,
+  DEFAULT_WIDGET_WIDTH,
+  clampBounds,
+  createWidgetWindowService,
+  positionPopover,
+};

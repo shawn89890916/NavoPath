@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createWidgetWindowService } = require("./widget-window.cjs");
+const { createWidgetWindowService, positionPopover } = require("./widget-window.cjs");
 
 function makeDeps() {
   const handlers = new Map();
@@ -62,6 +62,8 @@ test("creates a reusable resizable widget window and registers IPC", async () =>
 
   assert.equal(first, second);
   assert.equal(windows.length, 1);
+  assert.equal(first.options.width, 500);
+  assert.equal(first.options.height, 88);
   assert.equal(first.options.resizable, true);
   assert.equal(first.options.thickFrame, true);
   assert.equal(first.options.minWidth, 360);
@@ -91,7 +93,29 @@ test("rejects invalid requested bounds without corrupting the window", async () 
 
   await handlers.get("widget:set-bounds")(null, { x: "bad", width: Number.NaN });
 
-  assert.deepEqual(win.getBounds(), { x: 80, y: 80, width: 620, height: 100 });
+  assert.deepEqual(win.getBounds(), { x: 80, y: 80, width: 500, height: 88 });
+});
+
+test("positions the popover below the widget when it fits", () => {
+  assert.deepEqual(
+    positionPopover(
+      { x: 80, y: 80, width: 500, height: 88 },
+      { width: 280, height: 252 },
+      { x: 0, y: 0, width: 1280, height: 720 },
+    ),
+    { x: 300, y: 174 },
+  );
+});
+
+test("positions the popover above and within the work area when needed", () => {
+  assert.deepEqual(
+    positionPopover(
+      { x: 900, y: 620, width: 360, height: 88 },
+      { width: 280, height: 252 },
+      { x: 0, y: 0, width: 1280, height: 720 },
+    ),
+    { x: 980, y: 362 },
+  );
 });
 
 test("re-clamps the widget when display metrics change", () => {
