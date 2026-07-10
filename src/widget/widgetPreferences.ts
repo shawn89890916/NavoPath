@@ -52,7 +52,7 @@ export function clampWidgetBounds(bounds: WidgetBounds, workArea: WidgetBounds):
   const safeWidth = Number.isFinite(bounds.width) ? bounds.width : WIDGET_DEFAULT_BOUNDS.width;
   const safeHeight = Number.isFinite(bounds.height) ? bounds.height : WIDGET_DEFAULT_BOUNDS.height;
   const maxWidth = Math.min(WIDGET_MAX_WIDTH, Math.max(WIDGET_MIN_WIDTH, workArea.width - WINDOW_MARGIN * 2));
-  const maxHeight = Math.min(Math.round(workArea.height * 0.7), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
+  const maxHeight = Math.min(Math.max(320, Math.round(workArea.height * 0.7)), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
   const width = Math.min(maxWidth, Math.max(WIDGET_MIN_WIDTH, Math.round(safeWidth)));
   const height = Math.min(maxHeight, Math.max(WIDGET_MIN_HEIGHT, Math.round(safeHeight)));
   const minX = workArea.x;

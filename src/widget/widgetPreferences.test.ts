@@ -74,6 +74,17 @@ describe("widget geometry", () => {
     });
   });
 
+  it("preserves the 320px max-height floor within the available work area", () => {
+    expect(clampWidgetBounds(
+      { x: 0, y: 0, width: 500, height: 500 },
+      { x: 0, y: 0, width: 800, height: 400 },
+    )).toEqual({ x: 0, y: 0, width: 500, height: 320 });
+    expect(clampWidgetBounds(
+      { x: 0, y: 0, width: 500, height: 500 },
+      { x: 0, y: 0, width: 800, height: 300 },
+    )).toEqual({ x: 0, y: 0, width: 500, height: 288 });
+  });
+
   it("uses the stacked layout only for tall windows", () => {
     expect(getWidgetLayout(700, 100)).toBe("strip");
     expect(getWidgetLayout(480, 100)).toBe("strip");
