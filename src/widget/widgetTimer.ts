@@ -1,9 +1,63 @@
 import type {
+  Language,
   WidgetTimerMode,
+  WidgetTimerPhase,
   WidgetTimerPreferences,
   WidgetTimerRuntime,
   WidgetTimerTick,
 } from "../types";
+
+type WidgetTimerTransition = WidgetTimerTick["transitions"][number];
+
+export interface WidgetTimerNotificationDescriptor {
+  title: string;
+  body: string;
+}
+
+export function advanceTaskElapsedSeconds(baseSeconds: number, startedAt: number, now: number): number {
+  return Math.max(0, Math.floor(baseSeconds + Math.max(0, now - startedAt) / 1_000));
+}
+
+export function normalizeWidgetTimerMode(value: unknown, fallback: WidgetTimerMode): WidgetTimerMode {
+  return value === "stopwatch" || value === "pomodoro" || value === "countdown" ? value : fallback;
+}
+
+export function getWidgetTimerSnapshotDisplaySeconds(
+  mode: WidgetTimerMode,
+  widgetDisplaySeconds: number,
+  taskElapsedBase: number,
+  taskRunning: boolean,
+  taskStartedAt: number | null,
+  now: number,
+): number {
+  if (mode !== "stopwatch") return widgetDisplaySeconds;
+  return taskRunning && taskStartedAt !== null
+    ? advanceTaskElapsedSeconds(taskElapsedBase, taskStartedAt, now)
+    : Math.max(0, Math.floor(taskElapsedBase));
+}
+
+export function countsWidgetTimerPhaseAsWork(phase: WidgetTimerPhase): boolean {
+  return phase !== "break";
+}
+
+export function getWidgetTimerNotificationDescriptor(
+  transition: WidgetTimerTransition,
+  lang: Language,
+): WidgetTimerNotificationDescriptor {
+  const descriptors: Record<Language, Record<WidgetTimerTransition, WidgetTimerNotificationDescriptor>> = {
+    en: {
+      focusComplete: { title: "Focus complete", body: "Time for a break." },
+      breakComplete: { title: "Break complete", body: "Ready for the next focus round." },
+      countdownComplete: { title: "Countdown complete", body: "Overrun timing has started." },
+    },
+    zh: {
+      focusComplete: { title: "专注结束", body: "该休息一下了。" },
+      breakComplete: { title: "休息结束", body: "准备开始下一轮专注。" },
+      countdownComplete: { title: "倒计时结束", body: "已开始超时计时。" },
+    },
+  };
+  return descriptors[lang][transition];
+}
 
 export const DEFAULT_WIDGET_TIMER_PREFERENCES: WidgetTimerPreferences = {
   mode: "stopwatch",
@@ -40,6 +94,96 @@ export function normalizeWidgetTimerPreferences(
     breakMinutes: normalizeInteger(value?.breakMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.breakMinutes, 1, 60),
     rounds: normalizeInteger(value?.rounds, DEFAULT_WIDGET_TIMER_PREFERENCES.rounds, 1, 12),
     countdownSeconds: normalizeInteger(value?.countdownSeconds, DEFAULT_WIDGET_TIMER_PREFERENCES.countdownSeconds, 1, 86_400),
+  };
+}
+
+export function normalizeWidgetTimerRuntime(
+  value: Partial<WidgetTimerRuntime> | null | undefined,
+  preferenceValue: Partial<WidgetTimerPreferences>,
+  now: number,
+): WidgetTimerRuntime {
+  const preferences = normalizeWidgetTimerPreferences(preferenceValue);
+  const allowedPhases: Record<WidgetTimerMode, WidgetTimerPhase[]> = {
+    stopwatch: ["stopwatch"],
+    pomodoro: ["focus", "break"],
+    countdown: ["countdown", "overrun"],
+  };
+  const mode = preferences.mode;
+  const phase = value?.mode === mode && value?.phase && allowedPhases[mode].includes(value.phase)
+    ? value.phase
+    : mode === "pomodoro" ? "focus" : mode;
+  const running = value?.running === true;
+  const round = Math.min(preferences.rounds, Math.max(1,
+    Number.isFinite(value?.round) ? Math.round(value!.round!) : 1));
+  const phaseStartedAt = Number.isFinite(value?.phaseStartedAt) && value!.phaseStartedAt! >= 0
+    && value!.phaseStartedAt! <= now ? value!.phaseStartedAt! : now;
+  const runtime: WidgetTimerRuntime = { mode, phase, running, round, phaseStartedAt };
+  if (phase === "focus" || phase === "break" || phase === "countdown") {
+    const fallbackDuration = phase === "focus" ? preferences.focusMinutes * 60_000
+      : phase === "break" ? preferences.breakMinutes * 60_000
+        : preferences.countdownSeconds * 1_000;
+    runtime.phaseEndsAt = Number.isFinite(value?.phaseEndsAt) && value!.phaseEndsAt! >= phaseStartedAt
+      ? value!.phaseEndsAt! : phaseStartedAt + fallbackDuration;
+  }
+  if (!running) {
+    runtime.pausedAt = Number.isFinite(value?.pausedAt) && value!.pausedAt! >= phaseStartedAt
+      ? value!.pausedAt! : now;
+  } else if (Number.isFinite(value?.pausedAt) && value!.pausedAt! >= phaseStartedAt) {
+    runtime.pausedAt = value!.pausedAt!;
+  }
+  return runtime;
+}
+
+function calculateWidgetWorkMilliseconds(
+  value: WidgetTimerRuntime,
+  preferenceValue: Partial<WidgetTimerPreferences>,
+  from: number,
+  now: number,
+): number {
+  if (!value.running || value.pausedAt !== undefined || now <= from) return 0;
+  const preferences = normalizeWidgetTimerPreferences(preferenceValue);
+  if (value.mode !== "pomodoro") return Math.max(0, now - from);
+  let cursor = Math.max(from, value.phaseStartedAt);
+  let phase: WidgetTimerPhase = value.phase;
+  let phaseEndsAt = Math.max(cursor, value.phaseEndsAt ?? cursor);
+  let workMs = 0;
+  while (cursor < now) {
+    const segmentEnd = Math.min(now, phaseEndsAt);
+    if (phase !== "break") workMs += Math.max(0, segmentEnd - cursor);
+    cursor = segmentEnd;
+    if (cursor >= now) break;
+    if (phase === "focus") {
+      phase = "break";
+      phaseEndsAt += preferences.breakMinutes * 60_000;
+    } else {
+      phase = "focus";
+      phaseEndsAt += preferences.focusMinutes * 60_000;
+    }
+  }
+  return Math.max(0, workMs);
+}
+
+export function calculateWidgetWorkSeconds(
+  value: WidgetTimerRuntime,
+  preferenceValue: Partial<WidgetTimerPreferences>,
+  from: number,
+  now: number,
+): number {
+  return Math.floor(calculateWidgetWorkMilliseconds(value, preferenceValue, from, now) / 1_000);
+}
+
+export function accumulateWidgetWorkTime(
+  value: WidgetTimerRuntime,
+  preferenceValue: Partial<WidgetTimerPreferences>,
+  from: number,
+  now: number,
+  priorRemainderMs: number,
+): { wholeSeconds: number; remainderMs: number } {
+  const totalMs = Math.max(0, priorRemainderMs)
+    + calculateWidgetWorkMilliseconds(value, preferenceValue, from, now);
+  return {
+    wholeSeconds: Math.floor(totalMs / 1_000),
+    remainderMs: totalMs % 1_000,
   };
 }
 
@@ -124,6 +268,6 @@ export function advanceWidgetTimer(
   } else {
     displaySeconds = Math.max(0, Math.ceil(((runtime.phaseEndsAt ?? now) - now) / 1_000));
   }
-  const countsAsWork = runtime.phase !== "break";
+  const countsAsWork = countsWidgetTimerPhaseAsWork(runtime.phase);
   return { ...runtime, runtime, displaySeconds, transitions, countsAsWork };
 }

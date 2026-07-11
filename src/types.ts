@@ -591,6 +591,12 @@ export interface WidgetSnapshot {
   alwaysOnTop: boolean;
   appearance: WidgetAppearance;
   appearanceConfigured: boolean;
+  theme: "light" | "dark";
+  timerPreferences: WidgetTimerPreferences;
+  timerRuntime: WidgetTimerRuntime;
+  timerDisplaySeconds: number;
+  timerPhase: WidgetTimerPhase;
+  popoverOpen: boolean;
 }
 
 /** 小组件发往主窗口的动作请求。 */
@@ -604,6 +610,11 @@ export type WidgetAction =
   | { type: "complete"; taskId?: string }
   | { type: "setAlwaysOnTop"; enabled: boolean }
   | { type: "updateAppearance"; patch: Partial<WidgetAppearance> }
+  | { type: "setTimerMode"; mode: WidgetTimerMode }
+  | { type: "updateTimerPreferences"; patch: Partial<Omit<WidgetTimerPreferences, "mode">> }
+  | { type: "toggleWidgetTimer" }
+  | { type: "updateWidgetAppearance"; patch: Partial<WidgetAppearance> }
+  | { type: "setWidgetShadow"; enabled: boolean }
   | { type: "resetPosition" };
 
 declare global {

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerRuntime } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -62,6 +62,20 @@ import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deact
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import { WidgetApp, WidgetPopoverApp } from "./widget/WidgetApp";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
+import {
+  DEFAULT_WIDGET_RUNTIME,
+  DEFAULT_WIDGET_TIMER_PREFERENCES,
+  accumulateWidgetWorkTime,
+  advanceTaskElapsedSeconds,
+  advanceWidgetTimer,
+  countsWidgetTimerPhaseAsWork,
+  createWidgetTimerRuntime,
+  getWidgetTimerNotificationDescriptor,
+  getWidgetTimerSnapshotDisplaySeconds,
+  normalizeWidgetTimerPreferences,
+  normalizeWidgetTimerMode,
+  normalizeWidgetTimerRuntime,
+} from "./widget/widgetTimer";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -142,6 +156,18 @@ const categories: Record<Category, { label: string; color: string }> = {
 const categoryOrder: Category[] = ["exam", "project", "essay", "materials", "uk", "us", "personal"];
 
 type Mode = "execute" | "planning";
+const WIDGET_TIMER_RUNTIME_KEY = "navopath-widget-timer-runtime";
+const WIDGET_TIMER_ADVANCED_AT_KEY = "navopath-widget-timer-advanced-at";
+const WIDGET_TIMER_REMAINDER_KEY = "navopath-widget-timer-remainder-ms";
+
+function loadWidgetTimerRuntime(): WidgetTimerRuntime {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(WIDGET_TIMER_RUNTIME_KEY) || "null") as Partial<WidgetTimerRuntime> | null;
+    return normalizeWidgetTimerRuntime(parsed, { ...DEFAULT_WIDGET_TIMER_PREFERENCES, mode: parsed?.mode }, Date.now());
+  } catch { /* Ignore malformed or unavailable local storage. */ }
+  const now = Date.now();
+  return { ...DEFAULT_WIDGET_RUNTIME, phaseStartedAt: now, pausedAt: now };
+}
 type AddType = "task" | "project" | "event";
 type CompactExecuteView = "tasks" | "schedule";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
@@ -1718,6 +1744,11 @@ function App() {
   const [focusOverlayMode, setFocusOverlayMode] = useState<null | "stopwatch" | "pomodoro" | "flowtime">(null);
   const timerIntervalRef = useRef<number | null>(null);
   const timerTaskRef = useRef<string | null>(null);
+  const timerElapsedRef = useRef(0);
+  const timerElapsedBaseRef = useRef(0);
+  const timerStartedAtRef = useRef<number | null>(null);
+  const widgetManagesTaskTimerRef = useRef(false);
+  timerElapsedRef.current = timerElapsed;
 
   useEffect(() => {
     try {
@@ -1727,6 +1758,7 @@ function App() {
         if (parsed.taskId) {
           setTimerTaskId(parsed.taskId);
           setTimerElapsed(parsed.elapsed || 0);
+          timerElapsedBaseRef.current = parsed.elapsed || 0;
           setTimerRunning(false);
           timerTaskRef.current = parsed.taskId;
         }
@@ -1740,7 +1772,8 @@ function App() {
       return;
     }
     timerIntervalRef.current = window.setInterval(() => {
-      setTimerElapsed((prev) => prev + 1);
+      if (widgetManagesTaskTimerRef.current) return;
+      setTimerElapsed(advanceTaskElapsedSeconds(timerElapsedBaseRef.current, timerStartedAt, Date.now()));
     }, 1000);
     return () => { if (timerIntervalRef.current) { window.clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; } };
   }, [timerRunning, timerStartedAt]);
@@ -1756,23 +1789,39 @@ function App() {
   }, [timerTaskId, timerElapsed, timerRunning]);
 
   const startTimer = useCallback((taskId: string) => {
-    setTimerElapsed((current) => timerTaskRef.current === taskId ? current : 0);
+    const baseElapsed = timerTaskRef.current === taskId ? timerElapsedRef.current : 0;
+    const now = Date.now();
+    timerElapsedBaseRef.current = baseElapsed;
+    timerStartedAtRef.current = now;
+    timerTaskRef.current = taskId;
+    setTimerElapsed(baseElapsed);
     setTimerTaskId(taskId);
     setTimerRunning(true);
-    setTimerStartedAt(Date.now());
+    setTimerStartedAt(now);
   }, []);
 
   const pauseTimer = useCallback(() => {
+    if (timerStartedAtRef.current !== null) {
+      const elapsed = advanceTaskElapsedSeconds(timerElapsedBaseRef.current, timerStartedAtRef.current, Date.now());
+      timerElapsedRef.current = elapsed;
+      timerElapsedBaseRef.current = elapsed;
+      setTimerElapsed(elapsed);
+    }
+    timerStartedAtRef.current = null;
     setTimerRunning(false);
     setTimerStartedAt(null);
   }, []);
 
   const resumeTimer = useCallback(() => {
+    const now = Date.now();
+    timerElapsedBaseRef.current = timerElapsedRef.current;
+    timerStartedAtRef.current = now;
     setTimerRunning(true);
-    setTimerStartedAt(Date.now());
+    setTimerStartedAt(now);
   }, []);
 
   const discardTimer = useCallback(() => {
+    timerElapsedRef.current = 0; timerElapsedBaseRef.current = 0; timerStartedAtRef.current = null;
     setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null);
   }, []);
 
@@ -1782,6 +1831,88 @@ function App() {
     const s = seconds % 60;
     return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
   }, []);
+
+  const widgetTimerPreferences = useMemo(
+    () => normalizeWidgetTimerPreferences(settings?.widgetTimerPreferences),
+    [settings?.widgetTimerPreferences],
+  );
+  const [widgetTimerRuntime, setWidgetTimerRuntime] = useState<WidgetTimerRuntime>(loadWidgetTimerRuntime);
+  const widgetTimerRuntimeRef = useRef(widgetTimerRuntime);
+  widgetTimerRuntimeRef.current = widgetTimerRuntime;
+  const widgetTimerAdvancedAtRef = useRef<number>((() => {
+    try {
+      const stored = Number(localStorage.getItem(WIDGET_TIMER_ADVANCED_AT_KEY));
+      return Number.isFinite(stored) && stored >= 0 ? stored : Date.now();
+    } catch { return Date.now(); }
+  })());
+  const widgetTimerRemainderMsRef = useRef<number>((() => {
+    try {
+      const stored = Number(localStorage.getItem(WIDGET_TIMER_REMAINDER_KEY));
+      return Number.isFinite(stored) && stored >= 0 && stored < 1_000 ? stored : 0;
+    } catch { return 0; }
+  })());
+  const [widgetPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    if (!settings) return;
+    const now = Date.now();
+    const normalized = normalizeWidgetTimerRuntime(widgetTimerRuntime, widgetTimerPreferences, now);
+    if (JSON.stringify(normalized) !== JSON.stringify(widgetTimerRuntime)) {
+      widgetTimerRuntimeRef.current = normalized;
+      setWidgetTimerRuntime(normalized);
+    }
+  }, [settings, widgetTimerPreferences, widgetTimerRuntime]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDGET_TIMER_RUNTIME_KEY, JSON.stringify(widgetTimerRuntime));
+      localStorage.setItem(WIDGET_TIMER_ADVANCED_AT_KEY, String(widgetTimerAdvancedAtRef.current));
+      localStorage.setItem(WIDGET_TIMER_REMAINDER_KEY, String(widgetTimerRemainderMsRef.current));
+    } catch { /* Ignore unavailable storage. */ }
+  }, [widgetTimerRuntime]);
+
+  const advanceWidgetTimerNow = useCallback(() => {
+    const now = Date.now();
+    const current = widgetTimerRuntimeRef.current;
+    const from = Math.min(now, Math.max(current.phaseStartedAt, widgetTimerAdvancedAtRef.current));
+    const work = accumulateWidgetWorkTime(
+      current,
+      widgetTimerPreferences,
+      from,
+      now,
+      widgetTimerRemainderMsRef.current,
+    );
+    widgetTimerRemainderMsRef.current = work.remainderMs;
+    const tick = advanceWidgetTimer(current, widgetTimerPreferences, now);
+    widgetTimerAdvancedAtRef.current = now;
+    widgetTimerRuntimeRef.current = tick.runtime;
+    setWidgetTimerRuntime(tick.runtime);
+    if (current.mode !== "stopwatch" && timerTaskRef.current) {
+      if (work.wholeSeconds > 0) {
+        const elapsed = timerElapsedRef.current + work.wholeSeconds;
+        timerElapsedRef.current = elapsed;
+        timerElapsedBaseRef.current = elapsed;
+        setTimerElapsed(elapsed);
+      }
+      widgetManagesTaskTimerRef.current = true;
+      timerStartedAtRef.current = tick.countsAsWork ? now : null;
+      setTimerStartedAt(tick.countsAsWork ? now : null);
+      setTimerRunning(tick.countsAsWork);
+    }
+    for (const transition of tick.transitions) {
+      const descriptor = getWidgetTimerNotificationDescriptor(transition, lang);
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        try { new Notification(descriptor.title, { body: descriptor.body }); } catch { /* Ignore unsupported notification shells. */ }
+      }
+    }
+  }, [lang, widgetTimerPreferences]);
+
+  useEffect(() => {
+    if (!widgetTimerRuntime.running) return;
+    advanceWidgetTimerNow();
+    const interval = window.setInterval(advanceWidgetTimerNow, 1_000);
+    return () => window.clearInterval(interval);
+  }, [advanceWidgetTimerNow, widgetTimerRuntime.running]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -3064,16 +3195,22 @@ function App() {
   const timerProject = useMemo(() => timerTask?.projectId ? projects.find((p) => p.id === timerTask.projectId) || null : null, [timerTask, projects]);
 
   const stopAndSaveTimer = useCallback(() => {
-    if (!timerTaskId || timerElapsed < 1) { setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null); return; }
+    const elapsed = timerRunning && timerStartedAtRef.current !== null
+      ? advanceTaskElapsedSeconds(timerElapsedBaseRef.current, timerStartedAtRef.current, Date.now())
+      : timerElapsedRef.current;
+    if (!timerTaskId || elapsed < 1) {
+      timerElapsedRef.current = 0; timerElapsedBaseRef.current = 0; timerStartedAtRef.current = null;
+      setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null); return;
+    }
     const now = new Date().toISOString();
-    const start = new Date(Date.now() - timerElapsed * 1000).toISOString();
+    const start = new Date(Date.now() - elapsed * 1000).toISOString();
     const entry = {
       id: `te-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       taskId: timerTaskId,
       projectId: timerTask?.projectId,
       startAt: start,
       endAt: now,
-      durationMinutes: Math.max(1, Math.round(timerElapsed / 60)),
+      durationMinutes: Math.max(1, Math.round(elapsed / 60)),
       source: "timer" as const,
       createdAt: now,
       updatedAt: now,
@@ -3082,8 +3219,9 @@ function App() {
       const nextData = { ...data, timeEntries: [...(data.timeEntries || []), entry] };
       void saveData(nextData);
     }
+    timerElapsedRef.current = 0; timerElapsedBaseRef.current = 0; timerStartedAtRef.current = null;
     setTimerTaskId(null); setTimerRunning(false); setTimerElapsed(0); setTimerStartedAt(null);
-  }, [timerTaskId, timerElapsed, timerTask, data, saveData]);
+  }, [timerRunning, timerTaskId, timerTask, data, saveData]);
 
   /**
    * Build "virtual" Task objects for each active preview block. These are
@@ -3933,6 +4071,8 @@ function App() {
   function buildWidgetSnapshot(): WidgetSnapshot {
     const task = timerTask || headerTask;
     const project = task?.projectId ? projects.find((p) => String(p.id) === String(task.projectId)) || null : null;
+    const snapshotNow = Date.now();
+    const widgetTimerTick = advanceWidgetTimer(widgetTimerRuntime, widgetTimerPreferences, snapshotNow);
     return {
       taskId: task?.id,
       taskTitle: task?.title || "",
@@ -3944,6 +4084,19 @@ function App() {
       alwaysOnTop: settings?.widgetAlwaysOnTop !== false,
       appearance: normalizeWidgetAppearance(settings?.widgetAppearance),
       appearanceConfigured: settings?.widgetAppearanceMigrated === true,
+      theme: settings?.theme === "dark" ? "dark" : "light",
+      timerPreferences: widgetTimerPreferences,
+      timerRuntime: widgetTimerTick.runtime,
+      timerDisplaySeconds: getWidgetTimerSnapshotDisplaySeconds(
+        widgetTimerPreferences.mode,
+        widgetTimerTick.displaySeconds,
+        timerElapsedBaseRef.current,
+        timerRunning,
+        timerStartedAtRef.current,
+        snapshotNow,
+      ),
+      timerPhase: widgetTimerTick.runtime.phase,
+      popoverOpen: widgetPopoverOpen,
     };
   }
 
@@ -3982,11 +4135,77 @@ function App() {
         void saveSettings({ widgetAlwaysOnTop: action.enabled });
         break;
       case "updateAppearance":
+      case "updateWidgetAppearance":
         void saveSettings({
           widgetAppearance: normalizeWidgetAppearance({ ...settings?.widgetAppearance, ...action.patch }),
           widgetAppearanceMigrated: true,
         });
         break;
+      case "setWidgetShadow":
+        void saveSettings({
+          widgetAppearance: normalizeWidgetAppearance({ ...settings?.widgetAppearance, shadowEnabled: action.enabled }),
+          widgetAppearanceMigrated: true,
+        });
+        break;
+      case "setTimerMode": {
+        const mode = normalizeWidgetTimerMode(action.mode, widgetTimerPreferences.mode);
+        if (widgetTimerRuntime.running && widgetTimerRuntime.mode !== "stopwatch") advanceWidgetTimerNow();
+        else if (widgetTimerRuntime.running) pauseTimer();
+        widgetManagesTaskTimerRef.current = false;
+        timerStartedAtRef.current = null;
+        setTimerRunning(false);
+        setTimerStartedAt(null);
+        const preferences = normalizeWidgetTimerPreferences({ ...widgetTimerPreferences, mode });
+        const now = Date.now();
+        const runtime = { ...createWidgetTimerRuntime(mode, now, preferences), running: false, pausedAt: now };
+        widgetTimerAdvancedAtRef.current = now;
+        widgetTimerRemainderMsRef.current = 0;
+        widgetTimerRuntimeRef.current = runtime;
+        setWidgetTimerRuntime(runtime);
+        void saveSettings({ widgetTimerPreferences: preferences });
+        break;
+      }
+      case "updateTimerPreferences": {
+        const preferences = normalizeWidgetTimerPreferences({ ...widgetTimerPreferences, ...action.patch });
+        void saveSettings({ widgetTimerPreferences: preferences });
+        break;
+      }
+      case "toggleWidgetTimer": {
+        const now = Date.now();
+        const current = widgetTimerRuntimeRef.current;
+        if (current.running) {
+          if (current.mode === "stopwatch") pauseTimer();
+          else advanceWidgetTimerNow();
+          const advanced = widgetTimerRuntimeRef.current;
+          const runtime = { ...advanced, running: false, pausedAt: now };
+          widgetManagesTaskTimerRef.current = false;
+          timerStartedAtRef.current = null;
+          setTimerRunning(false);
+          setTimerStartedAt(null);
+          widgetTimerAdvancedAtRef.current = now;
+          widgetTimerRuntimeRef.current = runtime;
+          setWidgetTimerRuntime(runtime);
+        } else {
+          const runtime = { ...current, running: true };
+          widgetTimerAdvancedAtRef.current = now;
+          widgetTimerRuntimeRef.current = runtime;
+          setWidgetTimerRuntime(runtime);
+          if (current.mode === "stopwatch") {
+            widgetManagesTaskTimerRef.current = false;
+            if (timerTaskRef.current) resumeTimer();
+            else if (headerTask) startTimer(headerTask.id);
+          } else {
+            widgetManagesTaskTimerRef.current = true;
+            if (!timerTaskRef.current && headerTask) startTimer(headerTask.id);
+            const countsAsWork = countsWidgetTimerPhaseAsWork(current.phase);
+            timerElapsedBaseRef.current = timerElapsedRef.current;
+            timerStartedAtRef.current = countsAsWork ? now : null;
+            setTimerRunning(Boolean(timerTaskRef.current) && countsAsWork);
+            setTimerStartedAt(Boolean(timerTaskRef.current) && countsAsWork ? now : null);
+          }
+        }
+        break;
+      }
       case "resetPosition":
         try { localStorage.removeItem("navopath-widget-bounds"); } catch { /* ignore */ }
         void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 500, height: 88 });
@@ -4015,7 +4234,7 @@ function App() {
   useEffect(() => {
     if (!window.desktopApi?.widget) return;
     window.desktopApi.widget.pushSnapshot(buildWidgetSnapshot());
-  }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, settings?.widgetAppearance, settings?.widgetAppearanceMigrated, lang]);
+  }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, settings?.widgetAppearance, settings?.widgetAppearanceMigrated, settings?.theme, widgetTimerPreferences, widgetTimerRuntime, widgetPopoverOpen, lang]);
 
   // Auto-open the widget on launch if the user opted in. Runs once.
   const widgetAutoOpenedRef = useRef(false);
