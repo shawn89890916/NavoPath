@@ -16,10 +16,36 @@ import {
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerMode,
   resetWidgetTimerRuntime,
+  resolveWidgetCountdownTarget,
   taskDueDateTargetAt,
+  scheduleWidgetCountdown,
 } from "./widgetTimer";
+import type { Task } from "../types";
 
 describe("widget timer preferences", () => {
+  it("uses the user-entered duration to schedule the active task from now", () => {
+    const task = { id: "task-1" } as Task;
+    const result = scheduleWidgetCountdown(task, new Date("2026-07-11T10:15:00"), 45);
+    expect(result.record).toMatchObject({ scheduledDate: "2026-07-11", scheduledStart: "10:15", scheduledEnd: "11:00", executionStatus: "scheduled" });
+    expect(result.countdownTargetAt).toBe(new Date("2026-07-11T11:00:00").getTime());
+  });
+
+  it("preserves a schedule-now target when saving a no-deadline countdown", () => {
+    const task = { id: "task-1", dueDate: "" } as Task;
+    const scheduled = scheduleWidgetCountdown(task, new Date("2026-07-11T10:15:00"), 45);
+    const runtime = { ...createWidgetTimerRuntime("countdown", 1, DEFAULT_WIDGET_TIMER_PREFERENCES, scheduled.countdownTargetAt), countdownTaskId: task.id };
+    expect(resolveWidgetCountdownTarget(task.dueDate, task.id, runtime)).toBe(scheduled.countdownTargetAt);
+  });
+
+  it("creates a paused Pomodoro reset runtime from the current draft", () => {
+    const { runtime } = createWidgetTimerModeTransition("pomodoro", {
+      ...DEFAULT_WIDGET_TIMER_PREFERENCES,
+      mode: "pomodoro",
+      focusMinutes: 10,
+    }, 5_000);
+    expect(runtime).toMatchObject({ mode: "pomodoro", phase: "focus", running: false, phaseEndsAt: 605_000, pausedAt: 5_000 });
+  });
+
   it("creates one paused fresh runtime when switching modes", () => {
     expect(createWidgetTimerModeTransition("countdown", {
       ...DEFAULT_WIDGET_TIMER_PREFERENCES,

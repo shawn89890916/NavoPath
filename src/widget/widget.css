@@ -73,6 +73,7 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
   background: rgb(var(--widget-bg-rgb)); box-shadow: var(--widget-shadow); -webkit-app-region: no-drag;
 }
 .df-widget-popover-header { display: flex; align-items: center; gap: 6px; }
+.df-widget-popover-header > span { flex: 1 1 auto; font-size: 13px; font-weight: 650; }
 .df-widget-mode-switch { display: grid; grid-template-columns: repeat(3, 1fr); flex: 1 1 auto; min-width: 0; border: 1px solid var(--widget-border); border-radius: 12px; }
 .df-widget-mode-switch button {
   position: relative; min-width: 0; min-height: 44px; padding: 7px 5px; border: 0; border-right: 1px solid var(--widget-border);
@@ -95,6 +96,14 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 .df-widget-opacity-row output { color: var(--widget-muted); font: 12px "Cascadia Mono", Consolas, monospace; }
 .df-widget-opacity-row input { grid-column: 1 / -1; width: 100%; min-height: 44px; margin: 0; accent-color: var(--widget-ink); cursor: pointer; touch-action: pan-x; }
 .df-widget-popover-action { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--widget-ink); font: 600 13px inherit; cursor: pointer; }
+.df-widget-compact-toggles, .df-widget-timer-settings-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.df-widget-timer-settings-actions { grid-template-columns: repeat(3, 1fr); }
+.df-widget-compact-toggles .df-widget-popover-action { justify-content: center; }
+.df-widget-timer-settings-action, .df-widget-timer-settings-actions .is-primary { min-height: 44px; border: 0; border-bottom: 1px solid var(--widget-ink); background: var(--widget-wash); color: var(--widget-ink); font: 650 13px inherit; cursor: pointer; }
+.df-widget-timer-settings-view { display: flex; flex-direction: column; gap: 8px; }
+.df-widget-schedule-guidance { padding: 6px 0; border-block: 1px solid var(--widget-border); }
+.df-widget-schedule-guidance p { margin: 0; color: var(--widget-muted); font-size: 13px; }
+.df-widget-popover-action:disabled { cursor: not-allowed; opacity: .5; }
 .df-widget-icon-btn:hover, .df-widget-close-more:hover, .df-widget-popover-action:hover { border-color: var(--widget-border); background: var(--widget-wash); color: var(--widget-ink); }
 .df-widget-close-widget-btn:hover { color: #8E403B; }
 .df-widget-icon-btn:active, .df-widget-close-more:active, .df-widget-popover-action:active { transform: translateY(1px); }

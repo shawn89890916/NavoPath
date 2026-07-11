@@ -614,6 +614,9 @@ export type WidgetAction =
   | { type: "updateAppearance"; patch: Partial<WidgetAppearance> }
   | { type: "setTimerMode"; mode: WidgetTimerMode }
   | { type: "updateTimerPreferences"; patch: Partial<Omit<WidgetTimerPreferences, "mode">> }
+  | { type: "saveTimerSettings"; draft: WidgetTimerPreferences }
+  | { type: "resetWidgetTimer"; draft: WidgetTimerPreferences }
+  | { type: "scheduleWidgetCountdown"; durationMinutes: number }
   | { type: "toggleWidgetTimer" }
   | { type: "updateWidgetAppearance"; patch: Partial<WidgetAppearance> }
   | { type: "setWidgetShadow"; enabled: boolean }

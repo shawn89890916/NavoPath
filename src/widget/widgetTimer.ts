@@ -1,5 +1,7 @@
 import type {
   Language,
+  Task,
+  TimelineRecord,
   WidgetTimerMode,
   WidgetTimerPhase,
   WidgetTimerPreferences,
@@ -113,6 +115,24 @@ export function taskDueDateTargetAt(dueDate?: string): number | undefined {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate || "")) return undefined;
   const target = new Date(`${dueDate}T23:59:59.999`);
   return Number.isFinite(target.getTime()) ? target.getTime() : undefined;
+}
+
+export function resolveWidgetCountdownTarget(dueDate: string | undefined, taskId: string | undefined, runtime: WidgetTimerRuntime): number | undefined {
+  const dueDateTarget = taskDueDateTargetAt(dueDate);
+  if (dueDateTarget !== undefined) return dueDateTarget;
+  return runtime.mode === "countdown" && runtime.countdownTaskId === taskId && isValidCountdownTarget(runtime.countdownTargetAt)
+    ? runtime.countdownTargetAt
+    : undefined;
+}
+
+export function scheduleWidgetCountdown(task: Task, now: Date, durationMinutes: number): { record: TimelineRecord; countdownTargetAt: number } {
+  const duration = Math.min(1_440, Math.max(1, Math.round(durationMinutes)));
+  const start = new Date(now);
+  start.setSeconds(0, 0);
+  const end = new Date(start.getTime() + duration * 60_000);
+  const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+  const time = (value: Date) => `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+  return { record: { id: `${task.id}_widget_${start.getTime().toString(36)}`, taskId: task.id, scheduledDate: date, scheduledStart: time(start), scheduledEnd: time(end), executionStatus: "scheduled", createdAt: start.toISOString() }, countdownTargetAt: end.getTime() };
 }
 
 function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {

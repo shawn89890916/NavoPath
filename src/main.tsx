@@ -77,6 +77,8 @@ import {
   getWidgetTimerSnapshotDisplaySeconds,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerRuntime,
+  resolveWidgetCountdownTarget,
+  scheduleWidgetCountdown,
   taskDueDateTargetAt,
 } from "./widget/widgetTimer";
 import "./styles.css";
@@ -4188,6 +4190,53 @@ function App() {
       case "updateTimerPreferences": {
         const preferences = normalizeWidgetTimerPreferences({ ...widgetTimerPreferences, ...action.patch });
         void saveSettings({ widgetTimerPreferences: preferences });
+        break;
+      }
+      case "saveTimerSettings": {
+        const now = Date.now();
+        const preferences = normalizeWidgetTimerPreferences(action.draft);
+        const activeTask = timerTask || headerTask;
+        const target = preferences.mode === "countdown"
+          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current)
+          : undefined;
+        const { runtime } = createWidgetTimerModeTransition(preferences.mode, preferences, now, target);
+        if (preferences.mode === "countdown" && activeTask) runtime.countdownTaskId = activeTask.id;
+        widgetTimerRuntimeRef.current = runtime;
+        widgetTimerAdvancedAtRef.current = now;
+        widgetTimerRemainderMsRef.current = 0;
+        setWidgetTimerRuntime(runtime);
+        void saveSettings({ widgetTimerPreferences: preferences });
+        break;
+      }
+      case "resetWidgetTimer": {
+        const now = Date.now();
+        const preferences = normalizeWidgetTimerPreferences(action.draft);
+        const activeTask = timerTask || headerTask;
+        const target = preferences.mode === "countdown"
+          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current)
+          : undefined;
+        const { runtime } = createWidgetTimerModeTransition(preferences.mode, preferences, now, target);
+        if (preferences.mode === "countdown" && activeTask) runtime.countdownTaskId = activeTask.id;
+        widgetTimerRuntimeRef.current = runtime;
+        widgetTimerAdvancedAtRef.current = now;
+        widgetTimerRemainderMsRef.current = 0;
+        setWidgetTimerRuntime(runtime);
+        break;
+      }
+      case "scheduleWidgetCountdown": {
+        const duration = Math.round(action.durationMinutes);
+        const activeTask = timerTask || headerTask;
+        const currentData = dataRef.current;
+        if (!activeTask || !currentData || !Number.isInteger(duration) || duration < 1 || duration > 1_440) break;
+        const now = Date.now();
+        const scheduled = scheduleWidgetCountdown(activeTask, new Date(now), duration);
+        const record = createScheduledRecord(activeTask, scheduled.record.scheduledDate, scheduled.record.scheduledStart, duration);
+        void saveData({ ...currentData, tasks: currentData.tasks.map((task) => task.id === activeTask.id ? { ...task, timelineRecords: [...(task.timelineRecords || []), record] } : task) });
+        const runtime = { ...createWidgetTimerRuntime("countdown", now, { ...widgetTimerPreferences, mode: "countdown" }, scheduled.countdownTargetAt), running: false, pausedAt: now, countdownTaskId: activeTask.id };
+        widgetTimerRuntimeRef.current = runtime;
+        widgetTimerAdvancedAtRef.current = now;
+        widgetTimerRemainderMsRef.current = 0;
+        setWidgetTimerRuntime(runtime);
         break;
       }
       case "toggleWidgetTimer": {

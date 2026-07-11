@@ -193,8 +193,9 @@ export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, 
 interface WidgetPopoverViewProps {
   snapshot: WidgetSnapshot;
   onClosePopover: () => void;
-  onSetMode: (mode: WidgetTimerMode) => void;
-  onUpdateTimerPreferences: (patch: Partial<Omit<WidgetTimerPreferences, "mode">>) => void;
+  onSaveTimerSettings: (draft: WidgetTimerPreferences) => void;
+  onResetTimer: (draft: WidgetTimerPreferences) => void;
+  onSchedule: (durationMinutes: number) => void;
   onToggleAlwaysOnTop: () => void;
   onToggleShadow: () => void;
   onOpacityChange: (value: number) => void;
@@ -217,46 +218,39 @@ function NumberSetting({ label, value, onChange }: { label: string; value: numbe
   return <label className="df-widget-number-row"><span>{label}</span><input type="number" min="1" value={value} onChange={(event) => onChange(Math.max(1, Number(event.target.value) || 1))} /></label>;
 }
 
-export function WidgetPopoverView({ snapshot, onClosePopover, onSetMode, onUpdateTimerPreferences, onToggleAlwaysOnTop, onToggleShadow, onOpacityChange }: WidgetPopoverViewProps) {
+interface WidgetTimerSettingsViewProps { snapshot: WidgetSnapshot; onSave: (draft: WidgetTimerPreferences) => void; onCancel: () => void; onReset: (draft: WidgetTimerPreferences) => void; onSchedule: (durationMinutes: number) => void; }
+
+export function WidgetTimerSettingsView({ snapshot, onSave, onCancel, onReset, onSchedule }: WidgetTimerSettingsViewProps) {
   const zh = snapshot.lang === "zh";
-  const prefs = snapshot.timerPreferences;
-  const appearance = normalizeWidgetAppearance(snapshot.appearance);
+  const [draft, setDraft] = useState(snapshot.timerPreferences);
+  const [duration, setDuration] = useState(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))));
+  const parsedDuration = Number(duration);
+  const needsSchedule = draft.mode === "countdown" && snapshot.timerRuntime.countdownTargetAt === undefined;
+  const chooseMode = (mode: WidgetTimerMode) => setDraft((current) => ({ ...current, mode }));
   const onModeKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, mode: WidgetTimerMode) => {
     const nextMode = getAdjacentTimerMode(mode, event.key);
     if (!nextMode) return;
     event.preventDefault();
-    onSetMode(nextMode);
+    chooseMode(nextMode);
     event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-mode="${nextMode}"]`)?.focus();
   };
-  return (
-    <main className="df-widget-popover-root" data-theme={snapshot.theme} style={appearanceStyle(snapshot)}>
-      <section className="df-widget-popover-surface" role="dialog" aria-label={zh ? "小组件控制" : "Widget controls"}>
-        <div className="df-widget-popover-header">
-          <div className="df-widget-mode-switch" role="radiogroup" aria-label={zh ? "计时模式" : "Timer mode"}>
-            {TIMER_MODES.map(({ mode, zh: zhLabel, en }) => <button key={mode} type="button" role="radio" aria-checked={prefs.mode === mode} data-mode={mode} tabIndex={prefs.mode === mode ? 0 : -1} className={prefs.mode === mode ? "is-selected" : ""} autoFocus={prefs.mode === mode} onClick={() => onSetMode(mode)} onKeyDown={(event) => onModeKeyDown(event, mode)}>{zh ? zhLabel : en}</button>)}
-          </div>
-          <button type="button" className="df-widget-close-more" aria-label={zh ? "关闭更多" : "Close More"} onClick={onClosePopover}>×</button>
-        </div>
+  return <section className="df-widget-timer-settings-view">
+    <div className="df-widget-mode-switch" role="radiogroup" aria-label={zh ? "计时模式" : "Timer mode"}>{TIMER_MODES.map(({ mode, zh: zhLabel, en }) => <button key={mode} type="button" role="radio" aria-checked={draft.mode === mode} data-mode={mode} tabIndex={draft.mode === mode ? 0 : -1} className={draft.mode === mode ? "is-selected" : ""} onClick={() => chooseMode(mode)} onKeyDown={(event) => onModeKeyDown(event, mode)}>{zh ? zhLabel : en}</button>)}</div>
+    <div className="df-widget-mode-settings">
+      {draft.mode === "stopwatch" && <p className="df-widget-no-duration">{zh ? "无需设置时长" : "No duration"}</p>}
+      {draft.mode === "pomodoro" && <><NumberSetting label={zh ? "专注" : "Focus"} value={draft.focusMinutes} onChange={(focusMinutes) => setDraft((current) => ({ ...current, focusMinutes }))} /><NumberSetting label={zh ? "休息" : "Break"} value={draft.breakMinutes} onChange={(breakMinutes) => setDraft((current) => ({ ...current, breakMinutes }))} /><NumberSetting label={zh ? "轮数" : "Rounds"} value={draft.rounds} onChange={(rounds) => setDraft((current) => ({ ...current, rounds }))} /></>}
+      {draft.mode === "countdown" && <div className="df-widget-countdown-settings"><div className="df-widget-presets">{[15, 25, 45, 60].map((minutes) => <button type="button" key={minutes} className={draft.countdownSeconds === minutes * 60 ? "is-selected" : ""} onClick={() => setDraft((current) => ({ ...current, countdownSeconds: minutes * 60 }))}>{minutes}</button>)}</div><NumberSetting label={zh ? "自定义（秒）" : "Custom"} value={draft.countdownSeconds} onChange={(countdownSeconds) => setDraft((current) => ({ ...current, countdownSeconds }))} /></div>}
+    </div>
+    {needsSchedule && <div className="df-widget-schedule-guidance"><p>{zh ? "请先在时间轴安排此任务" : "Please schedule it on the timeline first"}</p><label className="df-widget-number-row"><span>{zh ? "时长（分钟）" : "Duration (minutes)"}</span><input type="number" min="1" max="1440" step="1" value={duration} onChange={(event) => setDuration(event.target.value)} /></label><button type="button" className="df-widget-popover-action" disabled={!Number.isInteger(parsedDuration) || parsedDuration < 1 || parsedDuration > 1_440} onClick={() => onSchedule(parsedDuration)}>{zh ? "立即安排" : "Schedule for now"}</button></div>}
+    <div className="df-widget-timer-settings-actions"><button type="button" className="df-widget-popover-action" onClick={() => onReset(draft)}>{zh ? "重置计时器" : "Reset timer"}</button><button type="button" className="df-widget-popover-action" onClick={onCancel}>{zh ? "取消" : "Cancel"}</button><button type="button" className="df-widget-popover-action is-primary" onClick={() => onSave(draft)}>{zh ? "保存" : "Save"}</button></div>
+  </section>;
+}
 
-        <div className="df-widget-mode-settings">
-          {prefs.mode === "stopwatch" && <p className="df-widget-no-duration">{zh ? "无需设置时长" : "No duration"}</p>}
-          {prefs.mode === "pomodoro" && <>
-            <NumberSetting label={zh ? "专注" : "Focus"} value={prefs.focusMinutes} onChange={(focusMinutes) => onUpdateTimerPreferences({ focusMinutes })} />
-            <NumberSetting label={zh ? "休息" : "Break"} value={prefs.breakMinutes} onChange={(breakMinutes) => onUpdateTimerPreferences({ breakMinutes })} />
-            <NumberSetting label={zh ? "轮数" : "Rounds"} value={prefs.rounds} onChange={(rounds) => onUpdateTimerPreferences({ rounds })} />
-          </>}
-          {prefs.mode === "countdown" && <div className="df-widget-countdown-settings">
-            <div className="df-widget-presets">{[15, 25, 45, 60].map((minutes) => <button type="button" key={minutes} className={prefs.countdownSeconds === minutes * 60 ? "is-selected" : ""} onClick={() => onUpdateTimerPreferences({ countdownSeconds: minutes * 60 })}>{minutes}</button>)}</div>
-            <NumberSetting label={zh ? "自定义（秒）" : "Custom"} value={prefs.countdownSeconds} onChange={(countdownSeconds) => onUpdateTimerPreferences({ countdownSeconds })} />
-          </div>}
-        </div>
-
-        <label className="df-widget-opacity-row"><span>{zh ? "背景透明度" : "Background opacity"}</span><output>{Math.round(appearance.opacity * 100)}%</output><input type="range" min="0" max="1" step="0.01" value={appearance.opacity} onChange={(event) => onOpacityChange(Number(event.target.value))} /></label>
-        <button type="button" className="df-widget-popover-action" onClick={onToggleAlwaysOnTop}><span>{zh ? "始终置顶" : "Always on top"}</span><span aria-hidden>{snapshot.alwaysOnTop ? "✓" : ""}</span></button>
-        <button type="button" className="df-widget-popover-action" onClick={onToggleShadow}><span>{zh ? "显示阴影" : "Shadow"}</span><span aria-hidden>{appearance.shadowEnabled ? "✓" : ""}</span></button>
-      </section>
-    </main>
-  );
+export function WidgetPopoverView({ snapshot, onClosePopover, onSaveTimerSettings, onResetTimer, onSchedule, onToggleAlwaysOnTop, onToggleShadow, onOpacityChange }: WidgetPopoverViewProps) {
+  const zh = snapshot.lang === "zh";
+  const appearance = normalizeWidgetAppearance(snapshot.appearance);
+  const [editingTimer, setEditingTimer] = useState(false);
+  return <main className="df-widget-popover-root" data-theme={snapshot.theme} style={appearanceStyle(snapshot)}><section className="df-widget-popover-surface" role="dialog" aria-label={zh ? "小组件控制" : "Widget controls"}><div className="df-widget-popover-header"><span>{zh ? "更多" : "More"}</span><button type="button" className="df-widget-close-more" aria-label={zh ? "关闭更多" : "Close More"} onClick={onClosePopover}>×</button></div>{editingTimer ? <WidgetTimerSettingsView snapshot={snapshot} onSave={(draft) => { onSaveTimerSettings(draft); setEditingTimer(false); }} onCancel={() => setEditingTimer(false)} onReset={onResetTimer} onSchedule={onSchedule} /> : <><label className="df-widget-opacity-row"><span>{zh ? "背景透明度" : "Background opacity"}</span><output>{Math.round(appearance.opacity * 100)}%</output><input type="range" min="0" max="1" step="0.01" value={appearance.opacity} onChange={(event) => onOpacityChange(Number(event.target.value))} /></label><div className="df-widget-compact-toggles"><button type="button" className="df-widget-popover-action" aria-pressed={snapshot.alwaysOnTop} onClick={onToggleAlwaysOnTop}>{zh ? "始终置顶" : "Always on top"}</button><button type="button" className="df-widget-popover-action" aria-pressed={appearance.shadowEnabled} onClick={onToggleShadow}>{zh ? "显示阴影" : "Shadow"}</button></div><button type="button" className="df-widget-timer-settings-action" onClick={() => setEditingTimer(true)}>{zh ? "计时器设置" : "Timer settings"}</button></>}</section></main>;
 }
 
 const EMPTY_SNAPSHOT: WidgetSnapshot = {
@@ -328,5 +322,5 @@ export function WidgetPopoverApp() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
-  return <WidgetPopoverView snapshot={snapshot} onClosePopover={closePopover} onSetMode={(mode) => send({ type: "setTimerMode", mode })} onUpdateTimerPreferences={(patch) => send({ type: "updateTimerPreferences", patch })} onToggleAlwaysOnTop={() => send({ type: "setAlwaysOnTop", enabled: !snapshot.alwaysOnTop })} onToggleShadow={() => send({ type: "setWidgetShadow", enabled: !snapshot.appearance.shadowEnabled })} onOpacityChange={(value) => send(opacityAction(value))} />;
+  return <WidgetPopoverView snapshot={snapshot} onClosePopover={closePopover} onSaveTimerSettings={(draft) => send({ type: "saveTimerSettings", draft })} onResetTimer={(draft) => send({ type: "resetWidgetTimer", draft })} onSchedule={(durationMinutes) => send({ type: "scheduleWidgetCountdown", durationMinutes })} onToggleAlwaysOnTop={() => send({ type: "setAlwaysOnTop", enabled: !snapshot.alwaysOnTop })} onToggleShadow={() => send({ type: "setWidgetShadow", enabled: !snapshot.appearance.shadowEnabled })} onOpacityChange={(value) => send(opacityAction(value))} />;
 }

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -115,10 +115,29 @@ describe("WidgetView", () => {
 });
 
 describe("WidgetPopoverView", () => {
-  const render = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetPopoverView snapshot={next} onClosePopover={() => undefined} onSetMode={() => undefined} onUpdateTimerPreferences={() => undefined} onToggleAlwaysOnTop={() => undefined} onToggleShadow={() => undefined} onOpacityChange={() => undefined} />);
+  const render = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetPopoverView snapshot={next} onClosePopover={() => undefined} onSaveTimerSettings={() => undefined} onResetTimer={() => undefined} onSchedule={() => undefined} onToggleAlwaysOnTop={() => undefined} onToggleShadow={() => undefined} onOpacityChange={() => undefined} />);
 
-  it("renders a flat three-mode selector and only pomodoro focus, break, and rounds", () => {
-    const html = render(snapshot);
+  const countdownWithoutDeadline: WidgetSnapshot = {
+    ...snapshot,
+    taskId: "task-without-deadline",
+    timerPreferences: { ...snapshot.timerPreferences, mode: "countdown" },
+    timerRuntime: { mode: "countdown", phase: "countdown", running: false, round: 1, phaseStartedAt: 1, pausedAt: 1 },
+  };
+
+  it("keeps timer fields hidden until Timer settings opens", () => {
+    const html = render(countdownWithoutDeadline);
+    expect(html).toContain("Timer settings");
+    expect(html).not.toContain('role="radiogroup"');
+  });
+
+  it("shows scheduling guidance for a countdown without a task deadline", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={countdownWithoutDeadline} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    expect(html).toContain("Please schedule it on the timeline first");
+    expect(html).toContain("Schedule for now");
+  });
+
+  it("renders timer mode fields only in the draft settings view", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={snapshot} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     expect(html).toContain('role="radiogroup"');
     expect(html).toContain("Stopwatch");
     expect(html).toContain("Pomodoro");
@@ -127,7 +146,7 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Break");
     expect(html).toContain("Rounds");
     expect(html).not.toContain("Long break");
-    expect(html).toContain('aria-label="Close More"');
+    expect(render(snapshot)).toContain('aria-label="Close More"');
     expect((html.match(/tabindex="0"/g) ?? [])).toHaveLength(1);
     expect((html.match(/tabindex="-1"/g) ?? [])).toHaveLength(2);
   });
@@ -138,21 +157,24 @@ describe("WidgetPopoverView", () => {
     expect(getAdjacentTimerMode("pomodoro", "ArrowDown")).toBe("countdown");
     expect(getAdjacentTimerMode("pomodoro", "ArrowUp")).toBe("stopwatch");
     expect(getAdjacentTimerMode("pomodoro", "Enter")).toBeNull();
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    expect(source).toContain("onKeyDown={(event) => onModeKeyDown(event, mode)}");
   });
 
-  it("shows countdown presets and keeps More limited to opacity, topmost, and shadow", () => {
-    const html = render({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "countdown" } });
+  it("shows countdown presets only in the timer settings view", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "countdown" }, timerRuntime: { mode: "countdown", phase: "countdown", running: false, round: 1, phaseStartedAt: 1, countdownTargetAt: Date.now() + 60_000 } }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     for (const minutes of [15, 25, 45, 60]) expect(html).toContain(`>${minutes}<`);
     expect(html).toContain("Custom");
-    expect(html).toContain("Background opacity");
-    expect(html).toContain("Always on top");
-    expect(html).toContain("Shadow");
-    expect(html).not.toContain("Font family");
-    expect(html).not.toContain("Reset position");
+    const restingHtml = render(snapshot);
+    expect(restingHtml).toContain("Background opacity");
+    expect(restingHtml).toContain("Always on top");
+    expect(restingHtml).toContain("Shadow");
+    expect(restingHtml).not.toContain("Font family");
+    expect(restingHtml).not.toContain("Reset position");
   });
 
-  it("shows no duration input for stopwatch", () => {
-    const html = render({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } });
+  it("shows no duration input for stopwatch settings", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     expect(html).toContain("No duration");
     expect(html).not.toContain('type="number"');
   });
