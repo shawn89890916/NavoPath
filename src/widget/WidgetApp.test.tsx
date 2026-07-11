@@ -54,6 +54,13 @@ describe("WidgetView", () => {
     expect(source).not.toContain("restoreStoredWidgetBounds");
   });
 
+  it("keeps both settings reset paths aligned with the native compact default", () => {
+    const mainSource = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
+    expect(mainSource).not.toContain('localStorage.removeItem("navopath-widget-bounds")');
+    expect(mainSource.match(/setBounds\(\{ x: 80, y: 80, width: 400, height: 80 \}\)/g)).toHaveLength(2);
+    expect(mainSource).not.toContain("Restore 500");
+  });
+
   it("renders only task, timer, and More at full density", () => {
     const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain(snapshot.taskTitle);

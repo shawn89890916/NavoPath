@@ -4228,8 +4228,7 @@ function App() {
         break;
       }
       case "resetPosition":
-        try { localStorage.removeItem("navopath-widget-bounds"); } catch { /* ignore */ }
-        void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 500, height: 88 });
+        void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 400, height: 80 });
         break;
     }
   }
@@ -12942,8 +12941,8 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
               <SettingRow
                 title={lang === "zh" ? "重置位置与尺寸" : "Reset position and size"}
-                description={lang === "zh" ? "恢复为 500 × 88，并放回屏幕内的默认位置。" : "Restore 500 × 88 and return the widget to its default on-screen position."}
-                control={<SettingActionButton disabled={!Boolean(window.desktopApi?.widget)} onClick={() => { try { localStorage.removeItem("navopath-widget-bounds"); } catch { /* ignore */ } void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 500, height: 88 }); }}>{lang === "zh" ? "重置" : "Reset"}</SettingActionButton>}
+                description={lang === "zh" ? "恢复为 400 × 80，并放回屏幕内的默认位置。" : "Restore 400 × 80 and return the widget to its default on-screen position."}
+                control={<SettingActionButton disabled={!Boolean(window.desktopApi?.widget)} onClick={() => { void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 400, height: 80 }); }}>{lang === "zh" ? "重置" : "Reset"}</SettingActionButton>}
               />
             </SettingSection>}
             {settingsSection === "shortcuts" && <section className="df-settings-group"><h3>{lang === "zh" ? "快捷键" : "Shortcuts"}</h3>
