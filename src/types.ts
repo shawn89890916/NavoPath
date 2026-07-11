@@ -580,6 +580,8 @@ export interface WidgetSnapshot {
   /** 当前正在做/计时的任务（无则字段为空）。 */
   taskId?: string;
   taskTitle: string;
+  /** Current task deadline used to decide whether countdown needs scheduling. */
+  taskDueDate?: string;
   taskProjectColor?: string;
   /** 计时累计秒数。 */
   elapsedSeconds: number;

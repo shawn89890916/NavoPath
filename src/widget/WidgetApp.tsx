@@ -225,7 +225,9 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onCancel, onReset, o
   const [draft, setDraft] = useState(snapshot.timerPreferences);
   const [duration, setDuration] = useState(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))));
   const parsedDuration = Number(duration);
-  const needsSchedule = draft.mode === "countdown" && snapshot.timerRuntime.countdownTargetAt === undefined;
+  const needsSchedule = draft.mode === "countdown"
+    && snapshot.timerRuntime.countdownTargetAt === undefined
+    && !snapshot.taskDueDate;
   const chooseMode = (mode: WidgetTimerMode) => setDraft((current) => ({ ...current, mode }));
   const onModeKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, mode: WidgetTimerMode) => {
     const nextMode = getAdjacentTimerMode(mode, event.key);

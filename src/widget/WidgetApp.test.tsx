@@ -136,6 +136,12 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Schedule for now");
   });
 
+  it("does not require scheduling when a task due date can supply a countdown target", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...countdownWithoutDeadline, taskDueDate: "2026-07-12" }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    expect(html).not.toContain("Please schedule it on the timeline first");
+    expect(html).not.toContain("Schedule for now");
+  });
+
   it("renders timer mode fields only in the draft settings view", () => {
     const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={snapshot} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     expect(html).toContain('role="radiogroup"');

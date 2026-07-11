@@ -4083,6 +4083,7 @@ function App() {
     return {
       taskId: task?.id,
       taskTitle: task?.title || "",
+      taskDueDate: task?.dueDate,
       taskProjectColor: project?.color,
       elapsedSeconds: timerElapsed,
       timerRunning,
