@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, opacityAction, shouldToggleTimerClick } from "./WidgetApp";
+import { WidgetPopoverView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, opacityAction, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -54,6 +54,11 @@ describe("WidgetView", () => {
     expect(html).toContain('data-phase="overrun"');
     expect(html).toContain('aria-label="Close widget"');
     expect(html).toContain("df-widget-close-widget-btn");
+  });
+
+  it("lets native popover events override stale snapshot state in both directions", () => {
+    expect(withPopoverState(snapshot, true).popoverOpen).toBe(true);
+    expect(withPopoverState({ ...snapshot, popoverOpen: true }, false).popoverOpen).toBe(false);
   });
 
   it("treats movement beyond 5px as drag, but not exactly 5px", () => {

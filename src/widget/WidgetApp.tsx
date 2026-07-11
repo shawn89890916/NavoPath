@@ -39,6 +39,10 @@ export function shouldToggleTimerClick(wasDragged: boolean): boolean {
   return !wasDragged;
 }
 
+export function withPopoverState(snapshot: WidgetSnapshot, popoverOpen: boolean): WidgetSnapshot {
+  return { ...snapshot, popoverOpen };
+}
+
 export function opacityAction(value: number): WidgetAction {
   return { type: "updateWidgetAppearance", patch: { opacity: Math.min(1, Math.max(0, value)) } };
 }
@@ -215,11 +219,16 @@ function useWidgetSnapshot() {
 export function WidgetApp() {
   const { snapshot, send } = useWidgetSnapshot();
   const [density, setDensity] = useState<WidgetDensity>(() => getWidgetDensity(window.innerWidth));
+  const [nativePopoverOpen, setNativePopoverOpen] = useState<boolean | null>(null);
   const moveQueueRef = useRef(Promise.resolve());
   useEffect(() => {
     const update = () => setDensity(getWidgetDensity(window.innerWidth));
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
+  }, []);
+  useEffect(() => {
+    const unsubscribe = getWidgetApi()?.onPopoverState?.(setNativePopoverOpen);
+    return unsubscribe;
   }, []);
   useEffect(() => {
     const api = getWidgetApi();
@@ -239,7 +248,8 @@ export function WidgetApp() {
       if (bounds) await api.setBounds({ x: bounds.x + deltaX, y: bounds.y + deltaY });
     });
   };
-  return <WidgetView snapshot={snapshot} density={density} onToggleTimer={() => send({ type: "toggleWidgetTimer" })} onTogglePopover={() => { void getWidgetApi()?.togglePopover(); }} onCloseWidget={() => { void getWidgetApi()?.close(); }} onMove={move} />;
+  const renderedSnapshot = nativePopoverOpen === null ? snapshot : withPopoverState(snapshot, nativePopoverOpen);
+  return <WidgetView snapshot={renderedSnapshot} density={density} onToggleTimer={() => send({ type: "toggleWidgetTimer" })} onTogglePopover={() => { void getWidgetApi()?.togglePopover(); }} onCloseWidget={() => { void getWidgetApi()?.close(); }} onMove={move} />;
 }
 
 export function WidgetPopoverApp() {

@@ -1,10 +1,10 @@
-const WIDGET_MIN_WIDTH = 360;
+const WIDGET_MIN_WIDTH = 128;
 const WIDGET_MAX_WIDTH = 860;
-const WIDGET_MIN_HEIGHT = 84;
+const WIDGET_MIN_HEIGHT = 56;
 const DEFAULT_WIDGET_WIDTH = 500;
 const DEFAULT_WIDGET_HEIGHT = 88;
-const POPOVER_WIDTH = 280;
-const POPOVER_HEIGHT = 252;
+const POPOVER_WIDTH = 332;
+const POPOVER_HEIGHT = 420;
 const POPOVER_GAP = 6;
 const WINDOW_MARGIN = 6;
 
@@ -30,14 +30,47 @@ function clampBounds(bounds, workArea) {
 }
 
 function positionPopover(widgetBounds, popoverSize, workArea) {
-  const minX = workArea.x;
-  const maxX = workArea.x + workArea.width - popoverSize.width;
-  const x = Math.min(maxX, Math.max(minX, widgetBounds.x + widgetBounds.width - popoverSize.width));
-  const below = widgetBounds.y + widgetBounds.height + POPOVER_GAP;
-  const y = below + popoverSize.height <= workArea.y + workArea.height
-    ? below
-    : Math.max(workArea.y, widgetBounds.y - popoverSize.height - POPOVER_GAP);
-  return { x: Math.round(x), y: Math.round(y) };
+  const area = {
+    x: Math.round(Number(workArea.x)),
+    y: Math.round(Number(workArea.y)),
+    width: Math.max(0, Math.round(Number(workArea.width))),
+    height: Math.max(0, Math.round(Number(workArea.height))),
+  };
+  const widget = {
+    x: Number(widgetBounds.x),
+    y: Number(widgetBounds.y),
+    width: Math.max(0, Number(widgetBounds.width)),
+    height: Math.max(0, Number(widgetBounds.height)),
+  };
+  const requestedWidth = Math.max(1, Math.round(Number(popoverSize.width)));
+  const requestedHeight = Math.min(POPOVER_HEIGHT, Math.max(1, Math.round(Number(popoverSize.height))));
+  const width = Math.min(requestedWidth, Math.max(1, area.width - WINDOW_MARGIN * 2));
+  const minX = area.x + WINDOW_MARGIN;
+  const maxX = area.x + area.width - WINDOW_MARGIN - width;
+  const x = Math.min(maxX, Math.max(minX, widget.x + widget.width - width));
+
+  const top = area.y + WINDOW_MARGIN;
+  const bottom = area.y + area.height - WINDOW_MARGIN;
+  const belowY = widget.y + widget.height + POPOVER_GAP;
+  const belowSpace = Math.max(0, bottom - belowY);
+  const aboveSpace = Math.max(0, widget.y - POPOVER_GAP - top);
+  const fitsBelow = requestedHeight <= belowSpace;
+  const fitsAbove = requestedHeight <= aboveSpace;
+  const openAbove = !fitsBelow && (fitsAbove || aboveSpace > belowSpace);
+  const availableHeight = openAbove ? aboveSpace : belowSpace;
+  const height = Math.min(requestedHeight, availableHeight);
+  const y = openAbove
+    ? widget.y - POPOVER_GAP - height
+    : belowY;
+
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width,
+    height,
+    openAbove,
+    scrollRequired: height < requestedHeight,
+  };
 }
 
 function createWidgetWindowService(deps) {
@@ -103,12 +136,24 @@ function createWidgetWindowService(deps) {
     return true;
   }
 
+  function broadcastPopoverState(openState) {
+    if (widgetWindow && !widgetWindow.isDestroyed()) {
+      widgetWindow.webContents.send("widget:popover-state", Boolean(openState));
+    }
+  }
+
   function togglePopover() {
     if (popoverWindow && !popoverWindow.isDestroyed()) return closePopover();
     if (!widgetWindow || widgetWindow.isDestroyed()) return false;
+    const workArea = displayFor(widgetWindow.getBounds()).workArea;
+    const position = positionPopover(
+      widgetWindow.getBounds(),
+      { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
+      workArea,
+    );
     const popover = new deps.BrowserWindow({
-      width: POPOVER_WIDTH,
-      height: POPOVER_HEIGHT,
+      width: position.width,
+      height: position.height,
       parent: widgetWindow,
       title: "NavoPath",
       icon: deps.iconPath,
@@ -128,9 +173,6 @@ function createWidgetWindowService(deps) {
       },
     });
     popoverWindow = popover;
-    const workArea = displayFor(widgetWindow.getBounds()).workArea;
-    const [width, height] = popover.getSize();
-    const position = positionPopover(widgetWindow.getBounds(), { width, height }, workArea);
     popover.setPosition(position.x, position.y);
     const useLocalFile = deps.app.isPackaged || (deps.fs.existsSync(deps.localIndexPath) && !deps.env.VITE_DEV_SERVER_URL);
     if (useLocalFile) {
@@ -143,10 +185,14 @@ function createWidgetWindowService(deps) {
       if (popoverWindow !== popover || popover.isDestroyed()) return;
       popover.show();
       popover.focus();
+      broadcastPopoverState(true);
     });
     popover.on("blur", () => closePopover(popover));
     popover.on("closed", () => {
-      if (popoverWindow === popover) popoverWindow = null;
+      if (popoverWindow === popover) {
+        popoverWindow = null;
+        broadcastPopoverState(false);
+      }
     });
     return true;
   }
@@ -198,6 +244,7 @@ function createWidgetWindowService(deps) {
     });
     const refreshBounds = () => {
       if (!widgetWindow || widgetWindow.isDestroyed()) return;
+      closePopover();
       const current = widgetWindow.getBounds();
       const workArea = displayFor(current).workArea;
       widgetWindow.setMaximumSize?.(

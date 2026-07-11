@@ -650,6 +650,8 @@ declare global {
         sendAction: (action: WidgetAction) => void;
         /** Widget side: listen for snapshot pushes from the main window. */
         onSnapshot: (listener: (snapshot: WidgetSnapshot) => void) => () => void;
+        /** Primary widget side: listen for the native More popover open state. */
+        onPopoverState: (listener: (open: boolean) => void) => () => void;
         /** Main side: listen for action requests relayed from the widget. */
         onAction: (listener: (action: WidgetAction) => void) => () => void;
         /** Main side: push a snapshot to the widget window. */

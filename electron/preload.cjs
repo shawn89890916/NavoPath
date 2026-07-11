@@ -36,6 +36,11 @@ contextBridge.exposeInMainWorld("desktopApi", {
       ipcRenderer.on("widget:snapshot", handler);
       return () => ipcRenderer.removeListener("widget:snapshot", handler);
     },
+    onPopoverState: (listener) => {
+      const handler = (_event, open) => listener(Boolean(open));
+      ipcRenderer.on("widget:popover-state", handler);
+      return () => ipcRenderer.removeListener("widget:popover-state", handler);
+    },
     onAction: (listener) => {
       const handler = (_event, action) => listener(action);
       ipcRenderer.on("widget:action", handler);
