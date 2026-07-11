@@ -1,5 +1,21 @@
 # NavoPath 更新日志
 
+## 2026-07-11 · 桌面小组件自适应计时器
+
+### 新增
+- 桌面小组件现支持正计时、自动轮换专注与休息的番茄钟，以及结束后进入红色闪烁超时正计时的倒计时；小组件跟随主页面深浅模式，详细设置可分别调整两套主题颜色、字体、字号、背景透明度、置顶、阴影与各模式时长。
+
+### 改进
+- 小组件可从任意原生边缘自由缩放，横向收窄时依次精简为“时间与更多”和仅时间，纵向拉伸则平滑放大文字；独立“更多”面板保持简洁，并会根据屏幕边缘自动翻转、钳制或滚动，避免被桌面边缘遮挡。
+
+## 2026-07-11 · Adaptive desktop widget timer
+
+### Added
+- The desktop widget now supports a stopwatch, a Pomodoro timer that automatically alternates focus and break phases, and a countdown that continues as a red flashing overrun stopwatch; it follows the main app's light or dark theme, while detailed settings expose separate theme colors, font, type scale, background opacity, always-on-top, shadow, and mode durations.
+
+### Improved
+- The widget freely resizes from every native edge, progressively simplifies to timer plus More and then timer-only as it narrows, and smoothly scales its type when made taller; the separate compact More panel flips, clamps, or scrolls around screen edges so it is never obscured by the desktop boundary.
+
 ## 2026-07-10 · 桌面小组件交互与响应式重构
 
 ### 修复

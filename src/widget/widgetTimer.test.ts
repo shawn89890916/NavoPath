@@ -6,6 +6,7 @@ import {
   accumulateWidgetWorkTime,
   calculateWidgetWorkSeconds,
   countsWidgetTimerPhaseAsWork,
+  createWidgetTimerModeTransition,
   createWidgetTimerRuntime,
   getWidgetTimerNotificationDescriptor,
   getWidgetTimerSnapshotDisplaySeconds,
@@ -15,6 +16,25 @@ import {
 } from "./widgetTimer";
 
 describe("widget timer preferences", () => {
+  it("creates one paused fresh runtime when switching modes", () => {
+    expect(createWidgetTimerModeTransition("countdown", {
+      ...DEFAULT_WIDGET_TIMER_PREFERENCES,
+      mode: "pomodoro",
+      countdownSeconds: 90,
+    }, 12_345)).toEqual({
+      preferences: { ...DEFAULT_WIDGET_TIMER_PREFERENCES, mode: "countdown", countdownSeconds: 90 },
+      runtime: {
+        mode: "countdown",
+        phase: "countdown",
+        running: false,
+        round: 1,
+        phaseStartedAt: 12_345,
+        phaseEndsAt: 102_345,
+        pausedAt: 12_345,
+      },
+    });
+  });
+
   it("normalizes invalid durations and clamps supported ranges", () => {
     expect(normalizeWidgetTimerPreferences({
       mode: "invalid" as never,

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerRuntime } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
@@ -69,11 +69,11 @@ import {
   advanceTaskElapsedSeconds,
   advanceWidgetTimer,
   countsWidgetTimerPhaseAsWork,
+  createWidgetTimerModeTransition,
   createWidgetTimerRuntime,
   getWidgetTimerNotificationDescriptor,
   getWidgetTimerSnapshotDisplaySeconds,
   normalizeWidgetTimerPreferences,
-  normalizeWidgetTimerMode,
   normalizeWidgetTimerRuntime,
 } from "./widget/widgetTimer";
 import "./styles.css";
@@ -4148,16 +4148,14 @@ function App() {
         });
         break;
       case "setTimerMode": {
-        const mode = normalizeWidgetTimerMode(action.mode, widgetTimerPreferences.mode);
         if (widgetTimerRuntime.running && widgetTimerRuntime.mode !== "stopwatch") advanceWidgetTimerNow();
         else if (widgetTimerRuntime.running) pauseTimer();
         widgetManagesTaskTimerRef.current = false;
         timerStartedAtRef.current = null;
         setTimerRunning(false);
         setTimerStartedAt(null);
-        const preferences = normalizeWidgetTimerPreferences({ ...widgetTimerPreferences, mode });
         const now = Date.now();
-        const runtime = { ...createWidgetTimerRuntime(mode, now, preferences), running: false, pausedAt: now };
+        const { preferences, runtime } = createWidgetTimerModeTransition(action.mode, widgetTimerPreferences, now);
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
         widgetTimerRuntimeRef.current = runtime;
@@ -8323,7 +8321,7 @@ function App() {
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => { setUtilityPanel(null); setScheduleTemplateOpen(true); }} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onSetWidgetTimerMode={(mode) => handleWidgetAction({ type: "setTimerMode", mode })} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => { setUtilityPanel(null); setScheduleTemplateOpen(true); }} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
       {focusOverlayMode && (
         <div className="df-focus-overlay" style={focusProject?.color ? { ["--focus-accent" as string]: focusProject.color } as React.CSSProperties : undefined}>
@@ -12252,7 +12250,7 @@ function PluginRuntimePanel({ settings, data, onSave, onSaveData, lang }: { sett
   );
 }
 
-function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose, onSave, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang, onOpenScheduleTemplates }: { kind: "settings" | "about"; settings: Settings; initialSection?: SettingsSection; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language; onOpenScheduleTemplates?: () => void }) {
+function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose, onSave, onSetWidgetTimerMode, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang, onOpenScheduleTemplates }: { kind: "settings" | "about"; settings: Settings; initialSection?: SettingsSection; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onSetWidgetTimerMode: (mode: WidgetTimerMode) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language; onOpenScheduleTemplates?: () => void }) {
   // Map any persisted legacy section id ("page" / "features") onto the new
   // canonical category so older builds land on a real settings group instead
   // of an empty panel.
@@ -12268,6 +12266,17 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
   const [pluginConfigDialogId, setPluginConfigDialogId] = useState<string | null>(null);
   const [pluginConfigDraft, setPluginConfigDraft] = useState<Record<string, unknown>>({});
   const widgetAppearance = normalizeWidgetAppearance(settings.widgetAppearance);
+  const widgetTimerSettings = normalizeWidgetTimerPreferences(settings.widgetTimerPreferences);
+  const saveWidgetAppearance = (patch: Parameters<typeof normalizeWidgetAppearance>[0]) => onSave({
+    widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, ...patch }),
+    widgetAppearanceMigrated: true,
+  });
+  const saveWidgetThemeColor = (theme: "light" | "dark", patch: Partial<typeof widgetAppearance.light>) => saveWidgetAppearance({
+    [theme]: { ...widgetAppearance[theme], ...patch },
+  });
+  const saveWidgetTimerSettings = (patch: Partial<typeof widgetTimerSettings>) => onSave({
+    widgetTimerPreferences: normalizeWidgetTimerPreferences({ ...widgetTimerSettings, ...patch }),
+  });
   // Force a re-render of the plugin list when activation state changes (the
   // registry holds state outside React).
   const [, setPluginRefreshTick] = useState(0);
@@ -12856,26 +12865,63 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 title={lang === "zh" ? "始终置顶" : "Always on top"}
                 control={<SettingToggle checked={settings.widgetAlwaysOnTop !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "始终置顶" : "Always on top"} onChange={(next) => { onSave({ widgetAlwaysOnTop: next }); void window.desktopApi?.widget?.setAlwaysOnTop(next); }} />}
               />
+              <SettingRow
+                title={lang === "zh" ? "显示阴影" : "Show shadow"}
+                control={<SettingToggle checked={widgetAppearance.shadowEnabled} ariaLabel={lang === "zh" ? "显示小组件阴影" : "Show widget shadow"} onChange={(shadowEnabled) => saveWidgetAppearance({ shadowEnabled })} />}
+              />
+              <SettingRow
+                title={lang === "zh" ? "背景透明度" : "Background opacity"}
+                description={lang === "zh" ? "只调整纸面背景，文字和计时始终清晰显示。" : "Adjusts only the paper background; text and timer remain visible."}
+                control={<SettingNumberInput value={Math.round(widgetAppearance.opacity * 100)} min={0} max={100} step={1} suffix="%" ariaLabel={lang === "zh" ? "小组件背景透明度" : "Widget background opacity"} onChange={(value) => saveWidgetAppearance({ opacity: value / 100 })} />}
+              />
               <SettingDivider />
               <SettingRow
-                title={lang === "zh" ? "背景颜色" : "Background color"}
-                control={<SettingColorInput value={widgetAppearance.backgroundColor} ariaLabel={lang === "zh" ? "小组件背景颜色" : "Widget background color"} onChange={(backgroundColor) => onSave({ widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, backgroundColor }), widgetAppearanceMigrated: true })} />}
+                title={lang === "zh" ? "字体" : "Font family"}
+                control={<SettingSelect value={widgetAppearance.fontFamily} ariaLabel={lang === "zh" ? "小组件字体" : "Widget font family"} onChange={(fontFamily) => saveWidgetAppearance({ fontFamily })} options={[
+                  { value: "system-ui, sans-serif", label: lang === "zh" ? "系统字体" : "System" },
+                  { value: "Inter, system-ui, sans-serif", label: "Inter" },
+                  { value: "Georgia, serif", label: lang === "zh" ? "衬线字体" : "Serif" },
+                  { value: "ui-monospace, monospace", label: lang === "zh" ? "等宽字体" : "Monospace" },
+                ]} />}
               />
               <SettingRow
-                title={lang === "zh" ? "字体颜色" : "Font color"}
-                control={<SettingColorInput value={widgetAppearance.fontColor} ariaLabel={lang === "zh" ? "小组件字体颜色" : "Widget font color"} onChange={(fontColor) => onSave({ widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, fontColor }), widgetAppearanceMigrated: true })} />}
+                title={lang === "zh" ? "字号比例" : "Font scale"}
+                control={<SettingNumberInput value={widgetAppearance.fontScale} min={0.5} max={2} step={0.05} suffix="×" ariaLabel={lang === "zh" ? "小组件字号比例" : "Widget font scale"} onChange={(fontScale) => saveWidgetAppearance({ fontScale })} />}
               />
+              {(["light", "dark"] as const).map((theme) => {
+                const themeName = theme === "light" ? (lang === "zh" ? "浅色" : "Light") : (lang === "zh" ? "深色" : "Dark");
+                const colors = widgetAppearance[theme];
+                return <React.Fragment key={theme}>
+                  <SettingDivider />
+                  <SettingRow title={lang === "zh" ? `${themeName}背景` : `${themeName} background`} control={<SettingColorInput value={colors.backgroundColor} ariaLabel={lang === "zh" ? `${themeName}背景颜色` : `${themeName} background color`} onChange={(backgroundColor) => saveWidgetThemeColor(theme, { backgroundColor })} />} />
+                  <SettingRow title={lang === "zh" ? `${themeName}文字` : `${themeName} text`} control={<SettingColorInput value={colors.fontColor} ariaLabel={lang === "zh" ? `${themeName}文字颜色` : `${themeName} text color`} onChange={(fontColor) => saveWidgetThemeColor(theme, { fontColor })} />} />
+                  <SettingRow title={lang === "zh" ? `${themeName}计时` : `${themeName} timer`} control={<SettingColorInput value={colors.timerColor} ariaLabel={lang === "zh" ? `${themeName}计时颜色` : `${themeName} timer color`} onChange={(timerColor) => saveWidgetThemeColor(theme, { timerColor })} />} />
+                  <SettingRow title={lang === "zh" ? `${themeName}超时` : `${themeName} overrun`} control={<SettingColorInput value={colors.overrunColor} ariaLabel={lang === "zh" ? `${themeName}超时颜色` : `${themeName} overrun color`} onChange={(overrunColor) => saveWidgetThemeColor(theme, { overrunColor })} />} />
+                </React.Fragment>;
+              })}
+              <SettingDivider />
               <SettingRow
-                title={lang === "zh" ? "强调颜色" : "Accent color"}
-                description={lang === "zh" ? "用于状态、焦点和细标记。" : "Used for status, focus, and fine annotation marks."}
-                control={<SettingColorInput value={widgetAppearance.accentColor} ariaLabel={lang === "zh" ? "小组件强调颜色" : "Widget accent color"} onChange={(accentColor) => onSave({ widgetAppearance: normalizeWidgetAppearance({ ...widgetAppearance, accentColor }), widgetAppearanceMigrated: true })} />}
+                title={lang === "zh" ? "计时模式" : "Timer mode"}
+                control={<SettingSelect value={widgetTimerSettings.mode} ariaLabel={lang === "zh" ? "小组件计时模式" : "Widget timer mode"} onChange={onSetWidgetTimerMode} options={[
+                  { value: "stopwatch", label: lang === "zh" ? "正计时" : "Stopwatch" },
+                  { value: "pomodoro", label: lang === "zh" ? "番茄钟" : "Pomodoro" },
+                  { value: "countdown", label: lang === "zh" ? "倒计时" : "Countdown" },
+                ]} />}
               />
+              <SettingRow title={lang === "zh" ? "专注时长" : "Focus duration"} control={<SettingNumberInput value={widgetTimerSettings.focusMinutes} min={1} max={180} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "番茄钟专注时长" : "Pomodoro focus duration"} onChange={(focusMinutes) => saveWidgetTimerSettings({ focusMinutes })} />} />
+              <SettingRow title={lang === "zh" ? "休息时长" : "Break duration"} control={<SettingNumberInput value={widgetTimerSettings.breakMinutes} min={1} max={60} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "番茄钟休息时长" : "Pomodoro break duration"} onChange={(breakMinutes) => saveWidgetTimerSettings({ breakMinutes })} />} />
+              <SettingRow title={lang === "zh" ? "循环轮数" : "Pomodoro rounds"} control={<SettingNumberInput value={widgetTimerSettings.rounds} min={1} max={12} step={1} ariaLabel={lang === "zh" ? "番茄钟循环轮数" : "Pomodoro rounds"} onChange={(rounds) => saveWidgetTimerSettings({ rounds })} />} />
+              <SettingRow title={lang === "zh" ? "倒计时时长" : "Countdown duration"} control={<SettingNumberInput value={Math.round(widgetTimerSettings.countdownSeconds / 60)} min={1} max={1440} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "倒计时时长" : "Countdown duration"} onChange={(minutes) => saveWidgetTimerSettings({ countdownSeconds: minutes * 60 })} />} />
+              <SettingDivider />
               <SettingRow
                 title={lang === "zh" ? "恢复默认外观" : "Restore default appearance"}
-                control={<SettingActionButton onClick={() => onSave({ widgetAppearance: { ...DEFAULT_WIDGET_APPEARANCE }, widgetAppearanceMigrated: true })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
+                control={<SettingActionButton onClick={() => onSave({ widgetAppearance: structuredClone(DEFAULT_WIDGET_APPEARANCE), widgetAppearanceMigrated: true })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
               />
-              <SettingComingSoon title={lang === "zh" ? "显示快速添加" : "Show quick add"} description={lang === "zh" ? "在小组件中提供快速添加任务入口。" : "Quick-add entry inside the widget."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
-              <SettingComingSoon title={lang === "zh" ? "紧凑模式" : "Compact mode"} description={lang === "zh" ? "缩小小组件尺寸。" : "Shrink the widget to a compact size."} note={Boolean(window.desktopApi?.widget) ? (lang === "zh" ? "即将支持" : "Coming soon") : (lang === "zh" ? "桌面端启用后可用" : "Available on desktop")} />
+              <SettingRow
+                title={lang === "zh" ? "重置位置与尺寸" : "Reset position and size"}
+                description={lang === "zh" ? "恢复为 500 × 88，并放回屏幕内的默认位置。" : "Restore 500 × 88 and return the widget to its default on-screen position."}
+                control={<SettingActionButton disabled={!Boolean(window.desktopApi?.widget)} onClick={() => { try { localStorage.removeItem("navopath-widget-bounds"); } catch { /* ignore */ } void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 500, height: 88 }); }}>{lang === "zh" ? "重置" : "Reset"}</SettingActionButton>}
+              />
             </SettingSection>}
             {settingsSection === "shortcuts" && <section className="df-settings-group"><h3>{lang === "zh" ? "快捷键" : "Shortcuts"}</h3>
               <p className="df-settings-desc">{lang === "zh" ? "固定快捷键参考。本版本暂不支持自定义。" : "Fixed shortcut reference. Custom shortcuts are not enabled in this version."}</p>

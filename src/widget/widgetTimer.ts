@@ -97,6 +97,23 @@ export function normalizeWidgetTimerPreferences(
   };
 }
 
+export function createWidgetTimerModeTransition(
+  modeValue: unknown,
+  currentPreferences: WidgetTimerPreferences,
+  now: number,
+) {
+  const mode = normalizeWidgetTimerMode(modeValue, currentPreferences.mode);
+  const preferences = normalizeWidgetTimerPreferences({ ...currentPreferences, mode });
+  return {
+    preferences,
+    runtime: {
+      ...createWidgetTimerRuntime(mode, now, preferences),
+      running: false,
+      pausedAt: now,
+    } satisfies WidgetTimerRuntime,
+  };
+}
+
 export function normalizeWidgetTimerRuntime(
   value: Partial<WidgetTimerRuntime> | null | undefined,
   preferenceValue: Partial<WidgetTimerPreferences>,
