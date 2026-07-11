@@ -170,7 +170,7 @@ export function normalizeWidgetTimerRuntime(
   const phase = value?.mode === mode && value?.phase && allowedPhases[mode].includes(value.phase)
     ? value.phase
     : mode === "pomodoro" ? "focus" : mode;
-  const running = value?.running === true;
+  let running = value?.running === true;
   const round = Math.min(preferences.rounds, Math.max(1,
     Number.isFinite(value?.round) ? Math.round(value!.round!) : 1));
   const phaseStartedAt = Number.isFinite(value?.phaseStartedAt) && value!.phaseStartedAt! >= 0
@@ -187,6 +187,9 @@ export function normalizeWidgetTimerRuntime(
       runtime.countdownTargetAt = value!.countdownTargetAt!;
       if (typeof value?.countdownTaskId === "string") runtime.countdownTaskId = value.countdownTaskId;
       if (phase === "countdown") runtime.phaseEndsAt = runtime.countdownTargetAt;
+    } else {
+      running = false;
+      runtime.running = false;
     }
   }
   if (!running) {
