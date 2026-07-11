@@ -3,7 +3,7 @@ import {
   DEFAULT_WIDGET_APPEARANCE,
   WIDGET_APPEARANCE_VERSION,
   clampWidgetBounds,
-  getWidgetLayout,
+  getWidgetDensity,
   migrateLegacyWidgetAppearance,
   normalizeWidgetAppearance,
   restoreStoredWidgetBounds,
@@ -113,10 +113,11 @@ describe("widget geometry", () => {
     )).toEqual({ x: 0, y: 0, width: 500, height: 288 });
   });
 
-  it("uses the stacked layout only for tall windows", () => {
-    expect(getWidgetLayout(700, 100)).toBe("strip");
-    expect(getWidgetLayout(480, 100)).toBe("strip");
-    expect(getWidgetLayout(480, 132)).toBe("stacked");
-    expect(getWidgetLayout(700, 180)).toBe("stacked");
+  it("uses exact width thresholds for adaptive density", () => {
+    expect(getWidgetDensity(500)).toBe("full");
+    expect(getWidgetDensity(360)).toBe("full");
+    expect(getWidgetDensity(359)).toBe("timerControls");
+    expect(getWidgetDensity(220)).toBe("timerControls");
+    expect(getWidgetDensity(219)).toBe("timerOnly");
   });
 });

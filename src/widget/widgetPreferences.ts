@@ -130,8 +130,12 @@ export function restoreStoredWidgetBounds(raw: string | null): WidgetBounds | nu
   }
 }
 
-export function getWidgetLayout(_width: number, height: number): "strip" | "stacked" {
-  return height >= 132 ? "stacked" : "strip";
+export type WidgetDensity = "full" | "timerControls" | "timerOnly";
+
+export function getWidgetDensity(width: number): WidgetDensity {
+  if (width >= 360) return "full";
+  if (width >= 220) return "timerControls";
+  return "timerOnly";
 }
 
 export function hexToRgbTriplet(hex: string): string {

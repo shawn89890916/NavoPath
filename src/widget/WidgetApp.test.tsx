@@ -2,90 +2,132 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetView, opacityAction } from "./WidgetApp";
+import { WidgetPopoverView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, opacityAction, shouldToggleTimerClick } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
   taskTitle: "Write a long application essay title",
-  taskProjectColor: "#D7816A",
   elapsedSeconds: 125,
   timerRunning: true,
   candidateCount: 3,
   lang: "en",
   alwaysOnTop: true,
   appearanceConfigured: true,
+  theme: "light",
   appearance: {
-    backgroundColor: "#FBF9FF",
-    fontColor: "#27231E",
-    accentColor: "#27231E",
+    light: { backgroundColor: "#FBF9FF", fontColor: "#27231E", timerColor: "#5D9B63", overrunColor: "#B34F47" },
+    dark: { backgroundColor: "#27231E", fontColor: "#EEE9DF", timerColor: "#70D978", overrunColor: "#E27C68" },
     opacity: 0.96,
-    version: 1,
+    fontFamily: "system-ui, sans-serif",
+    fontScale: 1,
+    shadowEnabled: true,
+    version: 2,
   },
+  timerPreferences: { mode: "pomodoro", focusMinutes: 25, breakMinutes: 5, rounds: 4, countdownSeconds: 900 },
+  timerRuntime: { mode: "pomodoro", phase: "focus", running: true, round: 1, phaseStartedAt: 1, phaseEndsAt: 2 },
+  timerDisplaySeconds: 125,
+  timerPhase: "focus",
+  popoverOpen: false,
 };
 
 describe("WidgetView", () => {
-  it("keeps settings out of the compact surface and renders them in the popover", () => {
-    const mainHtml = renderToStaticMarkup(
-      <WidgetView
-        snapshot={snapshot}
-        elapsedSeconds={snapshot.elapsedSeconds}
-        layout="stacked"
-        onToggleTimer={() => undefined}
-        onTogglePopover={() => undefined}
-      />,
-    );
-    const popoverHtml = renderToStaticMarkup(
-      <WidgetPopoverView
-        snapshot={snapshot}
-        onToggleAlwaysOnTop={() => undefined}
-        onOpacityChange={() => undefined}
-        onResetPosition={() => undefined}
-        onCloseWidget={() => undefined}
-      />,
-    );
+  it("renders only task, timer, and More at full density", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} />);
+    expect(html).toContain(snapshot.taskTitle);
+    expect(html).toContain("2:05");
+    expect(html).toContain('aria-label="More"');
+    expect(html).not.toContain("Working");
+    expect(html).not.toContain("Play");
+    expect(html).not.toContain("project-footer");
+  });
 
-    expect(mainHtml).toContain('data-layout="stacked"');
-    expect(mainHtml).toContain("Working");
-    expect(mainHtml).toContain('aria-haspopup="dialog"');
-    expect(mainHtml).not.toContain("Always on top");
-    expect(mainHtml).not.toContain("df-widget-accent-line");
+  it("renders only the timer at time-only density", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="timerOnly" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} />);
+    expect(html).toContain("2:05");
+    expect(html).not.toContain(snapshot.taskTitle);
+    expect(html).not.toContain('aria-label="More"');
+  });
 
-    expect(popoverHtml).toContain("Always on top");
-    expect(popoverHtml).toContain('role="dialog"');
-    expect(popoverHtml).toContain('autofocus=""');
-    expect(popoverHtml).toContain("Background opacity");
-    expect(popoverHtml).toContain('min="0"');
-    expect(popoverHtml).toContain('max="1"');
-    expect(popoverHtml).toContain("Reset position");
-    expect(popoverHtml).toContain("Close widget");
+  it("uses the active theme, overrun phase, and red close-widget affordance", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={{ ...snapshot, theme: "dark", timerPhase: "overrun", popoverOpen: true }} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} />);
+    expect(html).toContain('data-theme="dark"');
+    expect(html).toContain('data-phase="overrun"');
+    expect(html).toContain('aria-label="Close widget"');
+    expect(html).toContain("df-widget-close-widget-btn");
+  });
+
+  it("treats movement beyond 5px as drag, but not exactly 5px", () => {
+    expect(didWidgetPointerDrag({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(false);
+    expect(didWidgetPointerDrag({ x: 0, y: 0 }, { x: 4, y: 4 })).toBe(true);
+  });
+
+  it("allows keyboard/click timer activation while suppressing the click after a drag", () => {
+    expect(shouldToggleTimerClick(false)).toBe(true);
+    expect(shouldToggleTimerClick(true)).toBe(false);
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    expect(source).toMatch(/className="df-widget-timer"[\s\S]*?onClick=/);
   });
 
   it("normalizes opacity updates into a widget action", () => {
-    expect(opacityAction(2)).toEqual({ type: "updateAppearance", patch: { opacity: 1 } });
-    expect(opacityAction(-1)).toEqual({ type: "updateAppearance", patch: { opacity: 0 } });
-    expect(opacityAction(0.72)).toEqual({ type: "updateAppearance", patch: { opacity: 0.72 } });
+    expect(opacityAction(2)).toEqual({ type: "updateWidgetAppearance", patch: { opacity: 1 } });
+    expect(opacityAction(-1)).toEqual({ type: "updateWidgetAppearance", patch: { opacity: 0 } });
+  });
+});
+
+describe("WidgetPopoverView", () => {
+  const render = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetPopoverView snapshot={next} onClosePopover={() => undefined} onSetMode={() => undefined} onUpdateTimerPreferences={() => undefined} onToggleAlwaysOnTop={() => undefined} onToggleShadow={() => undefined} onOpacityChange={() => undefined} />);
+
+  it("renders a flat three-mode selector and only pomodoro focus, break, and rounds", () => {
+    const html = render(snapshot);
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain("Stopwatch");
+    expect(html).toContain("Pomodoro");
+    expect(html).toContain("Countdown");
+    expect(html).toContain("Focus");
+    expect(html).toContain("Break");
+    expect(html).toContain("Rounds");
+    expect(html).not.toContain("Long break");
+    expect(html).toContain('aria-label="Close More"');
+    expect((html.match(/tabindex="0"/g) ?? [])).toHaveLength(1);
+    expect((html.match(/tabindex="-1"/g) ?? [])).toHaveLength(2);
   });
 
-  it("restores and periodically persists widget bounds while mounted", () => {
-    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
-    expect(source).toContain('const WIDGET_BOUNDS_KEY = "navopath-widget-bounds"');
-    expect(source).toMatch(/restoreStoredWidgetBounds\(raw\)[\s\S]*?setBounds\(restored\)/);
-    expect(source).not.toContain("getWorkArea()");
-    expect(source).toMatch(/setInterval\([\s\S]*?getBounds\(\)[\s\S]*?localStorage\.setItem\(WIDGET_BOUNDS_KEY[\s\S]*?1200/);
+  it("wraps radiogroup keyboard selection in both directions", () => {
+    expect(getAdjacentTimerMode("stopwatch", "ArrowRight")).toBe("pomodoro");
+    expect(getAdjacentTimerMode("stopwatch", "ArrowLeft")).toBe("countdown");
+    expect(getAdjacentTimerMode("pomodoro", "ArrowDown")).toBe("countdown");
+    expect(getAdjacentTimerMode("pomodoro", "ArrowUp")).toBe("stopwatch");
+    expect(getAdjacentTimerMode("pomodoro", "Enter")).toBeNull();
   });
 
-  it("keeps opacity on the paper shell and establishes the compact hierarchy", () => {
+  it("shows countdown presets and keeps More limited to opacity, topmost, and shadow", () => {
+    const html = render({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "countdown" } });
+    for (const minutes of [15, 25, 45, 60]) expect(html).toContain(`>${minutes}<`);
+    expect(html).toContain("Custom");
+    expect(html).toContain("Background opacity");
+    expect(html).toContain("Always on top");
+    expect(html).toContain("Shadow");
+    expect(html).not.toContain("Font family");
+    expect(html).not.toContain("Reset position");
+  });
+
+  it("shows no duration input for stopwatch", () => {
+    const html = render({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } });
+    expect(html).toContain("No duration");
+    expect(html).not.toContain('type="number"');
+  });
+
+  it("uses scoped container scaling and reduced-motion overrun styling", () => {
     const css = readFileSync(new URL("./widget.css", import.meta.url), "utf8");
-    expect(css).toMatch(/\.df-widget-root\s*\{[\s\S]*?padding:\s*6px[\s\S]*?-webkit-app-region:\s*no-drag/);
-    expect(css).toMatch(/\.df-widget-card::before\s*\{[\s\S]*?opacity:\s*var\(--widget-opacity\)/);
-    expect(css).toMatch(/\.df-widget-card\s*>\s*\*\s*\{[\s\S]*?z-index:\s*1/);
-    expect(css).toMatch(/\.df-widget-status\s*\{[\s\S]*?color:\s*var\(--widget-muted\)[\s\S]*?font-size:\s*clamp\(11px,/);
-    expect(css).toMatch(/\.df-widget-task-title\s*\{[\s\S]*?font-size:\s*clamp\(18px,/);
-    expect(css).toMatch(/\.df-widget-timer\s*\{[\s\S]*?font:\s*750\s+clamp\(18px,/);
-    expect(css).toMatch(/\.df-widget-icon-btn[\s\S]*min-width:\s*44px/);
-    expect(css).toMatch(/\.df-widget-popover-action[\s\S]*min-height:\s*44px/);
-    expect(css).toMatch(/\.df-widget-card[\s\S]*border-radius:\s*16px/);
-    expect(css).toMatch(/\.df-widget-popover-surface[\s\S]*border-radius:\s*12px/);
-    expect(css).not.toContain(".df-widget-accent-line");
+    expect(css).toContain("container-type: size");
+    expect(css).toMatch(/font-size:\s*clamp\([^;]*cqh/);
+    expect(css).toContain("data-phase=\"overrun\"");
+    expect(css).toContain("prefers-reduced-motion: reduce");
+    expect(css).toMatch(/\.df-widget-number-row input\s*\{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.df-widget-presets button\s*\{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.df-widget-opacity-row input\s*\{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.df-widget-timer\s*\{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.df-widget-icon-btn,[^}]*width:\s*clamp\(44px,/);
+    expect(css).toMatch(/\.df-widget-icon-btn,[^}]*height:\s*clamp\(44px,/);
   });
 });
