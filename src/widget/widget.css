@@ -22,6 +22,19 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
   background: rgb(var(--widget-bg-rgb)); box-shadow: var(--widget-shadow); opacity: var(--widget-opacity); pointer-events: none;
 }
 .df-widget-card > * { position: relative; z-index: 1; }
+.df-widget-resize-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.df-widget-resize-handle { position: absolute; -webkit-app-region: no-drag; pointer-events: auto; touch-action: none; }
+.df-widget-resize-handle.is-n, .df-widget-resize-handle.is-s { left: 8px; right: 8px; height: 8px; }
+.df-widget-resize-handle.is-n { top: 0; cursor: n-resize; }
+.df-widget-resize-handle.is-s { bottom: 0; cursor: s-resize; }
+.df-widget-resize-handle.is-e, .df-widget-resize-handle.is-w { top: 8px; bottom: 8px; width: 8px; }
+.df-widget-resize-handle.is-e { right: 0; cursor: e-resize; }
+.df-widget-resize-handle.is-w { left: 0; cursor: w-resize; }
+.df-widget-resize-handle.is-ne, .df-widget-resize-handle.is-se, .df-widget-resize-handle.is-sw, .df-widget-resize-handle.is-nw { width: 12px; height: 12px; }
+.df-widget-resize-handle.is-ne { top: 0; right: 0; cursor: ne-resize; }
+.df-widget-resize-handle.is-se { right: 0; bottom: 0; cursor: se-resize; }
+.df-widget-resize-handle.is-sw { bottom: 0; left: 0; cursor: sw-resize; }
+.df-widget-resize-handle.is-nw { top: 0; left: 0; cursor: nw-resize; }
 .df-widget-task-title {
   min-width: 0; flex: 1 1 auto; overflow: hidden; color: var(--widget-ink);
   font-size: calc(clamp(17px, 24cqh, 34px) * var(--widget-font-scale)); font-weight: 700; line-height: 1.15;

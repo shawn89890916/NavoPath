@@ -1,19 +1,61 @@
 import React, { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
-import type { WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerPreferences } from "../types";
+import type { WidgetAction, WidgetBounds, WidgetSnapshot, WidgetTimerMode, WidgetTimerPreferences } from "../types";
 import {
   DEFAULT_WIDGET_APPEARANCE,
   getWidgetDensity,
   hexToRgbTriplet,
   migrateLegacyWidgetAppearance,
   normalizeWidgetAppearance,
-  restoreStoredWidgetBounds,
   type WidgetDensity,
 } from "./widgetPreferences";
 import { DEFAULT_WIDGET_TIMER_PREFERENCES } from "./widgetTimer";
 import "./widget.css";
 
-const WIDGET_BOUNDS_KEY = "navopath-widget-bounds";
 const LEGACY_WIDGET_PREFS_KEY = "navopath-widget-prefs";
+const WIDGET_MIN_WIDTH = 128;
+const WIDGET_MIN_HEIGHT = 56;
+const WIDGET_MAX_WIDTH = 860;
+const WINDOW_MARGIN = 6;
+
+export type WidgetResizeDirection = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
+
+const WIDGET_RESIZE_DIRECTIONS: WidgetResizeDirection[] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
+
+export function getWidgetResizeDirection(point: { x: number; y: number }, bounds: WidgetBounds, handleSize: number): WidgetResizeDirection | null {
+  const west = point.x <= bounds.x + handleSize;
+  const east = point.x >= bounds.x + bounds.width - handleSize;
+  const north = point.y <= bounds.y + handleSize;
+  const south = point.y >= bounds.y + bounds.height - handleSize;
+  if (north && west) return "nw";
+  if (north && east) return "ne";
+  if (south && east) return "se";
+  if (south && west) return "sw";
+  if (north) return "n";
+  if (east) return "e";
+  if (south) return "s";
+  if (west) return "w";
+  return null;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function resizeWidgetBounds(initial: WidgetBounds, direction: WidgetResizeDirection, delta: { x: number; y: number }, workArea: WidgetBounds): WidgetBounds {
+  const maxWidth = Math.min(WIDGET_MAX_WIDTH, Math.max(WIDGET_MIN_WIDTH, workArea.width - WINDOW_MARGIN * 2));
+  const maxHeight = Math.min(Math.max(320, Math.round(workArea.height * 0.7)), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
+  const right = initial.x + initial.width;
+  const bottom = initial.y + initial.height;
+  let left = initial.x;
+  let top = initial.y;
+  let nextRight = right;
+  let nextBottom = bottom;
+  if (direction.includes("w")) left = clamp(initial.x + delta.x, Math.max(workArea.x, right - maxWidth), right - WIDGET_MIN_WIDTH);
+  if (direction.includes("e")) nextRight = clamp(right + delta.x, left + WIDGET_MIN_WIDTH, Math.min(workArea.x + workArea.width - WINDOW_MARGIN, left + maxWidth));
+  if (direction.includes("n")) top = clamp(initial.y + delta.y, Math.max(workArea.y, bottom - maxHeight), bottom - WIDGET_MIN_HEIGHT);
+  if (direction.includes("s")) nextBottom = clamp(bottom + delta.y, top + WIDGET_MIN_HEIGHT, Math.min(workArea.y + workArea.height - WINDOW_MARGIN, top + maxHeight));
+  return { x: Math.round(left), y: Math.round(top), width: Math.round(nextRight - left), height: Math.round(nextBottom - top) };
+}
 
 type WidgetApiWithPopover = NonNullable<NonNullable<Window["desktopApi"]>["widget"]>;
 
@@ -69,9 +111,36 @@ interface WidgetViewProps {
   onTogglePopover: () => void;
   onCloseWidget: () => void;
   onMove: (deltaX: number, deltaY: number) => void;
+  onResize: (direction: WidgetResizeDirection, deltaX: number, deltaY: number) => void;
 }
 
-export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, onCloseWidget, onMove }: WidgetViewProps) {
+function WidgetResizeHandles({ onResize }: { onResize: WidgetViewProps["onResize"] }) {
+  const beginResize = (event: ReactPointerEvent<HTMLDivElement>, direction: WidgetResizeDirection) => {
+    event.preventDefault();
+    const handle = event.currentTarget;
+    let lastX = event.screenX;
+    let lastY = event.screenY;
+    handle.setPointerCapture(event.pointerId);
+    const onMove = (moveEvent: PointerEvent) => {
+      onResize(direction, moveEvent.screenX - lastX, moveEvent.screenY - lastY);
+      lastX = moveEvent.screenX;
+      lastY = moveEvent.screenY;
+    };
+    const finish = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  };
+  return <div className="df-widget-resize-layer" aria-hidden="true">
+    {WIDGET_RESIZE_DIRECTIONS.map((direction) => <div key={direction} className={`df-widget-resize-handle is-${direction}`} onPointerDown={(event) => beginResize(event, direction)} />)}
+  </div>;
+}
+
+export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, onCloseWidget, onMove, onResize }: WidgetViewProps) {
   const zh = snapshot.lang === "zh";
   const pointer = useRef<{ startX: number; startY: number; lastX: number; lastY: number; dragged: boolean } | null>(null);
   const suppressNextClick = useRef(false);
@@ -116,6 +185,7 @@ export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, 
           <button type="button" className="df-widget-icon-btn df-widget-more-btn" aria-label={zh ? "更多" : "More"} aria-haspopup="dialog" onClick={onTogglePopover} />
         ))}
       </section>
+      <WidgetResizeHandles onResize={onResize} />
     </main>
   );
 }
@@ -220,7 +290,7 @@ export function WidgetApp() {
   const { snapshot, send } = useWidgetSnapshot();
   const [density, setDensity] = useState<WidgetDensity>(() => getWidgetDensity(window.innerWidth));
   const [nativePopoverOpen, setNativePopoverOpen] = useState<boolean | null>(null);
-  const moveQueueRef = useRef(Promise.resolve());
+  const geometryQueueRef = useRef(Promise.resolve());
   useEffect(() => {
     const update = () => setDensity(getWidgetDensity(window.innerWidth));
     window.addEventListener("resize", update);
@@ -230,26 +300,24 @@ export function WidgetApp() {
     const unsubscribe = getWidgetApi()?.onPopoverState?.(setNativePopoverOpen);
     return unsubscribe;
   }, []);
-  useEffect(() => {
-    const api = getWidgetApi();
-    if (!api) return;
-    try {
-      const restored = restoreStoredWidgetBounds(localStorage.getItem(WIDGET_BOUNDS_KEY));
-      if (restored) void api.setBounds(restored);
-    } catch { /* storage can be unavailable */ }
-    const poller = window.setInterval(() => void api.getBounds().then((bounds) => bounds && localStorage.setItem(WIDGET_BOUNDS_KEY, JSON.stringify(bounds))), 1200);
-    return () => window.clearInterval(poller);
-  }, []);
   const move = (deltaX: number, deltaY: number) => {
     const api = getWidgetApi();
     if (!api) return;
-    moveQueueRef.current = moveQueueRef.current.then(async () => {
+    geometryQueueRef.current = geometryQueueRef.current.then(async () => {
       const bounds = await api.getBounds();
       if (bounds) await api.setBounds({ x: bounds.x + deltaX, y: bounds.y + deltaY });
     });
   };
+  const resize = (direction: WidgetResizeDirection, deltaX: number, deltaY: number) => {
+    const api = getWidgetApi();
+    if (!api) return;
+    geometryQueueRef.current = geometryQueueRef.current.then(async () => {
+      const [bounds, workArea] = await Promise.all([api.getBounds(), api.getWorkArea()]);
+      if (bounds) await api.setBounds(resizeWidgetBounds(bounds, direction, { x: deltaX, y: deltaY }, workArea));
+    });
+  };
   const renderedSnapshot = nativePopoverOpen === null ? snapshot : withPopoverState(snapshot, nativePopoverOpen);
-  return <WidgetView snapshot={renderedSnapshot} density={density} onToggleTimer={() => send({ type: "toggleWidgetTimer" })} onTogglePopover={() => { void getWidgetApi()?.togglePopover(); }} onCloseWidget={() => { void getWidgetApi()?.close(); }} onMove={move} />;
+  return <WidgetView snapshot={renderedSnapshot} density={density} onToggleTimer={() => send({ type: "toggleWidgetTimer" })} onTogglePopover={() => { void getWidgetApi()?.togglePopover(); }} onCloseWidget={() => { void getWidgetApi()?.close(); }} onMove={move} onResize={resize} />;
 }
 
 export function WidgetPopoverApp() {

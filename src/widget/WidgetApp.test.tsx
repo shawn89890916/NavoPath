@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, opacityAction, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { WidgetPopoverView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -31,8 +31,31 @@ const snapshot: WidgetSnapshot = {
 };
 
 describe("WidgetView", () => {
+  it("identifies all eight handles and keeps the opposite edge stable", () => {
+    const bounds = { x: 0, y: 0, width: 400, height: 80 };
+    const workArea = { x: 0, y: 0, width: 1280, height: 720 };
+    expect(getWidgetResizeDirection({ x: 0, y: 0 }, bounds, 8)).toBe("nw");
+    expect(getWidgetResizeDirection({ x: 399, y: 0 }, bounds, 8)).toBe("ne");
+    expect(getWidgetResizeDirection({ x: 399, y: 40 }, bounds, 8)).toBe("e");
+    expect(getWidgetResizeDirection({ x: 399, y: 79 }, bounds, 8)).toBe("se");
+    expect(getWidgetResizeDirection({ x: 200, y: 79 }, bounds, 8)).toBe("s");
+    expect(getWidgetResizeDirection({ x: 0, y: 79 }, bounds, 8)).toBe("sw");
+    expect(getWidgetResizeDirection({ x: 0, y: 40 }, bounds, 8)).toBe("w");
+    expect(getWidgetResizeDirection({ x: 200, y: 0 }, bounds, 8)).toBe("n");
+    expect(resizeWidgetBounds({ x: 100, y: 100, width: 400, height: 80 }, "w", { x: 30, y: 0 }, workArea)).toMatchObject({ x: 130, width: 370 });
+    expect(resizeWidgetBounds({ x: 100, y: 100, width: 128, height: 80 }, "w", { x: 30, y: 0 }, workArea)).toMatchObject({ x: 100, width: 128 });
+  });
+
+  it("renders eight no-drag resize handles without a localStorage bounds loop", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+    for (const direction of ["n", "ne", "e", "se", "s", "sw", "w", "nw"]) expect(html).toContain(`df-widget-resize-handle is-${direction}`);
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    expect(source).not.toContain("navopath-widget-bounds");
+    expect(source).not.toContain("restoreStoredWidgetBounds");
+  });
+
   it("renders only task, timer, and More at full density", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} />);
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain(snapshot.taskTitle);
     expect(html).toContain("2:05");
     expect(html).toContain('aria-label="More"');
@@ -42,14 +65,14 @@ describe("WidgetView", () => {
   });
 
   it("renders only the timer at time-only density", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="timerOnly" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} />);
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="timerOnly" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain("2:05");
     expect(html).not.toContain(snapshot.taskTitle);
     expect(html).not.toContain('aria-label="More"');
   });
 
   it("uses the active theme, overrun phase, and red close-widget affordance", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={{ ...snapshot, theme: "dark", timerPhase: "overrun", popoverOpen: true }} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} />);
+    const html = renderToStaticMarkup(<WidgetView snapshot={{ ...snapshot, theme: "dark", timerPhase: "overrun", popoverOpen: true }} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain('data-theme="dark"');
     expect(html).toContain('data-phase="overrun"');
     expect(html).toContain('aria-label="Close widget"');

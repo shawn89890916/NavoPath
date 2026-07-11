@@ -56,7 +56,7 @@ function makeDeps() {
   };
 }
 
-test("creates a reusable resizable widget window and registers IPC", async () => {
+test("opens and resets the widget at the compact 400 by 80 default", async () => {
   const { deps, windows, handlers } = makeDeps();
   const service = createWidgetWindowService(deps);
   service.registerIpc();
@@ -66,8 +66,8 @@ test("creates a reusable resizable widget window and registers IPC", async () =>
 
   assert.equal(first, second);
   assert.equal(windows.length, 1);
-  assert.equal(first.options.width, 500);
-  assert.equal(first.options.height, 88);
+  assert.equal(first.options.width, 400);
+  assert.equal(first.options.height, 80);
   assert.equal(first.options.resizable, true);
   assert.equal(first.options.thickFrame, true);
   assert.equal(first.options.minWidth, 128);
@@ -76,6 +76,9 @@ test("creates a reusable resizable widget window and registers IPC", async () =>
   assert.equal(first.options.maxHeight, 504);
   assert.ok(handlers.has("widget:set-bounds"));
   assert.ok(handlers.has("widget:get-bounds"));
+
+  await handlers.get("widget:set-bounds")(null, { width: 128, height: 56 });
+  assert.deepEqual(first.getBounds(), { x: 80, y: 80, width: 128, height: 56 });
 });
 
 test("clamps requested bounds to the current display", async () => {
@@ -97,7 +100,7 @@ test("rejects invalid requested bounds without corrupting the window", async () 
 
   await handlers.get("widget:set-bounds")(null, { x: "bad", width: Number.NaN });
 
-  assert.deepEqual(win.getBounds(), { x: 80, y: 80, width: 500, height: 88 });
+  assert.deepEqual(win.getBounds(), { x: 80, y: 80, width: 400, height: 80 });
 });
 
 test("positions the popover below the widget when it fits", () => {
@@ -200,9 +203,9 @@ test("toggles a separate fixed-size popover without changing widget bounds", asy
   assert.equal(windows[1].options.width, 332);
   assert.equal(windows[1].options.height, 420);
   assert.equal(windows[1].options.resizable, false);
-  assert.deepEqual(windows[0].getBounds(), { x: 80, y: 80, width: 500, height: 88 });
+  assert.deepEqual(windows[0].getBounds(), { x: 80, y: 80, width: 400, height: 80 });
   assert.deepEqual(windows[1].loaded.options.query, { widgetPopover: "1" });
-  assert.deepEqual(windows[1].getBounds(), { x: 248, y: 174, width: 332, height: 420 });
+  assert.deepEqual(windows[1].getBounds(), { x: 148, y: 166, width: 332, height: 420 });
   windows[1].emit("ready-to-show");
   assert.equal(windows[1].shown, true);
   assert.equal(windows[1].focused, true);
