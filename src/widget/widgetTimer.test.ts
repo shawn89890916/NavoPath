@@ -10,6 +10,8 @@ import {
   createWidgetTimerRuntime,
   getWidgetTimerNotificationDescriptor,
   getWidgetTimerSnapshotDisplaySeconds,
+  getStopwatchTaskTimerAction,
+  getWidgetTimerModeChangeTaskAction,
   normalizeWidgetTimerRuntime,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerMode,
@@ -81,6 +83,27 @@ describe("widget wall-clock timer", () => {
 
   it("projects stopwatch display from the existing task timer base", () => {
     expect(getWidgetTimerSnapshotDisplaySeconds("stopwatch", 999, 42, true, 10_000, 13_900)).toBe(45);
+  });
+
+  it("pauses a stopwatch from the true running task timer and captures wall-clock time", () => {
+    expect(getStopwatchTaskTimerAction("task-1", 42, 10_000, 13_900)).toEqual({
+      type: "pause",
+      elapsedSeconds: 45,
+    });
+  });
+
+  it("resumes a stopwatch from the true paused task timer", () => {
+    expect(getStopwatchTaskTimerAction("task-1", 45, null, 13_900)).toEqual({
+      type: "resume",
+      elapsedSeconds: 45,
+    });
+  });
+
+  it("captures a truly running stopwatch before a mode reset even when widget runtime is stale", () => {
+    expect(getWidgetTimerModeChangeTaskAction("stopwatch", "task-1", 42, 10_000, 13_900)).toEqual({
+      type: "pause",
+      elapsedSeconds: 45,
+    });
   });
 
   it("normalizes an inconsistent persisted runtime against preferences", () => {

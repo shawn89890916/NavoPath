@@ -72,6 +72,8 @@ import {
   createWidgetTimerModeTransition,
   createWidgetTimerRuntime,
   getWidgetTimerNotificationDescriptor,
+  getStopwatchTaskTimerAction,
+  getWidgetTimerModeChangeTaskAction,
   getWidgetTimerSnapshotDisplaySeconds,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerRuntime,
@@ -1800,9 +1802,9 @@ function App() {
     setTimerStartedAt(now);
   }, []);
 
-  const pauseTimer = useCallback(() => {
+  const pauseTimerAt = useCallback((now: number) => {
     if (timerStartedAtRef.current !== null) {
-      const elapsed = advanceTaskElapsedSeconds(timerElapsedBaseRef.current, timerStartedAtRef.current, Date.now());
+      const elapsed = advanceTaskElapsedSeconds(timerElapsedBaseRef.current, timerStartedAtRef.current, now);
       timerElapsedRef.current = elapsed;
       timerElapsedBaseRef.current = elapsed;
       setTimerElapsed(elapsed);
@@ -1811,6 +1813,8 @@ function App() {
     setTimerRunning(false);
     setTimerStartedAt(null);
   }, []);
+
+  const pauseTimer = useCallback(() => pauseTimerAt(Date.now()), [pauseTimerAt]);
 
   const resumeTimer = useCallback(() => {
     const now = Date.now();
@@ -4148,13 +4152,20 @@ function App() {
         });
         break;
       case "setTimerMode": {
-        if (widgetTimerRuntime.running && widgetTimerRuntime.mode !== "stopwatch") advanceWidgetTimerNow();
-        else if (widgetTimerRuntime.running) pauseTimer();
+        const now = Date.now();
+        const taskAction = getWidgetTimerModeChangeTaskAction(
+          widgetTimerPreferences.mode,
+          timerTaskRef.current,
+          timerElapsedBaseRef.current,
+          timerStartedAtRef.current,
+          now,
+        );
+        if (taskAction?.type === "pause") pauseTimerAt(now);
+        else if (widgetTimerRuntime.running && widgetTimerRuntime.mode !== "stopwatch") advanceWidgetTimerNow();
         widgetManagesTaskTimerRef.current = false;
         timerStartedAtRef.current = null;
         setTimerRunning(false);
         setTimerStartedAt(null);
-        const now = Date.now();
         const { preferences, runtime } = createWidgetTimerModeTransition(action.mode, widgetTimerPreferences, now);
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
@@ -4171,9 +4182,27 @@ function App() {
       case "toggleWidgetTimer": {
         const now = Date.now();
         const current = widgetTimerRuntimeRef.current;
+        if (current.mode === "stopwatch") {
+          const taskAction = getStopwatchTaskTimerAction(
+            timerTaskRef.current,
+            timerElapsedBaseRef.current,
+            timerStartedAtRef.current,
+            now,
+          );
+          if (taskAction.type === "pause") pauseTimerAt(now);
+          else if (taskAction.type === "resume") resumeTimer();
+          else if (headerTask) startTimer(headerTask.id);
+          const running = taskAction.type !== "pause" && (Boolean(timerTaskRef.current) || Boolean(headerTask));
+          const runtime = { ...current, running, ...(running ? {} : { pausedAt: now }) };
+          if (running) delete runtime.pausedAt;
+          widgetManagesTaskTimerRef.current = false;
+          widgetTimerAdvancedAtRef.current = now;
+          widgetTimerRuntimeRef.current = runtime;
+          setWidgetTimerRuntime(runtime);
+          break;
+        }
         if (current.running) {
-          if (current.mode === "stopwatch") pauseTimer();
-          else advanceWidgetTimerNow();
+          advanceWidgetTimerNow();
           const advanced = widgetTimerRuntimeRef.current;
           const runtime = { ...advanced, running: false, pausedAt: now };
           widgetManagesTaskTimerRef.current = false;
@@ -4188,19 +4217,13 @@ function App() {
           widgetTimerAdvancedAtRef.current = now;
           widgetTimerRuntimeRef.current = runtime;
           setWidgetTimerRuntime(runtime);
-          if (current.mode === "stopwatch") {
-            widgetManagesTaskTimerRef.current = false;
-            if (timerTaskRef.current) resumeTimer();
-            else if (headerTask) startTimer(headerTask.id);
-          } else {
-            widgetManagesTaskTimerRef.current = true;
-            if (!timerTaskRef.current && headerTask) startTimer(headerTask.id);
-            const countsAsWork = countsWidgetTimerPhaseAsWork(current.phase);
-            timerElapsedBaseRef.current = timerElapsedRef.current;
-            timerStartedAtRef.current = countsAsWork ? now : null;
-            setTimerRunning(Boolean(timerTaskRef.current) && countsAsWork);
-            setTimerStartedAt(Boolean(timerTaskRef.current) && countsAsWork ? now : null);
-          }
+          widgetManagesTaskTimerRef.current = true;
+          if (!timerTaskRef.current && headerTask) startTimer(headerTask.id);
+          const countsAsWork = countsWidgetTimerPhaseAsWork(current.phase);
+          timerElapsedBaseRef.current = timerElapsedRef.current;
+          timerStartedAtRef.current = countsAsWork ? now : null;
+          setTimerRunning(Boolean(timerTaskRef.current) && countsAsWork);
+          setTimerStartedAt(Boolean(timerTaskRef.current) && countsAsWork ? now : null);
         }
         break;
       }

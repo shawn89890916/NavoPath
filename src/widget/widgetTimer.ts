@@ -18,6 +18,36 @@ export function advanceTaskElapsedSeconds(baseSeconds: number, startedAt: number
   return Math.max(0, Math.floor(baseSeconds + Math.max(0, now - startedAt) / 1_000));
 }
 
+export type StopwatchTaskTimerAction = {
+  type: "start" | "resume" | "pause";
+  elapsedSeconds: number;
+};
+
+export function getStopwatchTaskTimerAction(
+  taskId: string | null,
+  elapsedBaseSeconds: number,
+  startedAt: number | null,
+  now: number,
+): StopwatchTaskTimerAction {
+  if (!taskId) return { type: "start", elapsedSeconds: 0 };
+  if (startedAt === null) return { type: "resume", elapsedSeconds: Math.max(0, Math.floor(elapsedBaseSeconds)) };
+  return {
+    type: "pause",
+    elapsedSeconds: advanceTaskElapsedSeconds(elapsedBaseSeconds, startedAt, now),
+  };
+}
+
+export function getWidgetTimerModeChangeTaskAction(
+  currentMode: WidgetTimerMode,
+  taskId: string | null,
+  elapsedBaseSeconds: number,
+  startedAt: number | null,
+  now: number,
+): StopwatchTaskTimerAction | null {
+  if (currentMode !== "stopwatch" || startedAt === null) return null;
+  return getStopwatchTaskTimerAction(taskId, elapsedBaseSeconds, startedAt, now);
+}
+
 export function normalizeWidgetTimerMode(value: unknown, fallback: WidgetTimerMode): WidgetTimerMode {
   return value === "stopwatch" || value === "pomodoro" || value === "countdown" ? value : fallback;
 }
