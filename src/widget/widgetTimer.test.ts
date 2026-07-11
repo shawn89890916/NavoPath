@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_WIDGET_TIMER_PREFERENCES,
   advanceTaskElapsedSeconds,
@@ -23,6 +24,13 @@ import {
 import type { Task } from "../types";
 
 describe("widget timer preferences", () => {
+  it("routes detailed settings timer Save and Reset through shared widget actions", () => {
+    const mainSource = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
+    expect(mainSource).toContain('onWidgetAction({ type: "saveTimerSettings", draft: widgetTimerDraft })');
+    expect(mainSource).toContain('onWidgetAction({ type: "resetWidgetTimer", draft: widgetTimerDraft })');
+    expect(mainSource).toContain('onClick={() => setWidgetTimerDraft(widgetTimerSettings)}');
+  });
+
   it("uses the user-entered duration to schedule the active task from now", () => {
     const task = { id: "task-1" } as Task;
     const result = scheduleWidgetCountdown(task, new Date("2026-07-11T10:15:00"), 45);

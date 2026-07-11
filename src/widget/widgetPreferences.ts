@@ -3,8 +3,8 @@ import type { WidgetAppearance, WidgetBounds, WidgetThemeColors } from "../types
 export const WIDGET_APPEARANCE_VERSION = 2;
 export const WIDGET_MIN_WIDTH = 360;
 export const WIDGET_MAX_WIDTH = 860;
-export const WIDGET_MIN_HEIGHT = 84;
-export const WIDGET_DEFAULT_BOUNDS = { width: 500, height: 88 } as const;
+export const WIDGET_MIN_HEIGHT = 80;
+export const WIDGET_DEFAULT_BOUNDS = { width: 400, height: 80 } as const;
 const WINDOW_MARGIN = 6;
 
 export const DEFAULT_WIDGET_APPEARANCE: WidgetAppearance = {

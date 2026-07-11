@@ -89,7 +89,7 @@ describe("widget geometry", () => {
       x: 414,
       y: 0,
       width: 860,
-      height: 84,
+      height: 80,
     });
   });
 
@@ -97,8 +97,8 @@ describe("widget geometry", () => {
     expect(clampWidgetBounds({ x: Number.NaN, y: Number.NaN, width: Number.NaN, height: Number.NaN }, workArea)).toEqual({
       x: 0,
       y: 0,
-      width: 500,
-      height: 88,
+      width: 400,
+      height: 80,
     });
   });
 

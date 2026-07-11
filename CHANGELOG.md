@@ -8,6 +8,7 @@
 ### 改进
 - 小组件可从任意原生边缘自由缩放，横向收窄时依次精简为“时间与更多”和仅时间，纵向拉伸则平滑放大文字；独立“更多”面板保持简洁，并会根据屏幕边缘自动翻转、钳制或滚动，避免被桌面边缘遮挡。
 - 小组件边缘现显示八向缩放光标，默认与重置尺寸统一为紧凑的 400 × 80，便于快速定位与调整。
+- 倒计时现在以当前任务截止日为目标；没有截止日时需要先安排任务。详细设置与“更多”共用草稿式保存和重置，置顶与阴影也可独立切换。
 
 ## 2026-07-11 · Adaptive desktop widget timer
 
@@ -17,6 +18,7 @@
 ### Improved
 - The widget freely resizes from every native edge, progressively simplifies to timer plus More and then timer-only as it narrows, and smoothly scales its type when made taller; the separate compact More panel flips, clamps, or scrolls around screen edges so it is never obscured by the desktop boundary.
 - Eight directional resize cursors now make each widget edge visible, while the compact 400 × 80 geometry is used consistently for both defaults and resets.
+- Countdown now targets the current task's deadline; tasks without one must be scheduled first. Detailed settings and More share draft-based Save and Reset actions, while always-on-top and shadow can be toggled independently.
 
 ## 2026-07-10 · 桌面小组件交互与响应式重构
 
