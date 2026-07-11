@@ -1,5 +1,6 @@
 import type { Settings } from "./types";
 import { DEFAULT_WIDGET_APPEARANCE } from "./widget/widgetPreferences";
+import { DEFAULT_WIDGET_TIMER_PREFERENCES } from "./widget/widgetTimer";
 
 /**
  * Canonical NavoPath default settings.
@@ -72,6 +73,7 @@ export const defaultSettings: Settings = {
   widgetAlwaysOnTop: true,
   widgetOpenOnLaunch: false,
   widgetAppearance: { ...DEFAULT_WIDGET_APPEARANCE },
+  widgetTimerPreferences: { ...DEFAULT_WIDGET_TIMER_PREFERENCES },
   widgetAppearanceMigrated: false,
 };
 
@@ -83,6 +85,11 @@ export function getDefaultSettings(): Settings {
   return {
     ...defaultSettings,
     panelWidths: { ...defaultSettings.panelWidths },
-    widgetAppearance: { ...DEFAULT_WIDGET_APPEARANCE },
+    widgetAppearance: {
+      ...DEFAULT_WIDGET_APPEARANCE,
+      light: { ...DEFAULT_WIDGET_APPEARANCE.light },
+      dark: { ...DEFAULT_WIDGET_APPEARANCE.dark },
+    },
+    widgetTimerPreferences: { ...DEFAULT_WIDGET_TIMER_PREFERENCES },
   };
 }

@@ -12,16 +12,31 @@ import {
 describe("widget appearance", () => {
   it("normalizes invalid persisted appearance values", () => {
     expect(normalizeWidgetAppearance({
-      backgroundColor: "lime",
-      fontColor: "#123456",
-      accentColor: "#abcdef",
+      light: {
+        backgroundColor: "lime",
+        fontColor: "#123456",
+        timerColor: "#abcdef",
+        overrunColor: "invalid",
+      },
+      dark: { ...DEFAULT_WIDGET_APPEARANCE.dark, backgroundColor: "#010203" },
       opacity: 4,
+      fontFamily: "",
+      fontScale: 5,
+      shadowEnabled: "yes" as never,
       version: 99,
     })).toEqual({
       ...DEFAULT_WIDGET_APPEARANCE,
-      fontColor: "#123456",
-      accentColor: "#ABCDEF",
+      light: {
+        ...DEFAULT_WIDGET_APPEARANCE.light,
+        fontColor: "#123456",
+        timerColor: "#ABCDEF",
+      },
+      dark: {
+        ...DEFAULT_WIDGET_APPEARANCE.dark,
+        backgroundColor: "#010203",
+      },
       opacity: 1,
+      fontScale: 2,
       version: WIDGET_APPEARANCE_VERSION,
     });
     expect(normalizeWidgetAppearance({ opacity: -2 })).toEqual({
@@ -44,9 +59,13 @@ describe("widget appearance", () => {
     });
 
     expect(migrateLegacyWidgetAppearance(legacy, 0)).toEqual({
-      backgroundColor: "#EEE9DF",
-      fontColor: "#27231E",
-      accentColor: "#7EA172",
+      ...DEFAULT_WIDGET_APPEARANCE,
+      light: {
+        backgroundColor: "#EEE9DF",
+        fontColor: "#27231E",
+        timerColor: "#7EA172",
+        overrunColor: DEFAULT_WIDGET_APPEARANCE.light.overrunColor,
+      },
       opacity: 0.72,
       version: WIDGET_APPEARANCE_VERSION,
     });

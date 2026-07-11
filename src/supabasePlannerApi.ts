@@ -1,6 +1,8 @@
 import { createClient, type User } from "@supabase/supabase-js";
 import type { AiAction, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
 import { fallbackData, normalizeData } from "./browserFallback";
+import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
+import { DEFAULT_WIDGET_TIMER_PREFERENCES, normalizeWidgetTimerPreferences } from "./widget/widgetTimer";
 
 const PROFILE_TABLE = "dayflow_profiles";
 
@@ -78,7 +80,8 @@ const defaultSettings: Settings = {
   featureWidgetEnabled: true,
   widgetAlwaysOnTop: true,
   widgetOpenOnLaunch: false,
-  widgetAppearance: { backgroundColor: "#FBF9FF", fontColor: "#27231E", accentColor: "#27231E", opacity: 0.96, version: 1 },
+  widgetAppearance: DEFAULT_WIDGET_APPEARANCE,
+  widgetTimerPreferences: DEFAULT_WIDGET_TIMER_PREFERENCES,
   widgetAppearanceMigrated: false,
 };
 
@@ -96,6 +99,8 @@ function mergeSettings(settings: unknown): Settings {
   if (typeof stored.syncIntervalMinutes !== "number" || !Number.isFinite(stored.syncIntervalMinutes) || stored.syncIntervalMinutes < 0) {
     stored.syncIntervalMinutes = 60;
   }
+  stored.widgetAppearance = normalizeWidgetAppearance(stored.widgetAppearance);
+  stored.widgetTimerPreferences = normalizeWidgetTimerPreferences(stored.widgetTimerPreferences);
   return { ...defaultSettings, ...stored };
 }
 

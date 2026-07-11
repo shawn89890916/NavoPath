@@ -286,11 +286,48 @@ export interface PlannerData {
 
 export type Language = "en" | "zh";
 
-export interface WidgetAppearance {
+export type WidgetTimerMode = "stopwatch" | "pomodoro" | "countdown";
+export type WidgetTimerPhase = "stopwatch" | "focus" | "break" | "countdown" | "overrun";
+
+export interface WidgetTimerPreferences {
+  mode: WidgetTimerMode;
+  focusMinutes: number;
+  breakMinutes: number;
+  rounds: number;
+  countdownSeconds: number;
+}
+
+export interface WidgetTimerRuntime {
+  mode: WidgetTimerMode;
+  phase: WidgetTimerPhase;
+  running: boolean;
+  round: number;
+  phaseStartedAt: number;
+  phaseEndsAt?: number;
+  pausedAt?: number;
+}
+
+export interface WidgetTimerTick {
+  runtime: WidgetTimerRuntime;
+  displaySeconds: number;
+  transitions: Array<"focusComplete" | "breakComplete" | "countdownComplete">;
+  countsAsWork: boolean;
+}
+
+export interface WidgetThemeColors {
   backgroundColor: string;
   fontColor: string;
-  accentColor: string;
+  timerColor: string;
+  overrunColor: string;
+}
+
+export interface WidgetAppearance {
+  light: WidgetThemeColors;
+  dark: WidgetThemeColors;
   opacity: number;
+  fontFamily: string;
+  fontScale: number;
+  shadowEnabled: boolean;
   version: number;
 }
 
@@ -376,6 +413,7 @@ export interface Settings {
   /** 启动时自动打开小组件。 */
   widgetOpenOnLaunch?: boolean;
   widgetAppearance?: WidgetAppearance;
+  widgetTimerPreferences?: WidgetTimerPreferences;
   widgetAppearanceMigrated?: boolean;
   /** 最近一次成功同步时间（ISO 字符串）。 */
   lastSyncedAt?: string;

@@ -1,4 +1,6 @@
 import type { AiAction, PlannerApi, PlannerData, Settings, Task, TaskRecurrence } from "./types";
+import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
+import { DEFAULT_WIDGET_TIMER_PREFERENCES, normalizeWidgetTimerPreferences } from "./widget/widgetTimer";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
 import { normalizePlannerDataForClient } from "./utils/dataNormalization";
@@ -562,7 +564,8 @@ export function installBrowserFallback() {
     featureWidgetEnabled: true,
     widgetAlwaysOnTop: true,
     widgetOpenOnLaunch: false,
-    widgetAppearance: { backgroundColor: "#FBF9FF", fontColor: "#27231E", accentColor: "#27231E", opacity: 0.96, version: 1 },
+    widgetAppearance: DEFAULT_WIDGET_APPEARANCE,
+    widgetTimerPreferences: DEFAULT_WIDGET_TIMER_PREFERENCES,
     widgetAppearanceMigrated: false,
   };
 
@@ -571,6 +574,8 @@ export function installBrowserFallback() {
     if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
     if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
     const merged: any = { ...defaultSettings, ...stored };
+    merged.widgetAppearance = normalizeWidgetAppearance(stored.widgetAppearance);
+    merged.widgetTimerPreferences = normalizeWidgetTimerPreferences(stored.widgetTimerPreferences);
     if (merged.model === "deepseek-v4-flash" || merged.model === "deepseek-chat" || /^deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(merged.model || "")) merged.model = "deepseek-ai/DeepSeek-V3.2";
     if (!merged.baseUrl || merged.baseUrl === "https://api.deepseek.com/chat/completions") merged.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
     if (merged._apiKey && !merged.hasApiKey) {
