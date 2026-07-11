@@ -23,10 +23,11 @@ controls stay small and timer configuration is an explicit edit-and-save flow.
 ## Countdown behavior
 
 - Stopwatch remains a normal elapsed task timer.
-- Countdown defaults to the active task's associated project deadline.
-- A deadline target is the project deadline at the end of its local day unless
-  the project stores a more precise deadline time.
-- If the current task has no project deadline, the timer settings show the
+- Countdown defaults to the active task's due date.
+- A date-only task deadline is interpreted as the end of that local calendar
+  day. A precise task deadline time, when the task model later provides one,
+  takes precedence.
+- If the current task has no due date, the timer settings show the
   actionable empty state: "Please schedule it on the timeline first" /
   "请先安排到时间轴才能计时".
 - The empty-state action "Schedule for now" / "安排到现在" opens a short
@@ -56,9 +57,10 @@ controls stay small and timer configuration is an explicit edit-and-save flow.
 
 ## Data and window contracts
 
-- Extend timer preferences/runtime with a normalized optional absolute
-  `countdownTargetAt` timestamp. Retain `countdownSeconds` only as the duration
-  chosen for user-entered timeline scheduling and fallback migration.
+- Extend timer runtime with a normalized optional absolute
+  `countdownTargetAt` timestamp and target task ID. Retain
+  `countdownSeconds` as the user-entered timeline-scheduling duration and as
+  the fallback migration value.
 - Calculate the displayed countdown against `countdownTargetAt` when present.
   Existing saved countdown preferences migrate to a paused duration-based
   countdown without silently creating a deadline target.
