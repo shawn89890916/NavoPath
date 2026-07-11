@@ -158,6 +158,29 @@ describe("widget wall-clock timer", () => {
     });
   });
 
+  it("drops a legacy duration countdown endpoint that has no absolute target", () => {
+    expect(normalizeWidgetTimerRuntime({
+      mode: "countdown",
+      phase: "countdown",
+      running: false,
+      round: 1,
+      phaseStartedAt: 1_000,
+      phaseEndsAt: 60_000,
+    }, { ...prefs, mode: "countdown" }, 2_000)).toMatchObject({
+      mode: "countdown",
+      phase: "countdown",
+      running: false,
+    });
+    expect(normalizeWidgetTimerRuntime({
+      mode: "countdown",
+      phase: "countdown",
+      running: false,
+      round: 1,
+      phaseStartedAt: 1_000,
+      phaseEndsAt: 60_000,
+    }, { ...prefs, mode: "countdown" }, 2_000)).not.toHaveProperty("phaseEndsAt");
+  });
+
   it("coerces an invalid IPC timer mode to the current mode", () => {
     expect(normalizeWidgetTimerMode("invalid", "pomodoro")).toBe("pomodoro");
   });

@@ -187,9 +187,6 @@ export function normalizeWidgetTimerRuntime(
       runtime.countdownTargetAt = value!.countdownTargetAt!;
       if (typeof value?.countdownTaskId === "string") runtime.countdownTaskId = value.countdownTaskId;
       if (phase === "countdown") runtime.phaseEndsAt = runtime.countdownTargetAt;
-    } else if (phase === "countdown" && Number.isFinite(value?.phaseEndsAt) && value!.phaseEndsAt! >= phaseStartedAt) {
-      // Preserve legacy duration-based runtimes without inventing a task deadline.
-      runtime.phaseEndsAt = value!.phaseEndsAt!;
     }
   }
   if (!running) {

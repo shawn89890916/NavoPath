@@ -4224,7 +4224,7 @@ function App() {
           widgetTimerRuntimeRef.current = runtime;
           setWidgetTimerRuntime(runtime);
         } else {
-          if (current.mode === "countdown" && current.phaseEndsAt === undefined) break;
+          if (current.mode === "countdown" && current.countdownTargetAt === undefined) break;
           const runtime = { ...current, running: true };
           widgetTimerAdvancedAtRef.current = now;
           widgetTimerRuntimeRef.current = runtime;

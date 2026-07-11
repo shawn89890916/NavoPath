@@ -61,6 +61,11 @@ describe("WidgetView", () => {
     expect(mainSource).not.toContain("Restore 500");
   });
 
+  it("blocks legacy duration countdowns without an absolute task target", () => {
+    const mainSource = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
+    expect(mainSource).toContain('if (current.mode === "countdown" && current.countdownTargetAt === undefined) break;');
+  });
+
   it("renders only task, timer, and More at full density", () => {
     const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain(snapshot.taskTitle);
