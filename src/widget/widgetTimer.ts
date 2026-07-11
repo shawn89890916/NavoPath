@@ -105,6 +105,16 @@ export const DEFAULT_WIDGET_RUNTIME: WidgetTimerRuntime = {
   phaseStartedAt: 0,
 };
 
+function isValidCountdownTarget(value: unknown): value is number {
+  return Number.isFinite(value) && Number(value) > 0;
+}
+
+export function taskDueDateTargetAt(dueDate?: string): number | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate || "")) return undefined;
+  const target = new Date(`${dueDate}T23:59:59.999`);
+  return Number.isFinite(target.getTime()) ? target.getTime() : undefined;
+}
+
 function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= min
@@ -131,13 +141,14 @@ export function createWidgetTimerModeTransition(
   modeValue: unknown,
   currentPreferences: WidgetTimerPreferences,
   now: number,
+  countdownTargetAt?: number,
 ) {
   const mode = normalizeWidgetTimerMode(modeValue, currentPreferences.mode);
   const preferences = normalizeWidgetTimerPreferences({ ...currentPreferences, mode });
   return {
     preferences,
     runtime: {
-      ...createWidgetTimerRuntime(mode, now, preferences),
+      ...createWidgetTimerRuntime(mode, now, preferences, countdownTargetAt),
       running: false,
       pausedAt: now,
     } satisfies WidgetTimerRuntime,
@@ -165,12 +176,21 @@ export function normalizeWidgetTimerRuntime(
   const phaseStartedAt = Number.isFinite(value?.phaseStartedAt) && value!.phaseStartedAt! >= 0
     && value!.phaseStartedAt! <= now ? value!.phaseStartedAt! : now;
   const runtime: WidgetTimerRuntime = { mode, phase, running, round, phaseStartedAt };
-  if (phase === "focus" || phase === "break" || phase === "countdown") {
+  if (phase === "focus" || phase === "break") {
     const fallbackDuration = phase === "focus" ? preferences.focusMinutes * 60_000
-      : phase === "break" ? preferences.breakMinutes * 60_000
-        : preferences.countdownSeconds * 1_000;
+      : preferences.breakMinutes * 60_000;
     runtime.phaseEndsAt = Number.isFinite(value?.phaseEndsAt) && value!.phaseEndsAt! >= phaseStartedAt
       ? value!.phaseEndsAt! : phaseStartedAt + fallbackDuration;
+  }
+  if (mode === "countdown") {
+    if (isValidCountdownTarget(value?.countdownTargetAt)) {
+      runtime.countdownTargetAt = value!.countdownTargetAt!;
+      if (typeof value?.countdownTaskId === "string") runtime.countdownTaskId = value.countdownTaskId;
+      if (phase === "countdown") runtime.phaseEndsAt = runtime.countdownTargetAt;
+    } else if (phase === "countdown" && Number.isFinite(value?.phaseEndsAt) && value!.phaseEndsAt! >= phaseStartedAt) {
+      // Preserve legacy duration-based runtimes without inventing a task deadline.
+      runtime.phaseEndsAt = value!.phaseEndsAt!;
+    }
   }
   if (!running) {
     runtime.pausedAt = Number.isFinite(value?.pausedAt) && value!.pausedAt! >= phaseStartedAt
@@ -237,7 +257,6 @@ export function accumulateWidgetWorkTime(
 function durationMs(runtime: WidgetTimerRuntime, preferences: WidgetTimerPreferences): number | undefined {
   if (runtime.phase === "focus") return preferences.focusMinutes * 60_000;
   if (runtime.phase === "break") return preferences.breakMinutes * 60_000;
-  if (runtime.phase === "countdown") return preferences.countdownSeconds * 1_000;
   return undefined;
 }
 
@@ -245,6 +264,7 @@ export function createWidgetTimerRuntime(
   mode: WidgetTimerMode,
   now: number,
   value: Partial<WidgetTimerPreferences> = DEFAULT_WIDGET_TIMER_PREFERENCES,
+  countdownTargetAt?: number,
 ): WidgetTimerRuntime {
   const preferences = normalizeWidgetTimerPreferences({ ...value, mode });
   const phase = mode === "pomodoro" ? "focus" : mode;
@@ -255,9 +275,23 @@ export function createWidgetTimerRuntime(
     round: 1,
     phaseStartedAt: now,
   };
+  if (mode === "countdown" && isValidCountdownTarget(countdownTargetAt)) {
+    runtime.countdownTargetAt = countdownTargetAt;
+    runtime.phaseEndsAt = countdownTargetAt;
+  }
   const duration = durationMs(runtime, preferences);
   if (duration !== undefined) runtime.phaseEndsAt = now + duration;
   return runtime;
+}
+
+export function resetWidgetTimerRuntime(
+  runtime: WidgetTimerRuntime,
+  preferenceValue: Partial<WidgetTimerPreferences>,
+  now: number,
+): WidgetTimerRuntime {
+  const reset = createWidgetTimerRuntime(runtime.mode, now, preferenceValue, runtime.countdownTargetAt);
+  if (runtime.mode === "countdown" && runtime.countdownTaskId) reset.countdownTaskId = runtime.countdownTaskId;
+  return { ...reset, running: false, pausedAt: now };
 }
 
 export function advanceWidgetTimer(
@@ -274,7 +308,9 @@ export function advanceWidgetTimer(
     else {
       const pauseDuration = Math.max(0, now - runtime.pausedAt);
       runtime.phaseStartedAt += pauseDuration;
-      if (runtime.phaseEndsAt !== undefined) runtime.phaseEndsAt += pauseDuration;
+      if (runtime.phaseEndsAt !== undefined && !isValidCountdownTarget(runtime.countdownTargetAt)) {
+        runtime.phaseEndsAt += pauseDuration;
+      }
       delete runtime.pausedAt;
     }
   }

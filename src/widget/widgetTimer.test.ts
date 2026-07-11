@@ -15,6 +15,8 @@ import {
   normalizeWidgetTimerRuntime,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerMode,
+  resetWidgetTimerRuntime,
+  taskDueDateTargetAt,
 } from "./widgetTimer";
 
 describe("widget timer preferences", () => {
@@ -31,7 +33,6 @@ describe("widget timer preferences", () => {
         running: false,
         round: 1,
         phaseStartedAt: 12_345,
-        phaseEndsAt: 102_345,
         pausedAt: 12_345,
       },
     });
@@ -53,6 +54,39 @@ describe("widget timer preferences", () => {
 
 describe("widget wall-clock timer", () => {
   const prefs = DEFAULT_WIDGET_TIMER_PREFERENCES;
+
+  it("uses the end of the local due-date day as countdown target", () => {
+    const target = taskDueDateTargetAt("2026-07-11");
+    expect(new Date(target!).getHours()).toBe(23);
+    expect(new Date(target!).getMinutes()).toBe(59);
+  });
+
+  it("enters overrun after an absolute countdown target", () => {
+    const runtime = createWidgetTimerRuntime("countdown", 1_000, { ...prefs, mode: "countdown" }, 2_000);
+    expect(advanceWidgetTimer(runtime, prefs, 2_001).runtime.phase).toBe("overrun");
+  });
+
+  it("keeps a paused deadline countdown pinned to its absolute target when resumed", () => {
+    const runtime = createWidgetTimerRuntime("countdown", 1_000, { ...prefs, mode: "countdown" }, 2_000);
+    const paused = { ...runtime, running: false, pausedAt: 1_500 };
+    expect(advanceWidgetTimer({ ...paused, running: true }, prefs, 1_800).runtime.phaseEndsAt).toBe(2_000);
+  });
+
+  it("leaves an unscheduled countdown without a deadline target", () => {
+    const runtime = createWidgetTimerRuntime("countdown", 1_000, { ...prefs, mode: "countdown" });
+    expect(runtime).not.toHaveProperty("countdownTargetAt");
+    expect(runtime).not.toHaveProperty("phaseEndsAt");
+  });
+
+  it("resets a deadline countdown as paused without losing its target", () => {
+    const running = createWidgetTimerRuntime("countdown", 1_000, { ...prefs, mode: "countdown" }, 2_000);
+    expect(resetWidgetTimerRuntime(running, prefs, 1_500)).toMatchObject({
+      running: false,
+      pausedAt: 1_500,
+      countdownTargetAt: 2_000,
+      phaseEndsAt: 2_000,
+    });
+  });
 
   it("advances task elapsed time by wall clock after a delayed tick", () => {
     expect(advanceTaskElapsedSeconds(12, 1_000, 6_750)).toBe(17);
@@ -120,7 +154,6 @@ describe("widget wall-clock timer", () => {
       running: false,
       round: 4,
       phaseStartedAt: 50_000,
-      phaseEndsAt: 110_000,
       pausedAt: 50_000,
     });
   });
@@ -131,7 +164,7 @@ describe("widget wall-clock timer", () => {
 
   it("continues a completed countdown as positive overrun time", () => {
     expect(advanceWidgetTimer(
-      createWidgetTimerRuntime("countdown", 0, { ...prefs, countdownSeconds: 60 }),
+      createWidgetTimerRuntime("countdown", 0, { ...prefs, countdownSeconds: 60 }, 60_000),
       prefs,
       61_000,
     )).toMatchObject({ phase: "overrun", displaySeconds: 1, transitions: ["countdownComplete"] });
@@ -168,7 +201,10 @@ describe("widget wall-clock timer", () => {
   });
 
   it("freezes while paused and shifts timestamps when resumed", () => {
-    const running = createWidgetTimerRuntime("countdown", 0, { ...prefs, countdownSeconds: 60 });
+    const running = {
+      ...createWidgetTimerRuntime("countdown", 0, { ...prefs, countdownSeconds: 60 }),
+      phaseEndsAt: 60_000,
+    };
     const paused = { ...running, running: false, pausedAt: 10_000 };
     expect(advanceWidgetTimer(paused, prefs, 40_000)).toMatchObject({
       phase: "countdown",

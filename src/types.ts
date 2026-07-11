@@ -305,6 +305,8 @@ export interface WidgetTimerRuntime {
   phaseStartedAt: number;
   phaseEndsAt?: number;
   pausedAt?: number;
+  countdownTargetAt?: number;
+  countdownTaskId?: string;
 }
 
 export interface WidgetTimerTick {

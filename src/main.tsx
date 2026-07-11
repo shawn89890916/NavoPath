@@ -77,6 +77,7 @@ import {
   getWidgetTimerSnapshotDisplaySeconds,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerRuntime,
+  taskDueDateTargetAt,
 } from "./widget/widgetTimer";
 import "./styles.css";
 import "./app-redesign.css";
@@ -4166,7 +4167,17 @@ function App() {
         timerStartedAtRef.current = null;
         setTimerRunning(false);
         setTimerStartedAt(null);
-        const { preferences, runtime } = createWidgetTimerModeTransition(action.mode, widgetTimerPreferences, now);
+        const activeTask = timerTask || headerTask;
+        const countdownTargetAt = action.mode === "countdown" ? taskDueDateTargetAt(activeTask?.dueDate) : undefined;
+        const { preferences, runtime: transitionedRuntime } = createWidgetTimerModeTransition(
+          action.mode,
+          widgetTimerPreferences,
+          now,
+          countdownTargetAt,
+        );
+        const runtime = action.mode === "countdown" && activeTask
+          ? { ...transitionedRuntime, countdownTaskId: activeTask.id }
+          : transitionedRuntime;
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
         widgetTimerRuntimeRef.current = runtime;
@@ -4213,6 +4224,7 @@ function App() {
           widgetTimerRuntimeRef.current = runtime;
           setWidgetTimerRuntime(runtime);
         } else {
+          if (current.mode === "countdown" && current.phaseEndsAt === undefined) break;
           const runtime = { ...current, running: true };
           widgetTimerAdvancedAtRef.current = now;
           widgetTimerRuntimeRef.current = runtime;
