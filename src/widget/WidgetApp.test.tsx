@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
+import { Children, isValidElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -28,6 +30,8 @@ const snapshot: WidgetSnapshot = {
   timerPhase: "focus",
   popoverOpen: false,
 };
+
+const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean };
 
 describe("WidgetView", () => {
   it("identifies all eight handles and keeps the opposite edge stable", () => {
@@ -147,10 +151,83 @@ describe("WidgetPopoverView", () => {
     timerRuntime: { mode: "countdown", phase: "countdown", running: false, round: 1, phaseStartedAt: 1, pausedAt: 1 },
   };
 
-  it("keeps timer fields hidden until Timer settings opens", () => {
+  it("renders the compact resting controls without a visible More heading", () => {
     const html = render(countdownWithoutDeadline);
-    expect(html).toContain("Timer settings");
-    expect(html).not.toContain('role="radiogroup"');
+    expect(html).not.toContain(">More<");
+    expect(html).not.toContain("Timer settings");
+    expect(html).toContain('class="df-widget-popover-utilities"');
+    expect(html).toContain('class="df-widget-opacity-row"');
+    expect(html).toContain('class="df-widget-timer-mode-label"');
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain("Stopwatch");
+    expect(html).toContain("Pomodoro");
+    expect(html).toContain("Countdown");
+    expect(html).toContain('aria-label="Close widget"');
+    expect(html).not.toContain('aria-label="Close More"');
+  });
+
+  it("selects a mode through the tab interaction and reveals its inline details state", () => {
+    let selected = snapshot.timerPreferences.mode;
+    const tabs = TimerModeTabs({ lang: "en", mode: selected, onSelect: (mode) => { selected = mode; } });
+    const pomodoro = Children.toArray(tabs.props.children).find((child) => isValidElement<{ "data-mode": string }>(child) && child.props["data-mode"] === "pomodoro") as ReactElement<{ onClick: () => void }>;
+    pomodoro.props.onClick();
+    expect(selected).toBe("pomodoro");
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: selected } }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    expect(html).toContain("Focus");
+    expect(html).toContain("Break");
+    expect(html).toContain("Rounds");
+  });
+
+  it("routes the only close utility to the close-widget callback", () => {
+    let closedWidget = false;
+    const utilities = WidgetPopoverUtilities({ lang: "en", alwaysOnTop: false, onToggleAlwaysOnTop: () => undefined, onCloseWidget: () => { closedWidget = true; } });
+    const buttons = Children.toArray(utilities.props.children).filter(isValidElement) as ReactElement<{ onClick: () => void; "aria-label": string }>[];
+    expect(buttons.map((button) => button.props["aria-label"])).toEqual(["Pin widget", "Close widget"]);
+    buttons[1].props.onClick();
+    expect(closedWidget).toBe(true);
+  });
+
+  const timerSettings = (next: WidgetSnapshot) => <WidgetTimerSettingsView snapshot={next} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />;
+
+  it("preserves unsaved mode, number, and duration edits across equal-preference rerenders", async () => {
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(timerSettings(snapshot)); });
+    await act(async () => { renderer.root.findByProps({ "data-mode": "countdown" }).props.onClick(); });
+    const inputs = renderer.root.findAllByType("input");
+    await act(async () => {
+      inputs[0].props.onChange({ target: { value: "1234" } });
+      inputs[1].props.onChange({ target: { value: "37" } });
+    });
+    await act(async () => { renderer.update(timerSettings({ ...snapshot, elapsedSeconds: 126, timerPreferences: { ...snapshot.timerPreferences } })); });
+    expect(renderer.root.findByProps({ "data-mode": "countdown" }).props["aria-checked"]).toBe(true);
+    expect(renderer.root.findAllByType("input").map((input) => input.props.value)).toEqual([1234, "37"]);
+    await act(async () => { renderer.unmount(); });
+  });
+
+  it("resets the mounted draft when timer preference primitive values change", async () => {
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(timerSettings(snapshot)); });
+    await act(async () => { renderer.root.findByProps({ "data-mode": "countdown" }).props.onClick(); });
+    const changed = { ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" as const, countdownSeconds: 1800 } };
+    await act(async () => { renderer.update(timerSettings(changed)); });
+    expect(renderer.root.findByProps({ "data-mode": "stopwatch" }).props["aria-checked"]).toBe(true);
+    expect(renderer.root.findByProps({ className: "df-widget-no-duration" }).children).toEqual(["No duration"]);
+    await act(async () => { renderer.unmount(); });
+  });
+
+  it("keeps tabs and actions outside the fields-only scrolling region", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={countdownWithoutDeadline} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    const tabs = html.indexOf('class="df-widget-mode-switch"');
+    const detailsOpen = html.indexOf('class="df-widget-mode-details"');
+    const guidance = html.indexOf('class="df-widget-schedule-guidance"');
+    const detailsClose = html.indexOf('</div><div class="df-widget-timer-settings-actions"');
+    const actions = html.indexOf('class="df-widget-timer-settings-actions"');
+    expect(tabs).toBeLessThan(detailsOpen);
+    expect(guidance).toBeGreaterThan(detailsOpen);
+    expect(detailsClose).toBeGreaterThan(guidance);
+    expect(actions).toBeGreaterThan(detailsClose);
   });
 
   it("shows scheduling guidance for a countdown without a task deadline", () => {
@@ -175,7 +252,7 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Break");
     expect(html).toContain("Rounds");
     expect(html).not.toContain("Long break");
-    expect(render(snapshot)).toContain('aria-label="Close More"');
+    expect(render(snapshot)).toContain('aria-label="Close widget"');
     expect((html.match(/tabindex="0"/g) ?? [])).toHaveLength(1);
     expect((html.match(/tabindex="-1"/g) ?? [])).toHaveLength(2);
   });
@@ -187,7 +264,7 @@ describe("WidgetPopoverView", () => {
     expect(getAdjacentTimerMode("pomodoro", "ArrowUp")).toBe("stopwatch");
     expect(getAdjacentTimerMode("pomodoro", "Enter")).toBeNull();
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
-    expect(source).toContain("onKeyDown={(event) => onModeKeyDown(event, mode)}");
+    expect(source).toContain("onKeyDown={(event) => onKeyDown(event, itemMode)}");
   });
 
   it("shows countdown presets only in the timer settings view", () => {
@@ -220,6 +297,20 @@ describe("WidgetPopoverView", () => {
     expect(css).toMatch(/\.df-widget-timer\s*\{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.df-widget-icon-btn\s*\{[^}]*width:\s*clamp\(44px,/);
     expect(css).toMatch(/\.df-widget-icon-btn\s*\{[^}]*height:\s*clamp\(44px,/);
+  });
+
+  it("uses a compact token-driven inline popover without purple, shadow, lift, or filled tabs", () => {
+    const css = readFileSync(new URL("./widget.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.df-widget-popover-surface\s*\{[^}]*overflow:\s*hidden/);
+    expect(css).toMatch(/\.df-widget-popover-utilities\s*\{[^}]*justify-content:\s*flex-end/);
+    expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
+    expect(css).toMatch(/\.df-widget-mode-switch button\.is-selected\s*\{[^}]*border-bottom:\s*1px solid var\(--widget-ink\)/);
+    expect(css).toMatch(/\.df-widget-mode-details\s*\{[^}]*overflow-y:\s*auto/);
+    expect(css).toMatch(/\.df-widget-timer-settings-view\s*\{[^}]*min-height:\s*0/);
+    expect(css).toMatch(/\.df-widget-timer-settings-view > \.df-widget-mode-switch, \.df-widget-timer-settings-actions\s*\{[^}]*flex:\s*0 0 auto/);
+    expect(css).not.toMatch(/#[a-f\d]{6}/i);
+    expect(css).not.toContain("box-shadow");
+    expect(css).not.toContain("translateY");
   });
 
   it("removes every widget shadow control and visual shadow", () => {

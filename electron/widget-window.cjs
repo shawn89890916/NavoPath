@@ -3,8 +3,8 @@ const WIDGET_MAX_WIDTH = 860;
 const WIDGET_MIN_HEIGHT = 56;
 const DEFAULT_WIDGET_WIDTH = 400;
 const DEFAULT_WIDGET_HEIGHT = 80;
-const POPOVER_WIDTH = 332;
-const POPOVER_HEIGHT = 420;
+const POPOVER_WIDTH = 250;
+const POPOVER_HEIGHT = 220;
 const POPOVER_GAP = 6;
 const WINDOW_MARGIN = 6;
 
@@ -47,7 +47,8 @@ function positionPopover(widgetBounds, popoverSize, workArea) {
     height: Math.max(0, Number(widgetBounds.height)),
   };
   const requestedWidth = Math.max(1, Math.round(Number(popoverSize.width)));
-  const requestedHeight = Math.min(POPOVER_HEIGHT, Math.max(1, Math.round(Number(popoverSize.height))));
+  const originalRequestedHeight = Math.max(1, Math.round(Number(popoverSize.height)));
+  const requestedHeight = Math.min(POPOVER_HEIGHT, originalRequestedHeight);
   const width = Math.min(requestedWidth, Math.max(1, area.width - WINDOW_MARGIN * 2));
   const minX = area.x + WINDOW_MARGIN;
   const maxX = area.x + area.width - WINDOW_MARGIN - width;
@@ -73,7 +74,7 @@ function positionPopover(widgetBounds, popoverSize, workArea) {
     width,
     height,
     openAbove,
-    scrollRequired: height < requestedHeight,
+    scrollRequired: height < originalRequestedHeight,
   };
 }
 
