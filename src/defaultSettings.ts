@@ -67,6 +67,7 @@ export const defaultSettings: Settings = {
   featureQuadrantViewEnabled: false,
   featureListViewEnabled: false,
   featureHabitsEnabled: true,
+  featureHabitCandidatesEnabled: true,
   featureTemplatesEnabled: true,
   featureMetricsEnabled: true,
   featureWidgetEnabled: true,

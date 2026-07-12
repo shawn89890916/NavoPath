@@ -32,6 +32,7 @@ import {
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
 import { scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, updateHabit, archiveHabit, buildHabitMetrics, isHabitDueOnDate, weekdayLabels, type HabitMetrics } from "./utils/habits";
+import { shouldShowHabitCandidates } from "./utils/habitCandidateVisibility";
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
 import { buildCommandSearchIndex, searchCommands, type CommandSearchResult } from "./utils/commandSearch";
@@ -7397,7 +7398,7 @@ function App() {
                   {drag?.source === "candidate" && candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
                 </div>
               ))}
-              {settings.featureHabitsEnabled !== false && (
+              {shouldShowHabitCandidates(settings) && (
                 <HabitCandidateCard
                   habits={habits}
                   habitDailyStates={habitDailyStates}
@@ -12832,8 +12833,8 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
               <SettingRow
                 title={lang === "zh" ? "在今日候选中显示习惯区" : "Show habits in today's candidates"}
-                description={lang === "zh" ? "与「启用习惯功能」共用同一开关。" : "Shares the same toggle as Enable habits."}
-                control={<SettingToggle checked={settings.featureHabitsEnabled !== false} disabled={settings.featureHabitsEnabled === false} ariaLabel={lang === "zh" ? "在今日候选中显示习惯区" : "Show habits in today's candidates"} onChange={(next) => onSave({ featureHabitsEnabled: next })} />}
+                description={lang === "zh" ? "关闭后仅隐藏今日候选中的习惯区，保留习惯功能和数据。" : "When off, only hides the habits area in today's candidates; habit features and data stay available."}
+                control={<SettingToggle checked={settings.featureHabitCandidatesEnabled !== false} disabled={settings.featureHabitsEnabled === false} ariaLabel={lang === "zh" ? "在今日候选中显示习惯区" : "Show habits in today's candidates"} onChange={(next) => onSave({ featureHabitCandidatesEnabled: next })} />}
               />
               <SettingRow
                 title={lang === "zh" ? "习惯是否计入指标" : "Include habits in metrics"}

@@ -77,6 +77,8 @@ const defaultSettings: Settings = {
   featureKanbanViewEnabled: false,
   featureQuadrantViewEnabled: false,
   featureListViewEnabled: false,
+  featureHabitsEnabled: true,
+  featureHabitCandidatesEnabled: true,
   featureWidgetEnabled: true,
   widgetAlwaysOnTop: true,
   widgetOpenOnLaunch: false,

@@ -404,6 +404,8 @@ export interface Settings {
   featureQuadrantViewEnabled?: boolean;
   featureListViewEnabled?: boolean;
   featureHabitsEnabled?: boolean;
+  /** Whether habits appear in today's candidates; omitted legacy settings stay visible. */
+  featureHabitCandidatesEnabled?: boolean;
   /** 模板功能开关：关闭后隐藏今日候选顶栏的「模板」入口与模板设置子项。 */
   featureTemplatesEnabled?: boolean;
   /** 指标视图开关：关闭后隐藏规划页的「指标」视图入口与指标设置子项。 */

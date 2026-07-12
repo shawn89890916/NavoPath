@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 2026-07-12 · 习惯候选显示开关
+
+### 修复
+- 修复“在今日候选中显示习惯区”开关无效的问题：该开关现独立控制今日候选区的习惯显示，不再意外关闭全部习惯功能；既有用户默认继续显示习惯。
+
+## 2026-07-12 · Habit candidate visibility toggle
+
+### Fixed
+- Fixed the “Show habits in today's candidates” toggle: it now independently controls the habit area in Today’s Candidates without disabling all habit features, while existing users continue to see habits by default.
+
 ## 2026-07-11 · 桌面小组件自适应计时器
 
 ### 新增
