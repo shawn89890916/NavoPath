@@ -22,7 +22,6 @@ describe("widget appearance", () => {
       opacity: 4,
       fontFamily: "",
       fontScale: 5,
-      shadowEnabled: "yes" as never,
       version: 99,
     } as never)).toEqual({
       ...DEFAULT_WIDGET_APPEARANCE,
@@ -49,15 +48,7 @@ describe("widget appearance", () => {
     });
   });
 
-  it("ignores legacy shadow preferences and uses compact density thresholds", () => {
-    expect(normalizeWidgetAppearance({ shadowEnabled: true } as never)).toEqual({
-      light: DEFAULT_WIDGET_APPEARANCE.light,
-      dark: DEFAULT_WIDGET_APPEARANCE.dark,
-      opacity: DEFAULT_WIDGET_APPEARANCE.opacity,
-      fontFamily: DEFAULT_WIDGET_APPEARANCE.fontFamily,
-      fontScale: DEFAULT_WIDGET_APPEARANCE.fontScale,
-      version: WIDGET_APPEARANCE_VERSION,
-    });
+  it("uses compact density thresholds", () => {
     expect(getWidgetDensity(280)).toBe("full");
     expect(getWidgetDensity(279)).toBe("timerControls");
     expect(getWidgetDensity(200)).toBe("timerControls");
