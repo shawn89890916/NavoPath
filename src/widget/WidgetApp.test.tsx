@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
+import { Children, isValidElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getSynchronizedTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -158,6 +159,35 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Stopwatch");
     expect(html).toContain("Pomodoro");
     expect(html).toContain("Countdown");
+    expect(html).toContain('aria-label="Close widget"');
+    expect(html).not.toContain('aria-label="Close More"');
+  });
+
+  it("selects a mode through the tab interaction and reveals its inline details state", () => {
+    let selected = snapshot.timerPreferences.mode;
+    const tabs = TimerModeTabs({ lang: "en", mode: selected, onSelect: (mode) => { selected = mode; } });
+    const pomodoro = Children.toArray(tabs.props.children).find((child) => isValidElement<{ "data-mode": string }>(child) && child.props["data-mode"] === "pomodoro") as ReactElement<{ onClick: () => void }>;
+    pomodoro.props.onClick();
+    expect(selected).toBe("pomodoro");
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: selected } }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    expect(html).toContain("Focus");
+    expect(html).toContain("Break");
+    expect(html).toContain("Rounds");
+  });
+
+  it("routes the only close utility to the close-widget callback", () => {
+    let closedWidget = false;
+    const utilities = WidgetPopoverUtilities({ lang: "en", alwaysOnTop: false, onToggleAlwaysOnTop: () => undefined, onCloseWidget: () => { closedWidget = true; } });
+    const buttons = Children.toArray(utilities.props.children).filter(isValidElement) as ReactElement<{ onClick: () => void; "aria-label": string }>[];
+    expect(buttons.map((button) => button.props["aria-label"])).toEqual(["Pin widget", "Close widget"]);
+    buttons[1].props.onClick();
+    expect(closedWidget).toBe(true);
+  });
+
+  it("synchronizes the selected tab when timer preferences change in a live snapshot", () => {
+    expect(getSynchronizedTimerMode("pomodoro", "countdown")).toBe("countdown");
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    expect(source).toContain("useEffect(() => setSelectedMode((current) => getSynchronizedTimerMode(current, snapshot.timerPreferences.mode))");
   });
 
   it("shows scheduling guidance for a countdown without a task deadline", () => {
@@ -182,7 +212,7 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Break");
     expect(html).toContain("Rounds");
     expect(html).not.toContain("Long break");
-    expect(render(snapshot)).toContain('aria-label="Close More"');
+    expect(render(snapshot)).toContain('aria-label="Close widget"');
     expect((html.match(/tabindex="0"/g) ?? [])).toHaveLength(1);
     expect((html.match(/tabindex="-1"/g) ?? [])).toHaveLength(2);
   });
