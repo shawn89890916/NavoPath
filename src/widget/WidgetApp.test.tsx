@@ -187,6 +187,21 @@ describe("WidgetPopoverView", () => {
   it("declares a snapshot-mode effect that refreshes the selected tab", () => {
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
     expect(source).toContain("useEffect(() => setSelectedMode(snapshot.timerPreferences.mode), [snapshot.timerPreferences.mode])");
+    expect(source).toContain("setDraft(snapshot.timerPreferences)");
+    expect(source).toContain("setDuration(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))))");
+  });
+
+  it("keeps tabs and actions outside the fields-only scrolling region", () => {
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={countdownWithoutDeadline} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    const tabs = html.indexOf('class="df-widget-mode-switch"');
+    const detailsOpen = html.indexOf('class="df-widget-mode-details"');
+    const guidance = html.indexOf('class="df-widget-schedule-guidance"');
+    const detailsClose = html.indexOf('</div><div class="df-widget-timer-settings-actions"');
+    const actions = html.indexOf('class="df-widget-timer-settings-actions"');
+    expect(tabs).toBeLessThan(detailsOpen);
+    expect(guidance).toBeGreaterThan(detailsOpen);
+    expect(detailsClose).toBeGreaterThan(guidance);
+    expect(actions).toBeGreaterThan(detailsClose);
   });
 
   it("shows scheduling guidance for a countdown without a task deadline", () => {
@@ -265,6 +280,8 @@ describe("WidgetPopoverView", () => {
     expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
     expect(css).toMatch(/\.df-widget-mode-switch button\.is-selected\s*\{[^}]*border-bottom:\s*1px solid var\(--widget-ink\)/);
     expect(css).toMatch(/\.df-widget-mode-details\s*\{[^}]*overflow-y:\s*auto/);
+    expect(css).toMatch(/\.df-widget-timer-settings-view\s*\{[^}]*min-height:\s*0/);
+    expect(css).toMatch(/\.df-widget-timer-settings-view > \.df-widget-mode-switch, \.df-widget-timer-settings-actions\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).not.toMatch(/#[a-f\d]{6}/i);
     expect(css).not.toContain("box-shadow");
     expect(css).not.toContain("translateY");

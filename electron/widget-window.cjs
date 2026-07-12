@@ -47,7 +47,8 @@ function positionPopover(widgetBounds, popoverSize, workArea) {
     height: Math.max(0, Number(widgetBounds.height)),
   };
   const requestedWidth = Math.max(1, Math.round(Number(popoverSize.width)));
-  const requestedHeight = Math.min(POPOVER_HEIGHT, Math.max(1, Math.round(Number(popoverSize.height))));
+  const originalRequestedHeight = Math.max(1, Math.round(Number(popoverSize.height)));
+  const requestedHeight = Math.min(POPOVER_HEIGHT, originalRequestedHeight);
   const width = Math.min(requestedWidth, Math.max(1, area.width - WINDOW_MARGIN * 2));
   const minX = area.x + WINDOW_MARGIN;
   const maxX = area.x + area.width - WINDOW_MARGIN - width;
@@ -73,7 +74,7 @@ function positionPopover(widgetBounds, popoverSize, workArea) {
     width,
     height,
     openAbove,
-    scrollRequired: height < requestedHeight,
+    scrollRequired: height < originalRequestedHeight,
   };
 }
 

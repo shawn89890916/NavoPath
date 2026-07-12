@@ -81,7 +81,7 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 }
 .df-widget-mode-switch button.is-selected { color: var(--widget-ink); border-bottom: 1px solid var(--widget-ink); }
 .df-widget-timer-mode-label { color: var(--widget-muted); font-size: 12px; line-height: 1.3; }
-.df-widget-mode-details { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.df-widget-mode-details { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .df-widget-mode-settings { min-height: 44px; padding: 4px 2px; border-bottom: 1px solid var(--widget-border); }
 .df-widget-no-duration { margin: 0; padding: 11px 8px; color: var(--widget-muted); font-size: 13px; }
 .df-widget-number-row, .df-widget-opacity-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; min-height: 44px; padding: 4px 8px; font-size: 13px; font-weight: 600; }
@@ -96,7 +96,8 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 .df-widget-popover-action { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--widget-ink); font: 600 13px inherit; cursor: pointer; }
 .df-widget-timer-settings-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .df-widget-timer-settings-actions .is-primary { border-bottom: 1px solid var(--widget-ink); background: var(--widget-wash); }
-.df-widget-timer-settings-view { display: flex; flex-direction: column; gap: 8px; }
+.df-widget-timer-settings-view { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 8px; }
+.df-widget-timer-settings-view > .df-widget-mode-switch, .df-widget-timer-settings-actions { flex: 0 0 auto; }
 .df-widget-schedule-guidance { padding: 6px 0; border-block: 1px solid var(--widget-border); }
 .df-widget-schedule-guidance p { margin: 0; color: var(--widget-muted); font-size: 13px; }
 .df-widget-popover-action:disabled { cursor: not-allowed; opacity: .5; }
