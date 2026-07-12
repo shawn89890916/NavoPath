@@ -3,7 +3,7 @@ import { Children, isValidElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getSynchronizedTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -184,10 +184,9 @@ describe("WidgetPopoverView", () => {
     expect(closedWidget).toBe(true);
   });
 
-  it("synchronizes the selected tab when timer preferences change in a live snapshot", () => {
-    expect(getSynchronizedTimerMode("pomodoro", "countdown")).toBe("countdown");
+  it("declares a snapshot-mode effect that refreshes the selected tab", () => {
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
-    expect(source).toContain("useEffect(() => setSelectedMode((current) => getSynchronizedTimerMode(current, snapshot.timerPreferences.mode))");
+    expect(source).toContain("useEffect(() => setSelectedMode(snapshot.timerPreferences.mode), [snapshot.timerPreferences.mode])");
   });
 
   it("shows scheduling guidance for a countdown without a task deadline", () => {
