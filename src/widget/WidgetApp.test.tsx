@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -43,6 +43,12 @@ describe("WidgetView", () => {
     expect(getWidgetResizeDirection({ x: 200, y: 0 }, bounds, 8)).toBe("n");
     expect(resizeWidgetBounds({ x: 100, y: 100, width: 400, height: 80 }, "w", { x: 30, y: 0 }, workArea)).toMatchObject({ x: 130, width: 370 });
     expect(resizeWidgetBounds({ x: 100, y: 100, width: 128, height: 80 }, "w", { x: 30, y: 0 }, workArea)).toMatchObject({ x: 100, width: 128 });
+  });
+
+  it("labels the opposite edges as fixed for native resize clamping", () => {
+    expect(getWidgetResizeFixedEdges("nw")).toEqual({ horizontal: "right", vertical: "bottom" });
+    expect(getWidgetResizeFixedEdges("e")).toEqual({ horizontal: "left" });
+    expect(getWidgetResizeFixedEdges("s")).toEqual({ vertical: "top" });
   });
 
   it("renders eight no-drag resize handles without a localStorage bounds loop", () => {

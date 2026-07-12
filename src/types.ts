@@ -339,6 +339,15 @@ export interface WidgetBounds {
   height: number;
 }
 
+export interface WidgetResizeFixedEdges {
+  horizontal?: "left" | "right";
+  vertical?: "top" | "bottom";
+}
+
+export type WidgetBoundsUpdate = Partial<WidgetBounds> & {
+  fixedEdges?: WidgetResizeFixedEdges;
+};
+
 export interface Settings {
   activeMode: "execute" | "planning";
   defaultTimelineView?: "daily" | "3day" | "weekly" | "month";
@@ -651,7 +660,7 @@ declare global {
         closePopover: () => Promise<boolean>;
         setAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
         getBounds: () => Promise<WidgetBounds | null>;
-        setBounds: (bounds: Partial<WidgetBounds>) => Promise<boolean>;
+        setBounds: (bounds: WidgetBoundsUpdate) => Promise<boolean>;
         getWorkArea: () => Promise<WidgetBounds>;
         /** Widget side: fire an action request to the main window (fire-and-forget). */
         sendAction: (action: WidgetAction) => void;

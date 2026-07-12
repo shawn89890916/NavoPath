@@ -1,6 +1,6 @@
 import React, { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { MoreHorizontal, Pause, Pin, PinOff, Play, X } from "lucide-react";
-import type { WidgetAction, WidgetBounds, WidgetSnapshot, WidgetTimerMode, WidgetTimerPreferences } from "../types";
+import type { WidgetAction, WidgetBounds, WidgetResizeFixedEdges, WidgetSnapshot, WidgetTimerMode, WidgetTimerPreferences } from "../types";
 import {
   DEFAULT_WIDGET_APPEARANCE,
   getWidgetDensity,
@@ -56,6 +56,13 @@ export function resizeWidgetBounds(initial: WidgetBounds, direction: WidgetResiz
   if (direction.includes("n")) top = clamp(initial.y + delta.y, Math.max(workArea.y, bottom - maxHeight), bottom - WIDGET_MIN_HEIGHT);
   if (direction.includes("s")) nextBottom = clamp(bottom + delta.y, top + WIDGET_MIN_HEIGHT, Math.min(workArea.y + workArea.height - WINDOW_MARGIN, top + maxHeight));
   return { x: Math.round(left), y: Math.round(top), width: Math.round(nextRight - left), height: Math.round(nextBottom - top) };
+}
+
+export function getWidgetResizeFixedEdges(direction: WidgetResizeDirection): WidgetResizeFixedEdges {
+  return {
+    ...(direction.includes("w") ? { horizontal: "right" as const } : direction.includes("e") ? { horizontal: "left" as const } : {}),
+    ...(direction.includes("n") ? { vertical: "bottom" as const } : direction.includes("s") ? { vertical: "top" as const } : {}),
+  };
 }
 
 type WidgetApiWithPopover = NonNullable<NonNullable<Window["desktopApi"]>["widget"]>;
@@ -300,7 +307,10 @@ export function WidgetApp() {
     if (!api) return;
     geometryQueueRef.current = geometryQueueRef.current.then(async () => {
       const [bounds, workArea] = await Promise.all([api.getBounds(), api.getWorkArea()]);
-      if (bounds) await api.setBounds(resizeWidgetBounds(bounds, direction, { x: deltaX, y: deltaY }, workArea));
+      if (bounds) await api.setBounds({
+        ...resizeWidgetBounds(bounds, direction, { x: deltaX, y: deltaY }, workArea),
+        fixedEdges: getWidgetResizeFixedEdges(direction),
+      });
     });
   };
   const renderedSnapshot = nativePopoverOpen === null ? snapshot : withPopoverState(snapshot, nativePopoverOpen);

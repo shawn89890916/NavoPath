@@ -92,6 +92,23 @@ test("clamps requested bounds to the current display", async () => {
   assert.deepEqual(win.getBounds(), { x: 414, y: 0, width: 860, height: 56 });
 });
 
+test("preserves the requested right and bottom edges when native size clamping applies", async () => {
+  const { deps, handlers } = makeDeps();
+  const service = createWidgetWindowService(deps);
+  service.registerIpc();
+  const win = service.open();
+
+  await handlers.get("widget:set-bounds")(null, {
+    x: 100,
+    y: 100,
+    width: 1000,
+    height: 600,
+    fixedEdges: { horizontal: "right", vertical: "bottom" },
+  });
+
+  assert.deepEqual(win.getBounds(), { x: 240, y: 196, width: 860, height: 504 });
+});
+
 test("rejects invalid requested bounds without corrupting the window", async () => {
   const { deps, handlers } = makeDeps();
   const service = createWidgetWindowService(deps);
