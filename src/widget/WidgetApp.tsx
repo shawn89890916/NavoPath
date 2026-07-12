@@ -238,10 +238,11 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onCancel, onReset, o
   const zh = snapshot.lang === "zh";
   const [draft, setDraft] = useState(snapshot.timerPreferences);
   const [duration, setDuration] = useState(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))));
+  const timerPreferencesSignature = `${snapshot.timerPreferences.mode}:${snapshot.timerPreferences.focusMinutes}:${snapshot.timerPreferences.breakMinutes}:${snapshot.timerPreferences.rounds}:${snapshot.timerPreferences.countdownSeconds}`;
   useEffect(() => {
     setDraft(snapshot.timerPreferences);
     setDuration(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))));
-  }, [snapshot.timerPreferences]);
+  }, [timerPreferencesSignature]);
   const parsedDuration = Number(duration);
   const needsSchedule = draft.mode === "countdown"
     && snapshot.timerRuntime.countdownTargetAt === undefined

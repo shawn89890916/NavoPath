@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
 import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
@@ -29,6 +30,8 @@ const snapshot: WidgetSnapshot = {
   timerPhase: "focus",
   popoverOpen: false,
 };
+
+const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean };
 
 describe("WidgetView", () => {
   it("identifies all eight handles and keeps the opposite edge stable", () => {
@@ -184,11 +187,34 @@ describe("WidgetPopoverView", () => {
     expect(closedWidget).toBe(true);
   });
 
-  it("declares a snapshot-mode effect that refreshes the selected tab", () => {
-    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
-    expect(source).toContain("useEffect(() => setSelectedMode(snapshot.timerPreferences.mode), [snapshot.timerPreferences.mode])");
-    expect(source).toContain("setDraft(snapshot.timerPreferences)");
-    expect(source).toContain("setDuration(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))))");
+  const timerSettings = (next: WidgetSnapshot) => <WidgetTimerSettingsView snapshot={next} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />;
+
+  it("preserves unsaved mode, number, and duration edits across equal-preference rerenders", async () => {
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(timerSettings(snapshot)); });
+    await act(async () => { renderer.root.findByProps({ "data-mode": "countdown" }).props.onClick(); });
+    const inputs = renderer.root.findAllByType("input");
+    await act(async () => {
+      inputs[0].props.onChange({ target: { value: "1234" } });
+      inputs[1].props.onChange({ target: { value: "37" } });
+    });
+    await act(async () => { renderer.update(timerSettings({ ...snapshot, elapsedSeconds: 126, timerPreferences: { ...snapshot.timerPreferences } })); });
+    expect(renderer.root.findByProps({ "data-mode": "countdown" }).props["aria-checked"]).toBe(true);
+    expect(renderer.root.findAllByType("input").map((input) => input.props.value)).toEqual([1234, "37"]);
+    await act(async () => { renderer.unmount(); });
+  });
+
+  it("resets the mounted draft when timer preference primitive values change", async () => {
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(timerSettings(snapshot)); });
+    await act(async () => { renderer.root.findByProps({ "data-mode": "countdown" }).props.onClick(); });
+    const changed = { ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" as const, countdownSeconds: 1800 } };
+    await act(async () => { renderer.update(timerSettings(changed)); });
+    expect(renderer.root.findByProps({ "data-mode": "stopwatch" }).props["aria-checked"]).toBe(true);
+    expect(renderer.root.findByProps({ className: "df-widget-no-duration" }).children).toEqual(["No duration"]);
+    await act(async () => { renderer.unmount(); });
   });
 
   it("keeps tabs and actions outside the fields-only scrolling region", () => {
