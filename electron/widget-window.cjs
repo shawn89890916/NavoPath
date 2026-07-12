@@ -12,7 +12,7 @@ function maxHeightFor(workArea) {
   return Math.max(320, Math.round(workArea.height * 0.7));
 }
 
-function clampBounds(bounds, workArea) {
+function clampBounds(bounds, workArea, fixedEdges = {}) {
   const safeX = Number.isFinite(Number(bounds.x)) ? Number(bounds.x) : workArea.x;
   const safeY = Number.isFinite(Number(bounds.y)) ? Number(bounds.y) : workArea.y;
   const safeWidth = Number.isFinite(Number(bounds.width)) ? Number(bounds.width) : DEFAULT_WIDGET_WIDTH;
@@ -21,9 +21,13 @@ function clampBounds(bounds, workArea) {
   const maxHeight = Math.min(maxHeightFor(workArea), Math.max(WIDGET_MIN_HEIGHT, workArea.height - WINDOW_MARGIN * 2));
   const width = Math.min(maxWidth, Math.max(WIDGET_MIN_WIDTH, Math.round(safeWidth)));
   const height = Math.min(maxHeight, Math.max(WIDGET_MIN_HEIGHT, Math.round(safeHeight)));
+  const requestedRight = Math.round(safeX + safeWidth);
+  const requestedBottom = Math.round(safeY + safeHeight);
+  const requestedX = fixedEdges.horizontal === "right" ? requestedRight - width : Math.round(safeX);
+  const requestedY = fixedEdges.vertical === "bottom" ? requestedBottom - height : Math.round(safeY);
   return {
-    x: Math.min(workArea.x + workArea.width - width - WINDOW_MARGIN, Math.max(workArea.x, Math.round(safeX))),
-    y: Math.min(workArea.y + workArea.height - height - WINDOW_MARGIN, Math.max(workArea.y, Math.round(safeY))),
+    x: Math.min(workArea.x + workArea.width - width - WINDOW_MARGIN, Math.max(workArea.x, requestedX)),
+    y: Math.min(workArea.y + workArea.height - height - WINDOW_MARGIN, Math.max(workArea.y, requestedY)),
     width,
     height,
   };
@@ -230,12 +234,18 @@ function createWidgetWindowService(deps) {
         const value = Number(requested[key]);
         if (Number.isFinite(value)) next[key] = value;
       }
+      const fixedEdges = requested.fixedEdges && typeof requested.fixedEdges === "object"
+        ? {
+            horizontal: requested.fixedEdges.horizontal === "right" ? "right" : "left",
+            vertical: requested.fixedEdges.vertical === "bottom" ? "bottom" : "top",
+          }
+        : {};
       const workArea = displayFor(next).workArea;
       widgetWindow.setMaximumSize?.(
         Math.min(WIDGET_MAX_WIDTH, workArea.width - WINDOW_MARGIN * 2),
         maxHeightFor(workArea),
       );
-      widgetWindow.setBounds(clampBounds(next, workArea));
+      widgetWindow.setBounds(clampBounds(next, workArea, fixedEdges));
       return true;
     });
     deps.ipcMain.handle("widget:get-work-area", () => {

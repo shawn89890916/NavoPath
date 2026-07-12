@@ -22,9 +22,8 @@ describe("widget appearance", () => {
       opacity: 4,
       fontFamily: "",
       fontScale: 5,
-      shadowEnabled: "yes" as never,
       version: 99,
-    })).toEqual({
+    } as never)).toEqual({
       ...DEFAULT_WIDGET_APPEARANCE,
       light: {
         ...DEFAULT_WIDGET_APPEARANCE.light,
@@ -47,6 +46,13 @@ describe("widget appearance", () => {
       ...DEFAULT_WIDGET_APPEARANCE,
       opacity: 0,
     });
+  });
+
+  it("uses compact density thresholds", () => {
+    expect(getWidgetDensity(280)).toBe("full");
+    expect(getWidgetDensity(279)).toBe("timerControls");
+    expect(getWidgetDensity(200)).toBe("timerControls");
+    expect(getWidgetDensity(199)).toBe("timerOnly");
   });
 
   it("migrates legacy local preferences only before the settings version is recorded", () => {
@@ -115,9 +121,9 @@ describe("widget geometry", () => {
 
   it("uses exact width thresholds for adaptive density", () => {
     expect(getWidgetDensity(500)).toBe("full");
-    expect(getWidgetDensity(360)).toBe("full");
-    expect(getWidgetDensity(359)).toBe("timerControls");
-    expect(getWidgetDensity(220)).toBe("timerControls");
-    expect(getWidgetDensity(219)).toBe("timerOnly");
+    expect(getWidgetDensity(280)).toBe("full");
+    expect(getWidgetDensity(279)).toBe("timerControls");
+    expect(getWidgetDensity(200)).toBe("timerControls");
+    expect(getWidgetDensity(199)).toBe("timerOnly");
   });
 });

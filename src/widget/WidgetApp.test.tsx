@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -20,7 +20,6 @@ const snapshot: WidgetSnapshot = {
     opacity: 0.96,
     fontFamily: "system-ui, sans-serif",
     fontScale: 1,
-    shadowEnabled: true,
     version: 2,
   },
   timerPreferences: { mode: "pomodoro", focusMinutes: 25, breakMinutes: 5, rounds: 4, countdownSeconds: 900 },
@@ -46,8 +45,14 @@ describe("WidgetView", () => {
     expect(resizeWidgetBounds({ x: 100, y: 100, width: 128, height: 80 }, "w", { x: 30, y: 0 }, workArea)).toMatchObject({ x: 100, width: 128 });
   });
 
+  it("labels the opposite edges as fixed for native resize clamping", () => {
+    expect(getWidgetResizeFixedEdges("nw")).toEqual({ horizontal: "right", vertical: "bottom" });
+    expect(getWidgetResizeFixedEdges("e")).toEqual({ horizontal: "left" });
+    expect(getWidgetResizeFixedEdges("s")).toEqual({ vertical: "top" });
+  });
+
   it("renders eight no-drag resize handles without a localStorage bounds loop", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     for (const direction of ["n", "ne", "e", "se", "s", "sw", "w", "nw"]) expect(html).toContain(`df-widget-resize-handle is-${direction}`);
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
     expect(source).not.toContain("navopath-widget-bounds");
@@ -66,29 +71,36 @@ describe("WidgetView", () => {
     expect(mainSource).toContain('if (current.mode === "countdown" && current.countdownTargetAt === undefined) break;');
   });
 
-  it("renders only task, timer, and More at full density", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+  it("renders task, timer, Pause, and More at full density", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain(snapshot.taskTitle);
     expect(html).toContain("2:05");
+    expect(html).toContain('aria-label="Pause timer"');
     expect(html).toContain('aria-label="More"');
     expect(html).not.toContain("Working");
-    expect(html).not.toContain("Play");
     expect(html).not.toContain("project-footer");
   });
 
+  it("renders timer and More without title or primary control at timer-controls density", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="timerControls" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+    expect(html).toContain("2:05");
+    expect(html).toContain('aria-label="More"');
+    expect(html).not.toContain(snapshot.taskTitle);
+    expect(html).not.toContain('aria-label="Pause timer"');
+  });
+
   it("renders only the timer at time-only density", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="timerOnly" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+    const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="timerOnly" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain("2:05");
     expect(html).not.toContain(snapshot.taskTitle);
     expect(html).not.toContain('aria-label="More"');
   });
 
-  it("uses the active theme, overrun phase, and red close-widget affordance", () => {
-    const html = renderToStaticMarkup(<WidgetView snapshot={{ ...snapshot, theme: "dark", timerPhase: "overrun", popoverOpen: true }} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onCloseWidget={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+  it("uses the active theme and overrun phase without replacing More", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={{ ...snapshot, theme: "dark", timerPhase: "overrun", popoverOpen: true }} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain('data-theme="dark"');
     expect(html).toContain('data-phase="overrun"');
-    expect(html).toContain('aria-label="Close widget"');
-    expect(html).toContain("df-widget-close-widget-btn");
+    expect(html).toContain('aria-label="More"');
   });
 
   it("lets native popover events override stale snapshot state in both directions", () => {
@@ -101,11 +113,11 @@ describe("WidgetView", () => {
     expect(didWidgetPointerDrag({ x: 0, y: 0 }, { x: 4, y: 4 })).toBe(true);
   });
 
-  it("allows keyboard/click timer activation while suppressing the click after a drag", () => {
+  it("keeps drag detection separate from the Play/Pause action", () => {
     expect(shouldToggleTimerClick(false)).toBe(true);
     expect(shouldToggleTimerClick(true)).toBe(false);
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
-    expect(source).toMatch(/className="df-widget-timer"[\s\S]*?onClick=/);
+    expect(source).toContain('type: "toggleWidgetTimer"');
   });
 
   it("normalizes opacity updates into a widget action", () => {
@@ -115,7 +127,18 @@ describe("WidgetView", () => {
 });
 
 describe("WidgetPopoverView", () => {
-  const render = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetPopoverView snapshot={next} onClosePopover={() => undefined} onSaveTimerSettings={() => undefined} onResetTimer={() => undefined} onSchedule={() => undefined} onToggleAlwaysOnTop={() => undefined} onToggleShadow={() => undefined} onOpacityChange={() => undefined} />);
+  const render = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetPopoverView snapshot={next} onClosePopover={() => undefined} onCloseWidget={() => undefined} onSaveTimerSettings={() => undefined} onResetTimer={() => undefined} onSchedule={() => undefined} onToggleAlwaysOnTop={() => undefined} onOpacityChange={() => undefined} />);
+
+  it("renders Pin, PinOff, and close icon controls for the More panel", () => {
+    expect(render({ ...snapshot, alwaysOnTop: false })).toContain('aria-label="Pin widget"');
+    const pinnedHtml = render(snapshot);
+    expect(pinnedHtml).toContain('aria-label="Unpin widget"');
+    expect(pinnedHtml).toContain('aria-label="Close widget"');
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    expect(source).toContain("<Pin ");
+    expect(source).toContain("<PinOff ");
+    expect(source).toContain("<X ");
+  });
 
   const countdownWithoutDeadline: WidgetSnapshot = {
     ...snapshot,
@@ -173,8 +196,8 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Custom");
     const restingHtml = render(snapshot);
     expect(restingHtml).toContain("Background opacity");
-    expect(restingHtml).toContain("Always on top");
-    expect(restingHtml).toContain("Shadow");
+    expect(restingHtml).toContain('aria-label="Unpin widget"');
+    expect(restingHtml).not.toContain("Shadow");
     expect(restingHtml).not.toContain("Font family");
     expect(restingHtml).not.toContain("Reset position");
   });
@@ -195,7 +218,18 @@ describe("WidgetPopoverView", () => {
     expect(css).toMatch(/\.df-widget-presets button\s*\{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.df-widget-opacity-row input\s*\{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.df-widget-timer\s*\{[^}]*min-height:\s*44px/);
-    expect(css).toMatch(/\.df-widget-icon-btn,[^}]*width:\s*clamp\(44px,/);
-    expect(css).toMatch(/\.df-widget-icon-btn,[^}]*height:\s*clamp\(44px,/);
+    expect(css).toMatch(/\.df-widget-icon-btn\s*\{[^}]*width:\s*clamp\(44px,/);
+    expect(css).toMatch(/\.df-widget-icon-btn\s*\{[^}]*height:\s*clamp\(44px,/);
+  });
+
+  it("removes every widget shadow control and visual shadow", () => {
+    const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
+    const css = readFileSync(new URL("./widget.css", import.meta.url), "utf8");
+    const mainSource = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
+    expect(source).not.toContain("shadowEnabled");
+    expect(source).not.toContain("setWidgetShadow");
+    expect(css).not.toContain("box-shadow");
+    expect(mainSource).not.toContain("setWidgetShadow");
+    expect(mainSource).not.toContain("shadowEnabled");
   });
 });

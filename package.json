@@ -1,6 +1,6 @@
 {
   "name": "navopath",
-  "version": "1.2.38",
+  "version": "1.2.39",
   "description": "NavoPath — Navigate your next step.",
   "author": "NavoPath",
   "main": "electron/main.cjs",
@@ -90,6 +90,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
+    "lucide-react": "^1.24.0",
     "three": "^0.185.0"
   },
   "devDependencies": {

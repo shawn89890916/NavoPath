@@ -4150,12 +4150,6 @@ function App() {
           widgetAppearanceMigrated: true,
         });
         break;
-      case "setWidgetShadow":
-        void saveSettings({
-          widgetAppearance: normalizeWidgetAppearance({ ...settings?.widgetAppearance, shadowEnabled: action.enabled }),
-          widgetAppearanceMigrated: true,
-        });
-        break;
       case "setTimerMode": {
         const now = Date.now();
         const taskAction = getWidgetTimerModeChangeTaskAction(
@@ -12951,10 +12945,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               <SettingRow
                 title={lang === "zh" ? "始终置顶" : "Always on top"}
                 control={<SettingToggle checked={settings.widgetAlwaysOnTop !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "始终置顶" : "Always on top"} onChange={(next) => { onSave({ widgetAlwaysOnTop: next }); void window.desktopApi?.widget?.setAlwaysOnTop(next); }} />}
-              />
-              <SettingRow
-                title={lang === "zh" ? "显示阴影" : "Show shadow"}
-                control={<SettingToggle checked={widgetAppearance.shadowEnabled} ariaLabel={lang === "zh" ? "显示小组件阴影" : "Show widget shadow"} onChange={(shadowEnabled) => saveWidgetAppearance({ shadowEnabled })} />}
               />
               <SettingRow
                 title={lang === "zh" ? "背景透明度" : "Background opacity"}

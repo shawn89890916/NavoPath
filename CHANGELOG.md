@@ -5,10 +5,16 @@
 ### 修复
 - 修复“在今日候选中显示习惯区”开关无效的问题：该开关现独立控制今日候选区的习惯显示，不再意外关闭全部习惯功能；既有用户默认继续显示习惯。
 
+### 改进
+- 桌面小组件现将播放/暂停与“更多”放到主界面，“更多”内提供置顶和关闭图标操作，并移除阴影设置；任务标题在更窄宽度下仍保持可见，窗口缩放时会固定相对的另一侧边缘。
+
 ## 2026-07-12 · Habit candidate visibility toggle
 
 ### Fixed
 - Fixed the “Show habits in today's candidates” toggle: it now independently controls the habit area in Today’s Candidates without disabling all habit features, while existing users continue to see habits by default.
+
+### Improved
+- The desktop widget now keeps play/pause and More on its primary surface, with pin and close icon actions in More, and removes shadow settings; task titles remain visible at narrower widths, while resizing keeps the opposite edge anchored.
 
 ## 2026-07-11 · 桌面小组件自适应计时器
 
