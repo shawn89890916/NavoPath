@@ -23,7 +23,6 @@ export const DEFAULT_WIDGET_APPEARANCE: WidgetAppearance = {
   opacity: 0.96,
   fontFamily: "system-ui, sans-serif",
   fontScale: 1,
-  shadowEnabled: true,
   version: WIDGET_APPEARANCE_VERSION,
 };
 
@@ -80,9 +79,6 @@ export function normalizeWidgetAppearance(value?: Partial<WidgetAppearance> | Le
     opacity: normalizeOpacity(value?.opacity),
     fontFamily,
     fontScale: normalizeScale(candidate.fontScale),
-    shadowEnabled: typeof candidate.shadowEnabled === "boolean"
-      ? candidate.shadowEnabled
-      : DEFAULT_WIDGET_APPEARANCE.shadowEnabled,
     version: WIDGET_APPEARANCE_VERSION,
   };
 }
@@ -133,8 +129,8 @@ export function restoreStoredWidgetBounds(raw: string | null): WidgetBounds | nu
 export type WidgetDensity = "full" | "timerControls" | "timerOnly";
 
 export function getWidgetDensity(width: number): WidgetDensity {
-  if (width >= 360) return "full";
-  if (width >= 220) return "timerControls";
+  if (width >= 280) return "full";
+  if (width >= 200) return "timerControls";
   return "timerOnly";
 }
 

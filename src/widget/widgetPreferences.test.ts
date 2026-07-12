@@ -24,7 +24,7 @@ describe("widget appearance", () => {
       fontScale: 5,
       shadowEnabled: "yes" as never,
       version: 99,
-    })).toEqual({
+    } as never)).toEqual({
       ...DEFAULT_WIDGET_APPEARANCE,
       light: {
         ...DEFAULT_WIDGET_APPEARANCE.light,
@@ -47,6 +47,21 @@ describe("widget appearance", () => {
       ...DEFAULT_WIDGET_APPEARANCE,
       opacity: 0,
     });
+  });
+
+  it("ignores legacy shadow preferences and uses compact density thresholds", () => {
+    expect(normalizeWidgetAppearance({ shadowEnabled: true } as never)).toEqual({
+      light: DEFAULT_WIDGET_APPEARANCE.light,
+      dark: DEFAULT_WIDGET_APPEARANCE.dark,
+      opacity: DEFAULT_WIDGET_APPEARANCE.opacity,
+      fontFamily: DEFAULT_WIDGET_APPEARANCE.fontFamily,
+      fontScale: DEFAULT_WIDGET_APPEARANCE.fontScale,
+      version: WIDGET_APPEARANCE_VERSION,
+    });
+    expect(getWidgetDensity(280)).toBe("full");
+    expect(getWidgetDensity(279)).toBe("timerControls");
+    expect(getWidgetDensity(200)).toBe("timerControls");
+    expect(getWidgetDensity(199)).toBe("timerOnly");
   });
 
   it("migrates legacy local preferences only before the settings version is recorded", () => {
@@ -115,9 +130,9 @@ describe("widget geometry", () => {
 
   it("uses exact width thresholds for adaptive density", () => {
     expect(getWidgetDensity(500)).toBe("full");
-    expect(getWidgetDensity(360)).toBe("full");
-    expect(getWidgetDensity(359)).toBe("timerControls");
-    expect(getWidgetDensity(220)).toBe("timerControls");
-    expect(getWidgetDensity(219)).toBe("timerOnly");
+    expect(getWidgetDensity(280)).toBe("full");
+    expect(getWidgetDensity(279)).toBe("timerControls");
+    expect(getWidgetDensity(200)).toBe("timerControls");
+    expect(getWidgetDensity(199)).toBe("timerOnly");
   });
 });

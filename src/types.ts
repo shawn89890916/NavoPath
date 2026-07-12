@@ -329,7 +329,6 @@ export interface WidgetAppearance {
   opacity: number;
   fontFamily: string;
   fontScale: number;
-  shadowEnabled: boolean;
   version: number;
 }
 
@@ -623,7 +622,6 @@ export type WidgetAction =
   | { type: "scheduleWidgetCountdown"; durationMinutes: number }
   | { type: "toggleWidgetTimer" }
   | { type: "updateWidgetAppearance"; patch: Partial<WidgetAppearance> }
-  | { type: "setWidgetShadow"; enabled: boolean }
   | { type: "resetPosition" };
 
 declare global {
