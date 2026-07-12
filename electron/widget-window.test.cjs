@@ -127,7 +127,7 @@ test("positions the popover below the widget when it fits", () => {
       { width: 332, height: 360 },
       { x: 0, y: 0, width: 1280, height: 720 },
     ),
-    { x: 248, y: 174, width: 332, height: 360, openAbove: false, scrollRequired: false },
+    { x: 248, y: 174, width: 332, height: 220, openAbove: false, scrollRequired: false },
   );
 });
 
@@ -138,7 +138,7 @@ test("positions the popover above and within the work area when needed", () => {
       { width: 332, height: 360 },
       { x: 1280, y: 0, width: 1920, height: 1080 },
     ),
-    { x: 1596, y: 584, width: 332, height: 360, openAbove: true, scrollRequired: false },
+    { x: 1596, y: 724, width: 332, height: 220, openAbove: true, scrollRequired: false },
   );
 });
 
@@ -149,7 +149,7 @@ test("clamps popovers on right, left, and negative-coordinate displays", () => {
       { width: 332, height: 360 },
       { x: -1920, y: 0, width: 1920, height: 1080 },
     ),
-    { x: -1914, y: 162, width: 332, height: 360, openAbove: false, scrollRequired: false },
+    { x: -1914, y: 162, width: 332, height: 220, openAbove: false, scrollRequired: false },
   );
   assert.equal(positionPopover(
     { x: 1180, y: 100, width: 128, height: 56 },
@@ -176,7 +176,7 @@ test("rounds fractional display bounds at 125 percent scaling", () => {
       { width: 331.6, height: 359.6 },
       { x: 0, y: 0, width: 1280, height: 720 },
     ),
-    { x: 269, y: 175, width: 332, height: 360, openAbove: false, scrollRequired: false },
+    { x: 269, y: 175, width: 332, height: 220, openAbove: false, scrollRequired: false },
   );
 });
 
@@ -217,12 +217,12 @@ test("toggles a separate fixed-size popover without changing widget bounds", asy
   await handlers.get("widget:toggle-popover")();
 
   assert.equal(windows.length, 2);
-  assert.equal(windows[1].options.width, 332);
-  assert.equal(windows[1].options.height, 420);
+  assert.equal(windows[1].options.width, 250);
+  assert.equal(windows[1].options.height, 220);
   assert.equal(windows[1].options.resizable, false);
   assert.deepEqual(windows[0].getBounds(), { x: 80, y: 80, width: 400, height: 80 });
   assert.deepEqual(windows[1].loaded.options.query, { widgetPopover: "1" });
-  assert.deepEqual(windows[1].getBounds(), { x: 148, y: 166, width: 332, height: 420 });
+  assert.deepEqual(windows[1].getBounds(), { x: 230, y: 166, width: 250, height: 220 });
   windows[1].emit("ready-to-show");
   assert.equal(windows[1].shown, true);
   assert.equal(windows[1].focused, true);
