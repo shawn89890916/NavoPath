@@ -147,10 +147,17 @@ describe("WidgetPopoverView", () => {
     timerRuntime: { mode: "countdown", phase: "countdown", running: false, round: 1, phaseStartedAt: 1, pausedAt: 1 },
   };
 
-  it("keeps timer fields hidden until Timer settings opens", () => {
+  it("renders the compact resting controls without a visible More heading", () => {
     const html = render(countdownWithoutDeadline);
-    expect(html).toContain("Timer settings");
-    expect(html).not.toContain('role="radiogroup"');
+    expect(html).not.toContain(">More<");
+    expect(html).not.toContain("Timer settings");
+    expect(html).toContain('class="df-widget-popover-utilities"');
+    expect(html).toContain('class="df-widget-opacity-row"');
+    expect(html).toContain('class="df-widget-timer-mode-label"');
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain("Stopwatch");
+    expect(html).toContain("Pomodoro");
+    expect(html).toContain("Countdown");
   });
 
   it("shows scheduling guidance for a countdown without a task deadline", () => {
@@ -187,7 +194,7 @@ describe("WidgetPopoverView", () => {
     expect(getAdjacentTimerMode("pomodoro", "ArrowUp")).toBe("stopwatch");
     expect(getAdjacentTimerMode("pomodoro", "Enter")).toBeNull();
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
-    expect(source).toContain("onKeyDown={(event) => onModeKeyDown(event, mode)}");
+    expect(source).toContain("onKeyDown={(event) => onKeyDown(event, itemMode)}");
   });
 
   it("shows countdown presets only in the timer settings view", () => {
@@ -220,6 +227,18 @@ describe("WidgetPopoverView", () => {
     expect(css).toMatch(/\.df-widget-timer\s*\{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.df-widget-icon-btn\s*\{[^}]*width:\s*clamp\(44px,/);
     expect(css).toMatch(/\.df-widget-icon-btn\s*\{[^}]*height:\s*clamp\(44px,/);
+  });
+
+  it("uses a compact token-driven inline popover without purple, shadow, lift, or filled tabs", () => {
+    const css = readFileSync(new URL("./widget.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.df-widget-popover-surface\s*\{[^}]*overflow:\s*hidden/);
+    expect(css).toMatch(/\.df-widget-popover-utilities\s*\{[^}]*justify-content:\s*flex-end/);
+    expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
+    expect(css).toMatch(/\.df-widget-mode-switch button\.is-selected\s*\{[^}]*border-bottom:\s*1px solid var\(--widget-ink\)/);
+    expect(css).toMatch(/\.df-widget-mode-details\s*\{[^}]*overflow-y:\s*auto/);
+    expect(css).not.toMatch(/#[a-f\d]{6}/i);
+    expect(css).not.toContain("box-shadow");
+    expect(css).not.toContain("translateY");
   });
 
   it("removes every widget shadow control and visual shadow", () => {
