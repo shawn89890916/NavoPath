@@ -4,6 +4,7 @@
 
 ### 修复
 - 修复“在今日候选中显示习惯区”开关无效的问题：该开关现独立控制今日候选区的习惯显示，不再意外关闭全部习惯功能；既有用户默认继续显示习惯。
+- 修复旧版习惯插件数据无法显示在今日候选中的问题：应用现在会一次性迁移旧习惯及其完成记录到新的习惯区，避免重复创建。
 
 ### 改进
 - 桌面小组件的“更多”面板现以紧凑工具面板贴附于小组件：透明度标签、滑杆与百分比合并为单行，三个计时模式改为内联文字标签页，选中模式的详细设置继续在同一面板内显示。
@@ -13,6 +14,7 @@
 
 ### Fixed
 - Fixed the “Show habits in today's candidates” toggle: it now independently controls the habit area in Today’s Candidates without disabling all habit features, while existing users continue to see habits by default.
+- Fixed legacy habit-plugin data not appearing in Today’s Candidates: the app now migrates legacy habits and completion history once into the new habit area without creating duplicates.
 
 ### Improved
 - The desktop widget More panel is now a compact tool panel attached to the widget: opacity label, slider, and percentage share one row, the three timer modes are inline text tabs, and the selected mode's details remain inside the same panel.

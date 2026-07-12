@@ -31,7 +31,7 @@ import {
   type TimelineViewMode,
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
-import { scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, updateHabit, archiveHabit, buildHabitMetrics, isHabitDueOnDate, weekdayLabels, type HabitMetrics } from "./utils/habits";
+import { migrateLegacyHabitTracker, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, updateHabit, archiveHabit, buildHabitMetrics, isHabitDueOnDate, weekdayLabels, type HabitMetrics } from "./utils/habits";
 import { shouldShowHabitCandidates } from "./utils/habitCandidateVisibility";
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
@@ -2078,17 +2078,19 @@ function App() {
         queuedRemoteRefreshRef.current = true;
         return;
       }
+      const migratedData = migrateLegacyHabitTracker(remote.data, remote.settings.pluginConfigs);
       remoteRevisionRef.current = Math.max(remoteRevisionRef.current, remote.revision || 0);
-      dataRef.current = remote.data;
+      dataRef.current = migratedData;
       settingsRef.current = remote.settings;
-      setData(remote.data);
+      setData(migratedData);
       setSettings(remote.settings);
       setLang(remote.settings.language || lang);
-      writeBootstrapCache(remote.data, remote.settings, userId, {
+      writeBootstrapCache(migratedData, remote.settings, userId, {
         dataDirty: false,
         settingsDirty: false,
         remoteRevision: remote.revision,
       });
+      if (migratedData !== remote.data) void saveData(migratedData);
     });
   }, [authState?.user?.id]);
 
@@ -2240,6 +2242,9 @@ function App() {
     const shouldPushCachedData = resolved.replayData;
     const shouldPushCachedSettings = resolved.replaySettings;
     if (!nextData || !nextSettings) return;
+    const migratedHabitData = migrateLegacyHabitTracker(nextData, nextSettings.pluginConfigs);
+    const shouldPersistHabitMigration = migratedHabitData !== nextData;
+    nextData = migratedHabitData;
     // Migrate legacy task scheduling fields into timelineRecords
     if (nextData.tasks) {
       nextData.tasks = nextData.tasks.map((task) => {
@@ -2271,7 +2276,7 @@ function App() {
     setModeState((nextSettings.activeMode as Mode) || "execute");
     setAdvancedOpen(Boolean(nextSettings.addAdvancedOpen));
     if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
-    if (shouldPushCachedData && nextData) void saveData(nextData);
+    if ((shouldPushCachedData || shouldPersistHabitMigration) && nextData) void saveData(nextData);
     if (shouldPushCachedSettings && cached?.settings) void saveSettings(cached.settings);
     // Persist a local JSON snapshot so users always have an offline backup.
     try {

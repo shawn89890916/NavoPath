@@ -1,7 +1,63 @@
 import type { Habit, HabitDailyState, HabitFrequency, PlannerData, Task, TimelineRecord } from "../types";
 
 function uid(prefix: string, seed: string) {
-  return `${prefix}-${seed.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "")}`;
+  const slug = seed.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
+  const unicodeSlug = Array.from(seed).map((char) => char.codePointAt(0)?.toString(36)).join("-");
+  return `${prefix}-${slug || unicodeSlug}`;
+}
+
+const LEGACY_DEFAULT_HABITS = ["复盘今天", "整理任务", "查看明日计划"];
+
+type LegacyHabitTrackerConfig = {
+  habits?: unknown;
+  doneByDate?: unknown;
+};
+
+export function migrateLegacyHabitTracker(
+  data: PlannerData,
+  pluginConfigs: Record<string, Record<string, unknown>> | undefined,
+  now = new Date().toISOString(),
+): PlannerData {
+  if ((data.habits || []).length > 0) return data;
+
+  const legacy = pluginConfigs?.["habit-tracker"] as LegacyHabitTrackerConfig | undefined;
+  if (!legacy || typeof legacy !== "object") return data;
+
+  const customTitles = typeof legacy.habits === "string"
+    ? legacy.habits.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    : [];
+  const titles = customTitles.length > 0 ? customTitles : LEGACY_DEFAULT_HABITS;
+  const habits: Habit[] = titles.map((title, index) => ({
+    id: uid("habit", title),
+    title,
+    defaultDurationMinutes: 20,
+    activeWeekdays: [1, 2, 3, 4, 5],
+    archived: false,
+    order: index,
+    createdAt: now,
+    updatedAt: now,
+  }));
+  const habitByTitle = new Map(habits.map((habit) => [habit.title, habit]));
+  const doneByDate = legacy.doneByDate && typeof legacy.doneByDate === "object"
+    ? legacy.doneByDate as Record<string, unknown>
+    : {};
+  const habitDailyStates: HabitDailyState[] = Object.entries(doneByDate).flatMap(([date, titlesForDate]) => {
+    if (!Array.isArray(titlesForDate)) return [];
+    return titlesForDate.flatMap((title) => {
+      const habit = typeof title === "string" ? habitByTitle.get(title) : undefined;
+      if (!habit) return [];
+      return [{
+        id: `habit-state-${habit.id}-${date}`,
+        habitId: habit.id,
+        date,
+        completed: true,
+        createdAt: now,
+        updatedAt: now,
+      }];
+    });
+  });
+
+  return { ...data, habits, habitDailyStates };
 }
 
 function addMinutes(time: string, minutes: number) {

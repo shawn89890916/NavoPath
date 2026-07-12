@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData } from "../types";
-import { normalizeHabits, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, buildHabitMetrics, isHabitDueOnDate, updateHabit, archiveHabit, weekdayLabels } from "./habits";
+import { migrateLegacyHabitTracker, normalizeHabits, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, buildHabitMetrics, isHabitDueOnDate, updateHabit, archiveHabit, weekdayLabels } from "./habits";
 
 const baseData: PlannerData = {
   version: 1,
@@ -20,6 +20,30 @@ const baseData: PlannerData = {
 };
 
 describe("habits", () => {
+  it("migrates legacy plugin defaults and completion history when core habits are missing", () => {
+    const migrated = migrateLegacyHabitTracker({ ...baseData, pluginConfigs: undefined }, {
+      "habit-tracker": { doneByDate: { "2026-07-03": ["复盘今天"] } },
+    }, "2026-07-12T00:00:00.000Z");
+    const review = migrated.habits?.find((habit) => habit.title === "复盘今天");
+
+    expect(migrated.habits?.map((habit) => habit.title)).toEqual(["复盘今天", "整理任务", "查看明日计划"]);
+    expect(migrated.habitDailyStates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ habitId: review?.id, date: "2026-07-03", completed: true }),
+    ]));
+  });
+
+  it("uses custom legacy names and leaves an existing core list unchanged", () => {
+    const pluginConfig = { "habit-tracker": { habits: "晨读\n运动", doneByDate: { "2026-07-03": ["运动"] } } };
+    const migrated = migrateLegacyHabitTracker({ ...baseData, pluginConfigs: undefined }, pluginConfig, "2026-07-12T00:00:00.000Z");
+    const unchangedData = { ...baseData, habits: [{ id: "habit-existing", title: "已有习惯", defaultDurationMinutes: 20, archived: false, order: 0, createdAt: "now", updatedAt: "now" }] };
+
+    expect(migrated.habits?.map((habit) => habit.title)).toEqual(["晨读", "运动"]);
+    expect(migrated.habitDailyStates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ habitId: migrated.habits?.[1].id, date: "2026-07-03", completed: true }),
+    ]));
+    expect(migrateLegacyHabitTracker(unchangedData, pluginConfig)).toBe(unchangedData);
+  });
+
   it("migrates plugin habit lines into first-class habits", () => {
     const result = normalizeHabits(baseData, "2026-07-01T00:00:00.000Z");
     expect(result.habits?.map((habit) => habit.title)).toEqual(["Read", "Stretch"]);
