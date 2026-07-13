@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, requiresRunningTimerModeConfirmation, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getClampedTooltipPosition, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, requiresRunningTimerModeConfirmation, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -203,16 +203,24 @@ describe("WidgetPopoverView", () => {
   it("previews hovered mode guidance at the pointer without changing the selected mode", async () => {
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
     let renderer!: ReactTestRenderer;
-    await act(async () => { renderer = create(timerSettings({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } })); });
+    await act(async () => { renderer = create(timerSettings({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } }), { createNodeMock: (element) => (element as ReactElement<{ className?: string }>).props.className === "df-widget-mode-tooltip" ? { getBoundingClientRect: () => ({ width: 100, height: 40 }) } : null }); });
     const pomodoro = renderer.root.findByProps({ "data-mode": "pomodoro" });
     await act(async () => { pomodoro.props.onPointerEnter({ clientX: 80, clientY: 42 }); });
     const tooltip = renderer.root.findByProps({ role: "tooltip" });
     expect(tooltip.children.join("")).toContain("task deadline");
-    expect(tooltip.props.style).toMatchObject({ left: 88, top: 50 });
+    expect(tooltip.props.style).toMatchObject({ left: 88, top: 50, visibility: "visible" });
     expect(renderer.root.findByProps({ "data-mode": "stopwatch" }).props["aria-checked"]).toBe(true);
+    await act(async () => { pomodoro.props.onPointerMove({ clientX: 280, clientY: 140 }); });
+    expect(renderer.root.findByProps({ role: "tooltip" }).props.style).toMatchObject({ left: 172, top: 92, visibility: "visible" });
     await act(async () => { pomodoro.props.onPointerLeave(); });
     expect(renderer.root.findAllByProps({ role: "tooltip" })).toHaveLength(0);
     await act(async () => { renderer.unmount(); });
+  });
+
+  it("flips and clamps hover guidance inside every window edge", () => {
+    expect(getClampedTooltipPosition({ pointerX: 80, pointerY: 42, tooltipWidth: 100, tooltipHeight: 40, viewportWidth: 300, viewportHeight: 156 })).toEqual({ left: 88, top: 50 });
+    expect(getClampedTooltipPosition({ pointerX: 280, pointerY: 140, tooltipWidth: 100, tooltipHeight: 40, viewportWidth: 300, viewportHeight: 156 })).toEqual({ left: 172, top: 92 });
+    expect(getClampedTooltipPosition({ pointerX: 2, pointerY: 2, tooltipWidth: 288, tooltipHeight: 144, viewportWidth: 300, viewportHeight: 156 })).toEqual({ left: 6, top: 6 });
   });
 
   it("applies a timer mode immediately without a bottom save action", async () => {

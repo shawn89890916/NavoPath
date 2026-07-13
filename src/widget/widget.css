@@ -85,7 +85,7 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 }
 .df-widget-mode-switch button.is-selected { color: var(--widget-ink); border-bottom: 1px solid var(--widget-ink); }
 .df-widget-mode-switch button:hover { color: var(--widget-ink); }
-.df-widget-mode-tooltip { position: fixed; z-index: 10; max-width: 210px; padding: 6px 8px; border: 0; border-radius: 7px; background: rgb(var(--widget-bg-rgb)); color: var(--widget-muted); font-size: 11px; line-height: 1.4; pointer-events: none; }
+.df-widget-mode-tooltip { position: fixed; z-index: 10; width: max-content; max-width: min(210px, calc(100vw - 12px)); max-height: calc(100vh - 12px); padding: 6px 8px; overflow: hidden; border: 0; border-radius: 7px; background: rgb(var(--widget-bg-rgb)); color: var(--widget-muted); font-size: 11px; line-height: 1.4; pointer-events: none; }
 .df-widget-timer-mode-label { color: var(--widget-muted); font-size: 12px; line-height: 1.3; }
 .df-widget-mode-details { display: none; }
 .df-widget-mode-settings { min-height: 44px; padding: 4px 2px; border-bottom: 1px solid var(--widget-border); }

@@ -9,7 +9,7 @@
 - 正计时、番茄钟和倒计时现在与当前任务的时间轴记录联动：倒计时默认使用任务结束时间，超时继续工作会延长当前任务，但不会移动后续安排。
 - 三种计时模式在同一个“更多”面板中完成选择和设置；悬停只预览固定说明，单击才切换草稿模式，参数与计划预览可在保存前调整。
 - 小组件时间现在保持垂直居中；“更多”面板将重置、置顶和关闭集中为紧凑图标，并把模式说明改为跟随指针的悬停提示。番茄钟运行时用番茄和草图标区分专注与休息，正计时继续使用播放 / 暂停图标，倒计时启动后不提供暂停。
-- 小组件播放与更多图标现在在主卡片中保持垂直居中；“更多”面板加宽透明度滑条、改用当前墨水色并上移顶部工具栏。面板会在三个计时选项下方直接结束，点击模式立即生效，不再显示底部操作栏；悬停说明不再带边框，并会避开窗口右侧边缘。
+- 小组件播放与更多图标现在在主卡片中保持垂直居中；“更多”面板加宽透明度滑条、改用当前墨水色并上移顶部工具栏。面板会在三个计时选项下方直接结束，点击模式立即生效，不再显示底部操作栏；悬停说明不再带边框，并会根据实际尺寸在窗口四边自动翻转和约束位置，彻底避免裁切。
 
 ### 修复
 - 修复关闭小组件时主进程向已销毁窗口发送消息而报错的问题。
@@ -23,7 +23,7 @@
 - Stopwatch, Pomodoro, and countdown now follow the active timeline record: countdown defaults to the task end, while overtime extends only the current task without moving later plans.
 - All three timer modes are selected and configured inside the same More panel; hover only previews fixed guidance, click changes the draft mode, and parameters plus the plan preview remain editable before saving.
 - Widget time now stays vertically centered; the More panel groups reset, pin, and close as compact icons, while mode guidance appears as a pointer-following hover tip. A running Pomodoro uses tomato and grass icons for focus and break, stopwatch keeps play/pause icons, and countdown does not offer pause after starting.
-- Play and More now stay vertically centered in the widget card; the More panel widens its opacity slider, uses the current ink color, and moves the utility row upward. It now ends directly below the three timer modes, applies a mode immediately without a bottom action bar, and shows borderless hover guidance that avoids the window's right edge.
+- Play and More now stay vertically centered in the widget card; the More panel widens its opacity slider, uses the current ink color, and moves the utility row upward. It now ends directly below the three timer modes, applies a mode immediately without a bottom action bar, and measures borderless hover guidance so it can flip and clamp against all four window edges without clipping.
 
 ### Fixed
 - Fixed a main-process error caused by sending to a destroyed window while closing the widget.

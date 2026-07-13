@@ -1,4 +1,4 @@
-import React, { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import React, { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Cherry, MoreHorizontal, Pause, Pin, PinOff, Play, RotateCcw, Sprout, X } from "lucide-react";
 import type { WidgetAction, WidgetBounds, WidgetResizeFixedEdges, WidgetSnapshot, WidgetTimerMode, WidgetTimerPreferences } from "../types";
 import {
@@ -231,6 +231,17 @@ function NumberSetting({ label, value, onChange }: { label: string; value: numbe
   return <label className="df-widget-number-row"><span>{label}</span><input type="number" min="1" value={value} onChange={(event) => onChange(Math.max(1, Number(event.target.value) || 1))} /></label>;
 }
 
+export function getClampedTooltipPosition({ pointerX, pointerY, tooltipWidth, tooltipHeight, viewportWidth, viewportHeight, offset = 8, margin = 6 }: { pointerX: number; pointerY: number; tooltipWidth: number; tooltipHeight: number; viewportWidth: number; viewportHeight: number; offset?: number; margin?: number }) {
+  const preferredLeft = pointerX + offset + tooltipWidth <= viewportWidth - margin ? pointerX + offset : pointerX - offset - tooltipWidth;
+  const preferredTop = pointerY + offset + tooltipHeight <= viewportHeight - margin ? pointerY + offset : pointerY - offset - tooltipHeight;
+  const maxLeft = Math.max(margin, viewportWidth - tooltipWidth - margin);
+  const maxTop = Math.max(margin, viewportHeight - tooltipHeight - margin);
+  return {
+    left: Math.max(margin, Math.min(preferredLeft, maxLeft)),
+    top: Math.max(margin, Math.min(preferredTop, maxTop)),
+  };
+}
+
 export function requiresRunningTimerModeConfirmation(running: boolean, currentMode: WidgetTimerMode, nextMode: WidgetTimerMode): boolean {
   return running && currentMode !== nextMode;
 }
@@ -259,12 +270,30 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onSchedule }: Widget
   const zh = snapshot.lang === "zh";
   const [draft, setDraft] = useState(snapshot.timerPreferences);
   const [modeTooltip, setModeTooltip] = useState<{ mode: WidgetTimerMode; x: number; y: number } | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const [duration, setDuration] = useState(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))));
   const timerPreferencesSignature = JSON.stringify(snapshot.timerPreferences);
   useEffect(() => {
     setDraft(snapshot.timerPreferences);
     setDuration(String(Math.max(1, Math.round(snapshot.timerPreferences.countdownSeconds / 60))));
   }, [timerPreferencesSignature]);
+  useLayoutEffect(() => {
+    const tooltip = tooltipRef.current;
+    if (!modeTooltip || !tooltip) {
+      setTooltipPosition(null);
+      return;
+    }
+    const bounds = tooltip.getBoundingClientRect();
+    setTooltipPosition(getClampedTooltipPosition({
+      pointerX: modeTooltip.x,
+      pointerY: modeTooltip.y,
+      tooltipWidth: bounds.width,
+      tooltipHeight: bounds.height,
+      viewportWidth: typeof window === "undefined" ? 300 : window.innerWidth,
+      viewportHeight: typeof window === "undefined" ? 156 : window.innerHeight,
+    }));
+  }, [modeTooltip]);
   const parsedDuration = Number(duration);
   const needsSchedule = draft.mode === "countdown"
     && snapshot.timerRuntime.countdownTargetAt === undefined
@@ -291,7 +320,7 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onSchedule }: Widget
   const previewBreak = pomodoroPlan.filter((phase) => phase.type !== "work").reduce((sum, phase) => sum + phase.durationMinutes, 0);
   return <section className="df-widget-timer-settings-view">
     <div className="df-widget-mode-switch" role="radiogroup" aria-label={zh ? "计时模式" : "Timer mode"}>{TIMER_MODES.map(({ mode, zh: zhLabel, en }) => <button key={mode} type="button" role="radio" aria-checked={draft.mode === mode} data-mode={mode} tabIndex={draft.mode === mode ? 0 : -1} className={draft.mode === mode ? "is-selected" : ""} onPointerEnter={(event) => setModeTooltip({ mode, x: event.clientX, y: event.clientY })} onPointerMove={(event) => setModeTooltip({ mode, x: event.clientX, y: event.clientY })} onPointerLeave={() => setModeTooltip(null)} onClick={() => chooseMode(mode)} onKeyDown={(event) => onModeKeyDown(event, mode)}>{zh ? zhLabel : en}</button>)}</div>
-    {modeTooltip && <div className="df-widget-mode-tooltip" role="tooltip" style={modeTooltip.x > 218 ? { left: modeTooltip.x - 8, top: modeTooltip.y + 8, transform: "translateX(-100%)" } : { left: modeTooltip.x + 8, top: modeTooltip.y + 8 }}>{zh ? TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].zh : TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].en}</div>}
+    {modeTooltip && <div ref={tooltipRef} className="df-widget-mode-tooltip" role="tooltip" style={{ left: tooltipPosition?.left ?? 0, top: tooltipPosition?.top ?? 0, visibility: tooltipPosition ? "visible" : "hidden" }}>{zh ? TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].zh : TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].en}</div>}
     <div className="df-widget-mode-details"><div className="df-widget-mode-settings">
       {draft.mode === "stopwatch" && <p className="df-widget-no-duration">{zh ? "无需设置时长" : "No duration"}</p>}
       {draft.mode === "pomodoro" && <><NumberSetting label={zh ? "偏好专注" : "Preferred focus"} value={draft.focusMinutes} onChange={(focusMinutes) => setDraft((current) => ({ ...current, focusMinutes }))} /><NumberSetting label={zh ? "最短专注" : "Minimum focus"} value={draft.minWorkMinutes || 15} onChange={(minWorkMinutes) => setDraft((current) => ({ ...current, minWorkMinutes }))} /><NumberSetting label={zh ? "最长专注" : "Maximum focus"} value={draft.maxWorkMinutes || 50} onChange={(maxWorkMinutes) => setDraft((current) => ({ ...current, maxWorkMinutes }))} /><NumberSetting label={zh ? "短休息" : "Short break"} value={draft.breakMinutes} onChange={(breakMinutes) => setDraft((current) => ({ ...current, breakMinutes }))} /><NumberSetting label={zh ? "长休息" : "Long break"} value={draft.longBreakMinutes || 15} onChange={(longBreakMinutes) => setDraft((current) => ({ ...current, longBreakMinutes }))} /><NumberSetting label={zh ? "长休息周期" : "Long break every"} value={draft.longBreakEvery || 4} onChange={(longBreakEvery) => setDraft((current) => ({ ...current, longBreakEvery }))} />{pomodoroPlan.length > 0 && <div className="df-widget-pomodoro-preview"><strong>{zh ? "计划预览" : "Plan preview"}</strong>{pomodoroPlan.map((phase) => <div key={phase.id}><time>{formatClock(phase.startAt)}–{formatClock(phase.endAt)}</time><span>{phase.type === "work" ? (zh ? "专注" : "Focus") : (zh ? "休息" : "Break")}</span></div>)}<p>{zh ? `专注 ${previewWork} 分钟 · 休息 ${previewBreak} 分钟 · ${pomodoroPlan.filter((phase) => phase.type === "work").length} 个周期` : `Work ${previewWork} min · Break ${previewBreak} min · Focus cycles ${pomodoroPlan.filter((phase) => phase.type === "work").length}`}</p></div>}</>}
