@@ -175,7 +175,7 @@ describe("WidgetPopoverView", () => {
     expect(html).not.toContain('aria-label="Close More"');
     expect(html).not.toContain('>Reset timer<');
     expect(html).not.toContain('>Cancel<');
-    expect(html).toContain('>Save<');
+    expect(html).not.toContain('>Save<');
   });
 
   it("selects a mode through the tab interaction and reveals its inline details state", () => {
@@ -212,6 +212,17 @@ describe("WidgetPopoverView", () => {
     expect(renderer.root.findByProps({ "data-mode": "stopwatch" }).props["aria-checked"]).toBe(true);
     await act(async () => { pomodoro.props.onPointerLeave(); });
     expect(renderer.root.findAllByProps({ role: "tooltip" })).toHaveLength(0);
+    await act(async () => { renderer.unmount(); });
+  });
+
+  it("applies a timer mode immediately without a bottom save action", async () => {
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    let savedMode = snapshot.timerPreferences.mode;
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerRuntime: { ...snapshot.timerRuntime, running: false } }} onSave={(next) => { savedMode = next.mode; }} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />); });
+    await act(async () => { renderer.root.findByProps({ "data-mode": "countdown" }).props.onClick(); });
+    expect(savedMode).toBe("countdown");
+    expect(renderer.root.findAllByProps({ className: "df-widget-timer-settings-actions" })).toHaveLength(0);
     await act(async () => { renderer.unmount(); });
   });
 
@@ -265,17 +276,14 @@ describe("WidgetPopoverView", () => {
     await act(async () => { renderer.unmount(); });
   });
 
-  it("keeps tabs and actions outside the fields-only scrolling region", () => {
+  it("cuts off the visible panel directly below the timer tabs", () => {
     const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={countdownWithoutDeadline} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     const tabs = html.indexOf('class="df-widget-mode-switch"');
     const detailsOpen = html.indexOf('class="df-widget-mode-details"');
     const guidance = html.indexOf('class="df-widget-schedule-guidance"');
-    const detailsClose = html.indexOf('</div><div class="df-widget-timer-settings-actions"');
-    const actions = html.indexOf('class="df-widget-timer-settings-actions"');
     expect(tabs).toBeLessThan(detailsOpen);
     expect(guidance).toBeGreaterThan(detailsOpen);
-    expect(detailsClose).toBeGreaterThan(guidance);
-    expect(actions).toBeGreaterThan(detailsClose);
+    expect(html).not.toContain('class="df-widget-timer-settings-actions"');
   });
 
   it("shows scheduling guidance for a countdown without a task deadline", () => {
@@ -354,11 +362,11 @@ describe("WidgetPopoverView", () => {
     expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
     expect(css).toMatch(/\.df-widget-opacity-row input\s*\{[^}]*accent-color:\s*var\(--widget-ink\)/);
     expect(css).toMatch(/\.df-widget-right\s*\{[^}]*align-items:\s*center/);
-    expect(css).toMatch(/\.df-widget-timer-settings-actions\s*\{[^}]*justify-content:\s*flex-end/);
+    expect(css).toMatch(/\.df-widget-mode-tooltip\s*\{[^}]*border:\s*0/);
     expect(css).toMatch(/\.df-widget-mode-switch button\.is-selected\s*\{[^}]*border-bottom:\s*1px solid var\(--widget-ink\)/);
-    expect(css).toMatch(/\.df-widget-mode-details\s*\{[^}]*overflow-y:\s*auto/);
+    expect(css).toMatch(/\.df-widget-mode-details\s*\{[^}]*display:\s*none/);
     expect(css).toMatch(/\.df-widget-timer-settings-view\s*\{[^}]*min-height:\s*0/);
-    expect(css).toMatch(/\.df-widget-timer-settings-view > \.df-widget-mode-switch, \.df-widget-timer-settings-actions\s*\{[^}]*flex:\s*0 0 auto/);
+    expect(css).toMatch(/\.df-widget-timer-settings-view > \.df-widget-mode-switch\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).not.toMatch(/#[a-f\d]{6}/i);
     expect(css).not.toContain("box-shadow");
     expect(css).not.toContain("translateY");

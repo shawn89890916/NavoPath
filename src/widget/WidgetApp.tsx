@@ -270,7 +270,13 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onSchedule }: Widget
     && snapshot.timerRuntime.countdownTargetAt === undefined
     && !snapshot.taskDueDate
     && !snapshot.taskScheduleEndAt;
-  const chooseMode = (mode: WidgetTimerMode) => setDraft((current) => ({ ...current, mode }));
+  const chooseMode = (mode: WidgetTimerMode) => {
+    if (requiresRunningTimerModeConfirmation(snapshot.timerRuntime.running, snapshot.timerRuntime.mode, mode)
+      && typeof window !== "undefined" && !window.confirm(zh ? "停止当前计时并切换模式？" : "Stop the current timer and switch modes?")) return;
+    const next = { ...draft, mode };
+    setDraft(next);
+    onSave(next);
+  };
   const onModeKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, mode: WidgetTimerMode) => {
     const nextMode = getAdjacentTimerMode(mode, event.key);
     if (!nextMode) return;
@@ -283,21 +289,15 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onSchedule }: Widget
     ? generateDeadlineAlignedPomodoroPlan({ startAt: new Date(previewStart), endAt: new Date(snapshot.taskScheduleEndAt), preferredWorkMinutes: draft.focusMinutes, minWorkMinutes: draft.minWorkMinutes || 15, maxWorkMinutes: draft.maxWorkMinutes || 50, preferredShortBreakMinutes: draft.breakMinutes, minShortBreakMinutes: draft.minBreakMinutes || 2, preferredLongBreakMinutes: draft.longBreakMinutes || 15, minLongBreakMinutes: draft.minLongBreakMinutes || 5, longBreakEvery: draft.longBreakEvery || 4 }) : [];
   const previewWork = pomodoroPlan.filter((phase) => phase.type === "work").reduce((sum, phase) => sum + phase.durationMinutes, 0);
   const previewBreak = pomodoroPlan.filter((phase) => phase.type !== "work").reduce((sum, phase) => sum + phase.durationMinutes, 0);
-  const saveDraft = () => {
-    if (requiresRunningTimerModeConfirmation(snapshot.timerRuntime.running, snapshot.timerRuntime.mode, draft.mode)
-      && !window.confirm(zh ? "停止当前计时并切换模式？" : "Stop the current timer and switch modes?")) return;
-    onSave(draft);
-  };
   return <section className="df-widget-timer-settings-view">
     <div className="df-widget-mode-switch" role="radiogroup" aria-label={zh ? "计时模式" : "Timer mode"}>{TIMER_MODES.map(({ mode, zh: zhLabel, en }) => <button key={mode} type="button" role="radio" aria-checked={draft.mode === mode} data-mode={mode} tabIndex={draft.mode === mode ? 0 : -1} className={draft.mode === mode ? "is-selected" : ""} onPointerEnter={(event) => setModeTooltip({ mode, x: event.clientX, y: event.clientY })} onPointerMove={(event) => setModeTooltip({ mode, x: event.clientX, y: event.clientY })} onPointerLeave={() => setModeTooltip(null)} onClick={() => chooseMode(mode)} onKeyDown={(event) => onModeKeyDown(event, mode)}>{zh ? zhLabel : en}</button>)}</div>
-    {modeTooltip && <div className="df-widget-mode-tooltip" role="tooltip" style={{ left: modeTooltip.x + 8, top: modeTooltip.y + 8 }}>{zh ? TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].zh : TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].en}</div>}
+    {modeTooltip && <div className="df-widget-mode-tooltip" role="tooltip" style={modeTooltip.x > 218 ? { left: modeTooltip.x - 8, top: modeTooltip.y + 8, transform: "translateX(-100%)" } : { left: modeTooltip.x + 8, top: modeTooltip.y + 8 }}>{zh ? TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].zh : TIMER_MODE_DESCRIPTIONS[modeTooltip.mode].en}</div>}
     <div className="df-widget-mode-details"><div className="df-widget-mode-settings">
       {draft.mode === "stopwatch" && <p className="df-widget-no-duration">{zh ? "无需设置时长" : "No duration"}</p>}
       {draft.mode === "pomodoro" && <><NumberSetting label={zh ? "偏好专注" : "Preferred focus"} value={draft.focusMinutes} onChange={(focusMinutes) => setDraft((current) => ({ ...current, focusMinutes }))} /><NumberSetting label={zh ? "最短专注" : "Minimum focus"} value={draft.minWorkMinutes || 15} onChange={(minWorkMinutes) => setDraft((current) => ({ ...current, minWorkMinutes }))} /><NumberSetting label={zh ? "最长专注" : "Maximum focus"} value={draft.maxWorkMinutes || 50} onChange={(maxWorkMinutes) => setDraft((current) => ({ ...current, maxWorkMinutes }))} /><NumberSetting label={zh ? "短休息" : "Short break"} value={draft.breakMinutes} onChange={(breakMinutes) => setDraft((current) => ({ ...current, breakMinutes }))} /><NumberSetting label={zh ? "长休息" : "Long break"} value={draft.longBreakMinutes || 15} onChange={(longBreakMinutes) => setDraft((current) => ({ ...current, longBreakMinutes }))} /><NumberSetting label={zh ? "长休息周期" : "Long break every"} value={draft.longBreakEvery || 4} onChange={(longBreakEvery) => setDraft((current) => ({ ...current, longBreakEvery }))} />{pomodoroPlan.length > 0 && <div className="df-widget-pomodoro-preview"><strong>{zh ? "计划预览" : "Plan preview"}</strong>{pomodoroPlan.map((phase) => <div key={phase.id}><time>{formatClock(phase.startAt)}–{formatClock(phase.endAt)}</time><span>{phase.type === "work" ? (zh ? "专注" : "Focus") : (zh ? "休息" : "Break")}</span></div>)}<p>{zh ? `专注 ${previewWork} 分钟 · 休息 ${previewBreak} 分钟 · ${pomodoroPlan.filter((phase) => phase.type === "work").length} 个周期` : `Work ${previewWork} min · Break ${previewBreak} min · Focus cycles ${pomodoroPlan.filter((phase) => phase.type === "work").length}`}</p></div>}</>}
       {draft.mode === "countdown" && <div className="df-widget-countdown-settings">{snapshot.taskScheduleEndAt && <p className="df-widget-deadline"><span>{zh ? "任务截止" : "Task deadline"}</span><time>{formatClock(new Date(snapshot.taskScheduleEndAt))}</time></p>}<div className="df-widget-presets">{[15, 25, 45, 60].map((minutes) => <button type="button" key={minutes} className={draft.countdownSeconds === minutes * 60 ? "is-selected" : ""} onClick={() => setDraft((current) => ({ ...current, countdownSeconds: minutes * 60 }))}>{minutes}</button>)}</div><NumberSetting label={zh ? "临时时长（秒）" : "Temporary duration"} value={draft.countdownSeconds} onChange={(countdownSeconds) => setDraft((current) => ({ ...current, countdownSeconds }))} /></div>}
     </div>
     {needsSchedule && <div className="df-widget-schedule-guidance"><p>{zh ? "请先在时间轴安排此任务" : "Please schedule it on the timeline first"}</p><label className="df-widget-number-row"><span>{zh ? "时长（分钟）" : "Duration (minutes)"}</span><input type="number" min="1" max="1440" step="1" value={duration} onChange={(event) => setDuration(event.target.value)} /></label><button type="button" className="df-widget-popover-action" disabled={!Number.isInteger(parsedDuration) || parsedDuration < 1 || parsedDuration > 1_440} onClick={() => onSchedule(parsedDuration)}>{zh ? "立即安排" : "Schedule for now"}</button></div>}</div>
-    <div className="df-widget-timer-settings-actions"><button type="button" className="df-widget-popover-action is-primary" onClick={saveDraft}>{zh ? "保存" : "Save"}</button></div>
   </section>;
 }
 
