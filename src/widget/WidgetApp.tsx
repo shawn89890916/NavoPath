@@ -255,7 +255,7 @@ export function WidgetPopoverUtilities({ lang, alwaysOnTop, onResetTimer, onTogg
 
 interface WidgetTimerSettingsViewProps { snapshot: WidgetSnapshot; onSave: (draft: WidgetTimerPreferences) => void; onCancel: () => void; onReset: (draft: WidgetTimerPreferences) => void; onSchedule: (durationMinutes: number) => void; }
 
-export function WidgetTimerSettingsView({ snapshot, onSave, onCancel, onReset, onSchedule }: WidgetTimerSettingsViewProps) {
+export function WidgetTimerSettingsView({ snapshot, onSave, onSchedule }: WidgetTimerSettingsViewProps) {
   const zh = snapshot.lang === "zh";
   const [draft, setDraft] = useState(snapshot.timerPreferences);
   const [modeTooltip, setModeTooltip] = useState<{ mode: WidgetTimerMode; x: number; y: number } | null>(null);
@@ -297,7 +297,7 @@ export function WidgetTimerSettingsView({ snapshot, onSave, onCancel, onReset, o
       {draft.mode === "countdown" && <div className="df-widget-countdown-settings">{snapshot.taskScheduleEndAt && <p className="df-widget-deadline"><span>{zh ? "任务截止" : "Task deadline"}</span><time>{formatClock(new Date(snapshot.taskScheduleEndAt))}</time></p>}<div className="df-widget-presets">{[15, 25, 45, 60].map((minutes) => <button type="button" key={minutes} className={draft.countdownSeconds === minutes * 60 ? "is-selected" : ""} onClick={() => setDraft((current) => ({ ...current, countdownSeconds: minutes * 60 }))}>{minutes}</button>)}</div><NumberSetting label={zh ? "临时时长（秒）" : "Temporary duration"} value={draft.countdownSeconds} onChange={(countdownSeconds) => setDraft((current) => ({ ...current, countdownSeconds }))} /></div>}
     </div>
     {needsSchedule && <div className="df-widget-schedule-guidance"><p>{zh ? "请先在时间轴安排此任务" : "Please schedule it on the timeline first"}</p><label className="df-widget-number-row"><span>{zh ? "时长（分钟）" : "Duration (minutes)"}</span><input type="number" min="1" max="1440" step="1" value={duration} onChange={(event) => setDuration(event.target.value)} /></label><button type="button" className="df-widget-popover-action" disabled={!Number.isInteger(parsedDuration) || parsedDuration < 1 || parsedDuration > 1_440} onClick={() => onSchedule(parsedDuration)}>{zh ? "立即安排" : "Schedule for now"}</button></div>}</div>
-    <div className="df-widget-timer-settings-actions"><button type="button" className="df-widget-popover-action" onClick={() => onReset(draft)}>{zh ? "重置计时器" : "Reset timer"}</button><button type="button" className="df-widget-popover-action" onClick={onCancel}>{zh ? "取消" : "Cancel"}</button><button type="button" className="df-widget-popover-action is-primary" onClick={saveDraft}>{zh ? "保存" : "Save"}</button></div>
+    <div className="df-widget-timer-settings-actions"><button type="button" className="df-widget-popover-action is-primary" onClick={saveDraft}>{zh ? "保存" : "Save"}</button></div>
   </section>;
 }
 

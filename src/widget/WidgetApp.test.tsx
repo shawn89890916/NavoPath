@@ -173,6 +173,9 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Countdown");
     expect(html).toContain('aria-label="Close widget"');
     expect(html).not.toContain('aria-label="Close More"');
+    expect(html).not.toContain('>Reset timer<');
+    expect(html).not.toContain('>Cancel<');
+    expect(html).toContain('>Save<');
   });
 
   it("selects a mode through the tab interaction and reveals its inline details state", () => {
@@ -347,7 +350,11 @@ describe("WidgetPopoverView", () => {
     const css = readFileSync(new URL("./widget.css", import.meta.url), "utf8");
     expect(css).toMatch(/\.df-widget-popover-surface\s*\{[^}]*overflow:\s*hidden/);
     expect(css).toMatch(/\.df-widget-popover-utilities\s*\{[^}]*justify-content:\s*flex-end/);
+    expect(css).toMatch(/\.df-widget-popover-utilities\s*\{[^}]*margin-top:\s*-8px/);
     expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
+    expect(css).toMatch(/\.df-widget-opacity-row input\s*\{[^}]*accent-color:\s*var\(--widget-ink\)/);
+    expect(css).toMatch(/\.df-widget-right\s*\{[^}]*align-items:\s*center/);
+    expect(css).toMatch(/\.df-widget-timer-settings-actions\s*\{[^}]*justify-content:\s*flex-end/);
     expect(css).toMatch(/\.df-widget-mode-switch button\.is-selected\s*\{[^}]*border-bottom:\s*1px solid var\(--widget-ink\)/);
     expect(css).toMatch(/\.df-widget-mode-details\s*\{[^}]*overflow-y:\s*auto/);
     expect(css).toMatch(/\.df-widget-timer-settings-view\s*\{[^}]*min-height:\s*0/);

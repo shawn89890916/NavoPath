@@ -235,12 +235,12 @@ test("toggles a separate fixed-size popover without changing widget bounds", asy
   await handlers.get("widget:toggle-popover")();
 
   assert.equal(windows.length, 2);
-  assert.equal(windows[1].options.width, 250);
+  assert.equal(windows[1].options.width, 300);
   assert.equal(windows[1].options.height, 220);
   assert.equal(windows[1].options.resizable, false);
   assert.deepEqual(windows[0].getBounds(), { x: 80, y: 80, width: 400, height: 80 });
   assert.deepEqual(windows[1].loaded.options.query, { widgetPopover: "1" });
-  assert.deepEqual(windows[1].getBounds(), { x: 230, y: 166, width: 250, height: 220 });
+  assert.deepEqual(windows[1].getBounds(), { x: 180, y: 166, width: 300, height: 220 });
   windows[1].emit("ready-to-show");
   assert.equal(windows[1].shown, true);
   assert.equal(windows[1].focused, true);
