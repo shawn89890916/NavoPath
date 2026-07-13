@@ -21,6 +21,7 @@
 ### 修复
 - 修复关闭小组件时主进程向已销毁窗口发送消息而报错的问题。
 - 修复 AI 服务 403/502 后对话长期停留在“思考中”的问题，并修复规划策略被内部最长任务排序覆盖的问题。
+- 修复网站更新后仍打开的旧页面无法加载已替换 AI 模块、导致对话直接显示“请求失败”的问题；AI 请求代码现随主入口加载，页面与脚本会重新验证版本，并在检测到部署切换时自动刷新一次。
 
 ## 2026-07-13 · Deadline-linked widget timers
 
@@ -43,6 +44,7 @@
 ### Fixed
 - Fixed a main-process error caused by sending to a destroyed window while closing the widget.
 - Fixed conversations remaining stuck in Thinking after AI 403/502 failures, and fixed planner strategies being overwritten by an internal longest-task sort.
+- Fixed pages left open across a website deployment failing to load a replaced AI module and immediately showing “Request failed”; AI request code now loads with the main entry, page and script versions are revalidated, and a detected deployment transition triggers one automatic refresh.
 
 ## 2026-07-12 · 习惯候选显示开关
 

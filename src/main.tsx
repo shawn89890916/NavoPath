@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
-import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
+import { callAiAssistant, type AiAction, type AiChatMessage, type AiMemoryPatch, type AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks, type UnscheduledTask } from "./autoSchedule";
@@ -2937,7 +2937,6 @@ function App() {
     if (durationConfidence >= 0.6 && (task.projectId || projectConfidence >= 0.6)) return;
     const snapshot = dataRef.current;
     if (!snapshot) return;
-    const { callAiAssistant } = await import("./aiAssistantApi");
     const result = await callAiAssistant({
       mode: "enrich_task",
       message: task.title,
@@ -6206,7 +6205,6 @@ function App() {
       } : message));
     }, 1800);
     try {
-      const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: attachmentSnapshot ? "import_schedule" : "chat",
         model: settings?.model,
@@ -6826,7 +6824,6 @@ function App() {
     const task = editingId ? tasks.find((item) => item.id === editingId) : null;
     setClarifyLoading(true);
     try {
-      const { callAiAssistant } = await import("./aiAssistantApi");
       const result = await callAiAssistant({
         mode: "parse_task",
         model: settings?.model,

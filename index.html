@@ -41,6 +41,20 @@
       window.addEventListener("unhandledrejection", function (event) {
         console.error("Unhandled promise rejection:", event.reason);
       });
+      // A page left open during a deployment can still hold an older entry
+      // bundle whose lazy chunk no longer exists. Vite emits this event before
+      // rejecting the import; reload once to move the page to the new manifest.
+      window.addEventListener("vite:preloadError", function (event) {
+        var key = "navopath:asset-recovery";
+        var lastReload = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - lastReload < 60000) return;
+        event.preventDefault();
+        sessionStorage.setItem(key, String(Date.now()));
+        location.reload();
+      });
+      window.addEventListener("load", function () {
+        window.setTimeout(function () { sessionStorage.removeItem("navopath:asset-recovery"); }, 10000);
+      });
     </script>
   </head>
   <body>
