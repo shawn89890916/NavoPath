@@ -288,6 +288,7 @@ export type Language = "en" | "zh";
 
 export type WidgetTimerMode = "stopwatch" | "pomodoro" | "countdown";
 export type WidgetTimerPhase = "stopwatch" | "focus" | "break" | "countdown" | "overrun";
+export type WidgetPomodoroPhase = { id: string; type: "work" | "short-break" | "long-break"; startAt: number; endAt: number; durationMinutes: number; index: number };
 
 export interface WidgetTimerPreferences {
   mode: WidgetTimerMode;
@@ -295,6 +296,15 @@ export interface WidgetTimerPreferences {
   breakMinutes: number;
   rounds: number;
   countdownSeconds: number;
+  minWorkMinutes?: number;
+  maxWorkMinutes?: number;
+  longBreakMinutes?: number;
+  minBreakMinutes?: number;
+  minLongBreakMinutes?: number;
+  longBreakEvery?: number;
+  autoStartNextPhase?: boolean;
+  allowWorkAdjustment?: boolean;
+  allowBreakShortening?: boolean;
 }
 
 export interface WidgetTimerRuntime {
@@ -307,6 +317,8 @@ export interface WidgetTimerRuntime {
   pausedAt?: number;
   countdownTargetAt?: number;
   countdownTaskId?: string;
+  pomodoroPlan?: WidgetPomodoroPhase[];
+  currentPomodoroPhaseIndex?: number;
 }
 
 export interface WidgetTimerTick {
@@ -592,6 +604,9 @@ export interface WidgetSnapshot {
   taskTitle: string;
   /** Current task deadline used to decide whether countdown needs scheduling. */
   taskDueDate?: string;
+  taskScheduleRecordId?: string;
+  taskScheduleStartAt?: number;
+  taskScheduleEndAt?: number;
   taskProjectColor?: string;
   /** 计时累计秒数。 */
   elapsedSeconds: number;

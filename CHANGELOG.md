@@ -1,5 +1,23 @@
 # NavoPath 更新日志
 
+## 2026-07-13 · 小组件截止时间联动计时器
+
+### 新增
+- 桌面小组件的番茄钟会按当前任务时间轴结束时间生成可预览的专注 / 休息计划；工作段会均匀调整，最后一段始终为专注并精确对齐任务结束时间。
+
+### 改进
+- 正计时、番茄钟和倒计时现在与当前任务的时间轴记录联动：倒计时默认使用任务结束时间，超时继续工作会延长当前任务，但不会移动后续安排。
+- 三种计时模式在同一个“更多”面板中完成选择和设置；悬停只预览固定说明，单击才切换草稿模式，参数与计划预览可在保存前调整。
+
+## 2026-07-13 · Deadline-linked widget timers
+
+### Added
+- The desktop widget now generates a previewable Pomodoro focus/break plan from the active task's timeline end; work phases are balanced, the final phase is always focus, and it ends exactly at the task deadline.
+
+### Improved
+- Stopwatch, Pomodoro, and countdown now follow the active timeline record: countdown defaults to the task end, while overtime extends only the current task without moving later plans.
+- All three timer modes are selected and configured inside the same More panel; hover only previews fixed guidance, click changes the draft mode, and parameters plus the plan preview remain editable before saving.
+
 ## 2026-07-12 · 习惯候选显示开关
 
 ### 修复

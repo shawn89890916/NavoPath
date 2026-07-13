@@ -8,6 +8,7 @@ import type {
   WidgetTimerRuntime,
   WidgetTimerTick,
 } from "../types";
+import { generateDeadlineAlignedPomodoroPlan } from "./pomodoroPlan";
 
 type WidgetTimerTransition = WidgetTimerTick["transitions"][number];
 
@@ -97,6 +98,15 @@ export const DEFAULT_WIDGET_TIMER_PREFERENCES: WidgetTimerPreferences = {
   breakMinutes: 5,
   rounds: 4,
   countdownSeconds: 25 * 60,
+  minWorkMinutes: 15,
+  maxWorkMinutes: 50,
+  longBreakMinutes: 15,
+  minBreakMinutes: 2,
+  minLongBreakMinutes: 5,
+  longBreakEvery: 4,
+  autoStartNextPhase: false,
+  allowWorkAdjustment: true,
+  allowBreakShortening: true,
 };
 
 export const DEFAULT_WIDGET_RUNTIME: WidgetTimerRuntime = {
@@ -106,6 +116,13 @@ export const DEFAULT_WIDGET_RUNTIME: WidgetTimerRuntime = {
   round: 1,
   phaseStartedAt: 0,
 };
+
+export function createDeadlineAlignedPomodoroRuntime(startAt: number, endAt: number, value: Partial<WidgetTimerPreferences>): WidgetTimerRuntime {
+  const preferences = normalizeWidgetTimerPreferences({ ...value, mode: "pomodoro" });
+  const pomodoroPlan = generateDeadlineAlignedPomodoroPlan({ startAt: new Date(startAt), endAt: new Date(endAt), preferredWorkMinutes: preferences.focusMinutes, minWorkMinutes: preferences.minWorkMinutes || 15, maxWorkMinutes: preferences.maxWorkMinutes || 50, preferredShortBreakMinutes: preferences.breakMinutes, minShortBreakMinutes: preferences.minBreakMinutes || 2, preferredLongBreakMinutes: preferences.longBreakMinutes || 15, minLongBreakMinutes: preferences.minLongBreakMinutes || 5, longBreakEvery: preferences.longBreakEvery || 4 }).map((phase) => ({ ...phase, startAt: phase.startAt.getTime(), endAt: phase.endAt.getTime() }));
+  const first = pomodoroPlan[0];
+  return { mode: "pomodoro", phase: "focus", running: false, round: 1, phaseStartedAt: startAt, phaseEndsAt: first?.endAt || endAt, pausedAt: startAt, pomodoroPlan, currentPomodoroPhaseIndex: 0 };
+}
 
 function isValidCountdownTarget(value: unknown): value is number {
   return Number.isFinite(value) && Number(value) > 0;
@@ -117,7 +134,8 @@ export function taskDueDateTargetAt(dueDate?: string): number | undefined {
   return Number.isFinite(target.getTime()) ? target.getTime() : undefined;
 }
 
-export function resolveWidgetCountdownTarget(dueDate: string | undefined, taskId: string | undefined, runtime: WidgetTimerRuntime): number | undefined {
+export function resolveWidgetCountdownTarget(dueDate: string | undefined, taskId: string | undefined, runtime: WidgetTimerRuntime, scheduledEndAt?: number): number | undefined {
+  if (isValidCountdownTarget(scheduledEndAt)) return scheduledEndAt;
   const dueDateTarget = taskDueDateTargetAt(dueDate);
   if (dueDateTarget !== undefined) return dueDateTarget;
   return runtime.mode === "countdown" && runtime.countdownTaskId === taskId && isValidCountdownTarget(runtime.countdownTargetAt)
@@ -154,6 +172,15 @@ export function normalizeWidgetTimerPreferences(
     breakMinutes: normalizeInteger(value?.breakMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.breakMinutes, 1, 60),
     rounds: normalizeInteger(value?.rounds, DEFAULT_WIDGET_TIMER_PREFERENCES.rounds, 1, 12),
     countdownSeconds: normalizeInteger(value?.countdownSeconds, DEFAULT_WIDGET_TIMER_PREFERENCES.countdownSeconds, 1, 86_400),
+    minWorkMinutes: normalizeInteger(value?.minWorkMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.minWorkMinutes!, 1, 180),
+    maxWorkMinutes: normalizeInteger(value?.maxWorkMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.maxWorkMinutes!, 1, 240),
+    longBreakMinutes: normalizeInteger(value?.longBreakMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.longBreakMinutes!, 1, 120),
+    minBreakMinutes: normalizeInteger(value?.minBreakMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.minBreakMinutes!, 1, 60),
+    minLongBreakMinutes: normalizeInteger(value?.minLongBreakMinutes, DEFAULT_WIDGET_TIMER_PREFERENCES.minLongBreakMinutes!, 1, 120),
+    longBreakEvery: normalizeInteger(value?.longBreakEvery, DEFAULT_WIDGET_TIMER_PREFERENCES.longBreakEvery!, 1, 12),
+    autoStartNextPhase: value?.autoStartNextPhase === true,
+    allowWorkAdjustment: value?.allowWorkAdjustment !== false,
+    allowBreakShortening: value?.allowBreakShortening !== false,
   };
 }
 
@@ -183,7 +210,7 @@ export function normalizeWidgetTimerRuntime(
   const preferences = normalizeWidgetTimerPreferences(preferenceValue);
   const allowedPhases: Record<WidgetTimerMode, WidgetTimerPhase[]> = {
     stopwatch: ["stopwatch"],
-    pomodoro: ["focus", "break"],
+    pomodoro: ["focus", "break", "overrun"],
     countdown: ["countdown", "overrun"],
   };
   const mode = preferences.mode;
@@ -196,6 +223,10 @@ export function normalizeWidgetTimerRuntime(
   const phaseStartedAt = Number.isFinite(value?.phaseStartedAt) && value!.phaseStartedAt! >= 0
     && value!.phaseStartedAt! <= now ? value!.phaseStartedAt! : now;
   const runtime: WidgetTimerRuntime = { mode, phase, running, round, phaseStartedAt };
+  if (mode === "pomodoro" && Array.isArray(value?.pomodoroPlan)) {
+    runtime.pomodoroPlan = value!.pomodoroPlan;
+    runtime.currentPomodoroPhaseIndex = Math.max(0, Math.min(runtime.pomodoroPlan.length - 1, Math.round(value?.currentPomodoroPhaseIndex || 0)));
+  }
   if (phase === "focus" || phase === "break") {
     const fallbackDuration = phase === "focus" ? preferences.focusMinutes * 60_000
       : preferences.breakMinutes * 60_000;
@@ -230,6 +261,9 @@ function calculateWidgetWorkMilliseconds(
   if (!value.running || value.pausedAt !== undefined || now <= from) return 0;
   const preferences = normalizeWidgetTimerPreferences(preferenceValue);
   if (value.mode !== "pomodoro") return Math.max(0, now - from);
+  if (value.pomodoroPlan?.length) {
+    return value.pomodoroPlan.filter((phase) => phase.type === "work").reduce((total, phase) => total + Math.max(0, Math.min(now, phase.endAt) - Math.max(from, phase.startAt)), 0);
+  }
   let cursor = Math.max(from, value.phaseStartedAt);
   let phase: WidgetTimerPhase = value.phase;
   let phaseEndsAt = Math.max(cursor, value.phaseEndsAt ?? cursor);
@@ -338,6 +372,18 @@ export function advanceWidgetTimer(
   if (runtime.running) {
     for (let index = 0; index < 64 && runtime.phaseEndsAt !== undefined && now >= runtime.phaseEndsAt; index += 1) {
       const transitionAt = runtime.phaseEndsAt;
+      if (runtime.mode === "pomodoro" && runtime.pomodoroPlan?.length) {
+        const currentIndex = runtime.currentPomodoroPhaseIndex || 0;
+        const next = runtime.pomodoroPlan[currentIndex + 1];
+        if (!next) {
+          runtime = { ...runtime, phase: "overrun", phaseStartedAt: transitionAt };
+          delete runtime.phaseEndsAt;
+          break;
+        }
+        transitions.push(runtime.phase === "focus" ? "focusComplete" : "breakComplete");
+        runtime = { ...runtime, phase: next.type === "work" ? "focus" : "break", phaseStartedAt: next.startAt, phaseEndsAt: next.endAt, currentPomodoroPhaseIndex: currentIndex + 1, round: next.type === "work" ? runtime.round + 1 : runtime.round };
+        continue;
+      }
       if (runtime.phase === "countdown") {
         transitions.push("countdownComplete");
         runtime = { ...runtime, phase: "overrun", phaseStartedAt: transitionAt };

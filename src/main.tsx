@@ -71,6 +71,7 @@ import {
   advanceWidgetTimer,
   countsWidgetTimerPhaseAsWork,
   createWidgetTimerModeTransition,
+  createDeadlineAlignedPomodoroRuntime,
   createWidgetTimerRuntime,
   getWidgetTimerNotificationDescriptor,
   getStopwatchTaskTimerAction,
@@ -82,6 +83,7 @@ import {
   scheduleWidgetCountdown,
   taskDueDateTargetAt,
 } from "./widget/widgetTimer";
+import { extendActiveTimelineRecord, timelineRecordBounds } from "./widget/widgetSchedule";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -4085,11 +4087,15 @@ function App() {
     const task = timerTask || headerTask;
     const project = task?.projectId ? projects.find((p) => String(p.id) === String(task.projectId)) || null : null;
     const snapshotNow = Date.now();
+    const schedule = timelineRecordBounds(task);
     const widgetTimerTick = advanceWidgetTimer(widgetTimerRuntime, widgetTimerPreferences, snapshotNow);
     return {
       taskId: task?.id,
       taskTitle: task?.title || "",
       taskDueDate: task?.dueDate,
+      taskScheduleRecordId: schedule?.recordId,
+      taskScheduleStartAt: schedule?.startAt,
+      taskScheduleEndAt: schedule?.endAt,
       taskProjectColor: project?.color,
       elapsedSeconds: timerElapsed,
       timerRunning,
@@ -4114,6 +4120,22 @@ function App() {
     };
   }
 
+  const widgetScheduleSyncMinuteRef = useRef(0);
+  function syncActiveTaskScheduleFromTimer(actualEnd: number, force = false) {
+    const currentData = dataRef.current;
+    const activeId = timerTaskRef.current || headerTask?.id;
+    if (!currentData || !activeId) return;
+    const task = currentData.tasks.find((item) => item.id === activeId);
+    const bounds = timelineRecordBounds(task);
+    if (!task || !bounds || actualEnd <= bounds.endAt) return;
+    const minute = Math.floor(actualEnd / 60_000);
+    if (!force && widgetScheduleSyncMinuteRef.current === minute) return;
+    widgetScheduleSyncMinuteRef.current = minute;
+    const updatedTask = extendActiveTimelineRecord(task, bounds.recordId, actualEnd);
+    if (updatedTask === task) return;
+    void saveData({ ...currentData, tasks: currentData.tasks.map((item) => item.id === task.id ? updatedTask : item) });
+  }
+
   /**
    * Process an action request relayed from the desktop widget. Reads the
    * latest state via refs so the handler stays correct even though the
@@ -4132,12 +4154,14 @@ function App() {
         else if (headerTask) startTimer(headerTask.id);
         break;
       case "timerPause":
+        syncActiveTaskScheduleFromTimer(Date.now(), true);
         pauseTimer();
         break;
       case "timerResume":
         resumeTimer();
         break;
       case "timerStop":
+        syncActiveTaskScheduleFromTimer(Date.now(), true);
         stopAndSaveTimer();
         break;
       case "complete":
@@ -4171,16 +4195,18 @@ function App() {
         setTimerRunning(false);
         setTimerStartedAt(null);
         const activeTask = timerTask || headerTask;
-        const countdownTargetAt = action.mode === "countdown" ? taskDueDateTargetAt(activeTask?.dueDate) : undefined;
+        const countdownTargetAt = action.mode === "countdown" ? (timelineRecordBounds(activeTask)?.endAt ?? taskDueDateTargetAt(activeTask?.dueDate)) : undefined;
         const { preferences, runtime: transitionedRuntime } = createWidgetTimerModeTransition(
           action.mode,
           widgetTimerPreferences,
           now,
           countdownTargetAt,
         );
-        const runtime = action.mode === "countdown" && activeTask
+        let runtime: WidgetTimerRuntime = action.mode === "countdown" && activeTask
           ? { ...transitionedRuntime, countdownTaskId: activeTask.id }
           : transitionedRuntime;
+        const scheduleEnd = timelineRecordBounds(activeTask)?.endAt;
+        if (action.mode === "pomodoro" && scheduleEnd && scheduleEnd > now) runtime = createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, preferences);
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
         widgetTimerRuntimeRef.current = runtime;
@@ -4196,11 +4222,22 @@ function App() {
       case "saveTimerSettings": {
         const now = Date.now();
         const preferences = normalizeWidgetTimerPreferences(action.draft);
+        if (preferences.mode !== widgetTimerRuntimeRef.current.mode && widgetTimerRuntimeRef.current.running) {
+          syncActiveTaskScheduleFromTimer(now, true);
+          if (widgetTimerRuntimeRef.current.mode === "stopwatch") pauseTimerAt(now);
+          else advanceWidgetTimerNow();
+          widgetManagesTaskTimerRef.current = false;
+          timerStartedAtRef.current = null;
+          setTimerRunning(false);
+          setTimerStartedAt(null);
+        }
         const activeTask = timerTask || headerTask;
         const target = preferences.mode === "countdown"
-          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current)
+          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current, timelineRecordBounds(activeTask)?.endAt)
           : undefined;
-        const { runtime } = createWidgetTimerModeTransition(preferences.mode, preferences, now, target);
+        let runtime: WidgetTimerRuntime = createWidgetTimerModeTransition(preferences.mode, preferences, now, target).runtime;
+        const scheduleEnd = timelineRecordBounds(activeTask)?.endAt;
+        if (preferences.mode === "pomodoro" && scheduleEnd && scheduleEnd > now) runtime = createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, preferences);
         if (preferences.mode === "countdown" && activeTask) runtime.countdownTaskId = activeTask.id;
         widgetTimerRuntimeRef.current = runtime;
         widgetTimerAdvancedAtRef.current = now;
@@ -4214,9 +4251,11 @@ function App() {
         const preferences = normalizeWidgetTimerPreferences(action.draft);
         const activeTask = timerTask || headerTask;
         const target = preferences.mode === "countdown"
-          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current)
+          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current, timelineRecordBounds(activeTask)?.endAt)
           : undefined;
-        const { runtime } = createWidgetTimerModeTransition(preferences.mode, preferences, now, target);
+        let runtime: WidgetTimerRuntime = createWidgetTimerModeTransition(preferences.mode, preferences, now, target).runtime;
+        const scheduleEnd = timelineRecordBounds(activeTask)?.endAt;
+        if (preferences.mode === "pomodoro" && scheduleEnd && scheduleEnd > now) runtime = createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, preferences);
         if (preferences.mode === "countdown" && activeTask) runtime.countdownTaskId = activeTask.id;
         widgetTimerRuntimeRef.current = runtime;
         widgetTimerAdvancedAtRef.current = now;
@@ -4250,7 +4289,7 @@ function App() {
             timerStartedAtRef.current,
             now,
           );
-          if (taskAction.type === "pause") pauseTimerAt(now);
+          if (taskAction.type === "pause") { syncActiveTaskScheduleFromTimer(now, true); pauseTimerAt(now); }
           else if (taskAction.type === "resume") resumeTimer();
           else if (headerTask) startTimer(headerTask.id);
           const running = taskAction.type !== "pause" && (Boolean(timerTaskRef.current) || Boolean(headerTask));
@@ -4263,6 +4302,7 @@ function App() {
           break;
         }
         if (current.running) {
+          syncActiveTaskScheduleFromTimer(now, true);
           advanceWidgetTimerNow();
           const advanced = widgetTimerRuntimeRef.current;
           const runtime = { ...advanced, running: false, pausedAt: now };
@@ -4275,7 +4315,12 @@ function App() {
           setWidgetTimerRuntime(runtime);
         } else {
           if (current.mode === "countdown" && current.countdownTargetAt === undefined) break;
-          const runtime = { ...current, running: true };
+          const scheduleEnd = timelineRecordBounds(timerTask || headerTask)?.endAt;
+          const prepared = current.mode === "pomodoro" && scheduleEnd && scheduleEnd > now
+            ? createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, widgetTimerPreferences)
+            : current;
+          const runtime = { ...prepared, running: true };
+          delete runtime.pausedAt;
           widgetTimerAdvancedAtRef.current = now;
           widgetTimerRuntimeRef.current = runtime;
           setWidgetTimerRuntime(runtime);
@@ -4317,6 +4362,11 @@ function App() {
     if (!window.desktopApi?.widget) return;
     window.desktopApi.widget.pushSnapshot(buildWidgetSnapshot());
   }, [timerElapsed, timerRunning, timerTaskId, data, settings?.widgetAlwaysOnTop, settings?.widgetAppearance, settings?.widgetAppearanceMigrated, settings?.theme, widgetTimerPreferences, widgetTimerRuntime, widgetPopoverOpen, lang]);
+
+  useEffect(() => {
+    const running = widgetTimerPreferences.mode === "stopwatch" ? timerRunning : widgetTimerRuntime.running;
+    if (running) syncActiveTaskScheduleFromTimer(Date.now());
+  }, [timerElapsed, timerRunning, widgetTimerRuntime, widgetTimerPreferences.mode]);
 
   // Auto-open the widget on launch if the user opted in. Runs once.
   const widgetAutoOpenedRef = useRef(false);

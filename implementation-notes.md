@@ -1,5 +1,29 @@
 # Implementation Notes
 
+## Desktop Widget Timer Audit
+
+### Widget
+- Widget component: `src/widget/WidgetApp.tsx` (`WidgetStrip`, `WidgetPopoverView`).
+- Settings popover: the native child window is managed by `electron/widget-window.cjs`; its React content is `WidgetPopoverView` in the same widget bundle.
+- Timer mode selector: `TimerModeTabs` in `src/widget/WidgetApp.tsx`.
+- Active task source: `timerTask || headerTask` in `src/main.tsx`; `headerTask` prefers the running task, then today's `doing` task, then the first candidate.
+
+### Timeline integration
+- Task scheduled start field: `TimelineRecord.scheduledDate` + `scheduledStart`; legacy task-level fields are fallback only.
+- Task scheduled end field: `TimelineRecord.scheduledEndDate` + `scheduledEnd`.
+- Task duration field: derived from record start/end; `estimatedHours` remains the task estimate.
+- Existing timeline update action: `saveData` updates the owning task's `timelineRecords`; resize uses the same immutable task/record replacement path.
+- Existing conflict detection: overlap is derived from scheduled record intervals; later records are not moved automatically.
+- Existing drag/resize update path: `src/main.tsx` replaces the matching `TimelineRecord` and updates its end time.
+
+### Timer implementation
+- Stopwatch implementation: the existing main task timer (`timerTaskId`, elapsed base, started-at timestamp) is authoritative.
+- Pomodoro implementation: `src/widget/widgetTimer.ts` currently alternates fixed focus/break durations and must be upgraded to a deadline-aligned plan.
+- Countdown implementation: `src/widget/widgetTimer.ts` already supports an absolute target, but currently resolves a due-date day or an ad-hoc scheduled target instead of the active timeline record end.
+- Persistent state: widget preferences live in settings; active task timer and widget runtime are restored from local storage/settings and advanced from timestamps rather than interval counts.
+- Root problems: the widget snapshot lacks the active record bounds; hover and selected mode are not separate; settings replace the popover body; Pomodoro is fixed-cycle; overtime has no shared record-extension service.
+- Reuse plan: keep the existing task timer, widget IPC, settings persistence, and immutable `saveData` path; add deadline metadata to the snapshot, a pure Pomodoro planner, and one record-sync helper used by all overtime modes.
+
 ## Drag Debug Findings
 
 - Drag library: no dnd-kit or external drag library is active. Drag/drop is a mix of custom pointer-event handlers, HTML5 native drag in month/landing paths, and shared overlay helpers from `src/unifiedDrag.tsx`.

@@ -20,10 +20,18 @@ import {
   resolveWidgetCountdownTarget,
   taskDueDateTargetAt,
   scheduleWidgetCountdown,
+  createDeadlineAlignedPomodoroRuntime,
 } from "./widgetTimer";
 import type { Task } from "../types";
 
 describe("widget timer preferences", () => {
+  it("advances through a deadline-aligned plan and enters overtime after its final work phase", () => {
+    const runtime = createDeadlineAlignedPomodoroRuntime(0, 70 * 60_000, DEFAULT_WIDGET_TIMER_PREFERENCES);
+    expect(runtime.pomodoroPlan?.at(-1)).toMatchObject({ type: "work", endAt: 70 * 60_000 });
+    const running = { ...runtime, running: true }; delete running.pausedAt;
+    const advanced = advanceWidgetTimer(running, DEFAULT_WIDGET_TIMER_PREFERENCES, 70 * 60_000 + 1_000);
+    expect(advanced).toMatchObject({ phase: "overrun", displaySeconds: 1 });
+  });
   it("routes detailed settings timer Save and Reset through shared widget actions", () => {
     const mainSource = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
     expect(mainSource).toContain('onWidgetAction({ type: "saveTimerSettings", draft: widgetTimerDraft })');

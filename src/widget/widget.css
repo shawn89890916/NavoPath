@@ -80,6 +80,9 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
   transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 .df-widget-mode-switch button.is-selected { color: var(--widget-ink); border-bottom: 1px solid var(--widget-ink); }
+.df-widget-mode-switch button:hover { color: var(--widget-ink); }
+.df-widget-mode-description { flex: 0 0 auto; min-height: 46px; margin: 0; padding: 7px 4px; color: var(--widget-muted); font-size: 11px; line-height: 1.4; animation: df-widget-description-in 160ms ease; }
+@keyframes df-widget-description-in { from { opacity: .35; } to { opacity: 1; } }
 .df-widget-timer-mode-label { color: var(--widget-muted); font-size: 12px; line-height: 1.3; }
 .df-widget-mode-details { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .df-widget-mode-settings { min-height: 44px; padding: 4px 2px; border-bottom: 1px solid var(--widget-border); }
@@ -100,6 +103,10 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 .df-widget-timer-settings-view > .df-widget-mode-switch, .df-widget-timer-settings-actions { flex: 0 0 auto; }
 .df-widget-schedule-guidance { padding: 6px 0; border-block: 1px solid var(--widget-border); }
 .df-widget-schedule-guidance p { margin: 0; color: var(--widget-muted); font-size: 13px; }
+.df-widget-pomodoro-preview { padding: 7px 8px; border-top: 1px solid var(--widget-border); font-size: 11px; }
+.df-widget-pomodoro-preview > div, .df-widget-deadline { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; color: var(--widget-muted); }
+.df-widget-pomodoro-preview time, .df-widget-deadline time { color: var(--widget-ink); font-family: "Cascadia Mono", Consolas, monospace; }
+.df-widget-pomodoro-preview p { margin: 6px 0 0; color: var(--widget-muted); }
 .df-widget-popover-action:disabled { cursor: not-allowed; opacity: .5; }
 .df-widget-icon-btn:hover, .df-widget-popover-action:hover { border-color: var(--widget-border); background: var(--widget-wash); color: var(--widget-ink); }
 .df-widget-root button:focus-visible, .df-widget-popover-root button:focus-visible, .df-widget-popover-root input:focus-visible { outline: 1px solid var(--widget-ink); outline-offset: 2px; }

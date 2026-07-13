@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, requiresRunningTimerModeConfirmation, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -30,6 +30,12 @@ const snapshot: WidgetSnapshot = {
   timerPhase: "focus",
   popoverOpen: false,
 };
+
+it("requires confirmation only when switching away from a running mode", () => {
+  expect(requiresRunningTimerModeConfirmation(true, "stopwatch", "pomodoro")).toBe(true);
+  expect(requiresRunningTimerModeConfirmation(false, "stopwatch", "pomodoro")).toBe(false);
+  expect(requiresRunningTimerModeConfirmation(true, "pomodoro", "pomodoro")).toBe(false);
+});
 
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean };
 
@@ -157,7 +163,7 @@ describe("WidgetPopoverView", () => {
     expect(html).not.toContain("Timer settings");
     expect(html).toContain('class="df-widget-popover-utilities"');
     expect(html).toContain('class="df-widget-opacity-row"');
-    expect(html).toContain('class="df-widget-timer-mode-label"');
+    expect(html).toContain('class="df-widget-mode-description"');
     expect(html).toContain('role="radiogroup"');
     expect(html).toContain("Stopwatch");
     expect(html).toContain("Pomodoro");
@@ -173,9 +179,30 @@ describe("WidgetPopoverView", () => {
     pomodoro.props.onClick();
     expect(selected).toBe("pomodoro");
     const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: selected } }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
-    expect(html).toContain("Focus");
-    expect(html).toContain("Break");
-    expect(html).toContain("Rounds");
+    expect(html).toContain("Preferred focus");
+    expect(html).toContain("Short break");
+    expect(html).toContain("Long break every");
+  });
+
+  it("previews hovered mode guidance without changing the selected mode", async () => {
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(timerSettings({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } })); });
+    const pomodoro = renderer.root.findByProps({ "data-mode": "pomodoro" });
+    await act(async () => { pomodoro.props.onMouseEnter(); });
+    expect(renderer.root.findByProps({ className: "df-widget-mode-description" }).children.join("")).toContain("task deadline");
+    expect(renderer.root.findByProps({ "data-mode": "stopwatch" }).props["aria-checked"]).toBe(true);
+    await act(async () => { pomodoro.props.onMouseLeave(); });
+    expect(renderer.root.findByProps({ className: "df-widget-mode-description" }).children.join("")).toContain("actual work time");
+    await act(async () => { renderer.unmount(); });
+  });
+
+  it("previews a deadline-aligned Pomodoro plan inside the same popover", () => {
+    const start = new Date("2026-07-13T14:00:00").getTime();
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, taskScheduleStartAt: start, taskScheduleEndAt: start + 70 * 60_000, timerPreferences: { ...snapshot.timerPreferences, mode: "pomodoro" } } as WidgetSnapshot} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    expect(html).toContain("Plan preview");
+    expect(html).toContain("Focus cycles");
+    expect(html).toContain("15:10");
   });
 
   it("routes the only close utility to the close-widget callback", () => {
@@ -248,10 +275,9 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Stopwatch");
     expect(html).toContain("Pomodoro");
     expect(html).toContain("Countdown");
-    expect(html).toContain("Focus");
-    expect(html).toContain("Break");
-    expect(html).toContain("Rounds");
-    expect(html).not.toContain("Long break");
+    expect(html).toContain("Preferred focus");
+    expect(html).toContain("Short break");
+    expect(html).toContain("Long break every");
     expect(render(snapshot)).toContain('aria-label="Close widget"');
     expect((html.match(/tabindex="0"/g) ?? [])).toHaveLength(1);
     expect((html.match(/tabindex="-1"/g) ?? [])).toHaveLength(2);
@@ -270,7 +296,7 @@ describe("WidgetPopoverView", () => {
   it("shows countdown presets only in the timer settings view", () => {
     const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "countdown" }, timerRuntime: { mode: "countdown", phase: "countdown", running: false, round: 1, phaseStartedAt: 1, countdownTargetAt: Date.now() + 60_000 } }} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     for (const minutes of [15, 25, 45, 60]) expect(html).toContain(`>${minutes}<`);
-    expect(html).toContain("Custom");
+    expect(html).toContain("Temporary duration");
     const restingHtml = render(snapshot);
     expect(restingHtml).toContain("Background opacity");
     expect(restingHtml).toContain('aria-label="Unpin widget"');
