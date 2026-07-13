@@ -2,6 +2,7 @@ import type { PlannerData, Task } from "../types";
 import { normalizeHabits } from "./habits";
 import { normalizeNullableLevel, normalizeUrgency } from "./productivityModel";
 import { normalizeTimelineRecord } from "./timelineRecords";
+import { buildAiProfile } from "../aiPersonalization";
 
 export function normalizeTaskForClient(task: Task): Task {
   return {
@@ -15,7 +16,7 @@ export function normalizeTaskForClient(task: Task): Task {
 
 export function normalizePlannerDataForClient(data: PlannerData): PlannerData {
   const habitPatch = normalizeHabits(data);
-  return {
+  const normalized: PlannerData = {
     ...data,
     tasks: (data.tasks || []).map(normalizeTaskForClient),
     projects: (data.projects || []).map((project) => ({
@@ -27,5 +28,9 @@ export function normalizePlannerDataForClient(data: PlannerData): PlannerData {
     scheduleTemplates: data.scheduleTemplates || [],
     habits: habitPatch.habits || [],
     habitDailyStates: habitPatch.habitDailyStates || [],
+  };
+  return {
+    ...normalized,
+    aiProfile: data.aiProfile || buildAiProfile(normalized),
   };
 }

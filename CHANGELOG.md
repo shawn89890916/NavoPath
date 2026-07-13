@@ -4,8 +4,14 @@
 
 ### 新增
 - 桌面小组件的番茄钟会按当前任务时间轴结束时间生成可预览的专注 / 休息计划；工作段会均匀调整，最后一段始终为专注并精确对齐任务结束时间。
+- 新增可靠的 AI 服务网关与健康检查：主服务鉴权失败、限流或超时时会在总时限内切换备用服务，并返回可诊断且不包含任务正文的错误信息。
+- 新建任务现在会在本地自动估算时长，并根据相似任务、实际计时与既有项目给出个性化归属；高置信度归属可撤销，中置信度建议可一键采用。
 
 ### 改进
+- “计划建议”现支持今天、未来三天和本周，以固定事件为锚点生成不冲突的临时时间块；当前候选栏可直接选择范围与策略、批量采用或放弃，长任务可预览分段，未安排任务会说明原因并提供缩短、拆分或移至下一天的操作。
+- AI 对话支持随时取消、失败后保留草稿，并移除打开面板时的模型列表请求；模型路由和高级偏好集中在设置中。
+- 设置页的分区导航在移动端改为横向滚动，不再被桌面端双栏规则挤压或裁切。
+- 规划设置会显示今日待安排量与剩余容量风险，并提供复用同一上下文的“开工简报”和“收工复盘”入口；模糊任务可在任务抽屉中生成明确的下一步行动。
 - 正计时、番茄钟和倒计时现在与当前任务的时间轴记录联动：倒计时默认使用任务结束时间，超时继续工作会延长当前任务，但不会移动后续安排。
 - 三种计时模式在同一个“更多”面板中完成选择和设置；悬停只预览固定说明，单击才切换草稿模式，参数与计划预览可在保存前调整。
 - 小组件时间现在保持垂直居中；“更多”面板将重置、置顶和关闭集中为紧凑图标，并把模式说明改为跟随指针的悬停提示。番茄钟运行时用番茄和草图标区分专注与休息，正计时继续使用播放 / 暂停图标，倒计时启动后不提供暂停。
@@ -14,13 +20,20 @@
 
 ### 修复
 - 修复关闭小组件时主进程向已销毁窗口发送消息而报错的问题。
+- 修复 AI 服务 403/502 后对话长期停留在“思考中”的问题，并修复规划策略被内部最长任务排序覆盖的问题。
 
 ## 2026-07-13 · Deadline-linked widget timers
 
 ### Added
 - The desktop widget now generates a previewable Pomodoro focus/break plan from the active task's timeline end; work phases are balanced, the final phase is always focus, and it ends exactly at the task deadline.
+- Added a reliable AI gateway and health check: authentication failures, rate limits, and timeouts fail over within a total request budget, with diagnostic errors that exclude task content.
+- New tasks now receive local duration estimates and personalized existing-project suggestions based on similar tasks, actual timer history, and prior choices; high-confidence assignments are undoable and medium-confidence suggestions are one click away.
 
 ### Improved
+- Plan Suggestions now covers today, the next three days, or this week, anchors around fixed events, and exposes scope, strategy, adopt-all, and reject controls in the current candidate header; long tasks can be previewed as segments, while unscheduled work includes reasons and shorten, split, or next-day actions.
+- AI conversations can be cancelled, retain the draft after failure, and no longer fetch a model list when the panel opens; routing and advanced preferences live in Settings.
+- Settings navigation now scrolls horizontally on mobile instead of being squeezed or clipped by the desktop two-column rule.
+- Planning settings now show today's unscheduled demand and remaining-capacity risk, with start-of-day brief and day-review prompts that reuse the same context; vague tasks can generate a concrete next action from the task drawer.
 - Stopwatch, Pomodoro, and countdown now follow the active timeline record: countdown defaults to the task end, while overtime extends only the current task without moving later plans.
 - All three timer modes are selected and configured inside the same More panel; hover only previews fixed guidance, click changes the draft mode, and parameters plus the plan preview remain editable before saving.
 - Widget time now stays vertically centered; the More panel groups reset, pin, and close as compact icons, while mode guidance appears as a pointer-following hover tip. A running Pomodoro uses tomato and grass icons for focus and break, stopwatch keeps play/pause icons, and countdown does not offer pause after starting.
@@ -29,6 +42,7 @@
 
 ### Fixed
 - Fixed a main-process error caused by sending to a destroyed window while closing the widget.
+- Fixed conversations remaining stuck in Thinking after AI 403/502 failures, and fixed planner strategies being overwritten by an internal longest-task sort.
 
 ## 2026-07-12 · 习惯候选显示开关
 

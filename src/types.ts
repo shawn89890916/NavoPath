@@ -71,6 +71,42 @@ export type RecurrenceFrequency =
 
 export type ExecutionLane = "candidate" | "queued";
 
+export type AiInferenceSource = "default" | "history" | "ai" | "user";
+
+export interface AiFieldInference {
+  source: AiInferenceSource;
+  confidence: number;
+  inferredAt: string;
+  modelVersion: string;
+  userOverridden?: boolean;
+}
+
+export interface TaskAiInference {
+  duration?: AiFieldInference & { minutes: number };
+  project?: AiFieldInference & { projectId: string };
+}
+
+export interface AiDurationStat {
+  minutes: number;
+  sampleCount: number;
+}
+
+export interface AiPersonalizationProfile {
+  version: 1;
+  updatedAt: string;
+  historySince?: string;
+  durationByProject: Record<string, AiDurationStat>;
+  projectTokenWeights: Record<string, Record<string, number>>;
+  preferredStartHourByProject: Record<string, number>;
+  feedback: {
+    durationCorrections: number;
+    projectCorrections: number;
+    assignmentUndos: number;
+    scheduleAccepts: number;
+    scheduleRejects: number;
+  };
+}
+
 export interface TaskRecurrence {
   mode: RecurrenceMode;
   frequency: RecurrenceFrequency;
@@ -97,6 +133,7 @@ export interface Task {
   importance?: NullablePriority;
   urgency?: NullablePriority;
   estimatedHours?: number;
+  aiInference?: TaskAiInference;
   order?: number;
   subtasks?: Subtask[];
   /** [DEPRECATED] Use timelineRecords instead */
@@ -278,6 +315,7 @@ export interface PlannerData {
   aiConversations?: AiConversation[];
   activeAiConversationId?: string;
   aiMemories: AiMemory[];
+  aiProfile?: AiPersonalizationProfile;
   scheduleTemplates?: ScheduleTemplate[];
   taskLayouts?: Record<string, { tree?: { x: number; y: number }; matrix?: { x: number; y: number } }>;
   sync?: { deleted: Record<string, string> };
@@ -412,6 +450,11 @@ export interface Settings {
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
   dayStartTime: string;
+  scheduleDayStartTime?: string;
+  dayEndTime?: string;
+  scheduleBufferMinutes?: number;
+  autoEstimateTaskDuration?: boolean;
+  autoAssignTaskProject?: boolean;
   /** 时间轴任务标题字体缩放系数（0.85 ~ 1.3）。1 表示默认大小。 */
   timelineFontScale?: number;
   /** 任务块以归属项目色整块填充（true）或仅描边（false）。 */

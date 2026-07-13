@@ -33413,7 +33413,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
   background: #FFFFFF !important;
 
-  border: 1.5px dashed rgba(124, 58, 237, 0.45) !important;
+  border: 1.5px dashed rgba(var(--accent-rgb), 0.46) !important;
 
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06) !important;
 
@@ -33423,9 +33423,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-app.theme-dark .df-time-block[style*="--df-preview:1"] {
 
-  background: rgba(198, 156, 249, 0.10) !important;
+  background: rgba(var(--accent-rgb), 0.10) !important;
 
-  border: 1.5px dashed rgba(198, 156, 249, 0.55) !important;
+  border: 1.5px dashed rgba(var(--accent-rgb), 0.55) !important;
 
 }
 
@@ -33447,9 +33447,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
   border-radius: 999px;
 
-  background: rgba(124, 58, 237, 0.18);
+  background: rgba(var(--accent-rgb), 0.16);
 
-  color: #7C3AED;
+  color: var(--accent-active);
 
   pointer-events: none;
 
@@ -33459,9 +33459,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-app.theme-dark .df-time-block .df-preview-badge {
 
-  background: rgba(202, 255, 114, 0.20);
+  background: rgba(var(--accent-rgb), 0.20);
 
-  color: #CAFF72;
+  color: var(--accent-active);
 
 }
 
@@ -33477,6 +33477,48 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
   font-weight: 500;
 
+}
+
+.df-ai-plan-unscheduled {
+  position: relative;
+  margin-left: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.df-ai-plan-unscheduled summary {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.df-ai-plan-unscheduled > div {
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.df-ai-plan-unscheduled small {
+  color: var(--text-faint);
+}
+
+.df-ai-project-suggestion {
+  max-width: 128px;
+  overflow: hidden;
+  padding: 2px 5px;
+  border: 0;
+  border-bottom: 1px dotted rgba(var(--accent-rgb), 0.58);
+  background: transparent;
+  color: var(--accent-active);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .df-ai-plan.committing {

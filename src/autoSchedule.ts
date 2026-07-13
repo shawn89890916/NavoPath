@@ -1,7 +1,6 @@
 // autoSchedule.ts — Deterministic time-blocking scheduler for NavoPath.
-// One task = one time block. Long tasks are NOT split. If there is no
-// continuous free slot that fits the entire task, the task stays in the
-// "unscheduled" list.
+// Fixed events remain anchors. Tasks are movable work blocks and may be split
+// only when the caller explicitly enables an auditable split preview.
 
 export interface ScheduleTask {
   id: string;
@@ -36,6 +35,9 @@ export interface AutoScheduleSettings {
   snapMinutes?: number;
   defaultTaskDuration?: number;
   bufferMinutes?: number;
+  strategy?: "random" | "byProject" | "alternativeProject" | "longShort";
+  preferredStartHourByProject?: Record<string, number>;
+  allowTaskSplitting?: boolean;
 }
 
 /**
@@ -55,12 +57,16 @@ export interface ProposedEvent {
   isPreview: true;
   reason: string;
   priority: "high" | "medium" | "low";
+  segmentIndex?: number;
+  segmentCount?: number;
 }
 
 export interface UnscheduledTask {
   taskId: string;
   title: string;
   reason: string;
+  code?: "missing_duration" | "insufficient_capacity" | "deadline_conflict" | "no_continuous_slot";
+  actions?: Array<"shorten" | "split" | "move_next_day">;
 }
 
 export interface AutoScheduleResult {
@@ -102,6 +108,49 @@ function overlaps(a: { startMinutes: number; endMinutes: number }, b: { startMin
   return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes;
 }
 
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+  return hash >>> 0;
+}
+
+function orderTasks<T extends ScheduleTask & { estimatedMinutes: number }>(tasks: T[], strategy: AutoScheduleSettings["strategy"]): T[] {
+  const priorityRank = { high: 0, medium: 1, low: 2 };
+  const base = [...tasks].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]
+    || (a.dueDate || "9999-12-31").localeCompare(b.dueDate || "9999-12-31")
+    || b.estimatedMinutes - a.estimatedMinutes);
+  if (strategy === "random") return base.sort((a, b) => stableHash(a.id) - stableHash(b.id));
+  if (strategy === "byProject") return base.sort((a, b) => (a.projectId || "~").localeCompare(b.projectId || "~") || priorityRank[a.priority] - priorityRank[b.priority]);
+  if (strategy === "longShort") {
+    const durationSorted = [...base].sort((a, b) => b.estimatedMinutes - a.estimatedMinutes);
+    const result: T[] = [];
+    let left = 0;
+    let right = durationSorted.length - 1;
+    while (left <= right) {
+      result.push(durationSorted[left++]);
+      if (left <= right) result.push(durationSorted[right--]);
+    }
+    return result;
+  }
+  if (strategy === "alternativeProject") {
+    const groups = new Map<string, T[]>();
+    for (const task of base) {
+      const key = task.projectId || "__none__";
+      groups.set(key, [...(groups.get(key) || []), task]);
+    }
+    const keys = [...groups.keys()];
+    const result: T[] = [];
+    while (result.length < base.length) {
+      for (const key of keys) {
+        const task = groups.get(key)?.shift();
+        if (task) result.push(task);
+      }
+    }
+    return result;
+  }
+  return base;
+}
+
 // ── getFreeSlots ──
 
 export function getFreeSlots(params: {
@@ -113,7 +162,7 @@ export function getFreeSlots(params: {
   const snap = settings.snapMinutes || 15;
   const dayStart = settings.dayStart ? timeToMinutes(settings.dayStart) : 480;
   const dayEnd = settings.dayEnd ? timeToMinutes(settings.dayEnd) : 1320;
-  const buffer = settings.bufferMinutes || 5;
+  const buffer = settings.bufferMinutes ?? 5;
   const now = new Date().getHours() * 60 + new Date().getMinutes();
   const tIso = todayIso();
 
@@ -218,8 +267,6 @@ export function previewEventsToTaskSpecs(
 
 // ── Main scheduler ──
 //
-// One task = one block. NO splitting. If a 4h task has no 4h continuous slot,
-// the task goes to `unscheduledTasks` with reason "no continuous slot".
 export function autoScheduleTasks(params: {
   tasks: ScheduleTask[];
   scheduledEvents: ScheduledEvent[];
@@ -231,6 +278,7 @@ export function autoScheduleTasks(params: {
   const s: Required<AutoScheduleSettings> = {
     dayStart: "08:00", dayEnd: "22:00", snapMinutes: 15,
     defaultTaskDuration: 30, bufferMinutes: 5,
+    strategy: "longShort", preferredStartHourByProject: {}, allowTaskSplitting: true,
     ...params.settings,
   };
   const warnings: string[] = [];
@@ -250,13 +298,22 @@ export function autoScheduleTasks(params: {
   });
   if (missing) warnings.push(`有 ${missing} 个任务缺少时长，已用默认值`);
 
-  // Sort: longest first so big tasks get slots before they fragment
-  withDuration.sort((a, b) => (b.estimatedMinutes || 30) - (a.estimatedMinutes || 30));
+  const orderedTasks = orderTasks(withDuration as Array<typeof withDuration[number] & { estimatedMinutes: number }>, s.strategy);
 
   let freeSlots = getFreeSlots({ dateRange, scheduledEvents: params.scheduledEvents, settings: s });
   const buf = s.bufferMinutes;
 
-  for (const task of withDuration) {
+  const consumeSlot = (slotToUse: FreeSlot, duration: number) => {
+    const next: FreeSlot[] = [];
+    for (const slot of freeSlots) {
+      if (slot !== slotToUse) { next.push(slot); continue; }
+      const after = { date: slot.date, startMinutes: slot.startMinutes + duration + buf, endMinutes: slot.endMinutes };
+      if (after.endMinutes - after.startMinutes >= 15) next.push(after);
+    }
+    freeSlots = next;
+  };
+
+  for (const task of orderedTasks) {
     const dur = task.estimatedMinutes || 30;
     const need = dur + buf;
 
@@ -266,8 +323,10 @@ export function autoScheduleTasks(params: {
     for (const slot of freeSlots) {
       const fit = slot.endMinutes - slot.startMinutes;
       if (fit < need) continue;
-      // Prefer the tightest fit
-      const score = 1000 - (fit - need);
+      const preferredHour = task.projectId ? s.preferredStartHourByProject[task.projectId] : undefined;
+      const preferredPenalty = preferredHour === undefined ? 0 : Math.abs(slot.startMinutes - preferredHour * 60) * 2;
+      const deadlineBonus = task.dueDate === slot.date ? 400 : task.dueDate && task.dueDate < slot.date ? -800 : 0;
+      const score = 1000 - (fit - need) - preferredPenalty + deadlineBonus;
       if (score > bestScore) { bestScore = score; best = slot; }
     }
 
@@ -290,22 +349,42 @@ export function autoScheduleTasks(params: {
         priority: task.priority,
       });
 
-      // Cut the used portion from freeSlots
-      const next: FreeSlot[] = [];
-      for (const slot of freeSlots) {
-        if (slot !== best) { next.push(slot); continue; }
-        const before = { date: slot.date, startMinutes: slot.startMinutes, endMinutes: best.startMinutes };
-        const after = { date: slot.date, startMinutes: best.startMinutes + need, endMinutes: slot.endMinutes };
-        if (before.endMinutes - before.startMinutes >= 15) next.push(before);
-        if (after.endMinutes - after.startMinutes >= 15) next.push(after);
+      consumeSlot(best, dur);
+    } else if (s.allowTaskSplitting && dur >= 60) {
+      const available = freeSlots
+        .filter((slot) => slot.endMinutes - slot.startMinutes >= 30 + buf)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.startMinutes - b.startMinutes);
+      const parts: Array<{ slot: FreeSlot; duration: number }> = [];
+      let remaining = dur;
+      for (const slot of available) {
+        if (remaining <= 0) break;
+        const capacity = Math.floor((slot.endMinutes - slot.startMinutes - buf) / s.snapMinutes) * s.snapMinutes;
+        const partDuration = Math.min(remaining, capacity);
+        if (partDuration < 30 && remaining > partDuration) continue;
+        parts.push({ slot, duration: partDuration });
+        remaining -= partDuration;
       }
-      freeSlots = next;
+      if (remaining <= 0 && parts.length > 1) {
+        parts.forEach((part, index) => {
+          proposed.push({
+            id: uid("preview"), taskId: task.id, clonedTaskId: uid("scheduledTask"),
+            title: task.title, projectId: task.projectId, scheduledDate: part.slot.date,
+            scheduledStart: minutesToTime(part.slot.startMinutes), scheduledEnd: minutesToTime(part.slot.startMinutes + part.duration),
+            durationMinutes: part.duration, isPreview: true, reason: `分段建议 ${index + 1}/${parts.length}`,
+            priority: task.priority, segmentIndex: index + 1, segmentCount: parts.length,
+          });
+          consumeSlot(part.slot, part.duration);
+        });
+      } else {
+        unscheduled.push({ taskId: task.id, title: task.title, reason: `总可用时间不足 ${Math.round(dur)} 分钟`, code: "insufficient_capacity", actions: ["shorten", "split", "move_next_day"] });
+      }
     } else {
-      // No continuous slot fits the entire task — do NOT split
       unscheduled.push({
         taskId: task.id,
         title: task.title,
         reason: `没有 ${Math.round(dur)} 分钟连续空档`,
+        code: "no_continuous_slot",
+        actions: ["shorten", "split", "move_next_day"],
       });
     }
   }

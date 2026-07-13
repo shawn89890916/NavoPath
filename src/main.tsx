@@ -6,8 +6,9 @@ import { Suspense, lazy } from "react";
 import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
 import type { AiAction, AiChatMessage, AiMemoryPatch, AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
-import { filterAiModels, groupAiModels, reasoningModesForModel } from "./utils/aiModels";
-import { autoScheduleTasks } from "./autoSchedule";
+import { reasoningModesForModel } from "./utils/aiModels";
+import { autoScheduleTasks, type UnscheduledTask } from "./autoSchedule";
+import { AI_INFERENCE_MODEL_VERSION, buildAiProfile, predictTaskIntelligence } from "./aiPersonalization";
 import { TaskDragLayer, UnifiedDragOverlay, type UnifiedDragSnapshot } from "./unifiedDrag";
 import { installBrowserFallback, forceLocalPreviewMode } from "./browserFallback";
 import {
@@ -179,14 +180,15 @@ function loadWidgetTimerRuntime(): WidgetTimerRuntime {
 type AddType = "task" | "project" | "event";
 type CompactExecuteView = "tasks" | "schedule";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
-type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
+type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day" | "week"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
 type SettingsPatch = Partial<Settings> & { apiKey?: string; clearApiKey?: boolean };
 type QueuedDataSave = { payload: PlannerData; version: number };
 type QueuedSettingsSave = { payload: SettingsPatch; version: number };
 
 /**
  * SchedulePreview — single source of truth for a preview block.
- * One preview = one real task (no splitting). On accept, a new cloned task
+ * One preview = one real task block. Split suggestions share a source task and
+ * expose segment metadata so the user can review each part before accepting.
  * with `clonedTaskId` is appended to `data.tasks`. The source task stays in
  * 今日候选 until then.
  */
@@ -202,6 +204,8 @@ type SchedulePreview = {
   durationMinutes: number;
   priority: Priority;
   reason: string;
+  segmentIndex?: number;
+  segmentCount?: number;
 };
 
 /** Auto-schedule state machine. */
@@ -1025,8 +1029,17 @@ function defaultForm(type: AddType = "task"): FormState {
   };
 }
 
-function makeTask(form: FormState): Task {
+function makeTask(form: FormState, intelligence?: { data: PlannerData; projects: Project[]; settings: Settings }): Task {
   const now = new Date().toISOString();
+  const prediction = intelligence
+    ? predictTaskIntelligence({ title: form.title, projectId: form.projectId || undefined, data: intelligence.data, projects: intelligence.projects })
+    : undefined;
+  const inferDuration = Boolean(
+    prediction && intelligence?.settings.autoEstimateTaskDuration !== false && Math.abs((form.estimatedHours || 0.5) - 0.5) < 0.001,
+  );
+  const inferredProject = !form.projectId && intelligence?.settings.autoAssignTaskProject !== false ? prediction?.project : undefined;
+  const autoProjectId = inferredProject && inferredProject.confidence >= 0.78 ? inferredProject.projectId : undefined;
+  const estimatedMinutes = inferDuration ? prediction!.duration.minutes : Math.round(Math.max(form.estimatedHours || 0.25, 0.25) * 60);
   return {
     id: uid("task"),
     title: form.title.trim(),
@@ -1036,10 +1049,14 @@ function makeTask(form: FormState): Task {
     notes: form.details,
     goalId: "goal_admission",
     completed: false,
-    projectId: form.projectId || undefined,
+    projectId: form.projectId || autoProjectId,
     importance: form.importance,
     urgency: form.urgency,
-    estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
+    estimatedHours: Math.max(estimatedMinutes / 60, 0.25),
+    aiInference: prediction ? {
+      ...(inferDuration ? { duration: { minutes: prediction.duration.minutes, confidence: prediction.duration.confidence, source: prediction.duration.source, inferredAt: now, modelVersion: AI_INFERENCE_MODEL_VERSION } } : {}),
+      ...(inferredProject ? { project: { projectId: inferredProject.projectId, confidence: inferredProject.confidence, source: inferredProject.source, inferredAt: now, modelVersion: AI_INFERENCE_MODEL_VERSION } } : {}),
+    } : undefined,
     plannedForDate: form.dueDate === todayIso() ? todayIso() : undefined,
     executionLane: form.dueDate === todayIso() ? "candidate" : undefined,
     order: Date.now(),
@@ -1047,6 +1064,11 @@ function makeTask(form: FormState): Task {
     createdAt: now,
     updatedAt: now
   };
+}
+
+function profileWithFeedback(data: PlannerData, key: keyof NonNullable<PlannerData["aiProfile"]>["feedback"], amount = 1) {
+  const profile = data.aiProfile || buildAiProfile(data);
+  return { ...profile, feedback: { ...profile.feedback, [key]: profile.feedback[key] + amount } };
 }
 
 function makeProject(form: FormState): Project {
@@ -1643,6 +1665,7 @@ function App() {
   const [referencedTaskId, setReferencedTaskId] = useState("");
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const aiAbortRef = useRef<AbortController | null>(null);
   const [aiMessages, setAiMessages] = useState<AiSessionMessage[]>([]);
   const [activeAiConversationId, setActiveAiConversationId] = useState("");
   const [aiConversationListOpen, setAiConversationListOpen] = useState(false);
@@ -1652,6 +1675,7 @@ function App() {
   const [aiAttachmentStatus, setAiAttachmentStatus] = useState("");
   // ── Auto-schedule: single source of truth ──
   const [schedulePreviews, setSchedulePreviews] = useState<SchedulePreview[]>([]);
+  const [scheduleUnscheduled, setScheduleUnscheduled] = useState<UnscheduledTask[]>([]);
   const [autoScheduleState, setAutoScheduleState] = useState<AutoScheduleState>("idle");
   const [aiPlanMenuOpen, setAiPlanMenuOpen] = useState(false);
   const [aiPlanPrefs, setAiPlanPrefs] = useState<AiPlanPrefs>({ source: "today", scope: "day", strategy: "longShort" });
@@ -2887,7 +2911,7 @@ function App() {
 
   async function saveData(next: PlannerData) {
     const savedAt = new Date().toISOString();
-    const optimistic = { ...next, savedAt };
+    const optimistic = { ...next, aiProfile: buildAiProfile(next), savedAt };
     const version = dataSaveVersionRef.current + 1;
     dataSaveVersionRef.current = version;
     pendingDataSaveRef.current = { payload: optimistic, version };
@@ -2899,6 +2923,63 @@ function App() {
       remoteRevision: remoteRevisionRef.current,
     });
     scheduleDataFlush();
+  }
+
+  function makeSmartTask(nextForm: FormState) {
+    const current = dataRef.current;
+    const currentSettings = settingsRef.current;
+    return makeTask(nextForm, current && currentSettings ? { data: current, projects: current.projects, settings: currentSettings } : undefined);
+  }
+
+  async function enrichTaskInBackground(task: Task) {
+    const durationConfidence = task.aiInference?.duration?.confidence ?? 1;
+    const projectConfidence = task.aiInference?.project?.confidence ?? 0;
+    if (durationConfidence >= 0.6 && (task.projectId || projectConfidence >= 0.6)) return;
+    const snapshot = dataRef.current;
+    if (!snapshot) return;
+    const { callAiAssistant } = await import("./aiAssistantApi");
+    const result = await callAiAssistant({
+      mode: "enrich_task",
+      message: task.title,
+      context: {
+        task: { id: task.id, title: task.title, estimatedMinutes: Math.round((task.estimatedHours || 0.5) * 60), projectId: task.projectId },
+        projects: snapshot.projects.map((project) => ({ id: project.id, title: project.title })),
+        preferences: snapshot.aiProfile ? {
+          durationByProject: snapshot.aiProfile.durationByProject,
+          feedback: snapshot.aiProfile.feedback,
+        } : undefined,
+      },
+    });
+    if (!result.ok || !result.enrichment) return;
+    const latest = dataRef.current;
+    const currentTask = latest?.tasks.find((item) => item.id === task.id);
+    if (!latest || !currentTask) return;
+    const confidence = Math.max(0, Math.min(1, Number(result.enrichment.confidence) || 0));
+    if (confidence < 0.72) return;
+    const canApplyDuration = !currentTask.aiInference?.duration?.userOverridden
+      && currentTask.estimatedHours === task.estimatedHours
+      && Number.isFinite(result.enrichment.durationMinutes);
+    const projectId = result.enrichment.projectId;
+    const canApplyProject = !currentTask.projectId
+      && !currentTask.aiInference?.project?.userOverridden
+      && typeof projectId === "string"
+      && latest.projects.some((project) => project.id === projectId);
+    if (!canApplyDuration && !canApplyProject) return;
+    const inferredAt = new Date().toISOString();
+    await saveData({
+      ...latest,
+      tasks: latest.tasks.map((item) => item.id === task.id ? {
+        ...item,
+        ...(canApplyDuration ? { estimatedHours: Math.max(15, Number(result.enrichment!.durationMinutes)) / 60 } : {}),
+        ...(canApplyProject ? { projectId } : {}),
+        aiInference: {
+          ...item.aiInference,
+          ...(canApplyDuration ? { duration: { minutes: Math.max(15, Number(result.enrichment!.durationMinutes)), confidence, source: "ai" as const, inferredAt, modelVersion: "gateway-enrich-v1" } } : {}),
+          ...(canApplyProject ? { project: { projectId: projectId!, confidence, source: "ai" as const, inferredAt, modelVersion: "gateway-enrich-v1" } } : {}),
+        },
+        updatedAt: inferredAt,
+      } : item),
+    });
   }
 
   async function saveSettings(patch: SettingsPatch) {
@@ -3544,6 +3625,21 @@ function App() {
     }).sort((a, b) => (a.order || 0) - (b.order || 0)),
     [tasks, today]
   );
+  const dailyCapacityRisk = useMemo(() => {
+    const start = timeToMinutes(settings?.scheduleDayStartTime || "08:00");
+    const end = timeToMinutes(settings?.dayEndTime || "22:00");
+    const scheduledMinutes = scheduledTasks
+      .filter((task) => task.scheduledDate === today && !task.id.startsWith("preview_"))
+      .reduce((total, task) => total + Math.max(timeToMinutes(task.scheduledEnd) - timeToMinutes(task.scheduledStart), 0), 0);
+    const availableMinutes = Math.max(end - start - scheduledMinutes, 0);
+    const demandMinutes = todayCandidates.reduce((total, task) => total + taskDuration(task), 0);
+    const ratio = availableMinutes > 0 ? demandMinutes / availableMinutes : demandMinutes > 0 ? 2 : 0;
+    return {
+      availableMinutes,
+      demandMinutes,
+      level: ratio > 1 ? "high" as const : ratio >= 0.8 ? "medium" as const : "comfortable" as const,
+    };
+  }, [settings?.scheduleDayStartTime, settings?.dayEndTime, scheduledTasks, todayCandidates, today]);
   const completedCandidates = useMemo(
     () => tasks.filter((task) => task.completed && getExecutionLane(task) !== "queued" && Boolean(task.plannedForDate && task.plannedForDate <= today) && !(task.timelineRecords || []).some((r) => r.executionStatus === "scheduled") && !task.scheduledDate && !hasRecurrenceOccurrenceOnDate(task, today)).sort((a, b) => (a.order || 0) - (b.order || 0)),
     [tasks, today]
@@ -3643,9 +3739,31 @@ function App() {
   function updateTask(taskId: string, patch: Partial<Task>) {
     const current = dataRef.current;
     if (!current) return;
+    const existing = current.tasks.find((task) => task.id === taskId);
+    const durationChanged = existing && patch.estimatedHours !== undefined && patch.estimatedHours !== existing.estimatedHours;
+    const projectChanged = existing && Object.prototype.hasOwnProperty.call(patch, "projectId") && patch.projectId !== existing.projectId;
+    const nextProfile = current.aiProfile || buildAiProfile(current);
     void saveData({
       ...current,
-      tasks: current.tasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task)
+      aiProfile: {
+        ...nextProfile,
+        feedback: {
+          ...nextProfile.feedback,
+          durationCorrections: nextProfile.feedback.durationCorrections + (durationChanged ? 1 : 0),
+          projectCorrections: nextProfile.feedback.projectCorrections + (projectChanged ? 1 : 0),
+          assignmentUndos: nextProfile.feedback.assignmentUndos + (projectChanged && existing?.aiInference?.project && !patch.projectId ? 1 : 0),
+        },
+      },
+      tasks: current.tasks.map((task) => task.id === taskId ? {
+        ...task,
+        ...patch,
+        aiInference: task.aiInference ? {
+          ...task.aiInference,
+          ...(durationChanged && task.aiInference.duration ? { duration: { ...task.aiInference.duration, userOverridden: true } } : {}),
+          ...(projectChanged && task.aiInference.project ? { project: { ...task.aiInference.project, userOverridden: true } } : {}),
+        } : undefined,
+        updatedAt: new Date().toISOString(),
+      } : task)
     });
   }
 
@@ -3899,7 +4017,7 @@ function App() {
 
     const createdTasks: Task[] = slots.map((slot) => {
       const durationMinutes = Math.max(timeToMinutes(slot.end) - timeToMinutes(slot.start), SLOT_MINUTES);
-      const task = makeTask({
+      const task = makeSmartTask({
         ...defaultForm("task"),
         title: slot.title,
         dueDate: timelineDate,
@@ -4049,36 +4167,43 @@ function App() {
       }
     }
     if (!title.trim()) return;
-    const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, quickProjectId);
-    const task = makeTask({
+    const task = makeSmartTask({
       ...defaultForm("task"),
       title,
       projectId: quickProjectId,
       dueDate: targetDate,
-      estimatedHours: estimatedMinutes / 60,
     });
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
+    void enrichTaskInBackground(task);
     setQuickTitle("");
     setQuickAddOpen(false);
     if ((settings?.onboardingVersion ?? 0) < 2 && settings?.onboardingStep === "add") {
       void saveSettings({ onboardingStep: "candidates" });
     }
-    showToast(t(lang, "toast.addedToCandidates"));
+    const inferredProject = !quickProjectId && task.projectId ? projects.find((project) => project.id === task.projectId) : undefined;
+    if (inferredProject) {
+      window.setTimeout(() => showUndoToast(
+        lang === "zh" ? `已估时 ${Math.round((task.estimatedHours || 0.5) * 60)} 分钟，并归入「${inferredProject.title}」` : `Estimated ${Math.round((task.estimatedHours || 0.5) * 60)} min and assigned to “${inferredProject.title}”`,
+        lang === "zh" ? "撤销归属" : "Undo assignment",
+        () => updateTask(task.id, { projectId: undefined }),
+      ), 0);
+    } else {
+      showToast(lang === "zh" ? `已加入今日候选 · 预计 ${Math.round((task.estimatedHours || 0.5) * 60)} 分钟` : `Added to today's candidates · ${Math.round((task.estimatedHours || 0.5) * 60)} min`);
+    }
   }
 
   /** Quick-add entry point used by the desktop widget (title comes from IPC). */
   function widgetQuickAdd(title: string) {
     if (!data || !title.trim()) return;
     const targetDate = today;
-    const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, "");
-    const task = makeTask({
+    const task = makeSmartTask({
       ...defaultForm("task"),
       title,
       projectId: "",
       dueDate: targetDate,
-      estimatedHours: estimatedMinutes / 60,
     });
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
+    void enrichTaskInBackground(task);
     showToast(t(lang, "toast.addedToCandidates"));
   }
 
@@ -4443,7 +4568,7 @@ function App() {
       }
       const cleanTitle = quickSchedule.title.replace(/#[^\s#]+/g, "").trim() || quickSchedule.title.trim();
       const durationMinutes = learnedTaskDurationMinutes(cleanTitle, data.tasks, projectId);
-      const task = makeTask({
+      const task = makeSmartTask({
         ...defaultForm("task"),
         title: cleanTitle,
         projectId,
@@ -4480,7 +4605,7 @@ function App() {
     const cleanTitle = quickSchedule.title.replace(/#[^\s#]+/g, "").trim() || quickSchedule.title.trim();
     const durationMinutes = learnedTaskDurationMinutes(cleanTitle, data.tasks, projectId);
     const endTime = addMinutes(quickSchedule.startTime, durationMinutes);
-    const task = makeTask({
+    const task = makeSmartTask({
       ...defaultForm("task"),
       title: cleanTitle,
       projectId,
@@ -4512,7 +4637,7 @@ function App() {
     }
     const cleanTitle = title.trim();
     const estimatedMinutes = learnedTaskDurationMinutes(cleanTitle, data.tasks, pid || undefined);
-    const task = makeTask({ ...defaultForm("task"), title: cleanTitle, projectId: pid, dueDate: targetDate, estimatedHours: estimatedMinutes / 60 });
+    const task = makeSmartTask({ ...defaultForm("task"), title: cleanTitle, projectId: pid, dueDate: targetDate, estimatedHours: estimatedMinutes / 60 });
     void saveData({
       ...data,
       projects: nextProjects,
@@ -4585,7 +4710,7 @@ function App() {
     if (!data || !floatingTimeAdd) return;
     const { date, startTime, endTime } = floatingTimeAdd;
     const durationMinutes = timeToMinutes(endTime) - timeToMinutes(startTime);
-    const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: durationMinutes / 60 });
+    const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: durationMinutes / 60 });
     const scheduledRecord = createScheduledRecord(task, date, startTime, durationMinutes);
     void saveData({
       ...data,
@@ -4787,7 +4912,16 @@ function App() {
       scheduledStart: task.scheduledStart,
       scheduledEnd: task.scheduledEnd,
     }));
-    return [...explicit, ...recurrence];
+    const fixedEvents = events
+      .filter((event) => dateRange.includes(event.startDate || event.date) && event.startTime && event.endTime)
+      .map((event) => ({
+        id: event.id,
+        title: event.title,
+        scheduledDate: event.startDate || event.date,
+        scheduledStart: event.startTime,
+        scheduledEnd: event.endTime,
+      }));
+    return [...explicit, ...recurrence, ...fixedEvents];
   }
 
   function findCandidatePlacement(task: Task) {
@@ -4805,7 +4939,13 @@ function App() {
       }],
       scheduledEvents: getScheduledEventsForRange(dateRange),
       dateRange,
-      settings: { dayStart: settings?.dayStartTime || "00:00" },
+      settings: {
+        dayStart: settings?.scheduleDayStartTime || "08:00",
+        dayEnd: settings?.dayEndTime || "22:00",
+        bufferMinutes: settings?.scheduleBufferMinutes ?? 5,
+        preferredStartHourByProject: data?.aiProfile?.preferredStartHourByProject || {},
+        allowTaskSplitting: false,
+      },
     }).proposedEvents[0];
     return tryRange(visibleRange) || tryRange(fallbackRange);
   }
@@ -5817,7 +5957,7 @@ function App() {
         void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details, recurrence: form.recurrence } : event) });
       }
     } else if (addType === "task") {
-      const task = makeTask(form);
+      const task = makeSmartTask(form);
       const durationMinutes = form.dueTime
         ? Math.max(
             form.endTime ? timeToMinutes(form.endTime) - timeToMinutes(form.dueTime) : Math.round((form.estimatedHours || 0.5) * 60),
@@ -5830,6 +5970,7 @@ function App() {
           ? { ...task, plannedForDate: form.dueDate, executionLane: undefined, timelineRecords: [createScheduledRecord(task, form.dueDate || today, form.dueTime, durationMinutes)] }
           : task;
       void saveData({ ...data, tasks: [...data.tasks, createdTask] });
+      void enrichTaskInBackground(createdTask);
     } else if (addType === "project") {
       void saveData({ ...data, projects: [...data.projects, makeProject(form)] });
     } else {
@@ -6054,6 +6195,9 @@ function App() {
       : pickMemoriesForContext(data.aiMemories || []);
 
     let thinkingStage = 0;
+    const requestController = new AbortController();
+    aiAbortRef.current?.abort();
+    aiAbortRef.current = requestController;
     const thinkingTimer = window.setInterval(() => {
       thinkingStage = Math.min(thinkingStage + 1, 2);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
@@ -6071,7 +6215,18 @@ function App() {
         context,
         history,
         memories,
+        signal: requestController.signal,
       });
+      if (!result.ok) {
+        setAiInput((current) => current || msg);
+        setAiMessages((current) => current.map((message) => message.id === assistantId ? {
+          ...message,
+          status: "error",
+          content: result.error.message,
+          steps: [{ label: result.error.message, status: "error" }],
+        } : message));
+        return;
+      }
       const validActions = (result.actions || [])
         .map((action) => action.type === "import_schedule_item" ? { ...action, kind: "task" as const } : action)
         .filter(isValidAiAction);
@@ -6140,6 +6295,7 @@ function App() {
         await saveData({ ...currentData, chat: nextChat, aiConversations: nextConversations, activeAiConversationId: conversationId, aiMemories: nextMemories });
       }
     } catch (error) {
+      setAiInput((current) => current || msg);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
         status: "error",
@@ -6148,8 +6304,20 @@ function App() {
       } : message));
     } finally {
       window.clearInterval(thinkingTimer);
+      if (aiAbortRef.current === requestController) aiAbortRef.current = null;
       setAiBusy(false);
     }
+  }
+
+  function openDailyAiPrompt(kind: "start" | "review") {
+    setAiInput(kind === "start"
+      ? (lang === "zh" ? "请结合今日容量、截止日期和我的常用执行时段，给我一份简短的开工简报：三项重点、首个行动和一项风险。" : "Give me a short start-of-day brief using today's capacity, deadlines, and my preferred work hours: three priorities, the first action, and one risk.")
+      : (lang === "zh" ? "请结合今天的计划、完成情况和计时记录做收工复盘：总结进展、识别偏差，并给出明天的一个调整建议。" : "Review my day using the plan, completions, and timer history: summarize progress, identify variance, and suggest one adjustment for tomorrow."));
+    setAiOpen(true);
+  }
+
+  function cancelAi() {
+    aiAbortRef.current?.abort();
   }
 
   async function handleAiAttachment(file: File) {
@@ -6228,10 +6396,9 @@ function App() {
           const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
           const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : learnedDuration);
           const task: Task = {
-            id: uid("task"), title: action.title, dueDate: a.date, category: validCategory(a.category),
-            priority: validPriority(a.priority), notes: a.notes || "", goalId: "goal_admission", completed: false,
-            projectId,
-            estimatedHours: Math.max(duration, 15) / 60, recurrence, subtasks: [], createdAt: now, updatedAt: now,
+            ...makeSmartTask({ ...defaultForm("task"), title: action.title, projectId: projectId || "", dueDate: a.date, estimatedHours: Math.max(duration, 15) / 60 }),
+            category: validCategory(a.category), priority: validPriority(a.priority), notes: a.notes || "",
+            recurrence, createdAt: now, updatedAt: now,
           };
           if (!recurrence && a.startTime) task.timelineRecords = [createScheduledRecord(task, a.date, a.startTime, Math.max(duration, 15))];
           nextTasks.push(task);
@@ -6247,10 +6414,9 @@ function App() {
         const startTime = a.start || "09:00";
         const date = a.date || today;
         const task: Task = {
-          id: uid("ai"), title: action.title, dueDate: date, category: "personal", priority: "medium",
-          importance: "medium", urgency: "medium", notes: a.reason || "", goalId: "", completed: false,
-          projectId,
-          estimatedHours: duration / 60, scheduledDate: date, scheduledStart: startTime,
+          ...makeSmartTask({ ...defaultForm("task"), title: action.title, projectId: projectId || "", dueDate: date, estimatedHours: duration / 60 }),
+          importance: "medium", urgency: "medium", notes: a.reason || "", goalId: "",
+          scheduledDate: date, scheduledStart: startTime,
           scheduledEnd: a.end || addMinutes(startTime, duration), subtasks: [], order: Date.now(),
           createdAt: now, updatedAt: now,
         };
@@ -6574,10 +6740,9 @@ function App() {
         const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
         const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : learnedTaskDurationMinutes(action.title, currentData.tasks, projectId));
         const task: Task = {
-          id: uid("task"), title: action.title, dueDate: a.date, category: validCategory(a.category),
-          priority: validPriority(a.priority), notes: a.notes || "", goalId: "goal_admission", completed: false,
-          projectId,
-          estimatedHours: Math.max(duration, 15) / 60, recurrence, subtasks: [], createdAt: now, updatedAt: now,
+          ...makeSmartTask({ ...defaultForm("task"), title: action.title, projectId: projectId || "", dueDate: a.date, estimatedHours: Math.max(duration, 15) / 60 }),
+          category: validCategory(a.category), priority: validPriority(a.priority), notes: a.notes || "",
+          recurrence, createdAt: now, updatedAt: now,
         };
         if (!recurrence && a.startTime) task.timelineRecords = [createScheduledRecord(task, a.date, a.startTime, Math.max(duration, 15))];
         await saveData({ ...currentData, tasks: [...currentData.tasks, task] });
@@ -6668,6 +6833,7 @@ function App() {
         message: t(lang, "toast.clarifyPrompt"),
         context: { title: form.title, project: projects.find((project) => project.id === form.projectId)?.title, date: form.dueDate, estimatedHours: form.estimatedHours, notes: form.details, subtasks: task?.subtasks || [] },
       });
+      if (!result.ok) throw new Error(result.error.message);
       const nextAction = result.reply || t(lang, "toast.clarifyHintGeneric");
       setForm((current) => ({ ...current, details: replaceNextAction(current.details, nextAction) }));
       showToast(lang === "zh" ? "已生成下一步建议" : "Next action generated");
@@ -6679,23 +6845,27 @@ function App() {
     }
   }
 
-  async function planMyDay() {
+  async function planMyDay(overrides?: Partial<AiPlanPrefs>) {
     if (autoScheduleState === "generating" || autoScheduleState === "committing") return;
 
-    const sourceTasks = aiPlanPrefs.source === "all"
+    const planPrefs = { ...aiPlanPrefs, ...overrides };
+    if (overrides) setAiPlanPrefs(planPrefs);
+    const sourceTasks = planPrefs.source === "all"
       ? tasks.filter((t) => !t.completed && getExecutionLane(t) !== "queued" && !(t.timelineRecords || []).some((r) => r.executionStatus === "scheduled") && !t.scheduledDate && !hasRecurrenceOccurrenceOnDate(t, today))
       : todayCandidates;
     if (sourceTasks.length === 0) {
-      void dialog.alert(aiPlanPrefs.source === "all" ? t(lang, "toast.noTaskToSchedule") : t(lang, "toast.noCandidateYet"));
+      void dialog.alert(planPrefs.source === "all" ? t(lang, "toast.noTaskToSchedule") : t(lang, "toast.noCandidateYet"));
       return;
     }
     setSchedulePreviews([]);
     setAutoScheduleState("generating");
     setSelectedDate(today);
 
-    const dateRange = aiPlanPrefs.scope === "3day"
-      ? [today, addDays(today, 1), addDays(today, 2)]
-      : [today];
+    const dateRange = planPrefs.scope === "week"
+      ? Array.from({ length: 7 }, (_, index) => addDays(today, index))
+      : planPrefs.scope === "3day"
+        ? [today, addDays(today, 1), addDays(today, 2)]
+        : [today];
 
     const existingEvents = getScheduledEventsForRange(dateRange);
 
@@ -6707,50 +6877,22 @@ function App() {
       scheduledDate: t.scheduledDate, scheduledStart: t.scheduledStart, scheduledEnd: t.scheduledEnd,
     }));
 
-    tasksForSchedule.sort((a, b) => (b.estimatedMinutes || 30) - (a.estimatedMinutes || 30));
-    if (aiPlanPrefs.strategy === "random") {
-      for (let i = tasksForSchedule.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [tasksForSchedule[i], tasksForSchedule[j]] = [tasksForSchedule[j], tasksForSchedule[i]];
-      }
-    } else if (aiPlanPrefs.strategy === "byProject") {
-      tasksForSchedule.sort((a, b) => (a.projectId || "").localeCompare(b.projectId || ""));
-    } else if (aiPlanPrefs.strategy === "longShort") {
-      const sorted = [...tasksForSchedule].sort((a, b) => (b.estimatedMinutes || 30) - (a.estimatedMinutes || 30));
-      const result: typeof tasksForSchedule = [];
-      let l = 0, r = sorted.length - 1;
-      while (l <= r) {
-        if (l <= r) result.push(sorted[l++]);
-        if (l <= r) result.push(sorted[r--]);
-      }
-      tasksForSchedule.length = 0;
-      tasksForSchedule.push(...result);
-    } else if (aiPlanPrefs.strategy === "alternativeProject") {
-      const byProject = new Map<string, typeof tasksForSchedule>();
-      tasksForSchedule.forEach((t) => {
-        const key = t.projectId || "__none__";
-        if (!byProject.has(key)) byProject.set(key, []);
-        byProject.get(key)!.push(t);
-      });
-      tasksForSchedule.length = 0;
-      const keys = [...byProject.keys()];
-      let idx = 0;
-      while (tasksForSchedule.length < sourceTasks.length) {
-        const key = keys[idx % keys.length];
-        const group = byProject.get(key);
-        if (group && group.length > 0) tasksForSchedule.push(group.shift()!);
-        idx++;
-      }
-    }
-
     const result = autoScheduleTasks({
       tasks: tasksForSchedule,
       scheduledEvents: existingEvents,
       dateRange,
-      settings: { dayStart: settings?.dayStartTime || "00:00" },
+      settings: {
+        dayStart: settings?.scheduleDayStartTime || "08:00",
+        dayEnd: settings?.dayEndTime || "22:00",
+        bufferMinutes: settings?.scheduleBufferMinutes ?? 5,
+        strategy: planPrefs.strategy,
+        preferredStartHourByProject: data?.aiProfile?.preferredStartHourByProject || {},
+        allowTaskSplitting: true,
+      },
     });
 
-    // One task = one preview block. NO splitting.
+    // Each proposed block remains a reviewable preview; split segments retain
+    // their shared source id and segment metadata until the user adopts them.
     const previews: SchedulePreview[] = result.proposedEvents.map((ev) => {
       const source = tasks.find((t) => t.id === ev.taskId);
       return {
@@ -6765,21 +6907,37 @@ function App() {
         durationMinutes: ev.durationMinutes,
         priority: ev.priority,
         reason: ev.reason,
+        segmentIndex: ev.segmentIndex,
+        segmentCount: ev.segmentCount,
       };
     });
 
     setSchedulePreviews(previews);
+    setScheduleUnscheduled(result.unscheduledTasks);
     setAutoScheduleState(previews.length > 0 ? "preview" : "idle");
     if (previews.length === 0 && result.unscheduledTasks.length > 0) {
       showToast(`${t(lang, "toast.noContinuousSlot").replace("%COUNT%", String(result.unscheduledTasks.length))}`);
     }
   }
 
+  function handleUnscheduledAction(item: UnscheduledTask, action: NonNullable<UnscheduledTask["actions"]>[number]) {
+    if (action === "shorten") {
+      const task = tasks.find((candidate) => candidate.id === item.taskId);
+      if (task) openTaskEdit(task);
+      return;
+    }
+    setAiPlanMenuOpen(false);
+    void planMyDay({ scope: action === "split" ? "week" : "3day" });
+  }
+
   /**
    * Cancel all auto-schedule previews. Does NOT touch real data.
    */
   function cancelAutoSchedule() {
+    const current = dataRef.current;
+    if (current && schedulePreviews.length > 0) void saveData({ ...current, aiProfile: profileWithFeedback(current, "scheduleRejects", schedulePreviews.length) });
     setSchedulePreviews([]);
+    setScheduleUnscheduled([]);
     setAutoScheduleState("idle");
     dismissToast();
   }
@@ -6789,6 +6947,8 @@ function App() {
    * If the cancelled preview is the last one, return to idle.
    */
   function cancelOnePreview(previewId: string) {
+    const currentData = dataRef.current;
+    if (currentData) void saveData({ ...currentData, aiProfile: profileWithFeedback(currentData, "scheduleRejects") });
     setSchedulePreviews((current) => {
       const next = current.filter((p) => p.id !== previewId);
       if (next.length === 0) setAutoScheduleState("idle");
@@ -6869,7 +7029,7 @@ function App() {
       removedFromCandidate: new Set([preview.sourceTaskId]),
     };
 
-    void saveData({ ...data, tasks: tasksAfter });
+    void saveData({ ...data, tasks: tasksAfter, aiProfile: profileWithFeedback(data, "scheduleAccepts") });
     setSchedulePreviews((current) => {
       const next = current.filter((p) => p.id !== previewId);
       if (next.length === 0) setAutoScheduleState("idle");
@@ -6939,7 +7099,7 @@ function App() {
       });
     }
 
-    void saveData({ ...data, tasks: tasksAfter });
+    void saveData({ ...data, tasks: tasksAfter, aiProfile: profileWithFeedback(data, "scheduleAccepts", toAdd.length) });
     setSchedulePreviews([]);
     setAutoScheduleState("idle");
     if (toAdd[0]?.scheduledDate) {
@@ -7354,23 +7514,53 @@ function App() {
                   ><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/></svg></button>
                 )}
                 {!settings.hideAi && (
-                  <button
-                    className={`df-icon-action df-ai-plan-title-icon ${autoScheduleState === "generating" || autoScheduleState === "committing" ? "thinking" : ""}`}
-                    data-tip={drawerOpen ? t(lang, "timeline.aiPlanToday") : t(lang, "timeline.planningSuggestion")}
-                    aria-label={t(lang, "timeline.aiPlanToday")}
-                    disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen}
-                    onClick={() => void planMyDay()}
-                  >
-                    <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M10 2.5l1.1 3.2 3.4 1.1-3.4 1.1L10 11.1 8.9 7.9 5.5 6.8l3.4-1.1L10 2.5z" />
-                      <path d="M4.8 11.5l.7 2 2.1.7-2.1.7-.7 2-.7-2-2.1-.7 2.1-.7.7-2z" />
-                      <path d="M15.6 12.5l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5.5-1.4z" />
-                    </svg>
-                  </button>
+                  <span className="df-ai-plan-title-tools">
+                    <button
+                      className={`df-icon-action df-ai-plan-title-icon ${autoScheduleState === "generating" || autoScheduleState === "committing" ? "thinking" : ""}`}
+                      data-tip={drawerOpen ? t(lang, "timeline.aiPlanToday") : t(lang, "timeline.planningSuggestion")}
+                      aria-label={t(lang, "timeline.aiPlanToday")}
+                      disabled={autoScheduleState === "generating" || autoScheduleState === "committing" || drawerOpen}
+                      onClick={() => { setAiPlanMenuOpen(false); void planMyDay(); }}
+                    >
+                      <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M10 2.5l1.1 3.2 3.4 1.1-3.4 1.1L10 11.1 8.9 7.9 5.5 6.8l3.4-1.1L10 2.5z" />
+                        <path d="M4.8 11.5l.7 2 2.1.7-2.1.7-.7 2-.7-2-2.1-.7 2.1-.7.7-2z" />
+                        <path d="M15.6 12.5l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5.5-1.4z" />
+                      </svg>
+                    </button>
+                    <button className={`df-icon-action df-ai-plan-options ${aiPlanMenuOpen ? "active" : ""}`} aria-label={t(lang, "timeline.aiPlanningSettings")} aria-expanded={aiPlanMenuOpen} onClick={(event) => { event.stopPropagation(); setAiPlanMenuOpen((open) => !open); }}><span className="df-ai-plan-chevron" aria-hidden="true" /></button>
+                    {schedulePreviews.length > 0 && autoScheduleState === "preview" && <>
+                      <button className="df-icon-action df-ai-plan-confirm" onClick={() => acceptAllPreviews()} title={t(lang, "timeline.adoptAll")} aria-label={t(lang, "timeline.adoptAll")}>✓</button>
+                      <button className="df-icon-action df-ai-plan-cancel" onClick={() => cancelAutoSchedule()} title={t(lang, "timeline.cancelPreview")} aria-label={t(lang, "timeline.cancelPreview")}>✕</button>
+                    </>}
+                    {aiPlanMenuOpen && <span className="df-ai-plan-menu df-ai-plan-menu-visible open" onClick={(event) => event.stopPropagation()}>
+                      <span className={`df-ai-capacity-risk ${dailyCapacityRisk.level}`}>
+                        <strong>{lang === "zh" ? "今日容量" : "Today's capacity"}</strong>
+                        <small>{lang === "zh" ? `待安排 ${formatMinutes(dailyCapacityRisk.demandMinutes)} / 可用 ${formatMinutes(dailyCapacityRisk.availableMinutes)}` : `${formatMinutes(dailyCapacityRisk.demandMinutes)} to place / ${formatMinutes(dailyCapacityRisk.availableMinutes)} free`}</small>
+                      </span>
+                      <label>{t(lang, "timeline.source")}<select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">{t(lang, "timeline.fromCandidates")}</option><option value="all">{t(lang, "timeline.allUnfinished")}</option></select></label>
+                      <label>{t(lang, "timeline.scope")}<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="week">{lang === "zh" ? "本周" : "This week"}</option></select></label>
+                      <label>{t(lang, "timeline.strategy")}<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="alternativeProject">{t(lang, "timeline.alternateByProject")}</option><option value="byProject">{t(lang, "timeline.scheduleByProject")}</option><option value="longShort">{t(lang, "timeline.alternateLongShort")}</option><option value="random">{t(lang, "timeline.random")}</option></select></label>
+                      <span className="df-ai-daily-tools"><button type="button" onClick={() => { setAiPlanMenuOpen(false); openDailyAiPrompt("start"); }}>{lang === "zh" ? "开工简报" : "Start brief"}</button><button type="button" onClick={() => { setAiPlanMenuOpen(false); openDailyAiPrompt("review"); }}>{lang === "zh" ? "收工复盘" : "Day review"}</button></span>
+                    </span>}
+                  </span>
                 )}
               </>
             }
             />
+            {(dailyCapacityRisk.level !== "comfortable" || schedulePreviews.length > 0 || scheduleUnscheduled.length > 0) && (
+              <div className="df-ai-plan-feedback" role="status">
+                {dailyCapacityRisk.level !== "comfortable" && <span className={`df-ai-capacity-inline ${dailyCapacityRisk.level}`}>{lang === "zh" ? `容量${dailyCapacityRisk.level === "high" ? "超载" : "偏紧"}：待安排 ${formatMinutes(dailyCapacityRisk.demandMinutes)}，剩余 ${formatMinutes(dailyCapacityRisk.availableMinutes)}` : `Capacity ${dailyCapacityRisk.level === "high" ? "overloaded" : "tight"}: ${formatMinutes(dailyCapacityRisk.demandMinutes)} to place, ${formatMinutes(dailyCapacityRisk.availableMinutes)} free`}</span>}
+                {schedulePreviews.length > 0 && <span className="df-ai-plan-summary">{t(lang, "timeline.previewPlan").replace("X", String(schedulePreviews.length))}</span>}
+                {scheduleUnscheduled.length > 0 && <details className="df-ai-plan-unscheduled">
+                  <summary>{lang === "zh" ? `${scheduleUnscheduled.length} 项暂未安排` : `${scheduleUnscheduled.length} not scheduled`}</summary>
+                  {scheduleUnscheduled.map((item) => <div key={item.taskId} className="df-ai-plan-unscheduled-item">
+                    <span><strong>{item.title}</strong><small>{item.reason}</small></span>
+                    <span className="df-ai-plan-unscheduled-actions">{(item.actions || []).map((action) => <button key={action} type="button" onClick={() => handleUnscheduledAction(item, action)}>{action === "shorten" ? (lang === "zh" ? "缩短" : "Shorten") : action === "split" ? (lang === "zh" ? "拆分" : "Split") : (lang === "zh" ? "移至下一天" : "Next day")}</button>)}</span>
+                  </div>)}
+                </details>}
+              </div>
+            )}
             {focusTask && (
               <div className="df-active-task-chip" style={focusProject?.color ? { ["--timer-project-color" as string]: focusProject.color } as React.CSSProperties : undefined}>
                 <button className="df-active-task-chip-main" onClick={() => openTaskEdit(focusTask)}>
@@ -7534,7 +7724,7 @@ function App() {
                 </>}
                 {aiPlanMenuOpen && <span className="df-ai-plan-menu open" onClick={(event) => event.stopPropagation()}>
                   <label>{t(lang, "timeline.source")}<select value={aiPlanPrefs.source} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, source: event.target.value as AiPlanPrefs["source"] }))}><option value="today">{t(lang, "timeline.fromCandidates")}</option><option value="all">{t(lang, "timeline.allUnfinished")}</option></select></label>
-                  <label>{t(lang, "timeline.scope")}<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option></select></label>
+                  <label>{t(lang, "timeline.scope")}<select value={aiPlanPrefs.scope} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, scope: event.target.value as AiPlanPrefs["scope"] }))}><option value="day">{viewLabel(lang, "daily")}</option><option value="3day">{viewLabel(lang, "3day")}</option><option value="week">{lang === "zh" ? "本周" : "This week"}</option></select></label>
                   <label>{t(lang, "timeline.strategy")}<select value={aiPlanPrefs.strategy} onChange={(event) => setAiPlanPrefs((current) => ({ ...current, strategy: event.target.value as AiPlanPrefs["strategy"] }))}><option value="alternativeProject">{t(lang, "timeline.alternateByProject")}</option><option value="byProject">{t(lang, "timeline.scheduleByProject")}</option><option value="longShort">{t(lang, "timeline.alternateLongShort")}</option><option value="random">{t(lang, "timeline.random")}</option></select></label>
                 </span>}
               </div>}
@@ -7542,6 +7732,7 @@ function App() {
                 {autoScheduleState === "preview" && schedulePreviews.length > 0 && (
                   <span className="df-ai-plan-summary">{`${t(lang, "timeline.previewPlan").replace("X", String(schedulePreviews.length))}`}</span>
                 )}
+                {scheduleUnscheduled.length > 0 && <details className="df-ai-plan-unscheduled"><summary>{lang === "zh" ? `${scheduleUnscheduled.length} 项暂未安排` : `${scheduleUnscheduled.length} not scheduled`}</summary>{scheduleUnscheduled.map((item) => <div key={item.taskId}><strong>{item.title}</strong><small>{item.reason}</small></div>)}</details>}
               </div>
             </div>
             <div className="df-timeline-body">
@@ -7966,7 +8157,7 @@ function App() {
                                         const startTime = minutesToTime(startMinutes);
                                         const endTime = minutesToTime(endMinutes);
                                         const estimatedH = (endMinutes - startMinutes) / 60;
-                                        const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
+                                        const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
                                         const scheduledRecord = createScheduledRecord(task, date, startTime, endMinutes - startMinutes);
                                         void saveData({
                                           ...data,
@@ -8118,7 +8309,7 @@ function App() {
                                             onSave={(title, projectId) => {
                                               if (!data || !title.trim()) return;
                                               const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, projectId || undefined);
-                                              const newTask = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: day, estimatedHours: estimatedMinutes / 60 });
+                                              const newTask = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: day, estimatedHours: estimatedMinutes / 60 });
                                               void saveData({ ...data, tasks: [...data.tasks, { ...newTask, plannedForDate: day, scheduledDate: day, order: Date.now() }] });
                                               setMonthQuickAdd(null);
                                               showToast(t(lang, "timeline.taskAdded"));
@@ -8397,7 +8588,7 @@ function App() {
                                   const startTime = minutesToTime(startMinutes);
                                   const endTime = minutesToTime(endMinutes);
                                   const estimatedH = (endMinutes - startMinutes) / 60;
-                                  const task = makeTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
+                                  const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
                                   const scheduledRecord = createScheduledRecord(task, date, startTime, endMinutes - startMinutes);
                                   void saveData({
                                     ...data,
@@ -8453,7 +8644,7 @@ function App() {
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} model={settings.model} onModelChange={(model) => void saveSettings({ model })} reasoningMode={settings.reasoningMode || "instant"} onReasoningModeChange={(reasoningMode) => void saveSettings({ reasoningMode })} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => { setUtilityPanel(null); setScheduleTemplateOpen(true); }} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
@@ -10247,6 +10438,9 @@ function TaskCard({
   const isPlacementArmed = placementPreview?.taskId === task.id;
   const hasSubtasks = (task.subtasks || []).length > 0;
   const displayTitle = task.title.trimStart();
+  const suggestedProject = !task.projectId && !task.aiInference?.project?.userOverridden && (task.aiInference?.project?.confidence || 0) >= 0.45
+    ? projects.find((project) => project.id === task.aiInference?.project?.projectId)
+    : undefined;
 
   useEffect(() => {
     setDraftDueDate(task.dueDate || focusDate);
@@ -10309,6 +10503,12 @@ function TaskCard({
             {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
             {!isEvent && (task.subtasks || []).length > 0 && <span className="df-candidate-subtask-count" title={lang === "zh" ? "子任务进度" : "Subtask progress"}>{countDoneSubtasks(task.subtasks)}/{countSubtasks(task.subtasks)}</span>}
           </TaskBlockContent>
+          {suggestedProject && <button
+            type="button"
+            className="df-ai-project-suggestion"
+            title={lang === "zh" ? `建议归入「${suggestedProject.title}」` : `Suggested project: ${suggestedProject.title}`}
+            onClick={(event) => { event.stopPropagation(); onProjectChange(suggestedProject.id); }}
+          >↗ {suggestedProject.title}</button>}
           {!isEvent && <TaskBlockDuration>
             <button
               className="df-duration-pill"
@@ -10801,7 +11001,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const sizeClass = height < 56 ? "short" : height >= 120 ? "tall" : "normal";
   
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragging={Boolean(isPreview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ top, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ top, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
@@ -11625,62 +11825,19 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, busy, onSend, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate, model, onModelChange, reasoningMode, onReasoningModeChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string; model: string; onModelChange: (model: string) => void; reasoningMode: Settings["reasoningMode"]; onReasoningModeChange: (mode: Settings["reasoningMode"]) => void }) {
+function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
   const projects = projectList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
-  const [availableModels, setAvailableModels] = useState<string[]>(model ? [model] : []);
-  const [modelsLoading, setModelsLoading] = useState(true);
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  useEffect(() => {
-    let active = true;
-    void import("./aiAssistantApi").then(({ listAiModels }) => listAiModels()).then((models) => {
-      if (!active) return;
-      const curatedModels = filterAiModels([model, ...models]);
-      setAvailableModels(curatedModels);
-      if (curatedModels.length > 0 && !curatedModels.includes(model)) onModelChange(curatedModels[0]);
-    }).finally(() => { if (active) setModelsLoading(false); });
-    return () => { active = false; };
-  }, []);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !followLatestRef.current) return;
     body.scrollTo({ top: body.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, attachmentStatus]);
-  useEffect(() => {
-    if (!modelMenuOpen) return;
-    const frame = window.requestAnimationFrame(() => {
-      const menu = modelMenuRef.current?.querySelector<HTMLElement>(".df-ai-model-menu");
-      const selected = menu?.querySelector<HTMLElement>("[aria-selected='true']");
-      if (menu && selected) menu.scrollTop = Math.max(0, selected.offsetTop - menu.clientHeight / 2 + selected.clientHeight / 2);
-    });
-    const closeMenu = (event: PointerEvent) => {
-      if (!modelMenuRef.current?.contains(event.target as Node)) setModelMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setModelMenuOpen(false); };
-    document.addEventListener("pointerdown", closeMenu);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("pointerdown", closeMenu);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [modelMenuOpen]);
   const contextLabel = lang === "zh"
     ? `${contextDate} · ${historyCount} 条历史 · ${memoryCount} 条记忆`
     : `${contextDate} · ${historyCount} history · ${memoryCount} memories`;
-  const modelGroups = groupAiModels(availableModels);
-  const modelOptions = modelGroups.flatMap((group) => group.models);
-  const selectedModel = modelOptions.find((option) => option.id === model);
-  const reasoningModes = reasoningModesForModel(model);
-  useEffect(() => {
-    if (!reasoningModes.includes(reasoningMode)) onReasoningModeChange("instant");
-  }, [model, reasoningMode]);
-  const economyModels = modelOptions.filter((option) => option.tier === "economy");
-  const standardModels = modelOptions.filter((option) => option.tier === "standard");
-  const proModels = modelOptions.filter((option) => option.tier === "pro");
   const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
   const promptSuggestions = lang === "zh"
     ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天", "从今日候选里制定计划", "查看我的下一个时间任务", "你能帮我做什么？"]
@@ -11855,29 +12012,7 @@ function AiPanel({ input, setInput, busy, onSend, onPlanToday, planState, onClos
       <div className="df-ai-composer-row">
         <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
         <label className="df-ai-attach-btn" title={text.upload}>＋<input type="file" accept={ATTACHMENT_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttachment(file); event.currentTarget.value = ""; }} /></label>
-        <button className="df-ai-send-btn" onClick={onSend} disabled={busy || (!input.trim() && !attachment)} title={busy ? t(lang, "aiPanel.thinking") : t(lang, "aiPanel.send")}>{busy ? "●" : "↑"}</button>
-        <div className="df-ai-model-picker" ref={modelMenuRef}>
-          <button className="df-ai-model-trigger" type="button" disabled={modelsLoading || busy} aria-haspopup="listbox" aria-expanded={modelMenuOpen} onClick={() => setModelMenuOpen((open) => !open)}>
-            <span>{selectedModel?.label || model}</span>{selectedModel?.pro && <b>PRO</b>}<i aria-hidden="true">⌄</i>
-          </button>
-          {modelMenuOpen && <div className="df-ai-model-menu" role="listbox" aria-label={lang === "zh" ? "选择模型" : "Choose model"}>
-            {[{ label: "ECONOMY", models: economyModels, tone: "economy" }, { label: "STANDARD", models: standardModels, tone: "standard" }, { label: "PRO", models: proModels, tone: "pro" }].map((tier) => tier.models.length > 0 && <section key={tier.label} className={`df-ai-model-tier ${tier.tone}`}>
-              <header><strong>{tier.label} <i aria-hidden="true">i</i></strong>{tier.tone === "pro" && <small>{lang === "zh" ? "最新旗舰模型" : "Latest flagship models"}</small>}</header>
-              <div className="df-ai-model-tier-list">
-                {tier.models.map((option) => <button type="button" role="option" aria-selected={option.id === model} className={option.id === model ? "selected" : ""} key={option.id} onClick={() => { onModelChange(option.id); setModelMenuOpen(false); }}>
-                  <em>{option.label}</em><small>{tier.label === "PRO" ? "PRO" : option.family}</small>{option.id === model && <i aria-hidden="true">✓</i>}
-                </button>)}
-              </div>
-            </section>)}
-            <button type="button" className="df-ai-model-manage" onClick={() => { setModelMenuOpen(false); onOpenMemorySettings(); }}>{lang === "zh" ? "管理模型…" : "Manage models…"}</button>
-          </div>}
-        </div>
-        <label className="df-ai-reasoning-picker">
-          <span>{lang === "zh" ? "思考" : "Reasoning"}</span>
-          <select value={reasoningMode} disabled={busy} onChange={(event) => onReasoningModeChange(event.target.value as Settings["reasoningMode"])}>
-            {reasoningModes.map((option) => <option key={option} value={option}>{option === "instant" ? (lang === "zh" ? "即时" : "Instant") : option === "high" ? "High" : "Xhigh"}</option>)}
-          </select>
-        </label>
+        <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")}>{busy ? "■" : "↑"}</button>
       </div>
       <small className="df-ai-reference-disclaimer">{lang === "zh" ? "AI 生成内容可能有误，请核对重要安排。" : "AI can make mistakes. Check important schedule changes."}</small>
     </div>
@@ -13078,10 +13213,18 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               </div>
             </section>}
             {settingsSection === "ai" && <section className="df-settings-group"><h3>Navo AI</h3>
-            <label className="df-utility-select">{lang === "zh" ? "默认模型" : "Default model"}<input value={settings.model} readOnly /></label>
+            <p className="df-settings-desc">{lang === "zh" ? "模型由服务端网关自动路由；即使 AI 暂时不可用，本地估时、分类与排程仍可工作。" : "Models are routed by the server gateway. Local estimation, classification, and scheduling keep working if AI is unavailable."}</p>
+            <label className="df-utility-select">{lang === "zh" ? "高级模型偏好" : "Advanced model preference"}<input value={settings.model} readOnly /></label>
             <label className="df-utility-select">{lang === "zh" ? "思考模式" : "Reasoning mode"}<select value={settings.reasoningMode || "instant"} onChange={(event) => onSave({ reasoningMode: event.target.value as Settings["reasoningMode"] })}><option value="instant">{lang === "zh" ? "即时" : "Instant"}</option>{reasoningModesForModel(settings.model).includes("high") && <option value="high">High</option>}{reasoningModesForModel(settings.model).includes("xhigh") && <option value="xhigh">Xhigh</option>}</select></label>
+            <label className="df-utility-check"><input type="checkbox" checked={settings.autoEstimateTaskDuration !== false} onChange={(event) => onSave({ autoEstimateTaskDuration: event.target.checked })} />{lang === "zh" ? "创建任务时自动估算用时" : "Estimate duration when creating tasks"}</label>
+            <label className="df-utility-check"><input type="checkbox" checked={settings.autoAssignTaskProject !== false} onChange={(event) => onSave({ autoAssignTaskProject: event.target.checked })} />{lang === "zh" ? "高置信度时自动归入已有项目" : "Auto-assign to an existing project at high confidence"}</label>
+            <div className="df-settings-divider" />
+            <label className="df-utility-select">{lang === "zh" ? "规划开始" : "Planning starts"}<input type="time" value={settings.scheduleDayStartTime || "08:00"} onChange={(event) => onSave({ scheduleDayStartTime: event.target.value })} /></label>
+            <label className="df-utility-select">{lang === "zh" ? "规划结束" : "Planning ends"}<input type="time" value={settings.dayEndTime || "22:00"} onChange={(event) => onSave({ dayEndTime: event.target.value })} /></label>
+            <label className="df-utility-select">{lang === "zh" ? "任务缓冲（分钟）" : "Task buffer (minutes)"}<input type="number" min="0" max="60" step="5" value={settings.scheduleBufferMinutes ?? 5} onChange={(event) => onSave({ scheduleBufferMinutes: Math.max(0, Math.min(60, Number(event.target.value) || 0)) })} /></label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />{t(lang, "settings.allowAiContext")}</label>
             <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
+            <button className="df-ai-clear-history" onClick={() => { const now = new Date().toISOString(); onSaveData({ ...data, aiProfile: { version: 1, updatedAt: now, historySince: now, durationByProject: {}, projectTokenWeights: {}, preferredStartHourByProject: {}, feedback: { durationCorrections: 0, projectCorrections: 0, assignmentUndos: 0, scheduleAccepts: 0, scheduleRejects: 0 } } }); }}>{lang === "zh" ? "重置个性化学习" : "Reset personalization"}</button>
             <section className="df-ai-memory-settings">
               <div className="df-ai-memory-settings-head">
                 <div><strong>AI 记忆</strong><small>{visibleMemories.length} 条会参与上下文</small></div>

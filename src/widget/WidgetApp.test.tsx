@@ -237,11 +237,14 @@ describe("WidgetPopoverView", () => {
   });
 
   it("previews a deadline-aligned Pomodoro plan inside the same popover", () => {
-    const start = new Date("2026-07-13T14:00:00").getTime();
-    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, taskScheduleStartAt: start, taskScheduleEndAt: start + 70 * 60_000, timerPreferences: { ...snapshot.timerPreferences, mode: "pomodoro" } } as WidgetSnapshot} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
+    const start = Date.now() + 60_000;
+    const end = start + 70 * 60_000;
+    const endDate = new Date(end);
+    const endLabel = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
+    const html = renderToStaticMarkup(<WidgetTimerSettingsView snapshot={{ ...snapshot, taskScheduleStartAt: start, taskScheduleEndAt: end, timerPreferences: { ...snapshot.timerPreferences, mode: "pomodoro" } } as WidgetSnapshot} onSave={() => undefined} onCancel={() => undefined} onReset={() => undefined} onSchedule={() => undefined} />);
     expect(html).toContain("Plan preview");
     expect(html).toContain("Focus cycles");
-    expect(html).toContain("15:10");
+    expect(html).toContain(endLabel);
   });
 
   it("routes reset and close utility callbacks", () => {

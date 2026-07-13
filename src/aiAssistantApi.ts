@@ -1,72 +1,22 @@
-// aiAssistantApi.ts — Frontend wrapper for NavoPath AI Assistant
-// Calls the Supabase Edge Function that proxies the configured AI provider.
-// NEVER exposes SILICONFLOW_API_KEY to the browser.
+// Frontend wrapper for the server-managed NavoPath AI gateway.
+// Provider credentials never enter the renderer process.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { localIsoDate } from "./utils/localDate";
 import { filterAiModels } from "./utils/aiModels";
 
-export type AiMode = "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "import_schedule" | "summarize_memory";
-
-export type AiStep = {
-  label: string;
-  status: "pending" | "running" | "done" | "error";
-};
-
-export type AiChatMessage = {
-  role: "user" | "assistant" | "system";
-  content: string;
-};
-
-export type AiMemoryPatch = {
-  content: string;
-  tags?: string[];
-};
+export type AiMode = "health" | "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "plan_schedule" | "enrich_task" | "import_schedule" | "summarize_memory";
+export type AiStep = { label: string; status: "pending" | "running" | "done" | "error" };
+export type AiChatMessage = { role: "user" | "assistant" | "system"; content: string };
+export type AiMemoryPatch = { content: string; tags?: string[] };
 
 export type AiAction =
-  | {
-      type: "create_subtasks";
-      taskId?: string;
-      projectId?: string;
-      subtasks?: { title: string; estimateMinutes?: number }[];
-      reason?: string;
-    }
-  | {
-      type: "create_task";
-      title?: string;
-      projectId?: string;
-      date?: string;
-      start?: string;
-      end?: string;
-      reason?: string;
-    }
-  | {
-      type: "schedule_task";
-      taskId?: string;
-      date?: string;
-      start?: string;
-      end?: string;
-      reason?: string;
-    }
-  | {
-      type: "create_scheduled_task";
-      title?: string;
-      projectId?: string;
-      projectName?: string;
-      date?: string;
-      start?: string;
-      end?: string;
-      durationMinutes?: number;
-      reason?: string;
-    }
-  | {
-      type: "plan_day";
-      reason?: string;
-    }
-  | {
-      type: "none";
-      reason?: string;
-    }
+  | { type: "create_subtasks"; taskId?: string; projectId?: string; subtasks?: { title: string; estimateMinutes?: number }[]; reason?: string }
+  | { type: "create_task"; title?: string; projectId?: string; date?: string; start?: string; end?: string; durationMinutes?: number; reason?: string }
+  | { type: "schedule_task"; taskId?: string; date?: string; start?: string; end?: string; reason?: string }
+  | { type: "create_scheduled_task"; title?: string; projectId?: string; projectName?: string; date?: string; start?: string; end?: string; durationMinutes?: number; reason?: string }
+  | { type: "plan_day"; reason?: string }
+  | { type: "none"; reason?: string }
   | {
       type: "import_schedule_item";
       kind?: "task" | "event";
@@ -93,16 +43,15 @@ export type AiAction =
       warning?: string;
     };
 
-export type AiPlanBlock = {
-  taskId?: string;
-  title: string;
-  start: string;
-  end: string;
-  durationMinutes?: number;
-  reason?: string;
+export type AiPlanBlock = { taskId?: string; title: string; start: string; end: string; durationMinutes?: number; reason?: string };
+export type AiServiceError = {
+  code: "AI_NOT_CONFIGURED" | "AI_AUTH" | "AI_RATE_LIMIT" | "AI_TIMEOUT" | "AI_CANCELLED" | "AI_PROVIDER" | "AI_NETWORK" | "AI_BAD_RESPONSE";
+  retryable: boolean;
+  requestId?: string;
+  message: string;
 };
 
-export type AiAssistantResponse = {
+type AiAssistantPayload = {
   reply: string;
   actions: AiAction[];
   steps?: AiStep[];
@@ -110,60 +59,76 @@ export type AiAssistantResponse = {
   intent?: string;
   plan?: AiPlanBlock[];
   format?: "text" | "markdown";
+  enrichment?: { durationMinutes?: number; projectId?: string; confidence?: number };
 };
 
-/**
- * Strip any number of nested JSON layers from the `reply` field. Mirrors the
- * server-side `unwrapReplyLayers` in supabase/functions/ai-assistant/index.ts
- * so the UI is protected even if the edge function is on an older revision.
- */
+export type AiAssistantResponse =
+  | (AiAssistantPayload & { ok: true; error?: never })
+  | (AiAssistantPayload & { ok: false; error: AiServiceError });
+
+export type AiHealthResponse = { ok: boolean; status: "ready" | "degraded" | "unavailable"; version?: string; configuredProviders?: string[] };
+
+const AI_REQUEST_TIMEOUT_MS = 25_000;
+
+function failure(error: AiServiceError): AiAssistantResponse {
+  return { ok: false, reply: error.message, actions: [], steps: [{ label: error.message, status: "error" }], error };
+}
+
 function unwrapNestedResponse(result: AiAssistantResponse): AiAssistantResponse {
   let reply = result.reply;
   for (let i = 0; i < 8; i += 1) {
     const trimmed = reply.trim();
     if (!trimmed.startsWith("{")) break;
     try {
-      const nested = JSON.parse(trimmed) as Partial<AiAssistantResponse>;
+      const nested = JSON.parse(trimmed) as Partial<AiAssistantPayload>;
       if (typeof nested.reply === "string" && nested.reply !== trimmed) {
         reply = nested.reply;
         continue;
       }
     } catch {
-      // not parseable -> done
+      // Plain text is already safe to render.
     }
     break;
   }
-  return {
-    reply,
-    actions: result.actions,
-    steps: result.steps,
-    memories: result.memories,
-    intent: result.intent,
-    plan: result.plan,
-    format: result.format,
-  };
+  return { ...result, reply };
 }
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
 }
 
-let _cache: SupabaseClient | null = null;
-
+let cachedClient: SupabaseClient | null = null;
 function getClient(): SupabaseClient | null {
-  if (_cache) return _cache;
+  if (cachedClient) return cachedClient;
   const url = (import.meta as any).env?.VITE_SUPABASE_URL;
   const key = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  _cache = createClient(url, key);
-  return _cache;
+  cachedClient = createClient(url, key);
+  return cachedClient;
 }
 
-/**
- * Call the AI Assistant via Supabase Edge Function.
- * NEVER exposes SILICONFLOW_API_KEY to the browser.
- */
-export async function callAiAssistant(params: {
+async function readFunctionError(error: unknown): Promise<AiServiceError> {
+  const candidate = error as { message?: string; context?: Response };
+  let payload: any = null;
+  try {
+    payload = candidate.context ? await candidate.context.clone().json() : null;
+  } catch {
+    payload = null;
+  }
+  if (payload?.error?.code) {
+    return {
+      code: payload.error.code,
+      retryable: Boolean(payload.error.retryable),
+      requestId: payload.error.requestId,
+      message: payload.error.message || "AI 服务暂时不可用。",
+    };
+  }
+  const message = candidate.message || "";
+  if (/not found|not deployed/i.test(message)) return { code: "AI_NOT_CONFIGURED", retryable: false, message: "AI 服务尚未部署。" };
+  return { code: "AI_PROVIDER", retryable: true, message: "AI 服务暂时不可用，请稍后重试。" };
+}
+
+export async function invokeAiAssistant(client: SupabaseClient, params: {
   mode: AiMode;
   message: string;
   model?: string;
@@ -172,122 +137,77 @@ export async function callAiAssistant(params: {
   history?: AiChatMessage[];
   memories?: AiMemoryPatch[];
   signal?: AbortSignal;
+  timeoutMs?: number;
 }): Promise<AiAssistantResponse> {
-  // Always include current date context for date parsing
-  const currentDate = localIsoDate();
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const enrichedContext = {
-    ...(params.context as Record<string, unknown> || {}),
-    currentDate,
-    timezone,
-  };
-
-  // Try desktop IPC first if available (more reliable than edge function on desktop)
-  const isDesktop = typeof window !== "undefined" && window.desktopApi?.isDesktop?.();
-  if (isDesktop && window.desktopApi?.aiChat) {
-    try {
-      if (params.signal?.aborted) {
-        return { reply: "请求已取消。", actions: [], steps: [{ label: "请求已取消", status: "error" }] };
-      }
-      const systemPrompt = buildDesktopSystemPrompt(params.mode, enrichedContext, params.memories);
-      const messages: AiChatMessage[] = [
-        { role: "system", content: systemPrompt },
-        ...(params.history || []),
-        { role: "user", content: params.message },
-      ];
-      const result = await window.desktopApi.aiChat({ messages, draftText: "" });
-      return {
-        reply: result.reply || "完成",
-        actions: Array.isArray(result.actions) ? result.actions.map((a: any) => adaptDesktopAction(a)) : [],
-        steps: [{ label: "AI 回复", status: "done" }],
-      };
-    } catch (err) {
-      console.warn("Desktop AI fallback failed, trying Supabase:", err);
-      // Fall through to Supabase
-    }
-  }
-
-  const client = getClient();
-  if (!client) {
-    return {
-      reply: "AI 服务未配置，请在设置中连接 Supabase。",
-      actions: [],
-      steps: [{ label: "连接 AI 服务", status: "error" }],
-    };
-  }
+  const timeoutMs = params.timeoutMs || AI_REQUEST_TIMEOUT_MS;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = window.setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  const abort = () => controller.abort();
+  if (params.signal?.aborted) controller.abort();
+  else params.signal?.addEventListener("abort", abort, { once: true });
 
   try {
-    if (params.signal?.aborted) {
-      return { reply: "请求已取消。", actions: [], steps: [{ label: "请求已取消", status: "error" }] };
-    }
+    const currentDate = localIsoDate();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const context = { ...((params.context as Record<string, unknown>) || {}), currentDate, timezone };
     const { data, error } = await client.functions.invoke("ai-assistant", {
-      body: { ...params, context: enrichedContext, signal: undefined },
+      body: { ...params, context, signal: undefined, timeoutMs: undefined },
+      signal: controller.signal,
+      timeout: timeoutMs,
     });
-
-    if (error) {
-      console.error("AI Assistant edge function error:", error);
-      const msg = error.message || "";
-      if (msg.includes("Missing SILICONFLOW_API_KEY")) {
-        return { reply: "AI 服务未配置 API Key，请联系管理员。", actions: [], steps: [{ label: "验证 API Key", status: "error" }] };
-      }
-      if (msg.includes("function not found") || msg.includes("not deployed")) {
-        return { reply: "AI 服务未部署，请在 Supabase 部署 ai-assistant 函数。", actions: [], steps: [{ label: "连接 AI 服务", status: "error" }] };
-      }
-      return { reply: "AI 请求失败，请稍后重试。", actions: [], steps: [{ label: "请求 AI 服务", status: "error" }] };
-    }
-
-    if (!data) {
-      return {
-        reply: "AI 返回格式异常，请重试。",
-        actions: [],
-        steps: [{ label: "解析 AI 响应", status: "error" }],
-      };
-    }
-
-    if (typeof data === "string") {
-      return { reply: data, actions: [], steps: [{ label: "AI 回复", status: "done" }] };
-    }
-
-    const result = data as AiAssistantResponse & { steps?: AiStep[] };
+    if (error) return failure(await readFunctionError(error));
+    if (!data) return failure({ code: "AI_BAD_RESPONSE", retryable: true, message: "AI 返回格式异常，请重试。" });
+    if (typeof data === "string") return { ok: true, reply: data, actions: [], steps: [{ label: "AI 回复", status: "done" }] };
+    if (data.ok === false && data.error) return failure({
+      code: data.error.code || "AI_PROVIDER",
+      retryable: Boolean(data.error.retryable),
+      requestId: data.error.requestId,
+      message: data.error.message || "AI 服务暂时不可用。",
+    });
     return unwrapNestedResponse({
-      reply: result.reply || "完成",
-      actions: Array.isArray(result.actions) ? result.actions : [],
-      steps: Array.isArray(result.steps) ? result.steps : [],
-      memories: Array.isArray(result.memories) ? result.memories : [],
-      intent: typeof result.intent === "string" ? result.intent : undefined,
-      plan: Array.isArray(result.plan) ? result.plan : undefined,
-      format: result.format === "markdown" ? "markdown" : "text",
+      ok: true,
+      reply: data.reply || "完成",
+      actions: Array.isArray(data.actions) ? data.actions : [],
+      steps: Array.isArray(data.steps) ? data.steps : [],
+      memories: Array.isArray(data.memories) ? data.memories : [],
+      intent: typeof data.intent === "string" ? data.intent : undefined,
+      plan: Array.isArray(data.plan) ? data.plan : undefined,
+      format: data.format === "markdown" ? "markdown" : "text",
+      enrichment: data.enrichment && typeof data.enrichment === "object" ? data.enrichment : undefined,
     });
-  } catch (err) {
-    console.error("AI Assistant network error:", err);
-    return {
-      reply: "网络异常，请检查连接后重试。",
-      actions: [],
-      steps: [{ label: "网络连接", status: "error" }],
-    };
+  } catch (error) {
+    console.error("AI Assistant network error:", error);
+    if (controller.signal.aborted) {
+      return failure({ code: timedOut ? "AI_TIMEOUT" : "AI_CANCELLED", retryable: true, message: timedOut ? "AI 响应超时，请重试。" : "请求已取消。" });
+    }
+    return failure({ code: "AI_NETWORK", retryable: true, message: "网络异常，请检查连接后重试。" });
+  } finally {
+    window.clearTimeout(timeoutId);
+    params.signal?.removeEventListener("abort", abort);
   }
 }
 
-function buildDesktopSystemPrompt(mode: AiMode, context: Record<string, unknown>, memories?: AiMemoryPatch[]): string {
-  const ctxStr = JSON.stringify(context).slice(0, 4000);
-  const memStr = memories && memories.length > 0 ? JSON.stringify(memories).slice(0, 2000) : "";
-  const language = context.language === "zh" ? "Chinese" : "English";
-  return [
-    `Reply, action reasons, and memory content in ${language} unless the user explicitly asks for another language.`,
-    "你是一个留学升学对话助手。你需要根据用户输入决定返回格式。",
-    "如果需要创建任务 / 事件 / 笔记 / 记忆，必须只返回纯 JSON，不要用 markdown 代码块（不要用 ```），不要加任何前缀文字：",
-    '{"reply":"你的中文回复","actions":[{"type":"add_task","title":"...","dueDate":"YYYY-MM-DD","category":"exam|uk|us|essay|materials|project|personal","priority":"high|medium|low","notes":"...","subtasks":[{"title":"子任务"}]}]}',
-    "如果只是普通聊天、不需要创建/修改任何数据，直接返回纯文本，不要用 JSON。",
-    "可用 action：add_task、reschedule_task、add_event、add_note、add_memory。",
-    `当前模式：${mode}`,
-    `上下文：${ctxStr}`,
-    memStr ? `记忆：${memStr}` : "",
-  ].filter(Boolean).join("\n");
+export async function callAiAssistant(params: Parameters<typeof invokeAiAssistant>[1]): Promise<AiAssistantResponse> {
+  const client = getClient();
+  if (!client) return failure({ code: "AI_NOT_CONFIGURED", retryable: false, message: "AI 服务未配置，请在设置中连接 Supabase。" });
+  return invokeAiAssistant(client, params);
 }
 
-function adaptDesktopAction(a: any): AiAction {
-  // Desktop returns AiAction-like objects from DeepSeek; pass through
-  return a as AiAction;
+export async function getAiHealth(): Promise<AiHealthResponse> {
+  const client = getClient();
+  if (!client) return { ok: false, status: "unavailable" };
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 5_000);
+  try {
+    const { data, error } = await client.functions.invoke("ai-assistant", { body: { mode: "health" }, signal: controller.signal, timeout: 5_000 });
+    if (error || !data) return { ok: false, status: "unavailable" };
+    return data as AiHealthResponse;
+  } catch {
+    return { ok: false, status: "unavailable" };
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export const FALLBACK_AI_MODELS = [
@@ -301,31 +221,11 @@ export const FALLBACK_AI_MODELS = [
   "zai-org/GLM-5.2",
   "zai-org/GLM-4.6",
   "moonshotai/Kimi-K2.7",
-  "moonshotai/Kimi-K2.7-Code",
   "MiniMaxAI/MiniMax-M3",
-  "MiniMaxAI/MiniMax-M2.5",
-  "stepfun-ai/Step-3.5-Flash",
-  "nexway/Nex-N2-Pro",
-  "inclusionAI/Ling-flash-2.0",
 ] as const;
 
 export async function listAiModels(): Promise<string[]> {
-  const client = getClient();
-  if (!client) return [...FALLBACK_AI_MODELS];
-  try {
-    const { data, error } = await client.functions.invoke("ai-assistant", {
-      body: { mode: "list_models" },
-    });
-    if (error) throw error;
-    const models = Array.isArray(data?.models)
-      ? data.models.filter((model: unknown): model is string => typeof model === "string" && model.length > 0)
-      : [];
-    const filtered = filterAiModels(models);
-    return filtered.length > 0 ? filtered : [...FALLBACK_AI_MODELS];
-  } catch (error) {
-    console.warn("Unable to load AI models; using fallback list:", error);
-    return [...FALLBACK_AI_MODELS];
-  }
+  return filterAiModels([...FALLBACK_AI_MODELS]);
 }
 
 export { uid };

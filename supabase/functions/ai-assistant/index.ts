@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { chatPrompt, importSchedulePrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
+import { AiGatewayError, callAiGateway, type AiProviderConfig } from "./gateway.ts";
 
 function localDateForTimeZone(timeZone: string) {
   try {
@@ -29,7 +30,7 @@ const corsHeaders = {
 };
 
 const STABLE_MODEL = "deepseek-ai/DeepSeek-V3.2";
-const PROVIDER_ATTEMPT_TIMEOUT_MS = 18_000;
+const AI_GATEWAY_VERSION = "2026-07-13.1";
 const FALLBACK_MODELS = [
   STABLE_MODEL,
   "deepseek-ai/DeepSeek-R1",
@@ -154,6 +155,7 @@ function normalizeAssistantPayload(value: unknown) {
     memories: Array.isArray(parsed.memories) ? parsed.memories : [],
     intent: typeof parsed.intent === "string" ? parsed.intent : undefined,
     plan: Array.isArray(parsed.plan) ? parsed.plan : undefined,
+    enrichment: parsed.enrichment && typeof parsed.enrichment === "object" ? parsed.enrichment : undefined,
     format: parsed.format === "markdown" ? "markdown" : "text",
   };
 }
@@ -162,65 +164,43 @@ function normalizeAssistantPayload(value: unknown) {
 // OpenAI-compatible provider call with timeout.
 // ---------------------------------------------------------------------------
 async function callDeepSeek(
-  apiKey: string,
+  apiKey: string | undefined,
   model: string,
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
   reasoningMode: "instant" | "high" | "xhigh" = "instant",
   signal?: AbortSignal,
 ): Promise<string> {
-  const candidates = Array.from(new Set([resolveModel(model), STABLE_MODEL]));
-  const effortCandidates = Array.from(new Set([reasoningMode, "instant"] as const));
-  const jsonFormatCandidates = [true, false];
-  let lastError: unknown;
-
-  for (const candidate of candidates) {
-    for (const effort of effortCandidates) {
-      for (const useJsonFormat of jsonFormatCandidates) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), PROVIDER_ATTEMPT_TIMEOUT_MS);
-        const abort = () => controller.abort();
-        if (signal) {
-          if (signal.aborted) controller.abort();
-          else signal.addEventListener("abort", abort, { once: true });
-        }
-        try {
-          const dsResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: candidate,
-              messages,
-              ...(useJsonFormat ? { response_format: { type: "json_object" } } : {}),
-              max_tokens: maxTokens,
-              stream: false,
-              ...(effort === "instant" ? {} : { reasoning_effort: effort }),
-            }),
-            signal: controller.signal,
-          });
-          if (!dsResponse.ok) {
-            const errorText = await dsResponse.text();
-            throw new Error(`AI service ${dsResponse.status}: ${errorText.slice(0, 200)}`);
-          }
-          const dsData = await dsResponse.json();
-          const content = dsData.choices?.[0]?.message?.content;
-          if (!content) throw new Error("AI service returned no content");
-          return content;
-        } catch (error) {
-          lastError = error;
-          console.warn("AI provider attempt failed", { model: candidate, reasoningMode: effort, responseFormat: useJsonFormat, error: String(error) });
-        } finally {
-          clearTimeout(timeoutId);
-          signal?.removeEventListener("abort", abort);
-        }
-      }
-    }
+  if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+  const providers: AiProviderConfig[] = [];
+  if (apiKey) {
+    providers.push({
+      name: "siliconflow",
+      baseUrl: Deno.env.get("SILICONFLOW_BASE_URL") || "https://api.siliconflow.cn/v1",
+      apiKey,
+      model: resolveModel(model),
+      supportsReasoning: true,
+    });
   }
-
-  throw lastError instanceof Error ? lastError : new Error("AI provider unavailable");
+  const deepSeekKey = Deno.env.get("DEEPSEEK_API_KEY");
+  if (deepSeekKey) {
+    providers.push({
+      name: "deepseek",
+      baseUrl: Deno.env.get("DEEPSEEK_BASE_URL") || "https://api.deepseek.com/v1",
+      apiKey: deepSeekKey,
+      model: Deno.env.get("DEEPSEEK_MODEL") || "deepseek-chat",
+    });
+  }
+  const result = await callAiGateway({
+    providers,
+    messages,
+    maxTokens,
+    reasoningMode,
+    perProviderTimeoutMs: 10_000,
+    totalTimeoutMs: 24_000,
+    onAttempt: (attempt) => console.log("AI gateway attempt", attempt),
+  });
+  return result.content;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +208,7 @@ async function callDeepSeek(
 // Falls back to a raw-text echo if everything fails.
 // ---------------------------------------------------------------------------
 async function plannerStage(
-  apiKey: string,
+  apiKey: string | undefined,
   model: string,
   mode: string,
   ctx: PromptContext,
@@ -236,7 +216,9 @@ async function plannerStage(
   historyMessages: Array<{ role: "user" | "assistant"; content: string }>,
   reasoningMode: "instant" | "high" | "xhigh" = "instant",
 ) {
-  const systemPrompt = mode === "summarize_memory"
+  const systemPrompt = mode === "enrich_task"
+    ? `You estimate task duration and choose an existing project. Return JSON only: {"reply":"","steps":[],"actions":[],"memories":[],"enrichment":{"durationMinutes":15-240,"projectId":"existing id or empty","confidence":0-1}}. Never invent a project. ${ctx.projectsInfo}`
+    : mode === "summarize_memory"
     ? summarizeMemoryPrompt(ctx)
     : mode === "import_schedule"
       ? importSchedulePrompt(ctx)
@@ -252,15 +234,8 @@ async function plannerStage(
   try {
     return normalizeAssistantPayload(extractJsonObject(content));
   } catch (firstError) {
-    console.warn("Planner payload validation failed; requesting one repair:", firstError);
-    const repaired = await callDeepSeek(apiKey, model, [
-      {
-        role: "system",
-        content: "Repair the candidate into one valid JSON object. Required fields: reply (plain user-facing sentence), steps (array), actions (array), memories (array). Never place JSON, markdown, or code inside reply. Return JSON only.",
-      },
-      { role: "user", content: content.slice(0, 12_000) },
-    ], maxTokens, reasoningMode);
-    return normalizeAssistantPayload(extractJsonObject(repaired));
+    console.warn("Planner returned plain text; preserving it without another provider call", firstError);
+    return normalizeAssistantPayload({ reply: content, steps: [], actions: [], memories: [] });
   }
 }
 
@@ -291,29 +266,34 @@ serve(async (req: Request) => {
     }
 
     const apiKey = Deno.env.get("SILICONFLOW_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Missing SILICONFLOW_API_KEY" }), { status: 500, headers: corsHeaders });
+    const deepSeekKey = Deno.env.get("DEEPSEEK_API_KEY");
+    const configuredProviders = [apiKey ? "siliconflow" : "", deepSeekKey ? "deepseek" : ""].filter(Boolean);
+
+    if (mode === "health") {
+      return new Response(JSON.stringify({
+        ok: configuredProviders.length > 0,
+        status: configuredProviders.length > 1 ? "ready" : configuredProviders.length === 1 ? "degraded" : "unavailable",
+        version: AI_GATEWAY_VERSION,
+        configuredProviders,
+      }), { status: configuredProviders.length > 0 ? 200 : 503, headers: corsHeaders });
     }
 
     if (mode === "list_models") {
-      const response = await fetch("https://api.siliconflow.cn/v1/models?type=text&sub_type=chat", {
-        headers: { "Authorization": `Bearer ${apiKey}` },
-      });
-      if (!response.ok) {
-        return new Response(JSON.stringify({ models: FALLBACK_MODELS, warning: `AI model service ${response.status}` }), { headers: corsHeaders });
-      }
-      const payload = await response.json();
-      const models = Array.isArray(payload?.data)
-        ? payload.data.map((item: { id?: unknown }) => item?.id).filter((id: unknown): id is string => typeof id === "string").sort()
-        : [];
-      return new Response(JSON.stringify({ models: Array.from(new Set([...models, ...FALLBACK_MODELS])).sort() }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ models: FALLBACK_MODELS, version: AI_GATEWAY_VERSION }), { headers: corsHeaders });
+    }
+
+    if (configuredProviders.length === 0) {
+      return new Response(JSON.stringify({
+        ok: false,
+        error: { code: "AI_NOT_CONFIGURED", retryable: false, requestId: crypto.randomUUID(), message: "AI 服务尚未配置。" },
+      }), { status: 503, headers: corsHeaders });
     }
 
     if (!message) {
       return new Response(JSON.stringify({ error: "Missing mode or message" }), { status: 400, headers: corsHeaders });
     }
 
-    const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day", "import_schedule", "summarize_memory"];
+    const validModes = ["chat", "suggest_subtasks", "parse_task", "plan_day", "plan_schedule", "enrich_task", "import_schedule", "summarize_memory"];
     if (!validModes.includes(mode)) {
       return new Response(
         JSON.stringify({ error: `Invalid mode. Must be one of: ${validModes.join(", ")}` }),
@@ -381,22 +361,40 @@ serve(async (req: Request) => {
     try {
       plannerValue = await plannerStage(apiKey, selectedModel, mode, promptCtx, userContent, historyMessages, selectedReasoning);
     } catch (err) {
-      console.error("Planner stage failed:", err);
       const fallback = {
         reply: "AI 请求失败，请稍后重试。",
         steps: [{ label: "AI 服务", status: "error" }],
         actions: [],
         memories: [],
       };
-      return new Response(JSON.stringify(fallback), { status: 502, headers: corsHeaders });
+      const requestId = crypto.randomUUID();
+      const gatewayError = err instanceof AiGatewayError ? err : null;
+      console.error("AI request failed", { requestId, code: gatewayError?.code || "AI_PROVIDER", attempts: gatewayError?.attempts || [] });
+      return new Response(JSON.stringify({
+        ok: false,
+        ...fallback,
+        error: {
+          code: gatewayError?.code || "AI_PROVIDER",
+          retryable: gatewayError?.retryable ?? true,
+          requestId,
+          message: gatewayError?.code === "AI_AUTH" ? "AI 服务凭据无效，已尝试备用服务。" : "AI 服务暂时不可用，请稍后重试。",
+        },
+      }), { status: 503, headers: corsHeaders });
     }
 
     // Stage 2: Actor — normalize the planner payload.
     const normalized = normalizeAssistantPayload(plannerValue);
 
-    return new Response(JSON.stringify(normalized), { headers: corsHeaders });
+    return new Response(JSON.stringify({ ok: true, ...normalized, version: AI_GATEWAY_VERSION }), { headers: corsHeaders });
   } catch (err) {
-    console.error("Edge function error:", err);
-    return new Response(JSON.stringify({ reply: "AI 服务异常，请稍后重试。", actions: [], steps: [] }), { status: 500, headers: corsHeaders });
+    const requestId = crypto.randomUUID();
+    console.error("AI edge error", { requestId, code: "AI_BAD_RESPONSE", name: err instanceof Error ? err.name : "unknown" });
+    return new Response(JSON.stringify({
+      ok: false,
+      reply: "AI 服务异常，请稍后重试。",
+      actions: [],
+      steps: [{ label: "AI 服务", status: "error" }],
+      error: { code: "AI_BAD_RESPONSE", retryable: true, requestId, message: "AI 服务异常，请稍后重试。" },
+    }), { status: 500, headers: corsHeaders });
   }
 });
