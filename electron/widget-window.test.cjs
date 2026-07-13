@@ -13,13 +13,20 @@ function makeDeps() {
       this.events = new Map();
       this.bounds = { x: 80, y: 80, width: options.width, height: options.height };
       this.sent = [];
-      this.webContents = { send: (...args) => this.sent.push(args) };
+      this.webContents = {
+        destroyed: false,
+        isDestroyed: () => this.webContents.destroyed,
+        send: (...args) => {
+          if (this.webContents.destroyed) throw new TypeError("Object has been destroyed");
+          this.sent.push(args);
+        },
+      };
       windows.push(this);
     }
     isDestroyed() { return this.destroyed; }
     show() { this.shown = true; }
     focus() { this.focused = true; }
-    close() { this.destroyed = true; this.events.get("closed")?.(); }
+    close() { this.webContents.destroyed = true; this.events.get("closed")?.(); this.destroyed = true; }
     setAlwaysOnTop(value) { this.alwaysOnTop = value; }
     setPosition(x, y) { this.bounds = { ...this.bounds, x, y }; }
     setBounds(bounds) { this.bounds = { ...this.bounds, ...bounds }; }
@@ -258,6 +265,16 @@ test("closes the popover on blur and through the close IPC handler", async () =>
   assert.equal(windows.length, 3);
   await handlers.get("widget:close-popover")();
   assert.equal(windows[2].isDestroyed(), true);
+});
+
+test("closing the widget does not broadcast through destroyed webContents", async () => {
+  const { deps, handlers, windows } = makeDeps();
+  const service = createWidgetWindowService(deps);
+  service.registerIpc();
+  service.open();
+  await handlers.get("widget:toggle-popover")();
+  windows[1].emit("ready-to-show");
+  assert.doesNotThrow(() => windows[0].close());
 });
 
 test("delayed events from a closed popover cannot dismiss its replacement", async () => {

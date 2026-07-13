@@ -142,7 +142,7 @@ function createWidgetWindowService(deps) {
   }
 
   function broadcastPopoverState(openState) {
-    if (widgetWindow && !widgetWindow.isDestroyed()) {
+    if (widgetWindow && !widgetWindow.isDestroyed() && widgetWindow.webContents && !widgetWindow.webContents.isDestroyed()) {
       widgetWindow.webContents.send("widget:popover-state", Boolean(openState));
     }
   }
@@ -204,7 +204,7 @@ function createWidgetWindowService(deps) {
 
   function broadcastSnapshot(snapshot) {
     for (const win of [widgetWindow, popoverWindow]) {
-      if (win && !win.isDestroyed()) win.webContents.send("widget:snapshot", snapshot);
+      if (win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) win.webContents.send("widget:snapshot", snapshot);
     }
   }
 

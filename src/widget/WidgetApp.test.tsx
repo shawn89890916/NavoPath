@@ -85,7 +85,7 @@ describe("WidgetView", () => {
     const html = renderToStaticMarkup(<WidgetView snapshot={snapshot} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
     expect(html).toContain(snapshot.taskTitle);
     expect(html).toContain("2:05");
-    expect(html).toContain('aria-label="Pause timer"');
+    expect(html).toContain('aria-label="Focusing — click to pause"');
     expect(html).toContain('aria-label="More"');
     expect(html).not.toContain("Working");
     expect(html).not.toContain("project-footer");
@@ -139,15 +139,18 @@ describe("WidgetView", () => {
 describe("WidgetPopoverView", () => {
   const render = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetPopoverView snapshot={next} onClosePopover={() => undefined} onCloseWidget={() => undefined} onSaveTimerSettings={() => undefined} onResetTimer={() => undefined} onSchedule={() => undefined} onToggleAlwaysOnTop={() => undefined} onOpacityChange={() => undefined} />);
 
-  it("renders Pin, PinOff, and close icon controls for the More panel", () => {
+  it("renders Reset, Pin, PinOff, and close icon controls for the More panel", () => {
     expect(render({ ...snapshot, alwaysOnTop: false })).toContain('aria-label="Pin widget"');
     const pinnedHtml = render(snapshot);
     expect(pinnedHtml).toContain('aria-label="Unpin widget"');
     expect(pinnedHtml).toContain('aria-label="Close widget"');
+    expect(pinnedHtml).toContain('aria-label="Reset timer"');
+    expect(pinnedHtml.indexOf('aria-label="Reset timer"')).toBeLessThan(pinnedHtml.indexOf('aria-label="Unpin widget"'));
     const source = readFileSync(new URL("./WidgetApp.tsx", import.meta.url), "utf8");
     expect(source).toContain("<Pin ");
     expect(source).toContain("<PinOff ");
     expect(source).toContain("<X ");
+    expect(source).toContain("<RotateCcw ");
   });
 
   const countdownWithoutDeadline: WidgetSnapshot = {
@@ -163,7 +166,7 @@ describe("WidgetPopoverView", () => {
     expect(html).not.toContain("Timer settings");
     expect(html).toContain('class="df-widget-popover-utilities"');
     expect(html).toContain('class="df-widget-opacity-row"');
-    expect(html).toContain('class="df-widget-mode-description"');
+    expect(html).not.toContain('class="df-widget-mode-description"');
     expect(html).toContain('role="radiogroup"');
     expect(html).toContain("Stopwatch");
     expect(html).toContain("Pomodoro");
@@ -184,16 +187,28 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("Long break every");
   });
 
-  it("previews hovered mode guidance without changing the selected mode", async () => {
+  it("uses Pomodoro phase icons only for a running Pomodoro and does not pause countdowns", () => {
+    const renderWidget = (next: WidgetSnapshot) => renderToStaticMarkup(<WidgetView snapshot={next} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+    expect(renderWidget(snapshot)).toContain('lucide-cherry');
+    expect(renderWidget({ ...snapshot, timerRuntime: { ...snapshot.timerRuntime, phase: "break" }, timerPhase: "break" })).toContain('lucide-sprout');
+    const countdown = renderWidget({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "countdown" }, timerRuntime: { mode: "countdown", phase: "countdown", running: true, round: 1, phaseStartedAt: 1, phaseEndsAt: 2 }, timerPhase: "countdown", timerRunning: false });
+    expect(countdown).not.toContain('aria-label="Pause timer"');
+    expect(countdown).not.toContain('lucide-pause');
+    expect(countdown).not.toContain('lucide-cherry');
+  });
+
+  it("previews hovered mode guidance at the pointer without changing the selected mode", async () => {
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
     let renderer!: ReactTestRenderer;
     await act(async () => { renderer = create(timerSettings({ ...snapshot, timerPreferences: { ...snapshot.timerPreferences, mode: "stopwatch" } })); });
     const pomodoro = renderer.root.findByProps({ "data-mode": "pomodoro" });
-    await act(async () => { pomodoro.props.onMouseEnter(); });
-    expect(renderer.root.findByProps({ className: "df-widget-mode-description" }).children.join("")).toContain("task deadline");
+    await act(async () => { pomodoro.props.onPointerEnter({ clientX: 80, clientY: 42 }); });
+    const tooltip = renderer.root.findByProps({ role: "tooltip" });
+    expect(tooltip.children.join("")).toContain("task deadline");
+    expect(tooltip.props.style).toMatchObject({ left: 88, top: 50 });
     expect(renderer.root.findByProps({ "data-mode": "stopwatch" }).props["aria-checked"]).toBe(true);
-    await act(async () => { pomodoro.props.onMouseLeave(); });
-    expect(renderer.root.findByProps({ className: "df-widget-mode-description" }).children.join("")).toContain("actual work time");
+    await act(async () => { pomodoro.props.onPointerLeave(); });
+    expect(renderer.root.findAllByProps({ role: "tooltip" })).toHaveLength(0);
     await act(async () => { renderer.unmount(); });
   });
 
@@ -205,12 +220,15 @@ describe("WidgetPopoverView", () => {
     expect(html).toContain("15:10");
   });
 
-  it("routes the only close utility to the close-widget callback", () => {
+  it("routes reset and close utility callbacks", () => {
     let closedWidget = false;
-    const utilities = WidgetPopoverUtilities({ lang: "en", alwaysOnTop: false, onToggleAlwaysOnTop: () => undefined, onCloseWidget: () => { closedWidget = true; } });
+    let reset = false;
+    const utilities = WidgetPopoverUtilities({ lang: "en", alwaysOnTop: false, onResetTimer: () => { reset = true; }, onToggleAlwaysOnTop: () => undefined, onCloseWidget: () => { closedWidget = true; } });
     const buttons = Children.toArray(utilities.props.children).filter(isValidElement) as ReactElement<{ onClick: () => void; "aria-label": string }>[];
-    expect(buttons.map((button) => button.props["aria-label"])).toEqual(["Pin widget", "Close widget"]);
-    buttons[1].props.onClick();
+    expect(buttons.map((button) => button.props["aria-label"])).toEqual(["Reset timer", "Pin widget", "Close widget"]);
+    buttons[0].props.onClick();
+    buttons[2].props.onClick();
+    expect(reset).toBe(true);
     expect(closedWidget).toBe(true);
   });
 
