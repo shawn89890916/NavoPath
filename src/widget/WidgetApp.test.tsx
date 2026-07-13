@@ -166,6 +166,8 @@ describe("WidgetPopoverView", () => {
     expect(html).not.toContain("Timer settings");
     expect(html).toContain('class="df-widget-popover-utilities"');
     expect(html).toContain('class="df-widget-opacity-row"');
+    expect(html).toContain('class="df-widget-popover-header"');
+    expect(html.indexOf("Background opacity")).toBeLessThan(html.indexOf('class="df-widget-popover-utilities"'));
     expect(html).not.toContain('class="df-widget-mode-description"');
     expect(html).toContain('role="radiogroup"');
     expect(html).toContain("Stopwatch");
@@ -366,9 +368,11 @@ describe("WidgetPopoverView", () => {
     const css = readFileSync(new URL("./widget.css", import.meta.url), "utf8");
     expect(css).toMatch(/\.df-widget-popover-surface\s*\{[^}]*overflow:\s*hidden/);
     expect(css).toMatch(/\.df-widget-popover-utilities\s*\{[^}]*justify-content:\s*flex-end/);
-    expect(css).toMatch(/\.df-widget-popover-utilities\s*\{[^}]*margin-top:\s*-8px/);
-    expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
-    expect(css).toMatch(/\.df-widget-opacity-row input\s*\{[^}]*accent-color:\s*var\(--widget-ink\)/);
+    expect(css).toMatch(/\.df-widget-popover-header\s*\{[^}]*justify-content:\s*space-between[^}]*margin-top:\s*-8px/);
+    expect(css).toMatch(/\.df-widget-opacity-row\s*\{[^}]*display:\s*flex[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.df-widget-opacity-row input\s*\{[^}]*width:\s*100%[^}]*appearance:\s*none[^}]*accent-color:\s*var\(--widget-ink\)/);
+    expect(css).toMatch(/\.df-widget-opacity-row input::\-webkit-slider-runnable-track\s*\{[^}]*background:\s*var\(--widget-ink\)/);
+    expect(css).toMatch(/\.df-widget-opacity-row input::\-webkit-slider-thumb\s*\{[^}]*\-webkit-appearance:\s*none[^}]*background:\s*var\(--widget-ink\)/);
     expect(css).toMatch(/\.df-widget-right\s*\{[^}]*align-items:\s*center/);
     expect(css).toMatch(/\.df-widget-mode-tooltip\s*\{[^}]*border:\s*0/);
     expect(css).toMatch(/\.df-widget-mode-switch button\.is-selected\s*\{[^}]*border-bottom:\s*1px solid var\(--widget-ink\)/);

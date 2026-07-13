@@ -75,7 +75,10 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
   overflow: hidden; border: 1px solid var(--widget-border); border-radius: 10px;
   background: rgb(var(--widget-bg-rgb)); -webkit-app-region: no-drag;
 }
-.df-widget-popover-utilities { display: flex; justify-content: flex-end; gap: 2px; min-height: 44px; margin-top: -8px; }
+.df-widget-popover-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; margin-top: -8px; }
+.df-widget-opacity-heading { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.df-widget-opacity-heading output { color: var(--widget-muted); font: 12px "Cascadia Mono", Consolas, monospace; }
+.df-widget-popover-utilities { display: flex; justify-content: flex-end; gap: 2px; min-height: 44px; }
 .df-widget-popover-utilities .df-widget-icon-btn { width: 44px; height: 44px; border-radius: 8px; }
 .df-widget-mode-switch { display: grid; grid-template-columns: repeat(3, 1fr); flex: 0 0 auto; min-width: 0; border-bottom: 1px solid var(--widget-border); }
 .df-widget-mode-switch button {
@@ -90,17 +93,19 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 .df-widget-mode-details { display: none; }
 .df-widget-mode-settings { min-height: 44px; padding: 4px 2px; border-bottom: 1px solid var(--widget-border); }
 .df-widget-no-duration { margin: 0; padding: 11px 8px; color: var(--widget-muted); font-size: 13px; }
-.df-widget-number-row, .df-widget-opacity-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; min-height: 44px; padding: 4px 8px; font-size: 13px; font-weight: 600; }
+.df-widget-number-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; min-height: 44px; padding: 4px 8px; font-size: 13px; font-weight: 600; }
 .df-widget-number-row input { width: 74px; min-height: 44px; padding: 4px 7px; border: 1px solid var(--widget-border); border-radius: 7px; background: transparent; color: var(--widget-ink); font: 13px "Cascadia Mono", Consolas, monospace; }
 .df-widget-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-bottom: 4px; border: 1px solid var(--widget-border); border-radius: 9px; overflow: hidden; }
 .df-widget-presets button { min-height: 44px; border: 0; border-right: 1px solid var(--widget-border); background: transparent; color: var(--widget-muted); cursor: pointer; }
 .df-widget-presets button:last-child { border-right: 0; }
 .df-widget-presets button.is-selected { color: var(--widget-ink); border-bottom: 2px solid var(--widget-ink); }
-.df-widget-opacity-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; min-height: 44px; padding: 0; font-size: 12px; }
-.df-widget-opacity-row output { color: var(--widget-muted); font: 12px "Cascadia Mono", Consolas, monospace; }
-.df-widget-opacity-row input { width: 100%; min-width: 0; min-height: 44px; margin: 0; accent-color: var(--widget-ink); cursor: pointer; touch-action: pan-x; }
+.df-widget-opacity-row { display: flex; align-items: center; width: 100%; min-height: 44px; padding: 0; }
+.df-widget-opacity-row input { width: 100%; min-width: 0; min-height: 44px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; color: var(--widget-ink); accent-color: var(--widget-ink); cursor: pointer; touch-action: pan-x; }
 .df-widget-opacity-row input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--widget-ink); }
-.df-widget-opacity-row input::-webkit-slider-thumb { margin-top: -6px; background: var(--widget-ink); }
+.df-widget-opacity-row input::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; -webkit-appearance: none; border: 0; border-radius: 50%; background: var(--widget-ink); }
+.df-widget-opacity-row input::-moz-range-track { height: 4px; border: 0; border-radius: 2px; background: var(--widget-ink); }
+.df-widget-opacity-row input::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--widget-ink); }
+.df-widget-opacity-row input::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--widget-ink); }
 .df-widget-popover-action { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--widget-ink); font: 600 13px inherit; cursor: pointer; }
 .df-widget-timer-settings-view { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 8px; }
 .df-widget-timer-settings-view > .df-widget-mode-switch { flex: 0 0 auto; }
