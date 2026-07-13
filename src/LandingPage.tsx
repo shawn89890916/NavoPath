@@ -3,6 +3,7 @@ import { ProductIcon } from "./main";
 import { TaskBlock } from "./components/TaskBlock";
 import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 import { SLOT_HEIGHT, SLOT_MINUTES, addMinutes, minutesToTime, timeToMinutes } from "./timelineGeometry";
+import { MOTION, prefersReducedMotion } from "./motion";
 
 type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
@@ -150,12 +151,19 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
   const [placedStart, setPlacedStart] = useState<string | null>(null);
   const [hoverStart, setHoverStart] = useState<string>("");
   const [fitStyle, setFitStyle] = useState<React.CSSProperties>({});
+  const orbitRef = useRef<HTMLDivElement | null>(null);
   const floatingTaskRef = useRef<HTMLButtonElement | null>(null);
   const firstCandidateRef = useRef<HTMLButtonElement | null>(null);
   const timelineRef = useRef<HTMLElement | null>(null);
   const timelineGridRef = useRef<HTMLDivElement | null>(null);
   const dragGhostRef = useRef<{ x: number; y: number; index: number; task: string } | null>(null);
   const timersRef = useRef<number[]>([]);
+  const stepRef = useRef<HeroStep>("idle");
+  const autoplayStartedRef = useRef(false);
+  const autoplayQueuedRef = useRef(false);
+  const heroVisibleRef = useRef(false);
+  const startAutoplayRef = useRef<() => void>(() => undefined);
+  const resumeAutoplayRef = useRef<() => void>(() => undefined);
   const c = copy[lang];
   const demoNow = useMemo(() => new Date(), []);
   const demoDate = useMemo(() => formatDemoDate(demoNow), [demoNow]);
@@ -172,12 +180,20 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
     { title: "Project review", start: addMinutes(targetStart, 70), end: addMinutes(targetStart, 115), color: "#0F0326", done: false },
   ].filter((block) => timeToMinutes(block.end) > startHour * 60);
 
-  useEffect(() => () => {
+  const clearHeroTimers = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
-  }, []);
+    timersRef.current = [];
+  };
 
-  const activate = () => {
-    if (step !== "idle") return;
+  const setHeroStep = (next: HeroStep) => {
+    stepRef.current = next;
+    setStep(next);
+  };
+
+  useEffect(() => () => clearHeroTimers(), []);
+
+  const activate = (withSound = true, autoPlace = false) => {
+    if (stepRef.current !== "idle") return;
     floatingTaskRef.current?.style.removeProperty("transform");
     floatingTaskRef.current?.style.removeProperty("filter");
     const cardRect = floatingTaskRef.current?.getBoundingClientRect();
@@ -194,22 +210,26 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
         "--fit-h": `${targetRect.height}px`,
       } as React.CSSProperties);
     }
-    playNavoSound("open");
-    setStep("flipped");
-    timersRef.current.forEach((timer) => window.clearTimeout(timer));
-    timersRef.current = [window.setTimeout(() => setStep("expanded"), 1040)];
+    if (withSound) playNavoSound("open");
+    setHeroStep("flipped");
+    clearHeroTimers();
+    timersRef.current = [window.setTimeout(() => setHeroStep("expanded"), MOTION.story)];
+    if (autoPlace) {
+      timersRef.current.push(window.setTimeout(() => placeOnTimeline(tasks[0], 0, targetStart, false), 1100));
+    }
   };
 
-  const placeOnTimeline = (task = dragGhostRef.current?.task ?? dragGhost?.task ?? tasks[0], index = dragGhostRef.current?.index ?? dragGhost?.index ?? 0, startTime = hoverStart || targetStart) => {
-    if (step === "placed") return;
-    playNavoSound("place");
+  const placeOnTimeline = (task = dragGhostRef.current?.task ?? dragGhost?.task ?? tasks[0], index = dragGhostRef.current?.index ?? dragGhost?.index ?? 0, startTime = hoverStart || targetStart, withSound = true) => {
+    if (stepRef.current === "placed") return;
+    clearHeroTimers();
+    if (withSound) playNavoSound("place");
     setPlacedTask(task);
     setPlacedIndex(index);
     setPlacedStart(startTime);
     setHoverStart("");
     dragGhostRef.current = null;
     setDragGhost(null);
-    setStep("placed");
+    setHeroStep("placed");
   };
 
   const skipIntro = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -232,10 +252,10 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
     if (!button || !rect) return;
     const relativeX = Math.max(-0.5, Math.min(0.5, (clientX - (rect.left + rect.width / 2)) / (rect.width * 0.78)));
     const relativeY = Math.max(-0.5, Math.min(0.5, (clientY - (rect.top + rect.height / 2)) / (rect.height * 0.78)));
-    button.style.setProperty("--tilt-x", `${relativeX * 24}deg`);
-    button.style.setProperty("--tilt-y", `${relativeY * -18}deg`);
-    button.style.setProperty("transform", `rotateX(${relativeY * -18}deg) rotateY(${relativeX * 24}deg) translateZ(0)`, "important");
-    button.style.setProperty("filter", "drop-shadow(0 30px 38px rgba(39, 35, 30, .2))", "important");
+    button.style.setProperty("--tilt-x", `${relativeX * 5}deg`);
+    button.style.setProperty("--tilt-y", `${relativeY * -4}deg`);
+    button.style.setProperty("transform", `rotateX(${relativeY * -4}deg) rotateY(${relativeX * 5}deg) translateZ(0)`, "important");
+    button.style.setProperty("filter", "drop-shadow(0 12px 18px rgba(39, 35, 30, .12))", "important");
   };
 
   const resetTilt = () => {
@@ -271,6 +291,100 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
   };
 
   const tasks = ["Read 20 pages"];
+
+  startAutoplayRef.current = () => {
+    if (autoplayStartedRef.current || !heroVisibleRef.current || document.hidden) return;
+    autoplayStartedRef.current = true;
+    activate(false, true);
+  };
+  resumeAutoplayRef.current = () => {
+    if (!autoplayStartedRef.current || !heroVisibleRef.current || document.hidden || stepRef.current === "placed") return;
+    clearHeroTimers();
+    if (stepRef.current === "idle") {
+      activate(false, true);
+      return;
+    }
+    if (stepRef.current === "flipped") {
+      timersRef.current = [window.setTimeout(() => setHeroStep("expanded"), 120)];
+      timersRef.current.push(window.setTimeout(() => placeOnTimeline(tasks[0], 0, targetStart, false), 1040));
+      return;
+    }
+    timersRef.current = [window.setTimeout(() => placeOnTimeline(tasks[0], 0, targetStart, false), MOTION.story)];
+  };
+
+  useEffect(() => {
+    if (prefersReducedMotion(window)) {
+      autoplayStartedRef.current = true;
+      setPlacedTask(tasks[0]);
+      setPlacedIndex(0);
+      setPlacedStart(targetStart);
+      setHeroStep("placed");
+      return;
+    }
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearHeroTimers();
+        autoplayQueuedRef.current = false;
+      }
+      else if (autoplayStartedRef.current) resumeAutoplayRef.current();
+      else startAutoplayRef.current();
+    };
+    const startTimer = () => {
+      if (autoplayStartedRef.current || autoplayQueuedRef.current) return;
+      autoplayQueuedRef.current = true;
+      timersRef.current.push(window.setTimeout(() => {
+        autoplayQueuedRef.current = false;
+        startAutoplayRef.current();
+      }, MOTION.instant));
+    };
+    const observer = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(([entry]) => {
+      heroVisibleRef.current = entry.isIntersecting && entry.intersectionRatio >= 0.35;
+      if (!heroVisibleRef.current) {
+        clearHeroTimers();
+        autoplayQueuedRef.current = false;
+      }
+      else if (autoplayStartedRef.current) resumeAutoplayRef.current();
+      else startTimer();
+    }, { threshold: [0.35] });
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (observer && orbitRef.current) observer.observe(orbitRef.current);
+    else {
+      heroVisibleRef.current = true;
+      startTimer();
+    }
+    const initialFrame = window.requestAnimationFrame(() => {
+      const rect = orbitRef.current?.getBoundingClientRect();
+      heroVisibleRef.current = Boolean(rect && rect.bottom > window.innerHeight * 0.35 && rect.top < window.innerHeight * 0.65);
+      if (heroVisibleRef.current) startTimer();
+    });
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.cancelAnimationFrame(initialFrame);
+      autoplayQueuedRef.current = false;
+      clearHeroTimers();
+    };
+  }, []);
+
+  const replayDemo = () => {
+    clearHeroTimers();
+    resetTilt();
+    dragGhostRef.current = null;
+    setDragGhost(null);
+    setPlacedTask(null);
+    setPlacedIndex(null);
+    setPlacedStart(null);
+    setHoverStart("");
+    setFitStyle({});
+    stepRef.current = "idle";
+    setStep("idle");
+    window.requestAnimationFrame(() => {
+      autoplayStartedRef.current = true;
+      activate(true, true);
+    });
+  };
 
   const getTimelineStartFromPointer = (clientY: number) => {
     const gridRect = timelineGridRef.current?.getBoundingClientRect();
@@ -330,6 +444,7 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
 
   return (
     <div
+      ref={orbitRef}
       className={`landing-orbit step-${step}${dragGhost ? " is-dragging" : ""}`}
       onPointerMove={onOrbitMove}
       onPointerLeave={resetTilt}
@@ -344,7 +459,7 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
         onPointerUp={(event) => { if (step === "expanded") endCandidateDrag(event); }}
         onPointerCancel={() => { floatingTaskRef.current?.style.removeProperty("animation"); floatingTaskRef.current?.style.removeProperty("opacity"); dragGhostRef.current = null; setDragGhost(null); }}
         onPointerLeave={() => undefined}
-        onClick={activate}
+        onClick={() => activate()}
         style={fitStyle}
         aria-label={c.tap}
       >
@@ -515,6 +630,11 @@ function HeroInteraction({ lang, onStart }: { lang: Lang; onStart: () => void })
           &gt;&gt;skip
         </button>
       )}
+      {step === "placed" && (
+        <button className="landing-replay-demo" type="button" onClick={replayDemo}>
+          {lang === "zh" ? "重播演示" : "Replay demo"}
+        </button>
+      )}
     </div>
   );
 }
@@ -552,7 +672,7 @@ function PlanningShowcase({ lang }: { lang: Lang }) {
   ];
 
   return (
-    <div className="landing-live-demo planning-showcase" id="demo">
+    <div className="landing-live-demo planning-showcase landing-reveal" id="demo">
       <div className="demo-copy">
         <span>PLANNING VIEW</span>
         <h2>{lang === "zh" ? "把上班后的学习，也放进长期路径。" : "Keep work and learning in one path."}</h2>
@@ -1031,10 +1151,28 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 }) {
   const [lang, setLang] = useState<Lang>("en");
   const [showAuth, setShowAuth] = useState(false);
+  const landingRef = useRef<HTMLDivElement | null>(null);
   const c = copy[lang];
 
+  useEffect(() => {
+    const elements = Array.from(landingRef.current?.querySelectorAll<HTMLElement>(".landing-reveal") || []);
+    if (prefersReducedMotion(window) || typeof IntersectionObserver === "undefined") {
+      elements.forEach((element) => element.classList.add("is-revealed"));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        (entry.target as HTMLElement).classList.add("is-revealed");
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.12 });
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="landing" lang={lang}>
+    <div ref={landingRef} className="landing" lang={lang}>
       <nav className="landing-nav">
         <a className="landing-brand" href="#top"><ProductIcon compact /><span>NavoPath</span></a>
         <div className="landing-nav-links">
@@ -1054,7 +1192,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 
         <PlanningShowcase lang={lang} />
 
-        <section className="landing-section landing-everyday" id="everyday">
+        <section className="landing-section landing-everyday landing-reveal" id="everyday">
           <header className="landing-section-head">
             <span>02 / EVERYDAY</span>
             <h2>{c.everydayTitle}</h2>
@@ -1071,7 +1209,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
           </div>
         </section>
 
-        <section className="landing-section landing-principles" id="principles">
+        <section className="landing-section landing-principles landing-reveal" id="principles">
           <header className="landing-section-head">
             <span>03 / PRINCIPLES</span>
             <h2>{c.principlesTitle}</h2>
@@ -1079,7 +1217,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
           <ol>{c.principles.map((item, index) => <li key={item}><span>0{index + 1}</span><strong>{item}</strong></li>)}</ol>
         </section>
 
-        <section className="landing-cta">
+        <section className="landing-cta landing-reveal">
           <GridDistortionLogo />
           <h2>{c.ctaTitle}</h2>
           <p>{c.ctaBody}</p>

@@ -1,4 +1,52 @@
 /* NavoPath paper editorial application layer. Shared accents follow --accent-active. */
+:root {
+  --motion-instant: 90ms;
+  --motion-fade: 140ms;
+  --motion-base: 180ms;
+  --motion-layout: 240ms;
+  --motion-story: 520ms;
+  --motion-ease: cubic-bezier(.2,.75,.25,1);
+  --motion-ease-settle: cubic-bezier(.22,1,.36,1);
+  --motion-shift-x: 0px;
+}
+
+html[data-motion-scope="workspace"] .df-app > .df-execute,
+html[data-motion-scope="workspace"] .df-app > .df-planning {
+  view-transition-name: navo-motion-surface;
+}
+
+html[data-motion-scope="timeline"] .df-app .df-timeline-panel {
+  view-transition-name: navo-motion-surface;
+}
+
+::view-transition-group(navo-motion-surface) {
+  animation-duration: var(--motion-layout);
+  animation-timing-function: var(--motion-ease);
+}
+
+::view-transition-old(navo-motion-surface) {
+  animation: navo-motion-old var(--motion-fade) var(--motion-ease) both;
+}
+
+::view-transition-new(navo-motion-surface) {
+  animation: navo-motion-new var(--motion-layout) var(--motion-ease) both;
+}
+
+@keyframes navo-motion-old {
+  to { opacity: 0; transform: translateX(calc(var(--motion-shift-x) * -.35)); }
+}
+
+@keyframes navo-motion-new {
+  from { opacity: 0; transform: translateX(var(--motion-shift-x)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+html[data-motion-fallback][data-motion-scope="workspace"] .df-app > .df-execute,
+html[data-motion-fallback][data-motion-scope="workspace"] .df-app > .df-planning,
+html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-panel {
+  animation: navo-motion-new var(--motion-layout) var(--motion-ease) both;
+}
+
 .df-app {
   --navo-brown: #584d3d;
   --navo-sage: #7ea172;
@@ -13,7 +61,8 @@
   --paper-complete: var(--navo-sage);
   --paper-radius: 4px;
   --paper-radius-soft: 8px;
-  --paper-motion: 160ms cubic-bezier(.2,.75,.25,1);
+  --paper-ease: var(--motion-ease);
+  --paper-motion: var(--motion-base) var(--motion-ease);
   --paper-rule: color-mix(in srgb, var(--text-main) 13%, transparent);
   --paper-rule-strong: color-mix(in srgb, var(--text-main) 21%, transparent);
   --paper-accent-rule: color-mix(in srgb, var(--accent-active) 48%, var(--paper-rule));
@@ -986,7 +1035,7 @@
 }
 .df-app .df-add-fab { bottom: 64px !important; color: var(--accent-on) !important; border-color: var(--accent-active) !important; background: var(--accent-active) !important; }
 .df-app .df-ai-fab { bottom: 14px !important; color: var(--accent-active) !important; }
-.df-add-fab:hover, .df-ai-fab:hover { transform: translateY(-1px) !important; filter: none !important; }
+.df-add-fab:hover, .df-ai-fab:hover { transform: none !important; filter: none !important; }
 
 /* Empty states */
 .df-app .blob-accent, .df-app [class*="spark"], .df-app [class*="glow"] { box-shadow: none !important; filter: none !important; text-shadow: none !important; }
@@ -1029,9 +1078,13 @@
   from { opacity: 0; transform: translateX(12px); }
   to { opacity: 1; transform: translateX(0); }
 }
-@keyframes paper-ink-breathe {
-  0%, 100% { opacity: .42; }
-  50% { opacity: 1; }
+@keyframes paper-drawer-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(10px); }
+}
+@keyframes paper-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 .df-app .df-task-card,
 .df-app .df-plan-project-node,
@@ -1099,17 +1152,16 @@
 .df-app.theme-light .df-month-cell.focus-month .df-month-cell-strong { color:#000 !important; opacity:1; }
 .df-app .df-month-cell.muted .df-month-cell-strong { opacity:.34; }
 .df-app.theme-dark .df-month-cell.focus-month .df-month-cell-strong { color:var(--paper-ink) !important; opacity:1; }
-.df-tree-drop-preview { position:relative; z-index:8; padding:8px 14px; color:var(--accent-active); background:color-mix(in srgb,var(--accent-active) 8%,var(--surface-main)); border-radius:8px; font:600 11px/1.3 var(--paper-mono); letter-spacing:.03em; pointer-events:none; animation:treeDropIn 220ms cubic-bezier(.2,.7,.3,1) both; display:flex; align-items:center; gap:8px; backdrop-filter:blur(4px); box-shadow:0 2px 8px color-mix(in srgb,var(--accent-active) 10%,transparent); }
-.df-tree-drop-preview::before { content:""; width:4px; height:4px; border-radius:50%; background:var(--accent-active); flex-shrink:0; animation:treeDropPulse 1.2s ease-in-out infinite; }
-@keyframes treeDropIn { from { opacity:0; transform:translateY(-6px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
-@keyframes treeDropPulse { 0%,100% { opacity:.5; transform:scale(1); } 50% { opacity:1; transform:scale(1.5); } }
+.df-tree-drop-preview { position:relative; z-index:8; padding:8px 14px; color:var(--accent-active); background:color-mix(in srgb,var(--accent-active) 8%,var(--surface-main)); border-radius:8px; font:600 11px/1.3 var(--paper-mono); letter-spacing:.03em; pointer-events:none; animation:treeDropIn var(--motion-base) var(--motion-ease) both; display:flex; align-items:center; gap:8px; }
+.df-tree-drop-preview::before { content:""; width:4px; height:4px; border-radius:50%; background:var(--accent-active); flex-shrink:0; }
+@keyframes treeDropIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
 .df-tree-drop-preview.before { margin-bottom:3px; border-bottom:1px dashed color-mix(in srgb,var(--accent-active) 40%,transparent); border-radius:8px 8px 0 0; }
 .df-tree-drop-preview.after { margin-top:3px; border-top:1px dashed color-mix(in srgb,var(--accent-active) 40%,transparent); border-radius:0 0 8px 8px; }
 .df-tree-drop-preview.inside { margin-inline-start:28px; border-inline-start:2px solid var(--accent-active); border-radius:4px 8px 8px 4px; }
-/* When dragging, nodes get a subtle scale effect */
+/* Drag targets use ink and rules only; no lift or scale. */
 .df-tree.is-tree-dragging .df-plan-project-node:hover,
 .df-tree.is-tree-dragging .df-plan-task-node:hover,
-.df-tree.is-tree-dragging .df-plan-subtask-node:hover { transform:scale(1.02); }
+.df-tree.is-tree-dragging .df-plan-subtask-node:hover { transform:none; }
 .df-app.mode-planning .df-tree {
   padding-top: 2px !important;
 }
@@ -1173,14 +1225,24 @@
 .df-app .df-repeat-modal,
 .df-app .df-source-modal,
 .df-app .df-ai-panel,
-.df-app .df-toast { animation: paper-sheet-in 170ms cubic-bezier(.2,.75,.25,1) both !important; transform-origin: center top !important; }
+ .df-app .df-toast { animation: paper-sheet-in var(--motion-base) var(--motion-ease) both !important; transform-origin: center top !important; }
 .df-app .df-drawer,
-.df-app .df-utility-panel { animation: paper-drawer-in 190ms cubic-bezier(.2,.75,.25,1) both !important; }
+.df-app .df-utility-panel { animation: paper-drawer-in var(--motion-base) var(--motion-ease) both !important; }
 .df-app .df-modal-backdrop,
 .df-app .df-drawer-backdrop,
-.df-app .df-utility-backdrop { animation: dfFadeIn 140ms ease-out both !important; }
+.df-app .df-utility-backdrop { animation: dfFadeIn var(--motion-fade) var(--motion-ease) both !important; }
+.df-app .df-drawer.is-closing,
+.df-app .df-utility-panel.is-closing {
+  pointer-events: none !important;
+  animation: paper-drawer-out var(--motion-fade) var(--motion-ease) both !important;
+}
+.df-app .df-drawer-backdrop.is-closing,
+.df-app .df-utility-backdrop.is-closing {
+  pointer-events: none !important;
+  animation: paper-fade-out var(--motion-fade) var(--motion-ease) both !important;
+}
 .df-app .df-ai-presence.thinking,
-.df-app .df-ai-step.running .df-ai-step-icon { color: var(--accent-active) !important; animation: paper-ink-breathe 1.35s ease-in-out infinite !important; box-shadow: none !important; }
+.df-app .df-ai-step.running .df-ai-step-icon { color: var(--accent-active) !important; animation: none !important; box-shadow: none !important; opacity: .82; }
 
 /* Text and outline buttons */
 .df-app .df-tabs button,
@@ -1278,6 +1340,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .df-app *, .df-app *::before, .df-app *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .001ms !important; }
+  ::view-transition-group(navo-motion-surface),
+  ::view-transition-old(navo-motion-surface),
+  ::view-transition-new(navo-motion-surface) { animation-duration: .001ms !important; }
 }
 
 /* One compatibility bridge for legacy theme-qualified component rules. */
@@ -3468,7 +3533,7 @@
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 120ms;
+  transition: border-color var(--motion-instant) var(--motion-ease), color var(--motion-instant) var(--motion-ease), background-color var(--motion-instant) var(--motion-ease);
 }
 .df-habit-weekday-chip:hover {
   border-color: var(--accent-active);
@@ -3496,7 +3561,7 @@
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
-  transition: all 120ms;
+  transition: border-color var(--motion-instant) var(--motion-ease), color var(--motion-instant) var(--motion-ease), background-color var(--motion-instant) var(--motion-ease);
 }
 .df-habit-back-btn:hover,
 .df-habit-archive-btn:hover {
@@ -3733,6 +3798,9 @@ body.df-timeline-pointer-drag * {
   color:#27231E !important;
   box-shadow:none !important;
   padding:8px 12px !important;
+}
+.df-app .df-drop-preview {
+  transition: top var(--motion-instant) var(--motion-ease), height var(--motion-instant) var(--motion-ease), opacity var(--motion-instant) var(--motion-ease), background-color var(--motion-instant) var(--motion-ease) !important;
 }
 .df-app.theme-dark .df-drop-preview.moving-block,
 .df-app.theme-dark .df-drop-preview.moving-block.is-event,
@@ -4880,7 +4948,29 @@ body.df-timeline-pointer-drag * {
   border: 0;
   border-radius: 0;
   cursor: pointer;
-  transition: background 120ms ease;
+  max-height: 280px;
+  overflow: clip;
+  transition: background var(--motion-instant) var(--motion-ease), max-height var(--motion-base) var(--motion-ease), opacity var(--motion-fade) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
+}
+.df-app .df-candidate-task-row.is-completing {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+.df-app .df-candidate-task-row.is-completing .df-candidate-main {
+  text-decoration: line-through;
+  color: var(--ink-faint);
+}
+.df-app .df-candidate-task-row.is-completing .df-block-check {
+  border-color: var(--accent-active) !important;
+  background: var(--accent-active) !important;
+  color: var(--surface-main) !important;
+}
+.df-app .df-candidate-task-row.is-completing .df-block-check::after {
+  content: "✓";
+  font-size: 10px;
+  line-height: 1;
 }
 
 /* Neutralize the global .df-task-card margin-bottom (styles.css ~21202) inside
@@ -6734,7 +6824,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   cursor: pointer;
   border-radius: 4px;
   white-space: nowrap;
-  transition: all 0.1s;
+  transition: border-color var(--motion-instant) var(--motion-ease), color var(--motion-instant) var(--motion-ease), background-color var(--motion-instant) var(--motion-ease);
 }
 .df-filter-reset-btn:hover { color: var(--df-ink, #333); border-color: var(--df-ink-muted, #888); }
 .df-filter-chip {
@@ -6748,9 +6838,9 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.1s;
+  transition: border-color var(--motion-instant) var(--motion-ease), color var(--motion-instant) var(--motion-ease), background-color var(--motion-instant) var(--motion-ease);
 }
-.df-filter-chip:hover { border-color: var(--accent-plan, #CAFF72); background: color-mix(in srgb, var(--accent-plan, #CAFF72) 4%, transparent); }
+.df-filter-chip:hover { border-color: var(--accent-active); background: color-mix(in srgb, var(--accent-active) 4%, transparent); }
 .df-filter-chip-label { color: var(--df-ink-muted, #888); }
 .df-filter-chip-value {
   color: var(--df-ink, #333);
@@ -7102,10 +7192,10 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   cursor: pointer;
   border-radius: 4px;
   white-space: nowrap;
-  transition: all 0.1s;
+  transition: border-color var(--motion-instant) var(--motion-ease), color var(--motion-instant) var(--motion-ease), background-color var(--motion-instant) var(--motion-ease);
 }
 .df-timer-action:hover {
-  background: color-mix(in srgb, var(--accent, #CAFF72) 12%, transparent);
+  background: color-mix(in srgb, var(--accent-active) 12%, transparent);
   color: var(--df-ink, #333);
 }
 
@@ -7165,11 +7255,11 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   color: var(--df-ink-muted, #888);
   cursor: pointer;
   border-radius: 999px;
-  transition: all 0.15s;
+  transition: border-color var(--motion-fade) var(--motion-ease), color var(--motion-fade) var(--motion-ease), background-color var(--motion-fade) var(--motion-ease);
 }
 .df-focus-mode-btn:hover { color: var(--df-ink, #ccc); border-color: rgba(255,255,255,0.2); }
 .df-focus-mode-btn.active {
-  border-color: var(--focus-accent, var(--accent, #CAFF72));
+  border-color: var(--focus-accent, var(--accent-active));
   color: var(--focus-accent, var(--accent, #CAFF72));
   background: color-mix(in srgb, var(--focus-accent, var(--accent, #CAFF72)) 10%, transparent);
 }
@@ -7187,7 +7277,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: all 0.15s;
+  transition: color var(--motion-fade) var(--motion-ease), background-color var(--motion-fade) var(--motion-ease);
 }
 .df-focus-close:hover { background: rgba(255,255,255,0.08); color: var(--df-ink, #fff); }
 .df-focus-main {
@@ -7249,11 +7339,11 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   color: var(--df-ink, #fff);
   cursor: pointer;
   border-radius: 999px;
-  transition: all 0.15s;
+  transition: border-color var(--motion-fade) var(--motion-ease), color var(--motion-fade) var(--motion-ease), background-color var(--motion-fade) var(--motion-ease);
 }
 .df-focus-controls button:hover {
-  border-color: var(--focus-accent, var(--accent, #CAFF72));
-  color: var(--focus-accent, var(--accent, #CAFF72));
+  border-color: var(--focus-accent, var(--accent-active));
+  color: var(--focus-accent, var(--accent-active));
 }
 
 /* Current task and focus mode final pass: editorial paper controls, not pills. */
@@ -8211,11 +8301,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   border-radius: 1px;
   background: var(--accent-active);
   pointer-events: none;
-  animation: df-list-insertion-pulse 1.2s ease-in-out infinite;
-}
-@keyframes df-list-insertion-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .55; }
+  animation: dfFadeIn var(--motion-instant) var(--motion-ease) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .df-list-insertion-line { animation: none; }

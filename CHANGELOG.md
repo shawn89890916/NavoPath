@@ -8,6 +8,9 @@
 - 新建任务现在会在本地自动估算时长，并根据相似任务、实际计时与既有项目给出个性化归属；高置信度归属可撤销，中置信度建议可一键采用。
 
 ### 改进
+- 核心工作区采用统一的纸面动效节奏：执行 / 规划、四种时间视图与双向翻页会在稳定导航下轻微交叉淡化；任务与设置抽屉现在对称退场并把键盘焦点还给触发按钮，减少动态模式则直接呈现最终状态。
+- 候选任务完成时会依次显示勾选、标题淡化与行高收拢后再提交；候选任务、习惯、规划树与时间轴拖拽共享克制的墨色浮层、平滑占位和无缩放的放置反馈。
+- 落地页首屏会无声自动演示一次从候选任务到时间轴的完整路径，并提供“重播演示”；页面失焦或首屏不可见时暂停，后续内容只在首次进入视口时轻微淡入，持续扫光、抖动、呼吸和循环引导已移除。
 - “计划建议”现支持今天、未来三天和本周，以固定事件为锚点生成不冲突的临时时间块；当前候选栏可直接选择范围与策略、批量采用或放弃，长任务可预览分段，未安排任务会说明原因并提供缩短、拆分或移至下一天的操作。
 - AI 对话支持随时取消、失败后保留草稿，并移除打开面板时的模型列表请求；模型路由和高级偏好集中在设置中。
 - 设置页的分区导航在移动端改为横向滚动，不再被桌面端双栏规则挤压或裁切。
@@ -31,6 +34,9 @@
 - New tasks now receive local duration estimates and personalized existing-project suggestions based on similar tasks, actual timer history, and prior choices; high-confidence assignments are undoable and medium-confidence suggestions are one click away.
 
 ### Improved
+- The core workspace now uses one paper-like motion rhythm: Execute / Planning, all four time views, and bidirectional paging cross-fade gently beneath stable navigation. Task and Settings drawers now exit symmetrically and return keyboard focus to their trigger, while reduced-motion mode renders the final state directly.
+- Completing a candidate task now shows the check, fades the title, and collapses the row before committing. Candidate, habit, Planning-tree, and timeline drags share a restrained ink overlay, smooth placeholders, and scale-free placement feedback.
+- The landing hero now silently autoplays the complete candidate-to-timeline story once and offers Replay demo. It pauses when the page or hero is hidden, later sections reveal only on their first viewport entry, and continuous sweeps, nudges, breathing, and looping guides have been removed.
 - Plan Suggestions now covers today, the next three days, or this week, anchors around fixed events, and exposes scope, strategy, adopt-all, and reject controls in the current candidate header; long tasks can be previewed as segments, while unscheduled work includes reasons and shorten, split, or next-day actions.
 - AI conversations can be cancelled, retain the draft after failure, and no longer fetch a model list when the panel opens; routing and advanced preferences live in Settings.
 - Settings navigation now scrolls horizontally on mobile instead of being squeezed or clipped by the desktop two-column rule.

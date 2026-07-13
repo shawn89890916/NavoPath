@@ -1562,6 +1562,11 @@ body.df-unified-dragging [contenteditable] * {
   border-radius: var(--task-radius, 10px);
   box-shadow: 0 6px 20px rgba(40, 36, 31, 0.12), 0 1px 3px rgba(40, 36, 31, 0.08);
   overflow: hidden;
+  animation: df-drag-ink-in 90ms cubic-bezier(.2, 0, 0, 1) both;
+}
+@keyframes df-drag-ink-in {
+  from { opacity: .88; box-shadow: 0 2px 8px rgba(40, 36, 31, 0.08); }
+  to { opacity: 1; box-shadow: 0 6px 20px rgba(40, 36, 31, 0.12), 0 1px 3px rgba(40, 36, 31, 0.08); }
 }
 .df-unified-drag-overlay .is-drag-overlay-clone {
   border-radius: inherit;
@@ -1641,7 +1646,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
    glow, no scale. */
 .df-task-block[data-drag-state="overlay"] {
   background: var(--task-bg) !important;
-  border-color: var(--task-border-hover) !important;
+  border-color: var(--accent-active) !important;
   box-shadow: var(--task-drag-shadow) !important;
   opacity: 1 !important;
   transform: none !important;
@@ -1664,6 +1669,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   box-shadow: none !important;
   transform: none !important;
   color: transparent !important;
+  transition: border-color 90ms cubic-bezier(.2, 0, 0, 1), background-color 90ms cubic-bezier(.2, 0, 0, 1), opacity 90ms cubic-bezier(.2, 0, 0, 1) !important;
 }
 .df-app .df-time-block[data-drag-state="source-placeholder"].is-dragging,
 .df-app .df-event-blocks-layer .df-time-block[data-drag-state="source-placeholder"].is-dragging {
@@ -1672,6 +1678,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 }
 .df-task-block[data-drag-state="source-placeholder"] > * {
   opacity: 0 !important;
+  transition: opacity 90ms cubic-bezier(.2, 0, 0, 1) !important;
 }
 .df-task-block[data-drag-state="source-placeholder"] .df-task-block-accent {
   display: none !important;
@@ -1682,6 +1689,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-task-drag-layer {
   border-radius: var(--task-radius, 6px);
   overflow: visible;
+  animation: df-drag-ink-in 90ms cubic-bezier(.2, 0, 0, 1) both;
 }
 .df-task-drag-layer .df-task-block {
   border-radius: var(--task-radius, 6px);

@@ -47,7 +47,7 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-100%);
-  transition: opacity 420ms cubic-bezier(.2,.75,.25,1), transform 620ms cubic-bezier(.18,1.18,.28,1);
+  transition: opacity var(--motion-base, 180ms) cubic-bezier(.2, 0, 0, 1), transform var(--motion-layout, 240ms) cubic-bezier(.2, 0, 0, 1);
 }
 .landing:has(.landing-orbit.step-placed) .landing-nav {
   opacity: 1;
@@ -95,8 +95,8 @@
   content: none;
   display: none;
 }
-.landing-hero-panel { min-width: 0; padding: 34px 24px 34px 0; opacity: 0; transform: translateX(-18px); transition: opacity 520ms cubic-bezier(.2,.75,.25,1), transform 720ms cubic-bezier(.2,.82,.2,1); }
-.landing-orbit.step-placed .landing-hero-panel { opacity: 1 !important; transform: translateX(0) !important; animation: heroSpring 780ms cubic-bezier(.18,1.28,.28,1) both; }
+.landing-hero-panel { min-width: 0; padding: 34px 24px 34px 0; opacity: 0; transform: translateX(-12px); transition: opacity var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1), transform var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1); }
+.landing-orbit.step-placed .landing-hero-panel { opacity: 1 !important; transform: translateX(0) !important; animation: heroSpring var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1) both; }
 .landing-kicker { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; color: var(--l-muted); font: 11px var(--l-mono); letter-spacing: .1em; text-transform: uppercase; }
 .landing-kicker i { width: 30px; height: 1px; background: var(--l-coral); }
 .landing h1 {
@@ -107,10 +107,10 @@
   line-height: .94;
   letter-spacing: 0;
 }
-.landing h1 .hero-line { display: block; opacity: 0; transform: translateX(-44px); }
-.landing-orbit.step-placed .hero-line { animation: lineSpring 820ms cubic-bezier(.18,1.32,.28,1) both; }
-.landing-orbit.step-placed .hero-line.line-1 { animation-name: lineSpringReverse; animation-delay: 90ms; }
-.landing-orbit.step-placed .hero-line.line-2 { animation-delay: 170ms; }
+.landing h1 .hero-line { display: block; opacity: 0; transform: translateX(-14px); }
+.landing-orbit.step-placed .hero-line { animation: lineSpring var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1) both; }
+.landing-orbit.step-placed .hero-line.line-1 { animation-name: lineSpringReverse; animation-delay: 45ms; }
+.landing-orbit.step-placed .hero-line.line-2 { animation-delay: 90ms; }
 .landing-hero-panel p { max-width: 500px; margin: 30px 0 26px; color: var(--l-muted); font-size: 17px; line-height: 1.75; }
 
 .landing-orbit {
@@ -125,7 +125,8 @@
   content: none;
   display: none;
 }
-.landing-skip-intro {
+.landing-skip-intro,
+.landing-replay-demo {
   position: absolute;
   right: clamp(14px, 2.4vw, 34px);
   bottom: clamp(14px, 2.4vw, 34px);
@@ -141,10 +142,12 @@
   opacity: .58;
   transition: opacity 140ms ease, color 140ms ease;
 }
-.landing-skip-intro:hover {
+.landing-skip-intro:hover,
+.landing-replay-demo:hover {
   color: var(--l-muted);
   opacity: .82;
 }
+.landing-replay-demo { top: 82px; bottom: auto; }
 .landing-floating-task {
   --tilt-x: 0deg;
   --tilt-y: 0deg;
@@ -167,18 +170,18 @@
   filter: drop-shadow(0 24px 34px rgba(39, 35, 30, .16));
   will-change: transform, width, height;
 }
-.landing-floating-task:hover { filter: drop-shadow(0 30px 38px rgba(39, 35, 30, .2)); }
+.landing-floating-task:hover { filter: drop-shadow(0 14px 20px rgba(39, 35, 30, .12)); }
 .landing .landing-orbit.step-idle button.landing-floating-task {
   transform: rotateX(var(--tilt-y)) rotateY(var(--tilt-x)) translateZ(0) !important;
-  filter: drop-shadow(0 24px 34px rgba(39, 35, 30, .16)) !important;
+  filter: drop-shadow(0 12px 18px rgba(39, 35, 30, .12)) !important;
 }
 .landing .landing-orbit.step-idle button.landing-floating-task:hover {
   transform: rotateX(var(--tilt-y)) rotateY(var(--tilt-x)) translateZ(0) !important;
-  filter: drop-shadow(0 30px 38px rgba(39, 35, 30, .2)) !important;
+  filter: drop-shadow(0 14px 20px rgba(39, 35, 30, .12)) !important;
 }
 .landing-orbit.step-flipped .landing-floating-task {
   pointer-events: none;
-  animation: cardFitIn 980ms cubic-bezier(.18,1.12,.28,1) forwards;
+  animation: cardFitIn var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1) forwards;
 }
 .landing-orbit.step-expanded .landing-floating-task {
   width: var(--fit-w);
@@ -195,7 +198,7 @@
   opacity: 0 !important;
   transition: none;
 }
-.landing-orbit.step-placed .landing-floating-task { opacity: 0; pointer-events: none; transform: rotateY(180deg) scale(.72); }
+.landing-orbit.step-placed .landing-floating-task { opacity: 0; pointer-events: none; transform: translate3d(var(--fit-x), var(--fit-y), 0); }
 .landing-floating-task .task-back, .landing-floating-task .task-front {
   position: absolute;
   inset: 42px 41px;
@@ -242,13 +245,13 @@
   background: linear-gradient(105deg, transparent 34%, rgba(251, 249, 255, .88) 48%, transparent 62%);
   transform: translateX(-86%);
   pointer-events: none;
-  animation: clickMeSweep 1900ms cubic-bezier(.2,.75,.25,1) infinite;
+  display: none;
 }
-.landing-floating-task:hover .task-front i::after { animation-duration: 1050ms; }
-.landing-floating-task .task-back { transform: rotateY(-90deg); opacity: 0; color: var(--l-ink); }
-.landing-orbit.step-flipped .landing-floating-task .task-front { animation: frontFlipOut 980ms cubic-bezier(.18,1.12,.28,1) forwards; }
-.landing-orbit.step-flipped .landing-floating-task .task-back { animation: backFlipIn 980ms cubic-bezier(.18,1.12,.28,1) forwards; }
-.landing-orbit.step-expanded .landing-floating-task .task-front { opacity: 0 !important; transform: rotateY(90deg); }
+.landing-floating-task:hover .task-front i::after { animation: none; }
+.landing-floating-task .task-back { transform: translateY(4px); opacity: 0; color: var(--l-ink); }
+.landing-orbit.step-flipped .landing-floating-task .task-front { animation: frontFlipOut var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1) forwards; }
+.landing-orbit.step-flipped .landing-floating-task .task-back { animation: backFlipIn var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1) forwards; }
+.landing-orbit.step-expanded .landing-floating-task .task-front { opacity: 0 !important; transform: none; }
 .landing-orbit.step-expanded .landing-floating-task .task-back {
   inset: 0;
   opacity: 1 !important;
@@ -300,7 +303,7 @@
   background: transparent;
   opacity: 0;
   transform: none;
-  transition: opacity 520ms cubic-bezier(.2,.75,.25,1), transform 720ms cubic-bezier(.2,.82,.2,1);
+  transition: opacity var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1), transform var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1);
   pointer-events: none;
   overflow: hidden;
 }
@@ -454,7 +457,7 @@
 .mini-task .df-candidate-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--paper-task); font-size: 15px; font-weight: 600; letter-spacing: -.012em; }
 .mini-task .df-duration-pill { color: var(--text-muted); font: 700 11px var(--paper-mono); letter-spacing: 0; }
 .landing-orbit.step-expanded .mini-task,
-.landing-orbit.step-placed .mini-task { animation: miniIn 520ms cubic-bezier(.2,.82,.2,1) forwards; }
+.landing-orbit.step-placed .mini-task { animation: miniIn var(--motion-layout, 240ms) cubic-bezier(.2, 0, 0, 1) forwards; }
 .landing-orbit.step-expanded .mini-task.t-0 { animation-delay: 0ms; }
 .landing-orbit.step-placed .mini-task.t-0 { animation-delay: 0ms; }
 .landing-orbit.step-expanded .mini-task.t-1,
@@ -492,7 +495,7 @@
   height: 30px;
   background: linear-gradient(105deg, transparent 28%, rgba(251, 249, 255, .9) 48%, transparent 68%);
   transform: translateX(-132%);
-  animation: dragDropSweep 1900ms cubic-bezier(.2,.75,.25,1) infinite;
+  display: none;
   pointer-events: none;
 }
 .mini-candidate-arrow span {
@@ -713,7 +716,7 @@
   border: 2px dashed color-mix(in srgb, var(--accent-active) 58%, var(--paper-rule));
   background: color-mix(in srgb, var(--accent-active) 5%, transparent);
   opacity: .42;
-  animation: targetBreathe 2100ms cubic-bezier(.2,.75,.25,1) infinite;
+  animation: none;
   pointer-events: none;
 }
 .mini-guide-path {
@@ -739,8 +742,8 @@
   background: color-mix(in srgb, var(--surface-card) 92%, transparent) !important;
   opacity: 0;
   pointer-events: none;
-  transform: translate3d(-310px, -74px, 0) scale(.98);
-  animation: guideIntoSlot 1700ms cubic-bezier(.2,.75,.25,1) infinite;
+  transform: translate3d(-310px, -74px, 0);
+  animation: guideIntoSlot var(--motion-story, 520ms) cubic-bezier(.2, 0, 0, 1) both;
 }
 .mini-guide-card i {
   position: static;
@@ -763,7 +766,7 @@
   color: color-mix(in srgb, var(--cat, var(--accent-active)) 70%, var(--text-main));
   font: normal 13px var(--paper-display);
 }
-.landing-orbit.step-placed .mini-placement { opacity: 1; transform: translateY(0); transition: opacity 320ms ease, transform 420ms cubic-bezier(.2,.82,.2,1); }
+.landing-orbit.step-placed .mini-placement { opacity: 1; transform: translateY(0); transition: opacity var(--motion-fade, 140ms) cubic-bezier(.2, 0, 0, 1), transform var(--motion-base, 180ms) cubic-bezier(.2, 0, 0, 1); }
 .mini-placement .df-resize-dot {
   position: absolute;
   right: 0;
@@ -773,7 +776,7 @@
   opacity: .62;
 }
 .mini-placement .df-resize-dot.top { top: -5px; }
-.mini-placement .df-resize-dot.bottom { bottom: -5px; animation: resizePulse 1500ms cubic-bezier(.2,.75,.25,1) infinite; }
+.mini-placement .df-resize-dot.bottom { bottom: -5px; animation: none; }
 .mini-drag-ghost {
   position: fixed;
   z-index: 100;
@@ -838,17 +841,17 @@
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--l-sage) 86%, white), transparent);
   opacity: .82;
   transform: translateX(-118%);
-  animation: ctaLineSweep 2200ms cubic-bezier(.2,.75,.25,1) infinite;
+  display: none;
   pointer-events: none;
 }
 .landing-button.primary.hero-cta:hover {
   color: color-mix(in srgb, var(--l-sage) 72%, var(--l-ink));
   background: color-mix(in srgb, var(--l-sage) 8%, transparent);
 }
-.landing-button.primary.hero-cta:hover::before { animation-duration: 1050ms; }
+.landing-button.primary.hero-cta:hover::before { animation: none; }
 .landing-button.primary.hero-cta span {
   display: inline-block;
-  animation: ctaArrowNudge 1350ms cubic-bezier(.2,.75,.25,1) infinite;
+  animation: none;
 }
 .landing-button.quiet.hero-cta {
   color: var(--l-muted);
@@ -1150,20 +1153,17 @@
 }
 
 @keyframes heroSpring {
-  0% { opacity: 0; transform: translateX(-28px); }
-  68% { opacity: 1; transform: translateX(7px); }
+  0% { opacity: 0; transform: translateX(-12px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes lineSpring {
-  0% { opacity: 0; transform: translateX(-58px); }
-  70% { opacity: 1; transform: translateX(12px); }
+  0% { opacity: 0; transform: translateX(-14px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes lineSpringReverse {
-  0% { opacity: 0; transform: translateX(58px); }
-  70% { opacity: 1; transform: translateX(-12px); }
+  0% { opacity: 0; transform: translateX(14px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 
@@ -1172,44 +1172,26 @@
     opacity: 1;
     width: min(430px, 86vw);
     height: 258px;
-    transform: translate3d(0, 0, 0) rotateY(0deg);
-    filter: drop-shadow(0 24px 34px rgba(39, 35, 30, .16));
-  }
-  38% {
-    opacity: 1;
-    width: min(410px, 84vw);
-    height: 214px;
-    transform: translate3d(calc(var(--fit-x) * .28), calc(var(--fit-y) * .28), 0) rotateY(-58deg);
-  }
-  52% {
-    opacity: 1;
-    width: calc(var(--fit-w) + 92px);
-    height: calc(var(--fit-h) + 48px);
-    transform: translate3d(calc(var(--fit-x) * .62), calc(var(--fit-y) * .62), 0) rotateY(-86deg);
-  }
-  84% {
-    opacity: 1;
-    width: var(--fit-w);
-    height: var(--fit-h);
-    transform: translate3d(var(--fit-x), var(--fit-y), 0) rotateY(0deg);
-    filter: drop-shadow(0 8px 12px rgba(39, 35, 30, .08));
+    transform: translate3d(0, 0, 0);
+    filter: drop-shadow(0 12px 18px rgba(39, 35, 30, .12));
   }
   100% {
-    opacity: 1;
+    opacity: 0;
     width: var(--fit-w);
     height: var(--fit-h);
-    transform: translate3d(var(--fit-x), var(--fit-y), 0) rotateY(0deg);
+    transform: translate3d(var(--fit-x), var(--fit-y), 0);
+    filter: drop-shadow(0 4px 8px rgba(39, 35, 30, .06));
   }
 }
 
 @keyframes frontFlipOut {
-  0%, 36% { opacity: 1; transform: rotateY(0deg); }
-  50%, 100% { opacity: 0; transform: rotateY(90deg); }
+  0%, 32% { opacity: 1; transform: translateY(0); }
+  58%, 100% { opacity: 0; transform: translateY(-4px); }
 }
 
 @keyframes backFlipIn {
-  0%, 42% { opacity: 0; transform: rotateY(-90deg); }
-  58%, 100% { opacity: 1; transform: rotateY(0deg); }
+  0%, 38% { opacity: 0; transform: translateY(4px); }
+  64%, 100% { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes clickMeSweep {
@@ -1243,20 +1225,20 @@
 }
 
 @keyframes guideIntoSlot {
-  0%, 4% {
+  0% {
     opacity: 0;
-    transform: translate3d(-310px, -74px, 0) scale(.98);
+    transform: translate3d(-310px, -74px, 0);
   }
-  16% {
+  18% {
     opacity: .72;
   }
-  78% {
+  76% {
     opacity: .72;
-    transform: translate3d(0, -2px, 0) scale(1);
+    transform: translate3d(0, -2px, 0);
   }
-  96%, 100% {
+  100% {
     opacity: 0;
-    transform: translate3d(0, -2px, 0) scale(1);
+    transform: translate3d(0, -2px, 0);
   }
 }
 
@@ -1284,12 +1266,16 @@
 @media (max-width: 640px) {
   .landing-nav-actions { gap: 10px; }
   .landing-donation-link { display: none; }
-  .landing h1 { font-size: clamp(43px, 13vw, 68px); }
+  .landing h1,
+  .landing-mini-product .landing-hero-panel h1 { font-size: clamp(38px, 10.5vw, 44px); }
   .landing-hero-panel p { font-size: 15px; }
   .landing-orbit { min-height: 680px; }
   .landing-orbit::before { inset: 0 -6px 0; }
-  .landing-mini-product { width: 94vw; min-height: 500px; grid-template-columns: 1fr; }
-  .landing-hero-panel { padding: 24px 18px 8px; }
+  .landing-mini-product,
+  .landing-orbit.step-placed .landing-mini-product { width: 94vw; min-height: 500px; grid-template-columns: minmax(0, 1fr); }
+  .landing-mini-product .landing-hero-panel,
+  .landing-orbit.step-placed .landing-mini-product .landing-hero-panel { width: 100%; min-width: 0; margin-top: 68px; padding: 24px 18px 8px; }
+  .landing-mini-product .landing-hero-panel p { width: 100%; max-width: 100%; }
   .mini-candidates { border-left: 0; border-right: 0; border-bottom: 1px solid var(--l-rule); }
   .mini-timeline { min-height: 260px; }
   .mini-hour { height: 54px; }
@@ -1313,6 +1299,22 @@
   .landing-auth-card { padding: 28px 22px; }
 }
 
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.landing-reveal.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity var(--motion-layout, 240ms) cubic-bezier(.2, 0, 0, 1), transform var(--motion-layout, 240ms) cubic-bezier(.2, 0, 0, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing *, .landing *::before, .landing *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+  .landing-reveal,
+  .landing-reveal.is-revealed,
+  .landing-orbit.step-placed .landing-hero-panel,
+  .landing-orbit.step-placed .hero-line,
+  .landing-orbit.step-placed .mini-task,
+  .landing-orbit.step-placed .mini-placement { opacity: 1 !important; transform: none !important; }
 }

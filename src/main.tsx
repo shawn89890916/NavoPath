@@ -85,6 +85,7 @@ import {
   taskDueDateTargetAt,
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, timelineRecordBounds } from "./widget/widgetSchedule";
+import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
 import "./landing.css";
@@ -1742,6 +1743,8 @@ function App() {
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
+  const layerExitHandlesRef = useRef(new Map<string, ReturnType<typeof scheduleMotionCommit> | null>());
+  const layerTriggerRef = useRef(new Map<string, HTMLElement>());
   const [habitPanel, setHabitPanel] = useState<"overview" | "detail" | null>(null);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [settingsSectionTarget, setSettingsSectionTarget] = useState<SettingsSection>("general");
@@ -1753,6 +1756,8 @@ function App() {
   const toastTimerRef = useRef<number | null>(null);
   const undoSnapshotRef = useRef<{ committedTaskIds: string[]; clearedSourceTaskIds: string[]; removedFromCandidate: Set<string> } | null>(null);
   const [showCompletedCandidates, setShowCompletedCandidates] = useState(false);
+  const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(() => new Set());
+  const completionHandlesRef = useRef(new Map<string, ReturnType<typeof scheduleMotionCommit> | null>());
   const [groupByProject, setGroupByProject] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProjectId, setQuickProjectId] = useState("");
@@ -1781,6 +1786,13 @@ function App() {
   const timerStartedAtRef = useRef<number | null>(null);
   const widgetManagesTaskTimerRef = useRef(false);
   timerElapsedRef.current = timerElapsed;
+
+  useEffect(() => () => {
+    layerExitHandlesRef.current.forEach((handle) => handle?.cancel());
+    completionHandlesRef.current.forEach((handle) => handle?.cancel());
+    layerExitHandlesRef.current.clear();
+    completionHandlesRef.current.clear();
+  }, []);
 
   useEffect(() => {
     try {
@@ -3943,6 +3955,27 @@ function App() {
     updateTask(taskId, patch);
   }
 
+  function toggleCandidateTaskDone(task: Task) {
+    if (task.completed || isEventDisplayTask(task)) {
+      toggleTaskDone(task.id);
+      return;
+    }
+    if (completionHandlesRef.current.has(task.id)) return;
+
+    setCompletingTaskIds((current) => new Set(current).add(task.id));
+    completionHandlesRef.current.set(task.id, null);
+    const handle = scheduleMotionCommit(() => {
+      completionHandlesRef.current.delete(task.id);
+      toggleTaskDone(task.id);
+      setCompletingTaskIds((current) => {
+        const next = new Set(current);
+        next.delete(task.id);
+        return next;
+      });
+    }, MOTION.base);
+    if (completionHandlesRef.current.has(task.id)) completionHandlesRef.current.set(task.id, handle);
+  }
+
   function deleteTaskById(taskId: string) {
     if (!data) return;
     // Check if this is a recurrence occurrence
@@ -4542,6 +4575,7 @@ function App() {
   }
 
   function createTaskInProject(projectId: string) {
+    rememberLayerTrigger("drawer");
     setAddType("task");
     setEditingId("");
     setEditingRecordId(undefined);
@@ -5865,7 +5899,29 @@ function App() {
     window.addEventListener("mouseup", up);
   }
 
+  function rememberLayerTrigger(key: string) {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) layerTriggerRef.current.set(key, active);
+  }
+
+  function requestLayerClose(key: string, selectors: string, commit: () => void) {
+    if (layerExitHandlesRef.current.has(key)) return;
+    document.querySelectorAll<HTMLElement>(selectors).forEach((element) => element.classList.add("is-closing"));
+    layerExitHandlesRef.current.set(key, null);
+    const handle = scheduleMotionCommit(() => {
+      layerExitHandlesRef.current.delete(key);
+      commit();
+      const trigger = layerTriggerRef.current.get(key);
+      layerTriggerRef.current.delete(key);
+      window.requestAnimationFrame(() => {
+        if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+      });
+    }, MOTION.fade);
+    if (layerExitHandlesRef.current.has(key)) layerExitHandlesRef.current.set(key, handle);
+  }
+
   function openAdd(type: AddType = "task") {
+    rememberLayerTrigger("drawer");
     setAddType(type);
     setEditingId("");
     setEditingRecordId(undefined);
@@ -5876,6 +5932,7 @@ function App() {
 
   function openTaskEdit(task: Task) {
     if (suppressBlockClickRef.current) return;
+    rememberLayerTrigger("drawer");
     const event = occurrenceToEventMap.get(task.id) || events.find((item) => task.id.startsWith(`event_occ_${item.id}_`));
     if (event) {
       openEventEdit(event);
@@ -5911,6 +5968,7 @@ function App() {
   }
 
   function openProjectEdit(project: Project) {
+    rememberLayerTrigger("drawer");
     setAddType("project");
     setEditingId(project.id);
     setEditingRecordId(undefined);
@@ -5920,6 +5978,7 @@ function App() {
   }
 
   function openEventEdit(event: CalendarEvent) {
+    rememberLayerTrigger("drawer");
     setAddType("event");
     setEditingId(event.id);
     setEditingRecordId(undefined);
@@ -5975,11 +6034,14 @@ function App() {
     } else {
       void saveData({ ...data, events: [...data.events, makeEvent(form)] });
     }
-    setEditingId("");
-    setEditingRecordId(undefined);
-    setForm(defaultForm("task"));
-    setAddType("task");
-    setDrawerOpen(false);
+    requestLayerClose("drawer", ".df-drawer-backdrop, .df-drawer", () => {
+      setEditingId("");
+      setEditingRecordId(undefined);
+      setEditingOccurrence(null);
+      setForm(defaultForm("task"));
+      setAddType("task");
+      setDrawerOpen(false);
+    });
   }
 
   function closeTaskDrawer(options?: { autoSave?: boolean }) {
@@ -6007,12 +6069,14 @@ function App() {
         });
       }
     }
-    setDrawerOpen(false);
-    setEditingRecordId(undefined);
-    setEditingOccurrence(null);
-    setEditingId("");
-    setForm(defaultForm("task"));
-    setAddType("task");
+    requestLayerClose("drawer", ".df-drawer-backdrop, .df-drawer", () => {
+      setDrawerOpen(false);
+      setEditingRecordId(undefined);
+      setEditingOccurrence(null);
+      setEditingId("");
+      setForm(defaultForm("task"));
+      setAddType("task");
+    });
   }
 
   function deleteEditingItem() {
@@ -7147,12 +7211,32 @@ function App() {
   }
 
   function shiftTimeline(direction: -1 | 1) {
-    setSelectedDate((date) => {
-      if (timelineView === "3day") return addDays(date, direction * 3);
-      if (timelineView === "weekly") return addDays(date, direction * 7);
-      if (timelineView === "month") return addMonths(date, direction);
-      return addDays(date, direction);
-    });
+    void runMotionTransition(() => {
+      setSelectedDate((date) => {
+        if (timelineView === "3day") return addDays(date, direction * 3);
+        if (timelineView === "weekly") return addDays(date, direction * 7);
+        if (timelineView === "month") return addMonths(date, direction);
+        return addDays(date, direction);
+      });
+    }, { direction: direction < 0 ? "backward" : "forward", scope: "timeline" });
+  }
+
+  function changeMode(nextMode: Mode) {
+    if (nextMode === mode) return;
+    setYearOverviewOpen(false);
+    void runMotionTransition(() => {
+      void saveSettings({ activeMode: nextMode });
+    }, { direction: nextMode === "planning" ? "forward" : "backward", scope: "workspace" });
+  }
+
+  function changeTimelineView(nextView: TimelineView) {
+    if (nextView === timelineView) return;
+    const order: TimelineView[] = ["daily", "3day", "weekly", "month"];
+    const direction = order.indexOf(nextView) < order.indexOf(timelineView) ? "backward" : "forward";
+    void runMotionTransition(() => {
+      setTimelineView(nextView);
+      setDragCreate(null);
+    }, { direction, scope: "timeline" });
   }
 
   function goToNow() {
@@ -7166,8 +7250,16 @@ function App() {
   }
 
   function openSettingsSection(section: SettingsSection) {
+    rememberLayerTrigger("utility");
     setSettingsSectionTarget(section);
     setUtilityPanel("settings");
+  }
+
+  function closeUtilityPanel(afterClose?: () => void) {
+    requestLayerClose("utility", ".df-utility-backdrop, .df-utility-panel", () => {
+      setUtilityPanel(null);
+      afterClose?.();
+    });
   }
 
   function toggleTimerShortcut() {
@@ -7381,11 +7473,11 @@ function App() {
             </button>
           </div>
           <nav className="df-tabs df-tabs-center">
-            <button className={mode === "execute" ? "active" : ""} onClick={() => void saveSettings({ activeMode: "execute" })}>{t(lang, "header.execute")}</button>
-            <button className={mode === "planning" ? "active" : ""} onClick={() => { setYearOverviewOpen(false); void saveSettings({ activeMode: "planning" }); }}>{t(lang, "header.planning")}</button>
+            <button className={mode === "execute" ? "active" : ""} onClick={() => changeMode("execute")}>{t(lang, "header.execute")}</button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => changeMode("planning")}>{t(lang, "header.planning")}</button>
           </nav>
           <div className="df-header-right">
-          <button className="df-user-avatar" onClick={() => setUtilityPanel("settings")} aria-label={t(lang, "header.settings")}>
+          <button className="df-user-avatar" onClick={() => { rememberLayerTrigger("utility"); setUtilityPanel("settings"); }} aria-label={t(lang, "header.settings")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         </div>
@@ -7453,8 +7545,7 @@ function App() {
                   {compactViewMenuOpen && <div className="df-compact-view-menu" role="menu">
                     {(["daily", "3day", "weekly", "month"] as TimelineView[]).map((view) => (
                       <button key={view} role="menuitemradio" aria-checked={timelineView === view} className={timelineView === view ? "active" : ""} onClick={() => {
-                        setTimelineView(view);
-                        setDragCreate(null);
+                        changeTimelineView(view);
                         setCompactViewMenuOpen(false);
                       }}>{viewLabel(lang, view)}</button>
                     ))}
@@ -7611,8 +7702,13 @@ function App() {
                           return (
                             <div
                               key={task.id}
-                              className={`df-candidate-task-row${dropHere ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                              className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${dropHere ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
                               data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
+                              onClickCapture={(event) => {
+                                if (!(event.target as HTMLElement).closest(".df-block-check")) return;
+                                event.stopPropagation();
+                                toggleCandidateTaskDone(task);
+                              }}
                             >
                               {dropHere && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
                               <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />
@@ -7626,8 +7722,13 @@ function App() {
               ) : visibleCandidates.map((task) => (
                 <div
                   key={task.id}
-                  className={`df-candidate-task-row${drag?.source === "candidate" && candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                  className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${drag?.source === "candidate" && candidateDropTarget?.taskId === task.id ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
                   data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
+                  onClickCapture={(event) => {
+                    if (!(event.target as HTMLElement).closest(".df-block-check")) return;
+                    event.stopPropagation();
+                    toggleCandidateTaskDone(task);
+                  }}
                 >
                   {drag?.source === "candidate" && candidateDropTarget?.taskId === task.id && candidateDropTarget.position === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
                   <TaskCard task={task} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />
@@ -8612,7 +8713,7 @@ function App() {
                   ["3day", viewLabel(lang, "3day")],
                   ["weekly", viewLabel(lang, "weekly")],
                   ["month", viewLabel(lang, "month")]
-                ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => { setTimelineView(view); setDragCreate(null); }}>{label}</button>)}
+                ] as Array<[TimelineView, string]>).map(([view, label]) => <button key={view} className={timelineView === view ? "active" : ""} onClick={() => changeTimelineView(view)}>{label}</button>)}
               </div>
             </div>
             </>}
@@ -8627,8 +8728,8 @@ function App() {
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
           <div className="df-mobile-mode-switch">
-            <button className={mode === "execute" ? "active" : ""} onClick={() => { setYearOverviewOpen(false); void saveSettings({ activeMode: "execute" }); }}>{t(lang, "header.execute")}</button>
-            <button className={mode === "planning" ? "active" : ""} onClick={() => { setYearOverviewOpen(false); void saveSettings({ activeMode: "planning" }); }}>{t(lang, "header.planning")}</button>
+            <button className={mode === "execute" ? "active" : ""} onClick={() => changeMode("execute")}>{t(lang, "header.execute")}</button>
+            <button className={mode === "planning" ? "active" : ""} onClick={() => changeMode("planning")}>{t(lang, "header.planning")}</button>
           </div>
           <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -8643,7 +8744,7 @@ function App() {
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
-      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => setUtilityPanel(null)} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => { setUtilityPanel(null); setScheduleTemplateOpen(true); }} />}
+      {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
       {focusOverlayMode && (
         <div className="df-focus-overlay" style={focusProject?.color ? { ["--focus-accent" as string]: focusProject.color } as React.CSSProperties : undefined}>
