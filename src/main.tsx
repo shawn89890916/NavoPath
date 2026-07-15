@@ -304,8 +304,8 @@ function isLightColor(value: string) {
 }
 
 function themeVars(settings: Settings, mode: Mode) {
-  const executeDefault = "#D7816A";
-  const planningDefault = "#7EA172";
+  const executeDefault = "#584D3D";
+  const planningDefault = "#584D3D";
   const execute = normalizeHexColor(settings.executeAccentColor || executeDefault, executeDefault);
   const planning = normalizeHexColor(settings.planningAccentColor || planningDefault, planningDefault);
   const executeLight = isLightColor(execute);
@@ -356,8 +356,8 @@ function themeVars(settings: Settings, mode: Mode) {
     "--accent-active": activeAccent,
     "--accent-rgb": `${r}, ${g}, ${b}`,
     "--accent-on": activeLight ? "#111827" : "#FFFFFF",
-    "--bg-app": "#F6F2F5",
-    "--bg-app-soft": "#EEE9EC",
+    "--bg-app": "#FBF9FF",
+    "--bg-app-soft": "#F5F1EA",
     "--surface-main": "#FBF9FF",
     "--surface-raised": "#FFFFFF",
     "--surface-card": "#FFFFFF",
@@ -7679,7 +7679,7 @@ function App() {
                   </div>}
                 </div>
                 <button
-                  className="df-icon-action"
+                  className="df-icon-action df-icon-focus"
                   data-tip={lang === "zh" ? "专注" : "Focus"}
                   aria-label={lang === "zh" ? "专注" : "Focus"}
                   disabled={!focusTask}
@@ -7692,7 +7692,7 @@ function App() {
                 )}
                 {Boolean(window.desktopApi?.widget) && settings.featureWidgetEnabled !== false && (
                   <button
-                    className="df-icon-action"
+                    className="df-icon-action df-icon-widget"
                     data-tip={lang === "zh" ? "桌面小组件" : "Desktop widget"}
                     aria-label={lang === "zh" ? "桌面小组件" : "Desktop widget"}
                     onClick={() => void window.desktopApi?.widget?.open()}
@@ -7733,6 +7733,11 @@ function App() {
               </>
             }
             />
+            {candidateDropActive && (
+              <div className="df-candidate-return-hint" role="status">
+                {lang === "zh" ? "松手后移回今日候选" : "Release to return to Today's Candidates"}
+              </div>
+            )}
             {(dailyCapacityRisk.level !== "comfortable" || schedulePreviews.length > 0 || scheduleUnscheduled.length > 0) && (
               <div className="df-ai-plan-feedback" role="status">
                 {dailyCapacityRisk.level !== "comfortable" && <span className={`df-ai-capacity-inline ${dailyCapacityRisk.level}`}>{lang === "zh" ? `容量${dailyCapacityRisk.level === "high" ? "超载" : "偏紧"}：待安排 ${formatMinutes(dailyCapacityRisk.demandMinutes)}，剩余 ${formatMinutes(dailyCapacityRisk.availableMinutes)}` : `Capacity ${dailyCapacityRisk.level === "high" ? "overloaded" : "tight"}: ${formatMinutes(dailyCapacityRisk.demandMinutes)} to place, ${formatMinutes(dailyCapacityRisk.availableMinutes)} free`}</span>}
@@ -8801,12 +8806,15 @@ function App() {
 
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
+          <button className="df-mobile-dock-action df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
           <div className="df-mobile-mode-switch">
             <button className={mode === "execute" ? "active" : ""} onClick={() => changeMode("execute")}>{t(lang, "header.execute")}</button>
             <button className={mode === "planning" ? "active" : ""} onClick={() => changeMode("planning")}>{t(lang, "header.planning")}</button>
           </div>
-          <button className="df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <button className="df-mobile-dock-action df-mobile-settings" onClick={() => { rememberLayerTrigger("utility"); setUtilityPanel("settings"); }} aria-label={t(lang, "header.settings")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         </nav>
       )}
