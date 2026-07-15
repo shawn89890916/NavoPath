@@ -10,6 +10,7 @@
 - 竖屏规划页的视图选项改为无阴影、无卡片感的等分顶栏，视图数量变化时自动铺满可用宽度；筛选入口贴齐右上角并移除默认边框。
 - 重构竖屏执行页：今日候选成为带圆角的手机式主页面，顶栏将 Tasks／Schedule、居中标题和右侧操作整合在同一行；移除收起与候选筛选按钮，改为带明显选中态的「显示已完成」快捷键。底部 Dock 改为深色全宽底栏；空状态新增纸面插画，以箭头指向左下角高亮的添加键。
 - 优化竖屏空状态插画与手机框架：将插画替换为透明线稿，避免与纸面背景形成突兀色块；整个执行／规划工作区现收进深色外壳的完整圆角画布，底栏随外壳一起圆角裁切。
+- 竖屏底栏改为更轻的暖石色，并保留纸面分隔与主题色选中标记；空状态透明引导插画放大为整屏层，箭头终点校准到左下角的添加按钮。
 - 合并「今日候选」的项目和已完成筛选为可完整显示的两级筛选器；现在可按项目多选并显示已完成任务，也可一键清空筛选，并移除按项目分组按钮。
 - 修复桌面小组件在主窗口转入后台后计时器更新缓慢的问题；点击时间可在如 `38min` 的分钟显示和精确到秒之间切换。今日候选习惯不再显示编辑按钮，任务详情的备注编辑入口改为图标按钮。
 - 修复竖屏候选任务行中勾选框占位过大、标题被挤成竖排的问题；现在保留 44 像素触控范围，同时使用紧凑勾选标记、双行标题和更均衡的时长与操作间距。候选区标题和工具栏也改为上下分行，避免标题与操作图标互相挤压。
@@ -35,6 +36,7 @@
 - Updated portrait Planning view choices to a shadow-free, evenly distributed top rail that fills the available width as the number of views changes; the Filter entry now sits flush at the upper-right without a default border.
 - Rebuilt the portrait Execute page as a rounded phone-like primary surface: Tasks/Schedule, the centered candidate title, and right-side actions now share one top bar; the collapse and candidate-filter controls are removed in favor of a clearly selected Show completed shortcut. The Dock is now a dark full-width bottom bar, and the empty state adds a paper illustration that points to the emphasized lower-left Add action.
 - Refined the portrait empty-state illustration and phone frame: the illustration is now a transparent line drawing rather than a mismatched paper-colored block, while the full Execute/Planning workspace is contained in one dark-shell rounded canvas with the bottom bar clipped into the same corners.
+- Changed the portrait bottom bar to a lighter warm-stone tone with paper separation and theme-driven active marking; the transparent empty-state guide now scales to a full-screen layer with its arrow aligned to the lower-left Add button.
 - Consolidated Today's Candidate project and completed controls into a fully visible two-level filter, with multi-project selection, completed-task visibility, a single clear-all action, and no project-grouping control.
 - Fixed slow desktop-widget timer updates after the main window enters the background. Clicking the displayed time now switches between a minute label such as `38min` and second precision. Habit rows no longer show edit buttons, and task-detail notes now use an icon-only edit control.
 - Fixed portrait candidate rows wasting width on oversized checkbox visuals and squeezing titles into near-vertical text. The rows now retain 44px touch targets while using compact check marks, two-line titles, and balanced duration/action spacing. The candidate heading and toolbar now use separate rows so the title no longer competes with action icons.

@@ -45,10 +45,10 @@
     padding: 6px 12px calc(6px + env(safe-area-inset-bottom)) !important;
     transform: none !important;
     border: 0 !important;
-    border-top: 1px solid color-mix(in srgb, var(--surface-main) 20%, transparent) !important;
+    border-top: 1px solid var(--paper-rule-strong) !important;
     border-radius: 0 !important;
-    background: color-mix(in srgb, var(--text-main) 92%, var(--surface-main)) !important;
-    color: var(--surface-main) !important;
+    background: color-mix(in srgb, var(--surface-main) 80%, var(--text-main)) !important;
+    color: var(--text-main) !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
     z-index: 30 !important;
@@ -64,13 +64,13 @@
     border: 0 !important;
     border-radius: 50% !important;
     background: transparent !important;
-    color: var(--surface-main) !important;
+    color: var(--text-main) !important;
     box-shadow: none !important;
   }
 
   #root .df-app .df-mobile-dock-action:hover,
   #root .df-app .df-mobile-dock-action:focus-visible {
-    background: color-mix(in srgb, var(--surface-main) 14%, transparent) !important;
+    background: color-mix(in srgb, var(--surface-main) 48%, transparent) !important;
   }
 
   #root .df-app .df-mobile-dock-action svg {
@@ -86,7 +86,7 @@
   #root .df-app .df-mobile-mode-switch {
     height: 48px !important;
     align-self: center !important;
-    border-inline: 1px solid color-mix(in srgb, var(--surface-main) 18%, transparent) !important;
+    border-inline: 1px solid var(--paper-rule) !important;
   }
 
   #root .df-app .df-mobile-mode-switch button {
@@ -97,8 +97,8 @@
   }
 
   #root .df-app .df-mobile-mode-switch button.active {
-    color: var(--surface-main) !important;
-    border-bottom-color: var(--surface-main) !important;
+    color: var(--text-main) !important;
+    border-bottom-color: var(--accent-active) !important;
     background: transparent !important;
   }
 
@@ -148,7 +148,7 @@
 
   #root .df-app .df-mobile-dock {
     border: 0 !important;
-    border-top: 1px solid color-mix(in srgb, var(--surface-main) 20%, transparent) !important;
+    border-top: 1px solid var(--paper-rule-strong) !important;
     box-shadow: none !important;
   }
 
@@ -400,13 +400,19 @@
 
   #root .df-app.mode-execute .df-empty-add-guidance {
     position: fixed !important;
-    z-index: 1 !important;
-    left: 10px !important;
-    bottom: 10px !important;
-    width: 170px !important;
-    height: 170px !important;
+    z-index: 0 !important;
+    left: -76px !important;
+    bottom: -170px !important;
+    width: 100% !important;
+    height: auto !important;
+    opacity: .3 !important;
     object-fit: contain !important;
     pointer-events: none !important;
+  }
+
+  #root .df-app.mode-execute .df-empty strong,
+  #root .df-app.mode-execute .df-empty span {
+    z-index: 1 !important;
   }
 
   #root .df-app.mode-execute:has(.df-empty) .df-mobile-add {
