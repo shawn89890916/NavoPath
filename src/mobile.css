@@ -313,23 +313,28 @@
     display: none !important;
   }
 
-  #root .df-app .df-planning .df-mindmap {
+  #root .df-app.mode-planning .df-planning .df-mindmap.no-root {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
-  #root .df-app .df-planning .df-planning-sidebar {
+  #root .df-app.mode-planning .df-planning .df-planning-sidebar {
     position: absolute !important;
-    inset: 0 0 auto 0 !important;
-    width: auto !important;
+    inset: -6px auto auto -8px !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 1 / 2 !important;
     height: 52px !important;
     min-height: 52px !important;
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    padding: 4px 10px !important;
+    box-sizing: border-box !important;
+    padding: 4px 56px 4px 10px !important;
     border-right: 0 !important;
     border-bottom: 1px solid var(--paper-rule) !important;
     background: var(--surface-main) !important;
+    box-shadow: none !important;
     z-index: 20 !important;
   }
 
@@ -337,31 +342,43 @@
     display: none !important;
   }
 
-  #root .df-app .df-planning .df-planning-view-switch {
-    display: flex !important;
+  #root .df-app.mode-planning .df-planning .df-planning-view-switch {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
     flex-direction: row !important;
-    width: auto !important;
+    width: 100% !important;
+    height: 44px !important;
     align-items: center !important;
-    justify-content: flex-start !important;
+    justify-content: stretch !important;
     gap: 0 !important;
   }
 
-  #root .df-app .df-planning .df-view-btn {
-    width: auto !important;
-    min-width: 44px !important;
+  #root .df-app.mode-planning .df-planning .df-view-btn {
+    width: 100% !important;
+    min-width: 0 !important;
     height: 44px !important;
     min-height: 44px !important;
     padding: 0 8px !important;
-    border-right: 0 !important;
+    border: 0 !important;
+    border-right: 1px solid var(--paper-rule) !important;
     border-bottom: 1px solid transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
     writing-mode: horizontal-tb !important;
     letter-spacing: 0 !important;
-    display: inline-flex !important;
+    display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     justify-content: center !important;
     gap: 5px !important;
-    flex: 0 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  #root .df-app.mode-planning .df-planning .df-view-btn:last-child {
+    border-right-color: transparent !important;
   }
 
   #root .df-app .df-planning .df-view-btn svg {
@@ -381,8 +398,28 @@
     background: transparent !important;
   }
 
-  #root .df-app .df-planning .df-tree-wrap {
+  #root .df-app.mode-planning .df-planning .df-tree-wrap {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 / 2 !important;
     padding-top: 60px !important;
+  }
+
+  #root .df-app.mode-planning .df-planning .df-planning-filter-corner {
+    position: fixed !important;
+    top: 4px !important;
+    right: 4px !important;
+    z-index: 30 !important;
+  }
+
+  #root .df-app.mode-planning .df-planning .df-filter-trigger {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   #root .df-app .df-task-node-actions,

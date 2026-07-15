@@ -7,6 +7,7 @@
 
 ### 修复
 - 重做竖屏工作区：移除顶栏和搜索入口，底部改为纸面风格 Dock，提供添加、执行／规划切换和设置；候选区仅保留筛选与优化建议；规划视图切换移至顶部横栏，并在拖回任务时明确提示「移回今日候选」。默认主题色改为深棕墨色，减少泛红、泛绿的背景感；时间轴去除外框，回到现在入口下移以避开顶部控件，Dock 图标保持同一底色。
+- 竖屏规划页的视图选项改为无阴影、无卡片感的等分顶栏，视图数量变化时自动铺满可用宽度；筛选入口贴齐右上角并移除默认边框。
 - 合并「今日候选」的项目和已完成筛选为可完整显示的两级筛选器；现在可按项目多选并显示已完成任务，也可一键清空筛选，并移除按项目分组按钮。
 - 修复桌面小组件在主窗口转入后台后计时器更新缓慢的问题；点击时间可在如 `38min` 的分钟显示和精确到秒之间切换。今日候选习惯不再显示编辑按钮，任务详情的备注编辑入口改为图标按钮。
 - 修复竖屏候选任务行中勾选框占位过大、标题被挤成竖排的问题；现在保留 44 像素触控范围，同时使用紧凑勾选标记、双行标题和更均衡的时长与操作间距。候选区标题和工具栏也改为上下分行，避免标题与操作图标互相挤压。
@@ -29,6 +30,7 @@
 
 ### Fixed
 - Redesigned the portrait workspace: removed the header and search entry, replaced the bottom navigation with a paper-style dock for Add, Execute/Planning, and Settings, kept only filtering and schedule suggestions in Candidates, moved Planning view choices into a top rail, and added an explicit return-to-candidates drop hint. Default accents now use deep brown ink to reduce red/green background casts; the timeline has no outer frame, Back to now sits below the top controls, and dock icons share one surface.
+- Updated portrait Planning view choices to a shadow-free, evenly distributed top rail that fills the available width as the number of views changes; the Filter entry now sits flush at the upper-right without a default border.
 - Consolidated Today's Candidate project and completed controls into a fully visible two-level filter, with multi-project selection, completed-task visibility, a single clear-all action, and no project-grouping control.
 - Fixed slow desktop-widget timer updates after the main window enters the background. Clicking the displayed time now switches between a minute label such as `38min` and second precision. Habit rows no longer show edit buttons, and task-detail notes now use an icon-only edit control.
 - Fixed portrait candidate rows wasting width on oversized checkbox visuals and squeezing titles into near-vertical text. The rows now retain 44px touch targets while using compact check marks, two-line titles, and balanced duration/action spacing. The candidate heading and toolbar now use separate rows so the title no longer competes with action icons.
