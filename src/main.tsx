@@ -8196,7 +8196,7 @@ function App() {
                                   );
                                 })}
                                 {/* Preview block during drag */}
-                                {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && (() => {
+                                {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && !drag.taskId.startsWith("habit:") && (() => {
                                   const tgtDate = dragTargetDateRef.current || threeDates[0];
                                   const dayOffset = continuousDateOffset(tgtDate);
                                   const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(tgtDate);
@@ -8637,7 +8637,7 @@ function App() {
                             in non-continuous mode (via NowLine's internal timeBlockTop) and
                             the continuous absolute coordinate in continuous mode. */}
                         {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && !drag.taskId.startsWith("habit:") && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
                         {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -8886,7 +8886,7 @@ function App() {
           />
         </TaskDragLayer>
       )}
-      {dragOverlay && !dragOverlayTask && drag?.kind !== "block" && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
+      {dragOverlay && !dragOverlayTask && dragOverlay.data?.kind !== "habit" && drag?.kind !== "block" && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
