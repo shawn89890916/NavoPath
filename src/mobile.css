@@ -123,13 +123,14 @@
   }
 
   #root .df-app .df-mobile-add {
-    border-radius: 999px !important;
-    background: color-mix(in srgb, var(--accent-active) 8%, var(--surface-main)) !important;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--text-main) 12%, transparent) !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   #root .df-app .df-mobile-dock {
-    box-shadow: 0 8px 26px color-mix(in srgb, var(--text-main) 14%, transparent) !important;
+    border: 1px solid var(--paper-rule) !important;
+    box-shadow: 0 -6px 18px color-mix(in srgb, var(--text-main) 8%, transparent) !important;
   }
 
   #root .df-app .df-date-title-compact {
@@ -138,7 +139,7 @@
 
   #root .df-app .df-execute,
   #root .df-app .df-planning {
-    height: calc(100dvh - 56px) !important;
+    height: 100dvh !important;
     min-height: 0 !important;
     padding: 0 8px !important;
     overflow: hidden !important;
@@ -272,8 +273,8 @@
   }
 
   #root .df-app .df-back-to-now {
-    top: 4px !important;
-    right: 4px !important;
+    top: 58px !important;
+    right: 8px !important;
     width: 44px !important;
     min-width: 44px !important;
     height: 44px !important;
@@ -285,6 +286,13 @@
   #root .df-app .df-back-to-now::after {
     content: "↵";
     font: 700 22px/1 var(--paper-sans);
+  }
+
+  #root .df-app .df-timeline-panel.compact-active {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   #root .df-app .df-task-drag-layer {
