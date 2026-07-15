@@ -97,17 +97,90 @@
   }
 
   #root .df-app .df-task-card {
-    padding-left: 56px !important;
+    min-height: 62px !important;
+    padding: 8px 8px 8px 10px !important;
+  }
+
+  #root .df-app .df-task-card .df-candidate-row {
+    grid-template-columns: 44px minmax(0, 1fr) auto auto !important;
+    column-gap: 6px !important;
+  }
+
+  #root .df-app .df-task-card .df-task-checkbox-wrap {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    display: grid !important;
+    place-items: center !important;
   }
 
   #root .df-app .df-task-card .df-block-check {
-    left: 6px !important;
-    top: 50% !important;
+    position: static !important;
+    inset: auto !important;
+    width: 20px !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    transform: none !important;
+  }
+
+  #root .df-app .df-task-card .df-task-urgency-mark {
+    right: 3px !important;
+    top: 2px !important;
+  }
+
+  #root .df-app .df-task-card .df-task-block-title,
+  #root .df-app .df-task-card .df-candidate-title {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  #root .df-app .df-task-card .df-task-actions {
+    gap: 0 !important;
+  }
+
+  #root .df-app .df-candidate-panel > .df-panel-title {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 4px !important;
+    min-height: 0 !important;
+    margin-bottom: 10px !important;
+    padding-bottom: 8px !important;
+  }
+
+  #root .df-app .df-candidate-panel > .df-panel-title h2 {
+    width: 100% !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  #root .df-app .df-candidate-panel > .df-panel-title > div {
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 0 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+
+  #root .df-app .df-candidate-panel > .df-panel-title > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  #root .df-app .df-candidate-panel > .df-panel-title .df-icon-action {
     width: 44px !important;
     min-width: 44px !important;
     height: 44px !important;
     min-height: 44px !important;
-    transform: translateY(-50%) !important;
+  }
+
+  #root .df-app .df-candidate-panel > .df-panel-title .df-ai-plan-title-tools {
+    flex: 0 0 auto !important;
+    gap: 0 !important;
   }
 
   #root .df-app .df-task-node-actions,
