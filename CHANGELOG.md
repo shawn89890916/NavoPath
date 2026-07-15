@@ -6,7 +6,7 @@
 - 桌面端新增独立于「正在做」小组件的完整竖屏窗口：默认以 420 × 760 打开，可自由调整大小，并可单独开启或关闭始终置顶。
 
 ### 修复
-- 修复今日候选拖拽习惯时残留的半透明占位框；移除候选栏顶部「正在做」状态栏，将专注入口放入每个候选任务，并在设置左侧新增全局搜索入口。
+- 修复今日候选拖拽习惯时残留的半透明占位框；移除候选栏顶部「正在做」状态栏，并将专注入口移至与日程模板、规划建议同一顶栏工具区；设置左侧新增全局搜索入口。
 - 修复桌面小组件未按当前时间轴定位任务、正计时与倒计时绑定错误的问题：现在会显示当前任务；没有当前任务时显示距下一任务开始的时间；倒计时到任务截止时间后切换为带「已超时」标注的红色正计时，并在每超时 15 分钟时将当前任务块延长 15 分钟。
 - 修复从任务块上边缘调整时间时预览先改变下边界的问题；上边缘与高度现在在同一帧按跨天绝对坐标更新。
 - 修复习惯无法稳定拖入日、三日、周及跨天时间轴的问题；习惯现在与普通候选任务共用一致的时间轴命中与落点计算。
@@ -24,7 +24,7 @@
 - Added a complete desktop portrait window independent from the current-task widget. It opens at 420 × 760 by default, remains resizable, and has its own always-on-top control.
 
 ### Fixed
-- Fixed the residual transparent placeholder when dragging a habit in Today’s Candidates. Removed the candidate-panel “Working” bar, moved Focus to each candidate task, and added a global search action to the left of Settings.
+- Fixed the residual transparent placeholder when dragging a habit in Today’s Candidates. Removed the candidate-panel “Working” bar, moved Focus into the same header tool group as Schedule Templates and Plan Suggestions, and added a global search action to the left of Settings.
 - Fixed the desktop widget selecting tasks outside the current timeline slot and binding stopwatch/countdown state to the wrong task. It now shows the current task, counts down to the next task when the timeline is idle, switches deadline countdowns to a labeled red overdue stopwatch, and extends the current task block by 15 minutes at each completed 15-minute overrun interval.
 - Fixed start-edge task resizing previewing a lower-boundary change first; the top edge and height now update in the same frame using continuous cross-day coordinates.
 - Fixed habits failing to drag reliably into day, three-day, week, and continuous timelines by sharing the same target and drop calculation used by regular candidate tasks.
