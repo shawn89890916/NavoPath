@@ -52,6 +52,12 @@ describe("continuous daily timeline", () => {
       anchorDate: "2026-07-01",
       dayStartHour: 0,
     })).toBe("7.2 0:00");
+    expect(dailyContinuousSlotLabel({
+      index: 96,
+      anchorDate: "2026-07-01",
+      dayStartHour: 0,
+      dateStep: 3,
+    })).toBe("7.4 0:00");
   });
 
   it("maps scroll offsets to the visible date window for daily, 3-day, and week views", () => {

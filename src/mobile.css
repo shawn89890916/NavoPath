@@ -281,7 +281,7 @@
 
   #root .df-app.mode-execute .df-candidate-panel.compact-active {
     position: relative !important;
-    padding: 52px 6px 0 !important;
+    padding: 100px 6px 0 !important;
     border: 0 !important;
     border-radius: 24px 24px 0 0 !important;
     background: var(--surface-main) !important;
@@ -305,9 +305,9 @@
     align-items: center !important;
     gap: 2px !important;
     padding: 3px !important;
-    border: 1px solid var(--paper-rule-strong) !important;
+    border: 1px solid var(--paper-rule) !important;
     border-radius: 7px !important;
-    background: color-mix(in srgb, var(--surface-main) 90%, var(--text-main) 10%) !important;
+    background: var(--surface-main) !important;
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs {
@@ -448,30 +448,31 @@
 
   #root .df-app.mode-execute .df-candidate-panel > .df-panel-title {
     position: absolute !important;
-    inset: 0 !important;
-    min-height: 52px !important;
-    height: 52px !important;
+    inset: 52px 0 auto !important;
+    min-height: 48px !important;
+    height: 48px !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 0 4px !important;
     border: 0 !important;
+    border-bottom: 1px solid var(--paper-rule) !important;
   }
 
   #root .df-app.mode-execute .df-candidate-panel > .df-panel-title h2 {
     position: absolute !important;
-    inset: 0 128px !important;
+    inset: 0 96px 0 4px !important;
     display: grid !important;
     place-items: center !important;
     margin: 0 !important;
     color: var(--text-main) !important;
-    font-size: 17px !important;
-    text-align: center !important;
+    font-size: 16px !important;
+    text-align: left !important;
     pointer-events: none;
   }
 
   #root .df-app.mode-execute .df-candidate-panel > .df-panel-title > div {
     position: absolute !important;
-    top: 4px !important;
-    right: 8px !important;
+    top: 2px !important;
+    right: 4px !important;
     height: 44px !important;
   }
 
@@ -616,6 +617,13 @@
 
   #root .df-app .df-timeline-3day-top {
     margin-top: 14px !important;
+    background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
+  }
+
+  #root .df-app .df-timeline-3day {
+    width: 100% !important;
+    max-width: none !important;
+    margin-inline: 0 !important;
   }
 
   #root .df-app .df-timeline-3day-date {
@@ -635,14 +643,37 @@
 
   #root .df-app .df-timeline-3day-ruler,
   #root .df-app .df-timeline-3day-ruler-spacer {
-    width: 56px !important;
-    flex: 0 0 56px !important;
+    width: 48px !important;
+    flex: 0 0 48px !important;
   }
 
   #root .df-app .df-timeline-3day-ruler .df-slot-ruler span {
-    left: 6px !important;
+    left: 0 !important;
     right: auto !important;
-    font-size: 8px !important;
+    font-size: 10px !important;
+    text-align: left !important;
+    letter-spacing: 0 !important;
+  }
+
+  #root .df-app .df-timeline-3day-ruler .df-slot-ruler .df-timeline-ruler-label b {
+    font: inherit !important;
+    font-weight: inherit !important;
+  }
+
+  #root .df-app .df-timeline-3day-ruler .df-slot-ruler .df-timeline-ruler-label.day-boundary {
+    top: -20px !important;
+    display: grid !important;
+    gap: 1px !important;
+  }
+
+  #root .df-app .df-timeline-3day-ruler .df-slot-ruler .df-timeline-ruler-label.day-boundary small {
+    color: var(--text-faint) !important;
+    font: 650 8px/10px var(--paper-mono) !important;
+    letter-spacing: .02em !important;
+  }
+
+  #root .df-app .df-timeline-3day-allday-label {
+    padding: 6px 0 0 !important;
     text-align: left !important;
   }
 

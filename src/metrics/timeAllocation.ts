@@ -303,8 +303,26 @@ function endForStartAndDuration(date: string, startTime: string, durationMinutes
   return { endDate: isoDate(end), endTime: minutesToTime(timeToMinutes(startTime) + durationMinutes) };
 }
 
-function taskRecords(task: Task, range: MetricDateRange): TimelineRecord[] {
-  const records = (task.timelineRecords || []).filter((record) => record.executionStatus !== "cancelled");
+function allDayDurationMinutes(task: Task) {
+  return Math.max(1, Math.round((task.estimatedHours || 0.5) * 60));
+}
+
+function timedMetricRecord(task: Task, record: TimelineRecord, dayStartMinutes: number): TimelineRecord {
+  if (record.scheduledStart) return record;
+  const startTime = minutesToTime(dayStartMinutes);
+  const { endDate, endTime } = endForStartAndDuration(record.scheduledDate, startTime, allDayDurationMinutes(task));
+  return {
+    ...record,
+    scheduledStart: startTime,
+    scheduledEndDate: endDate,
+    scheduledEnd: endTime,
+  };
+}
+
+function taskRecords(task: Task, range: MetricDateRange, dayStartMinutes: number): TimelineRecord[] {
+  const records = (task.timelineRecords || [])
+    .filter((record) => record.executionStatus !== "cancelled")
+    .map((record) => timedMetricRecord(task, record, dayStartMinutes));
   const allRecords = [...records];
   if (task.scheduledDate && task.scheduledStart && task.scheduledEnd) {
     allRecords.push({
@@ -315,6 +333,19 @@ function taskRecords(task: Task, range: MetricDateRange): TimelineRecord[] {
       scheduledEndDate: task.scheduledDate,
       scheduledEnd: task.scheduledEnd,
       executionStatus: "scheduled",
+      createdAt: task.createdAt,
+    });
+  } else if (task.scheduledDate && !task.scheduledStart) {
+    const startTime = minutesToTime(dayStartMinutes);
+    const { endDate, endTime } = endForStartAndDuration(task.scheduledDate, startTime, allDayDurationMinutes(task));
+    allRecords.push({
+      id: `metric-all-day-${task.id}-${task.scheduledDate}`,
+      taskId: task.id,
+      scheduledDate: task.scheduledDate,
+      scheduledStart: startTime,
+      scheduledEndDate: endDate,
+      scheduledEnd: endTime,
+      executionStatus: task.completed ? "completed" : "scheduled",
       createdAt: task.createdAt,
     });
   }
@@ -419,7 +450,7 @@ export function buildTimeAllocationMetrics(options: {
   for (const task of options.data.tasks || []) {
     const project = projectForTask(projects, task);
     const projectBlocked = projectFilter.size > 0 && !projectFilter.has(task.projectId || UNASSIGNED_GROUP_ID);
-    for (const rawRecord of taskRecords(task, range)) {
+    for (const rawRecord of taskRecords(task, range, dayStartMinutes)) {
       const record = normalizeTimelineRecord(rawRecord);
       const start = recordStartDateTime(record);
       const end = recordEndDateTime(record);

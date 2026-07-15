@@ -138,6 +138,38 @@ describe("time allocation metrics", () => {
     expect(result.heatmapBuckets.map((bucket) => bucket.date)).toEqual(["2026-05-01", "2026-07-06"]);
   });
 
+  it("counts legacy and record-based all-day tasks using their estimated duration", () => {
+    const legacyAllDay: Task = {
+      ...baseTask,
+      id: "task-all-day-legacy",
+      title: "Application checklist",
+      estimatedHours: 1.25,
+      scheduledDate: "2026-07-06",
+    };
+    const recordAllDay: Task = {
+      ...baseTask,
+      id: "task-all-day-record",
+      title: "Review materials",
+      projectId: "project-2",
+      estimatedHours: 0.5,
+      timelineRecords: [
+        { id: "record-all-day", taskId: "task-all-day-record", scheduledDate: "2026-07-06", scheduledStart: "", scheduledEnd: "", executionStatus: "scheduled", createdAt: "now" },
+      ],
+    };
+
+    const result = buildTimeAllocationMetrics({
+      data: { ...baseData, tasks: [legacyAllDay, recordAllDay] },
+      range: { preset: "today", anchorDate: "2026-07-06" },
+      dayStartMinutes: 240,
+    });
+
+    expect(result.summary.plannedMinutes).toBe(105);
+    expect(result.summary.taskCount).toBe(2);
+    expect(result.heatmapBuckets).toEqual([
+      expect.objectContaining({ date: "2026-07-06", minutes: 105, taskCount: 2 }),
+    ]);
+  });
+
   it("includes habits by default and can filter them out", () => {
     const habitTask: Task = {
       ...baseTask,

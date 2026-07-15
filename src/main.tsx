@@ -730,6 +730,10 @@ function shortDate(date: string) {
   return `${Number(month)}.${Number(day)}`;
 }
 
+function continuousTimelineDayCount(columnCount: number) {
+  return columnCount === 1 ? 7 : columnCount * 6;
+}
+
 function dateDiff(a: string, b: string) {
   return Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
 }
@@ -2015,6 +2019,7 @@ function App() {
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
+  const [nowInTimelineViewport, setNowInTimelineViewport] = useState(true);
   const suppressBlockClickRef = useRef(false);
   const suppressBlockClickTimerRef = useRef<number | null>(null);
   const suppressClickAfterDrag = useCallback(() => {
@@ -2608,7 +2613,7 @@ function App() {
     const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
     const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
     const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
-    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, 7 * effectColumnCount)[0] || selectedDate;
+    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, continuousTimelineDayCount(effectColumnCount))[0] || selectedDate;
     const effectTop = (date: string, time: string) => {
       const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
       const bandIndex = Math.floor(offset / effectColumnCount);
@@ -2663,7 +2668,7 @@ function App() {
     const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
     const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
     const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
-    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, 7 * effectColumnCount)[0] || selectedDate;
+    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, continuousTimelineDayCount(effectColumnCount))[0] || selectedDate;
     const effectTop = (date: string, time: string) => {
       const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
       const bandIndex = Math.floor(offset / effectColumnCount);
@@ -2692,7 +2697,7 @@ function App() {
     const scrollElement = timelineRef.current;
     if (!scrollElement) return;
     const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
-    const effectDates = buildDailyContinuousDates(effectAnchorDate, true, 7 * effectColumnCount);
+    const effectDates = buildDailyContinuousDates(effectAnchorDate, true, continuousTimelineDayCount(effectColumnCount));
     const effectStartDate = effectDates[0] || selectedDate;
     const effectBandCount = Math.max(1, Math.ceil(effectDates.length / effectColumnCount));
     const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
@@ -3284,7 +3289,6 @@ function App() {
   const timelineColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
   const timelineWindowAnchorDate = continuousTimelineEnabled ? visibleTimelineDate : timelineDate;
   const isViewingToday = timelineWindowAnchorDate === today;
-  const showBackToNow = timelineDate !== today || timelineWindowAnchorDate !== today || timelineView !== "daily";
   const projects = data?.projects || [];
   const tasks = data?.tasks || [];
   const events = data?.events || [];
@@ -3386,7 +3390,7 @@ function App() {
       if (timelineView === "3day" || timelineView === "weekly") return getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
       return [];
     }
-    return buildDailyContinuousDates(continuousAnchorDate, true, 7 * timelineColumnCount);
+    return buildDailyContinuousDates(continuousAnchorDate, true, continuousTimelineDayCount(timelineColumnCount));
   }, [continuousAnchorDate, continuousTimelineEnabled, timelineColumnCount, timelineDate, timelineView]);
   const continuousTimelineStartDate = continuousTimelineDates[0] || timelineDate;
   const continuousTimelineBandCount = Math.max(1, Math.ceil(continuousTimelineDates.length / timelineColumnCount));
@@ -3394,6 +3398,51 @@ function App() {
   const dailyTimelineDates = continuousTimelineDates;
   const dailyTimelineCanvasHeight = dailyContinuousCanvasHeight(continuousTimelineBandCount, SLOT_HEIGHT);
   const dailyTimelineSlotCount = dailyContinuousSlotCount(continuousTimelineBandCount);
+
+  useEffect(() => {
+    if (mode !== "execute") {
+      setNowInTimelineViewport(true);
+      return;
+    }
+    if (timelineView === "month") {
+      setNowInTimelineViewport(timelineWindowAnchorDate.slice(0, 7) === today.slice(0, 7));
+      return;
+    }
+    const scrollElement = timelineRef.current;
+    if (!scrollElement) return;
+
+    const updateNowVisibility = () => {
+      const now = new Date();
+      const nowDate = todayIso();
+      if (!continuousTimelineDates.includes(nowDate) || scrollElement.clientHeight <= 0) {
+        setNowInTimelineViewport(false);
+        return;
+      }
+      const dateOffset = Math.round((new Date(`${nowDate}T00:00:00`).getTime() - new Date(`${continuousTimelineStartDate}T00:00:00`).getTime()) / 86400000);
+      const bandIndex = continuousTimelineEnabled ? Math.floor(dateOffset / timelineColumnCount) : 0;
+      let minutesFromDayStart = now.getHours() * 60 + now.getMinutes() - dayStartHour * 60;
+      if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
+      const nowTop = bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+      const viewportTop = scrollElement.scrollTop;
+      const viewportBottom = viewportTop + scrollElement.clientHeight;
+      const visible = nowTop >= viewportTop + 2 && nowTop <= viewportBottom - 2;
+      setNowInTimelineViewport((current) => current === visible ? current : visible);
+    };
+
+    const frame = window.requestAnimationFrame(updateNowVisibility);
+    const interval = window.setInterval(updateNowVisibility, 60_000);
+    const resizeObserver = new ResizeObserver(updateNowVisibility);
+    resizeObserver.observe(scrollElement);
+    scrollElement.addEventListener("scroll", updateNowVisibility, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+      resizeObserver.disconnect();
+      scrollElement.removeEventListener("scroll", updateNowVisibility);
+    };
+  }, [compactExecuteView, continuousTimelineDates, continuousTimelineEnabled, continuousTimelineStartDate, dayStartHour, mode, timelineColumnCount, timelineView, timelineWindowAnchorDate, today]);
+
+  const showBackToNow = !nowInTimelineViewport;
 
   function getTimelineRangeFor(view: TimelineView, anchorDate: string) {
     if (view === "daily") return [anchorDate];
@@ -8073,10 +8122,13 @@ function App() {
                                 const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                                 const isHour = minutes % 60 === 0;
                                 const isMajor = minutes % (6 * 60) === 0;
-                                const label = continuousTimelineEnabled ? dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour }) : hourLabel(minutes);
+                                const label = continuousTimelineEnabled ? dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour, dateStep: timelineColumnCount }) : hourLabel(minutes);
+                                const boundarySeparator = label.indexOf(" ");
+                                const boundaryDate = boundarySeparator > 0 ? label.slice(0, boundarySeparator) : "";
+                                const timeLabel = boundarySeparator > 0 ? label.slice(boundarySeparator + 1) : label;
                                 return (
                                   <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}>
-                                    {isHour ? <span>{label}</span> : null}
+                                    {isHour ? <span className={`df-timeline-ruler-label${boundaryDate ? " day-boundary" : ""}`}>{boundaryDate && <small>{boundaryDate}</small>}<b>{timeLabel}</b></span> : null}
                                   </div>
                                 );
                               })}
