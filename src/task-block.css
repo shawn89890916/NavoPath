@@ -1532,6 +1532,12 @@ body.df-planning-native-dragging [contenteditable] * {
   display: none !important;
 }
 
+/* Habits keep their list slot during a drag, but should not leave the generic
+   dashed source placeholder visible beneath the floating preview. */
+.df-app .df-habit-candidate-row.is-dragging-source {
+  visibility: hidden;
+}
+
 /* While a unified pointer drag is in progress, suppress hover/active
    transforms so the placeholder stays calm. */
 body.df-unified-dragging .df-task-block[data-task-appearance]:hover,
