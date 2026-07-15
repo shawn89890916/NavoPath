@@ -6,8 +6,8 @@
 - 桌面端新增独立于「正在做」小组件的完整竖屏窗口：默认以 420 × 760 打开，可自由调整大小，并可单独开启或关闭始终置顶。
 
 ### 修复
-- 合并「今日候选」的项目和已完成筛选为同一个两级筛选器；现在可按项目多选并显示已完成任务，也可一键清空筛选。
-- 修复桌面小组件在主窗口转入后台后计时器更新缓慢的问题；点击时间可在按分钟和精确到秒之间切换显示。
+- 合并「今日候选」的项目和已完成筛选为可完整显示的两级筛选器；现在可按项目多选并显示已完成任务，也可一键清空筛选，并移除按项目分组按钮。
+- 修复桌面小组件在主窗口转入后台后计时器更新缓慢的问题；点击时间可在如 `38min` 的分钟显示和精确到秒之间切换。今日候选习惯不再显示编辑按钮，任务详情的备注编辑入口改为图标按钮。
 - 修复竖屏候选任务行中勾选框占位过大、标题被挤成竖排的问题；现在保留 44 像素触控范围，同时使用紧凑勾选标记、双行标题和更均衡的时长与操作间距。候选区标题和工具栏也改为上下分行，避免标题与操作图标互相挤压。
 - 修复今日候选拖拽习惯时残留的半透明占位框；移除候选栏顶部「正在做」状态栏，并将专注入口移至与日程模板、规划建议同一顶栏工具区；设置左侧新增全局搜索入口。
 - 修复桌面小组件未按当前时间轴定位任务、正计时与倒计时绑定错误的问题：现在会显示当前任务；没有当前任务时显示距下一任务开始的时间；倒计时到任务截止时间后切换为带「已超时」标注的红色正计时，并在每超时 15 分钟时将当前任务块延长 15 分钟。
@@ -27,8 +27,8 @@
 - Added a complete desktop portrait window independent from the current-task widget. It opens at 420 × 760 by default, remains resizable, and has its own always-on-top control.
 
 ### Fixed
-- Consolidated Today's Candidate project and completed controls into one two-level filter, with multi-project selection, completed-task visibility, and a single clear-all action.
-- Fixed slow desktop-widget timer updates after the main window enters the background. Clicking the displayed time now switches between minute and second precision.
+- Consolidated Today's Candidate project and completed controls into a fully visible two-level filter, with multi-project selection, completed-task visibility, a single clear-all action, and no project-grouping control.
+- Fixed slow desktop-widget timer updates after the main window enters the background. Clicking the displayed time now switches between a minute label such as `38min` and second precision. Habit rows no longer show edit buttons, and task-detail notes now use an icon-only edit control.
 - Fixed portrait candidate rows wasting width on oversized checkbox visuals and squeezing titles into near-vertical text. The rows now retain 44px touch targets while using compact check marks, two-line titles, and balanced duration/action spacing. The candidate heading and toolbar now use separate rows so the title no longer competes with action icons.
 - Fixed the residual transparent placeholder when dragging a habit in Today’s Candidates. Removed the candidate-panel “Working” bar, moved Focus into the same header tool group as Schedule Templates and Plan Suggestions, and added a global search action to the left of Settings.
 - Fixed the desktop widget selecting tasks outside the current timeline slot and binding stopwatch/countdown state to the wrong task. It now shows the current task, counts down to the next task when the timeline is idle, switches deadline countdowns to a labeled red overdue stopwatch, and extends the current task block by 15 minutes at each completed 15-minute overrun interval.

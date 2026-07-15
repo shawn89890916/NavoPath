@@ -74,7 +74,7 @@ function getWidgetApi(): WidgetApiWithPopover | undefined {
 
 export function formatTimer(seconds: number, precision: "minutes" | "seconds" = "seconds"): string {
   const value = Math.max(0, Math.floor(seconds));
-  if (precision === "minutes") return `${Math.floor(value / 60)} min`;
+  if (precision === "minutes") return `${Math.floor(value / 60)}min`;
   const hours = Math.floor(value / 3600);
   const minutes = Math.floor((value % 3600) / 60);
   const remaining = value % 60;

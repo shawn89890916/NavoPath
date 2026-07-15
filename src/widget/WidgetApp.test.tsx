@@ -38,7 +38,7 @@ it("requires confirmation only when switching away from a running mode", () => {
 });
 
 it("formats widget time by minutes or seconds", () => {
-  expect(formatTimer(125, "minutes")).toBe("2 min");
+  expect(formatTimer(125, "minutes")).toBe("2min");
   expect(formatTimer(125, "seconds")).toBe("2:05");
 });
 

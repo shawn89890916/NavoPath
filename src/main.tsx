@@ -7678,7 +7678,6 @@ function App() {
                     {candidateFilterActiveCount > 0 && <button type="button" className="df-filter-reset" onClick={() => { setCandidateProjectFilters([]); setShowCompletedCandidates(false); }}>{lang === "zh" ? "清除全部" : "Clear all"}</button>}
                   </div>}
                 </div>
-                <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
                 <button
                   className="df-icon-action"
                   data-tip={lang === "zh" ? "专注" : "Focus"}
@@ -10088,22 +10087,6 @@ function HabitCandidateCard(props: {
                   </button>
                 ) : (`${habit.defaultDurationMinutes || 20}m`)}
               </TaskBlockDuration>
-              <TaskActions>
-                <button
-                  type="button"
-                  className="df-habit-row-settings"
-                  aria-label={props.lang === "zh" ? "编辑习惯设置" : "Edit habit settings"}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    props.onEditHabit(habit.id);
-                  }}
-                >
-                  <svg viewBox="0 0 20 20" aria-hidden="true">
-                    <path d="M4 15.5h12M6 13l6.8-6.8 1.8 1.8L7.8 14.8 6 15z" />
-                  </svg>
-                </button>
-              </TaskActions>
             </TaskBlockRow>
           </TaskBlock>
         );
@@ -11706,9 +11689,8 @@ function EditDrawer(props: {
         <section className="df-detail-notes-new">
           <div className="df-detail-section-head">
             <h3>{t(props.lang, "drawer.notes")}</h3>
-            <button className="df-detail-add-btn" onClick={() => setNotesEditing((open) => !open)}>
+            <button className="df-detail-add-btn df-detail-icon-tool" title={notesEditing ? t(props.lang, "drawer.cancel") : t(props.lang, "drawer.edit")} aria-label={notesEditing ? t(props.lang, "drawer.cancel") : t(props.lang, "drawer.edit")} onClick={() => setNotesEditing((open) => !open)}>
               <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 2l2 2-6 6H2V8l6-6z"/></svg>
-              <span>{notesEditing ? t(props.lang, "drawer.cancel") : t(props.lang, "drawer.edit")}</span>
             </button>
           </div>
           {notesEditing ? (
