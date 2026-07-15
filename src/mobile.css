@@ -19,19 +19,21 @@
   }
 
   #root .df-app .df-mobile-dock {
-    left: 12px !important;
-    right: 12px !important;
-    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
     width: auto !important;
-    min-height: 60px !important;
+    min-height: calc(64px + env(safe-area-inset-bottom)) !important;
     grid-template-columns: 48px minmax(0, 1fr) 48px !important;
     gap: 8px !important;
-    padding: 5px !important;
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom)) !important;
     transform: none !important;
-    border: 1px solid var(--paper-rule) !important;
-    border-radius: 8px !important;
-    background: var(--surface-main) !important;
-    box-shadow: 0 -6px 18px color-mix(in srgb, var(--text-main) 8%, transparent) !important;
+    border: 0 !important;
+    border-top: 1px solid color-mix(in srgb, var(--surface-main) 20%, transparent) !important;
+    border-radius: 0 !important;
+    background: color-mix(in srgb, var(--text-main) 92%, var(--surface-main)) !important;
+    color: var(--surface-main) !important;
+    box-shadow: none !important;
     backdrop-filter: none !important;
   }
 
@@ -42,17 +44,16 @@
     min-height: 48px !important;
     display: grid !important;
     place-items: center !important;
-    border: 1px solid transparent !important;
+    border: 0 !important;
     border-radius: 50% !important;
     background: transparent !important;
-    color: var(--text-main) !important;
+    color: var(--surface-main) !important;
     box-shadow: none !important;
   }
 
   #root .df-app .df-mobile-dock-action:hover,
   #root .df-app .df-mobile-dock-action:focus-visible {
-    border-color: var(--paper-rule-strong) !important;
-    background: var(--paper-note) !important;
+    background: color-mix(in srgb, var(--surface-main) 14%, transparent) !important;
   }
 
   #root .df-app .df-mobile-dock-action svg {
@@ -68,7 +69,7 @@
   #root .df-app .df-mobile-mode-switch {
     height: 48px !important;
     align-self: center !important;
-    border-inline: 1px solid var(--paper-rule) !important;
+    border-inline: 1px solid color-mix(in srgb, var(--surface-main) 18%, transparent) !important;
   }
 
   #root .df-app .df-mobile-mode-switch button {
@@ -79,8 +80,8 @@
   }
 
   #root .df-app .df-mobile-mode-switch button.active {
-    color: var(--text-main) !important;
-    border-bottom-color: var(--text-main) !important;
+    color: var(--surface-main) !important;
+    border-bottom-color: var(--surface-main) !important;
     background: transparent !important;
   }
 
@@ -129,8 +130,9 @@
   }
 
   #root .df-app .df-mobile-dock {
-    border: 1px solid var(--paper-rule) !important;
-    box-shadow: 0 -6px 18px color-mix(in srgb, var(--text-main) 8%, transparent) !important;
+    border: 0 !important;
+    border-top: 1px solid color-mix(in srgb, var(--surface-main) 20%, transparent) !important;
+    box-shadow: none !important;
   }
 
   #root .df-app .df-date-title-compact {
@@ -229,6 +231,80 @@
     gap: 0 !important;
   }
 
+  #root .df-app.mode-execute .df-execute {
+    border-radius: 24px 24px 0 0 !important;
+  }
+
+  #root .df-app.mode-execute .df-candidate-panel.compact-active {
+    position: relative !important;
+    padding: 52px 6px 0 !important;
+    border: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+    background: var(--surface-main) !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-controls {
+    top: 4px !important;
+    left: 16px !important;
+    width: auto !important;
+    height: 44px !important;
+    z-index: 12 !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs {
+    height: 44px !important;
+    gap: 0 !important;
+    border-bottom: 1px solid var(--paper-rule) !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs button {
+    min-width: 56px !important;
+    height: 44px !important;
+    padding: 0 10px !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 6px 6px 0 0 !important;
+    color: var(--text-muted) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font: 650 11px/1 var(--paper-sans) !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs button.active {
+    color: var(--text-main) !important;
+    border-bottom-color: var(--accent-active) !important;
+    background: color-mix(in srgb, var(--surface-main) 92%, var(--text-main) 8%) !important;
+  }
+
+  #root .df-app.mode-execute .df-candidate-panel > .df-panel-title {
+    position: absolute !important;
+    inset: 0 !important;
+    min-height: 52px !important;
+    height: 52px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  #root .df-app.mode-execute .df-candidate-panel > .df-panel-title h2 {
+    position: absolute !important;
+    inset: 0 128px !important;
+    display: grid !important;
+    place-items: center !important;
+    margin: 0 !important;
+    color: var(--text-main) !important;
+    font-size: 17px !important;
+    text-align: center !important;
+    pointer-events: none;
+  }
+
+  #root .df-app.mode-execute .df-candidate-panel > .df-panel-title > div {
+    position: absolute !important;
+    top: 4px !important;
+    right: 8px !important;
+    height: 44px !important;
+  }
+
   #root .df-app .df-candidate-panel > .df-panel-title {
     display: flex !important;
     align-items: center !important;
@@ -249,6 +325,8 @@
     min-height: 44px !important;
   }
 
+  #root .df-app .df-candidate-panel .df-candidate-collapse,
+  #root .df-app .df-candidate-panel .df-candidate-filter-anchor,
   #root .df-app .df-candidate-panel .df-icon-focus,
   #root .df-app .df-candidate-panel .df-icon-template,
   #root .df-app .df-candidate-panel .df-icon-widget,
@@ -259,6 +337,65 @@
   #root .df-app .df-candidate-panel .df-candidate-filter-anchor,
   #root .df-app .df-candidate-panel .df-ai-plan-title-tools {
     flex: 0 0 auto !important;
+  }
+
+  #root .df-app .df-candidate-panel .df-candidate-completed-toggle {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+    color: var(--text-muted) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  #root .df-app .df-candidate-panel .df-candidate-completed-toggle span {
+    display: none !important;
+  }
+
+  #root .df-app .df-candidate-panel .df-candidate-completed-toggle.active {
+    color: var(--text-main) !important;
+    border-bottom-color: var(--accent-active) !important;
+    background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%) !important;
+  }
+
+  #root .df-app.mode-execute .df-candidate-list:has(> .df-empty),
+  #root .df-app.mode-execute .df-candidate-list > .df-empty {
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  #root .df-app.mode-execute .df-empty {
+    position: relative !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  #root .df-app.mode-execute .df-empty-add-guidance {
+    position: fixed !important;
+    z-index: 1 !important;
+    left: 4px !important;
+    bottom: -20px !important;
+    width: 230px !important;
+    height: 230px !important;
+    object-fit: cover !important;
+    pointer-events: none !important;
+  }
+
+  #root .df-app.mode-execute:has(.df-empty) .df-mobile-add {
+    color: var(--text-main) !important;
+    background: var(--surface-main) !important;
+    box-shadow: inset 0 -2px 0 var(--accent-active) !important;
   }
 
   #root .df-app .df-candidate-return-hint {

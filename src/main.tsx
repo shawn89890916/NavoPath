@@ -7642,7 +7642,7 @@ function App() {
               title={t(lang, "candidate.title")}
               actions={<>
                 {(timelineView === "3day" || timelineView === "weekly" || timelineView === "month") && (
-                  <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => { setCandidatePanelCollapsed(true); setFullscreen(false); }} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
+                  <button className="df-icon-action df-candidate-collapse" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => { setCandidatePanelCollapsed(true); setFullscreen(false); }} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
                 )}
                 <div className="df-candidate-filter-anchor">
                   <button
@@ -7678,6 +7678,17 @@ function App() {
                     {candidateFilterActiveCount > 0 && <button type="button" className="df-filter-reset" onClick={() => { setCandidateProjectFilters([]); setShowCompletedCandidates(false); }}>{lang === "zh" ? "清除全部" : "Clear all"}</button>}
                   </div>}
                 </div>
+                {compactLayout && <button
+                  type="button"
+                  className={`df-candidate-completed-toggle${showCompletedCandidates ? " active" : ""}`}
+                  aria-pressed={showCompletedCandidates}
+                  aria-label={lang === "zh" ? "显示今日已完成任务" : "Show today's completed tasks"}
+                  title={lang === "zh" ? "显示今日已完成" : "Show completed"}
+                  onClick={() => setShowCompletedCandidates((value) => !value)}
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 12.5l3 3 7-7"/><circle cx="12" cy="12" r="9"/></svg>
+                  <span>{lang === "zh" ? "已完成" : "Done"}</span>
+                </button>}
                 <button
                   className="df-icon-action df-icon-focus"
                   data-tip={lang === "zh" ? "专注" : "Focus"}
@@ -7753,7 +7764,7 @@ function App() {
             )}
             <div className="df-candidate-list">
               {visibleCandidates.length === 0 && !hasActiveHabits ? (
-                <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span></div>
+                <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span>{compactLayout && <img className="df-empty-add-guidance" src="/empty-add-guidance.png" alt="" aria-hidden="true" />}</div>
               ) : groupByProject ? (
                 Array.from(
                   visibleCandidates.reduce((map, task) => {
