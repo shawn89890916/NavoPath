@@ -8,7 +8,7 @@
 ### 修复
 - 修复从任务块上边缘调整时间时预览先改变下边界的问题；上边缘与高度现在在同一帧按跨天绝对坐标更新。
 - 修复习惯无法稳定拖入日、三日、周及跨天时间轴的问题；习惯现在与普通候选任务共用一致的时间轴命中与落点计算。
-- 习惯拖拽时现在只显示跟随指针的浮动任务，不再显示原列表或时间轴中的重复透明占位框；原列表布局仍会保留以避免跳动。
+- 习惯拖拽现在与普通候选任务保持一致，只显示单一浮动任务卡片，不再出现重复透明框；原列表布局仍会保留以避免跳动。
 - 设置页不再显示任何尚未实现的「即将支持」占位设置。
 
 ## 2026-07-15 · Timeline drag fixes and independent portrait window
@@ -19,7 +19,7 @@
 ### Fixed
 - Fixed start-edge task resizing previewing a lower-boundary change first; the top edge and height now update in the same frame using continuous cross-day coordinates.
 - Fixed habits failing to drag reliably into day, three-day, week, and continuous timelines by sharing the same target and drop calculation used by regular candidate tasks.
-- Habit dragging now shows only the floating task that follows the pointer, without duplicate transparent placeholders in the source list or timeline; the original list layout remains stable.
+- Habit dragging now matches regular candidate tasks and shows a single floating task card without a duplicate transparent frame, while keeping the original list layout stable.
 - Removed every unimplemented “Coming soon” placeholder setting from Settings.
 
 ## 2026-07-13 · 小组件截止时间联动计时器

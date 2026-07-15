@@ -281,6 +281,10 @@ type CandidateDropTarget = {
   position: "before" | "after";
   intent: Extract<DropIntent, "reorder-before" | "reorder-after">;
 } | null;
+type CandidateDragOptions = {
+  allowCandidateReorder?: boolean;
+  onSchedule?: (date: string, startTime: string) => void;
+};
 
 const DRAG_START_THRESHOLD_PX = 5;
 const SUPPRESS_CLICK_AFTER_DRAG_MS = 220;
@@ -5366,87 +5370,10 @@ function App() {
 
   function beginHabitDrag(event: React.PointerEvent, habit: Habit) {
     if (!settings || settings.featureHabitsEnabled === false) return;
-    const target = event.target as HTMLElement;
-    if (event.button !== 0 || target.closest("button,input,textarea,select,a")) return;
-    const pointerId = event.pointerId;
-    const dragElement = event.currentTarget as HTMLElement;
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const duration = Math.max(habit.defaultDurationMinutes || 20, 5);
-    const taskId = habitDragTaskId(habit.id);
-    let active = false;
-    let dropTime = "";
-    const cleanup = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("keydown", keydown);
-      document.body.classList.remove("df-timeline-pointer-drag");
-      dragElement.classList.remove("is-dragging-source");
-      setDrag(null);
-      setDragOverlay(null);
-      setDragOverlayTask(null);
-      setHoverSlot("");
-      dragTargetDateRef.current = "";
-      if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
-      if (active) window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
-    };
-    const updateTarget = (pointerEvent: PointerEvent) => {
-      const scrollEl = timelineRef.current;
-      if (scrollEl) {
-        const rect = scrollEl.getBoundingClientRect();
-        const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
-        if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
-      }
-      const targetSlot = resolveDropTarget(pointerEvent.clientX, pointerEvent.clientY);
-      if (!targetSlot) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
-      dragTargetDateRef.current = targetSlot.date;
-      dropTime = targetSlot.startTime;
-      setHoverSlot(targetSlot.startTime);
-    };
-    const move = (pointerEvent: PointerEvent) => {
-      if (pointerEvent.pointerId !== pointerId) return;
-      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < 8) return;
-      if (!active) {
-        active = true;
-        try {
-          dragElement.setPointerCapture(pointerId);
-        } catch {
-          // Synthetic and interrupted pointer streams may not have an active
-          // pointer capture target; drag rendering must still continue.
-        }
-        document.body.classList.add("df-timeline-pointer-drag");
-        dragElement.classList.add("is-dragging-source");
-        suppressBlockClickRef.current = true;
-        setDragCreate(null);
-        const rect = dragElement.getBoundingClientRect();
-        const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-        const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-        setDragOverlay({ taskId, sourceElement: dragElement, sourceRect: rect, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "habit" } });
-        if (compactLayout) {
-          setCompactExecuteView("schedule");
-          if (timelineView === "month") setTimelineView("daily");
-          window.requestAnimationFrame(() => updateTarget(pointerEvent));
-        }
-      }
-      pointerEvent.preventDefault();
-      setDragOverlayPointer({ x: pointerEvent.clientX, y: pointerEvent.clientY });
-      setDrag({ taskId, kind: "candidate", source: "candidate", duration, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY } });
-      updateTarget(pointerEvent);
-    };
-    const up = (pointerEvent: PointerEvent) => {
-      if (pointerEvent.pointerId !== pointerId) return;
-      if (active && dropTime && dragTargetDateRef.current) {
-        scheduleHabitAt(habit.id, dragTargetDateRef.current, dropTime);
-      }
-      cleanup();
-    };
-    const cancel = (pointerEvent: PointerEvent) => { if (pointerEvent.pointerId === pointerId) cleanup(); };
-    const keydown = (keyboardEvent: KeyboardEvent) => { if (keyboardEvent.key === "Escape") cleanup(); };
-    window.addEventListener("pointermove", move, { passive: false });
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("keydown", keydown);
+    beginShelfDrag(event, habitDragTask(habit, timelineDate), "candidate", {
+      allowCandidateReorder: false,
+      onSchedule: (date, startTime) => scheduleHabitAt(habit.id, date, startTime),
+    });
   }
 
   function unscheduleTask(taskId: string) {
@@ -6534,7 +6461,7 @@ function App() {
     scrollElement.scrollTop = Math.min(maxScroll, Math.max(0, scrollElement.scrollTop + event.deltaY));
   }
 
-  function beginShelfDrag(event: React.PointerEvent, task: Task, source: "candidate" | "allDay") {
+  function beginShelfDrag(event: React.PointerEvent, task: Task, source: "candidate" | "allDay", options: CandidateDragOptions = {}) {
     const target = event.target as HTMLElement;
     const interactiveTarget = target.closest("button,input,textarea,select,a");
     if (event.button !== 0 || (interactiveTarget && !target.closest(".icon-schedule"))) return;
@@ -6569,7 +6496,7 @@ function App() {
     };
     const updateTarget = (pointerEvent: PointerEvent) => {
       const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
-      const candidateRow = source === "candidate" ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
+      const candidateRow = source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
       if (candidateRow) {
         const targetTaskId = candidateRow.dataset.candidateTaskId || "";
         if (targetTaskId && targetTaskId !== task.id) {
@@ -6685,7 +6612,7 @@ function App() {
       if (pointerEvent.pointerId !== pointerId) return;
       if (active) {
         const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
-        const candidateRow = source === "candidate" ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
+        const candidateRow = source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
         if (candidateRow || candidateTarget) {
           const targetTaskId = candidateRow?.dataset.candidateTaskId || candidateTarget?.taskId || "";
           if (targetTaskId && targetTaskId !== task.id) {
@@ -6708,10 +6635,11 @@ function App() {
             allDay: false,
             clearSchedule: true,
           });
-        } else if (allDayCell) {
+        } else if (allDayCell && !options.onSchedule) {
           makeAllDay(task.id, allDayCell.dataset.allDayDate || timelineDate);
         } else if (dropTime && dragTargetDateRef.current) {
-          scheduleTask(task.id, dropTime);
+          if (options.onSchedule) options.onSchedule(dragTargetDateRef.current, dropTime);
+          else scheduleTask(task.id, dropTime);
         }
       }
       cleanup();
@@ -7422,21 +7350,7 @@ function App() {
       || (drag.taskId.startsWith("habit:")
         ? (() => {
             const habit = habits.find((item) => habitDragTaskId(item.id) === drag.taskId);
-            if (!habit) return undefined;
-            const duration = Math.max(habit.defaultDurationMinutes || 20, 5);
-            return {
-              id: habitDragTaskId(habit.id),
-              title: habit.title,
-              dueDate: timelineDate,
-              category: "personal",
-              priority: null,
-              notes: "",
-              goalId: "",
-              completed: false,
-              estimatedHours: duration / 60,
-              createdAt: "",
-              updatedAt: "",
-            } as Task;
+            return habit ? habitDragTask(habit, timelineDate) : undefined;
           })()
         : undefined)
     : undefined;
@@ -8196,7 +8110,7 @@ function App() {
                                   );
                                 })}
                                 {/* Preview block during drag */}
-                                {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && !drag.taskId.startsWith("habit:") && (() => {
+                                {multiColWidth > 0 && hoverSlot && drag && !drag.outsideTimeline && (() => {
                                   const tgtDate = dragTargetDateRef.current || threeDates[0];
                                   const dayOffset = continuousDateOffset(tgtDate);
                                   const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(tgtDate);
@@ -8637,7 +8551,7 @@ function App() {
                             in non-continuous mode (via NowLine's internal timeBlockTop) and
                             the continuous absolute coordinate in continuous mode. */}
                         {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
-                        {hoverSlot && drag && !drag.outsideTimeline && !drag.taskId.startsWith("habit:") && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
                         {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -8886,7 +8800,7 @@ function App() {
           />
         </TaskDragLayer>
       )}
-      {dragOverlay && !dragOverlayTask && dragOverlay.data?.kind !== "habit" && drag?.kind !== "block" && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
+      {dragOverlay && !dragOverlayTask && drag?.kind !== "block" && <UnifiedDragOverlay snapshot={dragOverlay} pointer={dragOverlayPointer} />}
       {floatingTimeAdd && <FloatingTimeAddInput add={floatingTimeAdd} projects={projects} onSave={saveFloatingTimeAdd} onCancel={() => setFloatingTimeAdd(null)} />}
       {toast && (
         <div className={toastAction ? "df-toast df-toast-undo" : "df-toast"}>
@@ -9860,6 +9774,23 @@ type CandidateTimeSettings = {
 
 function habitDragTaskId(habitId: string) {
   return `habit:${habitId}`;
+}
+
+function habitDragTask(habit: Habit, dueDate: string): Task {
+  const duration = Math.max(habit.defaultDurationMinutes || 20, 5);
+  return {
+    id: habitDragTaskId(habit.id),
+    title: habit.title,
+    dueDate,
+    category: "personal",
+    priority: null,
+    notes: "",
+    goalId: "",
+    completed: false,
+    estimatedHours: duration / 60,
+    createdAt: "",
+    updatedAt: "",
+  };
 }
 
 function CommandPalette(props: {
