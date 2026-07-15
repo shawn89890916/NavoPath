@@ -7589,10 +7589,13 @@ function App() {
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button
                 className={`active ${compactExecuteView === "schedule" ? "schedule-state" : "tasks-state"}`}
+                aria-label={compactExecuteView === "tasks" ? "Tasks" : "Schedule"}
                 aria-pressed={compactExecuteView === "schedule"}
                 onClick={() => setCompactExecuteView((view) => view === "tasks" ? "schedule" : "tasks")}
               >
-                {compactExecuteView === "tasks" ? <><ProductIcon compact /><span>Tasks</span></> : <><span>Schedule</span><ProductIcon compact /></>}
+                <span className="df-compact-mode-label tasks-label" aria-hidden="true">Tasks</span>
+                <span className="df-compact-mode-label schedule-label" aria-hidden="true">Schedule</span>
+                <span className="df-compact-mode-logo" aria-hidden="true"><ProductIcon compact /></span>
               </button>
             </nav>
             {compactExecuteView === "schedule" && (

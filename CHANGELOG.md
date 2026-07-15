@@ -3,6 +3,7 @@
 ## 本轮补充 / Current update
 
 ### 修复
+- 竖屏 Tasks / Schedule 单按钮新增白底圆角 Logo 滑块：Logo 块几乎铺满按钮高度，Tasks 文案左移；切换时 Logo 横向滑过并遮住旧文案，再显现另一侧状态文案，同时兼容减少动态效果设置。
 - 竖屏模式切换按钮固定使用英文 Tasks / Schedule，并确认复用箭头 N 品牌 Logo；移除外层重复边框，使其严格呈现为单个左右翻转的状态按钮。
 - 竖屏 Tasks / Schedule 由双分段按钮改为单一大状态按钮：Tasks 为「NavoPath 标志｜Tasks」，点击后切换为「Schedule｜NavoPath 标志」。
 - 浅色模式 Dock 改为纯白背景；竖屏 Tasks / Schedule 去除通用图标，改为 Tasks 的「NavoPath 标志 → 文字」与 Schedule 的「文字 → NavoPath 标志」结构。
@@ -12,6 +13,7 @@
 - 竖屏规划页在任务为空或极少时不再使用插图，而是显示强指示型「长期任务，从这里开始规划」说明，清晰给出项目 → 任务 → 排程的路径。
 
 ### Fixed
+- Added a white rounded Logo slider to the portrait Tasks / Schedule button. The Logo nearly fills the button height, Tasks sits closer to it, and switching slides the Logo across the old label before revealing the other state, with reduced-motion support.
 - Fixed the portrait mode toggle to use the English Tasks / Schedule labels and the arrow-N brand asset; removed the duplicate outer frame so it renders as one left/right-flipping state button.
 - Replaced the portrait Tasks / Schedule double segment with one large state button: “NavoPath mark | Tasks” switches on click to “Schedule | NavoPath mark”.
 - Set the light-mode Dock to pure white. Portrait Tasks / Schedule no longer use generic icons: Tasks uses “NavoPath mark → label” while Schedule uses “label → NavoPath mark”.

@@ -311,7 +311,7 @@
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs {
-    height: 38px !important;
+    height: 44px !important;
     gap: 0 !important;
     padding: 0 !important;
     border: 0 !important;
@@ -320,9 +320,11 @@
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs button {
-    min-width: 116px !important;
-    height: 38px !important;
-    padding: 0 9px !important;
+    position: relative !important;
+    width: 124px !important;
+    min-width: 124px !important;
+    height: 44px !important;
+    padding: 0 !important;
     border: 1px solid var(--paper-rule-strong) !important;
     border-radius: 6px !important;
     color: var(--text-muted) !important;
@@ -330,8 +332,9 @@
     box-shadow: none !important;
     display: inline-flex !important;
     align-items: center !important;
-    justify-content: space-between !important;
-    gap: 12px !important;
+    justify-content: initial !important;
+    gap: 0 !important;
+    overflow: hidden !important;
     font: 700 12px/1 var(--paper-sans) !important;
   }
 
@@ -353,15 +356,75 @@
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs .dayflow-icon.compact {
-    width: 26px !important;
-    height: 26px !important;
-    min-width: 26px !important;
+    width: 29px !important;
+    height: 29px !important;
+    min-width: 29px !important;
     margin: 0 !important;
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs .dayflow-icon img {
     width: 100% !important;
     height: 100% !important;
+    filter: none !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-mode-logo {
+    position: absolute !important;
+    z-index: 2 !important;
+    top: 2px !important;
+    left: 2px !important;
+    width: 40px !important;
+    height: 40px !important;
+    display: grid !important;
+    place-items: center !important;
+    border: 1px solid color-mix(in srgb, #000 14%, transparent) !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    transition: transform 180ms var(--paper-ease, cubic-bezier(.2, .75, .25, 1)) !important;
+    will-change: transform;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs button.schedule-state .df-compact-mode-logo {
+    transform: translateX(80px) !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-mode-label {
+    position: absolute !important;
+    z-index: 1 !important;
+    top: 50% !important;
+    color: var(--text-main) !important;
+    transform: translateY(-50%) !important;
+    transition: opacity 100ms linear, transform 180ms var(--paper-ease, cubic-bezier(.2, .75, .25, 1)) !important;
+    white-space: nowrap !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-mode-label.tasks-label {
+    left: 48px !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-mode-label.schedule-label {
+    left: 10px !important;
+    opacity: 0 !important;
+    transform: translate(-4px, -50%) !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs button.schedule-state .tasks-label {
+    opacity: 0 !important;
+    transform: translate(6px, -50%) !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs button.schedule-state .schedule-label {
+    opacity: 1 !important;
+    transform: translate(0, -50%) !important;
+    transition-delay: 85ms !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #root .df-app.mode-execute .df-compact-mode-logo,
+    #root .df-app.mode-execute .df-compact-mode-label {
+      transition: none !important;
+    }
   }
 
   #root .df-app.mode-execute .df-compact-date-arrow,
