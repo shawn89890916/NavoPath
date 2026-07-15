@@ -47,8 +47,8 @@
     border: 0 !important;
     border-top: 1px solid var(--paper-rule-strong) !important;
     border-radius: 0 !important;
-    background: var(--surface-main) !important;
-    color: var(--text-main) !important;
+    background: var(--text-main) !important;
+    color: var(--surface-main) !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
     z-index: 30 !important;
@@ -64,13 +64,13 @@
     border: 0 !important;
     border-radius: 50% !important;
     background: transparent !important;
-    color: var(--text-main) !important;
+    color: var(--surface-main) !important;
     box-shadow: none !important;
   }
 
   #root .df-app .df-mobile-dock-action:hover,
   #root .df-app .df-mobile-dock-action:focus-visible {
-    background: color-mix(in srgb, var(--surface-main) 48%, transparent) !important;
+    background: color-mix(in srgb, var(--surface-main) 16%, transparent) !important;
   }
 
   #root .df-app .df-mobile-dock-action svg {
@@ -97,7 +97,7 @@
   }
 
   #root .df-app .df-mobile-mode-switch button.active {
-    color: var(--text-main) !important;
+    color: var(--surface-main) !important;
     border-bottom-color: var(--accent-active) !important;
     background: transparent !important;
   }
@@ -153,7 +153,7 @@
   }
 
   #root .df-app.theme-dark .df-mobile-dock {
-    background: var(--text-main) !important;
+    background: color-mix(in srgb, var(--surface-main) 20%, #000) !important;
     color: var(--surface-main) !important;
     border-top-color: color-mix(in srgb, var(--surface-main) 24%, transparent) !important;
   }
@@ -489,48 +489,110 @@
   }
 
   #root .df-app .df-timeline-3day-top {
-    margin-top: 6px !important;
+    margin-top: 14px !important;
   }
 
   #root .df-app .df-timeline-3day-date {
-    min-height: 34px !important;
-    padding: 3px 1px !important;
+    min-height: 42px !important;
+    padding: 5px 1px !important;
   }
 
   #root .df-app .df-timeline-3day-date-num {
-    font-size: 14px !important;
+    font-size: 18px !important;
   }
 
   #root .df-app .df-timeline-3day-date-wd,
   #root .df-app .df-timeline-3day-ruler,
   #root .df-app .df-timeline-3day-allday-label {
-    font-size: 9px !important;
+    font-size: 8px !important;
   }
 
   #root .df-app .df-schedule-drop-guide {
+    position: relative !important;
     display: grid !important;
-    grid-template-columns: 64px minmax(0, 1fr) 30px !important;
+    grid-template-columns: minmax(0, 1fr) 90px 70px 30px !important;
     align-items: center !important;
-    min-height: 54px !important;
+    min-height: 68px !important;
     margin: 0 4px 8px !important;
-    padding: 4px 4px 4px 0 !important;
-    border-block: 1px solid var(--paper-rule) !important;
-    color: var(--text-muted) !important;
+    padding: 7px 4px 7px 8px !important;
+    border: 1px dashed color-mix(in srgb, var(--accent-active) 28%, var(--paper-rule)) !important;
+    border-radius: 8px !important;
+    color: color-mix(in srgb, var(--accent-active) 56%, var(--text-muted)) !important;
     background: transparent !important;
   }
 
   #root .df-app .df-schedule-drop-guide svg {
-    width: 58px !important;
-    height: 36px !important;
+    width: 90px !important;
+    height: 52px !important;
     fill: none !important;
     stroke: currentColor !important;
-    stroke-width: 1.2 !important;
+    stroke-width: 1.35 !important;
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
   }
 
-  #root .df-app .df-schedule-drop-guide span {
-    font: 600 11px/1.35 var(--paper-sans) !important;
+  #root .df-app .df-schedule-drop-guide-source {
+    display: grid !important;
+    grid-template-columns: 18px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    height: 42px !important;
+    padding: 0 8px !important;
+    border: 1px solid color-mix(in srgb, var(--accent-active) 35%, var(--paper-rule)) !important;
+    border-radius: 6px !important;
+    background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%) !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-check {
+    width: 14px !important;
+    height: 14px !important;
+    border: 1.5px solid currentColor !important;
+    border-radius: 4px !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-source strong {
+    overflow: hidden !important;
+    color: var(--text-main) !important;
+    font: 650 12px/1.2 var(--paper-sans) !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-source small {
+    color: var(--text-muted) !important;
+    font: 600 9px/1 var(--paper-mono) !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-target {
+    display: grid !important;
+    grid-template-columns: 24px 1fr !important;
+    grid-template-rows: repeat(3, 1fr) !important;
+    column-gap: 5px !important;
+    height: 40px !important;
+    padding: 4px 0 !important;
+    border-left: 1px solid color-mix(in srgb, var(--accent-active) 40%, var(--paper-rule)) !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-target span {
+    grid-row: 1 / -1 !important;
+    align-self: center !important;
+    color: var(--text-muted) !important;
+    font: 600 8px/1 var(--paper-mono) !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-target i {
+    align-self: center !important;
+    height: 1px !important;
+    background: color-mix(in srgb, var(--accent-active) 38%, var(--paper-rule)) !important;
+  }
+
+  #root .df-app .df-schedule-drop-guide-copy {
+    position: absolute !important;
+    right: 35px !important;
+    bottom: 4px !important;
+    color: var(--text-muted) !important;
+    font: 600 9px/1 var(--paper-sans) !important;
   }
 
   #root .df-app .df-schedule-drop-guide button {

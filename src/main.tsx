@@ -7752,14 +7752,20 @@ function App() {
             )}
             {compactLayout && compactExecuteView === "tasks" && scheduleGuideOpen && visibleCandidates.length > 0 && (
               <aside className="df-schedule-drop-guide" aria-label={lang === "zh" ? "将任务拖入时间轴的提示" : "Drag tasks into the timeline hint"}>
-                <svg viewBox="0 0 64 40" aria-hidden="true">
-                  <rect x="3" y="10" width="18" height="18" rx="3" />
-                  <path d="M8 16h8M8 21h5M25 19h14" strokeDasharray="2 3" />
-                  <path d="m36 15 4 4-4 4" />
-                  <path d="M47 7v26M56 7v26" />
-                  <path d="M44 14h15M44 22h15M44 30h15" />
+                <div className="df-schedule-drop-guide-source" aria-hidden="true">
+                  <span className="df-schedule-drop-guide-check" />
+                  <strong>{lang === "zh" ? "探索 NavoPath" : "Explore NavoPath"}</strong>
+                  <small>{lang === "zh" ? "15 分钟" : "15 min"}</small>
+                </div>
+                <svg viewBox="0 0 90 52" aria-hidden="true">
+                  <path d="M3 17C24 7 37 8 50 22s20 18 34 13" />
+                  <path d="m78 31 6 4-7 2" />
+                  <circle cx="50" cy="22" r="2.5" />
                 </svg>
-                <span>{lang === "zh" ? "拖入日程，让今天的任务落在具体时间里" : "Drag into Schedule to give today’s tasks a time"}</span>
+                <div className="df-schedule-drop-guide-target" aria-hidden="true">
+                  <span>09:30</span><i /><i /><i />
+                </div>
+                <span className="df-schedule-drop-guide-copy">{lang === "zh" ? "拖到日程" : "Drag to Schedule"}</span>
                 <button type="button" aria-label={lang === "zh" ? "关闭提示" : "Dismiss hint"} onClick={() => setScheduleGuideOpen(false)}>×</button>
               </aside>
             )}
@@ -7958,7 +7964,7 @@ function App() {
                 )}
                 {showBackToNow && (
                   <button className="df-back-to-now" type="button" onClick={goToNow} title={lang === "zh" ? "回到现在" : "Back to now"} aria-label={lang === "zh" ? "回到现在" : "Back to now"}>
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8v4h4" /><path d="M5.5 12a7 7 0 1 0 2-4.8" /></svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
                   </button>
                 )}
                 {(timelineView === "3day" || timelineView === "weekly") ? (() => {
