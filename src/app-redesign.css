@@ -446,7 +446,7 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 /* ============================================================
  * Unified settings-page primitives (SettingSection / SettingRow /
  * SettingToggle / SettingSelect / SettingNumberInput /
- * SettingActionButton / SettingComingSoon). Every settings row in
+ * SettingActionButton). Every settings row in
  * every section renders through these classes so the visual rhythm
  * stays consistent. Follows NavoPathStyle.md: paper-like surfaces,
  * fine rules, restrained annotation color, no hover lift, no glow.
@@ -490,21 +490,6 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 .df-settings-row[data-disabled="true"] .df-settings-row-title,
 .df-settings-row[data-disabled="true"] .df-settings-row-desc { color: var(--text-faint); }
 .df-settings-row[data-disabled="true"] .df-settings-row-control { opacity: .55; pointer-events: none; }
-
-/* Coming-soon rows use the same rhythm but mute the control and show
-   a small annotation tag instead of an interactive control. */
-.df-settings-row--coming-soon .df-settings-row-control { opacity: 1; pointer-events: none; }
-.df-settings-coming-soon-tag {
-  display: inline-flex; align-items: center;
-  padding: 3px 8px;
-  border: 1px solid var(--paper-rule-strong);
-  border-radius: var(--paper-radius);
-  color: var(--text-faint);
-  font: 600 10px/1 var(--paper-mono);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  background: transparent;
-}
 
 /* SettingToggle: a hand-drawn paper switch. Both the track AND the
    thumb take the state color — off = deep brick red, on = deep olive

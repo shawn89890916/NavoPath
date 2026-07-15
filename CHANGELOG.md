@@ -1,5 +1,25 @@
 # NavoPath 更新日志
 
+## 2026-07-15 · 时间轴拖拽修复与独立竖屏窗口
+
+### 新增
+- 桌面端新增独立于「正在做」小组件的完整竖屏窗口：默认以 420 × 760 打开，可自由调整大小，并可单独开启或关闭始终置顶。
+
+### 修复
+- 修复从任务块上边缘调整时间时预览先改变下边界的问题；上边缘与高度现在在同一帧按跨天绝对坐标更新。
+- 修复习惯无法稳定拖入日、三日、周及跨天时间轴的问题；习惯现在与普通候选任务共用一致的时间轴命中与落点计算。
+- 设置页不再显示任何尚未实现的「即将支持」占位设置。
+
+## 2026-07-15 · Timeline drag fixes and independent portrait window
+
+### Added
+- Added a complete desktop portrait window independent from the current-task widget. It opens at 420 × 760 by default, remains resizable, and has its own always-on-top control.
+
+### Fixed
+- Fixed start-edge task resizing previewing a lower-boundary change first; the top edge and height now update in the same frame using continuous cross-day coordinates.
+- Fixed habits failing to drag reliably into day, three-day, week, and continuous timelines by sharing the same target and drop calculation used by regular candidate tasks.
+- Removed every unimplemented “Coming soon” placeholder setting from Settings.
+
 ## 2026-07-13 · 小组件截止时间联动计时器
 
 ### 新增

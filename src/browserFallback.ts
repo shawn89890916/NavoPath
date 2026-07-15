@@ -571,6 +571,7 @@ export function installBrowserFallback() {
     featureWidgetEnabled: true,
     widgetAlwaysOnTop: true,
     widgetOpenOnLaunch: false,
+    compactWindowAlwaysOnTop: true,
     widgetAppearance: DEFAULT_WIDGET_APPEARANCE,
     widgetTimerPreferences: DEFAULT_WIDGET_TIMER_PREFERENCES,
     widgetAppearanceMigrated: false,

@@ -7,6 +7,7 @@ import {
   dateTimeToAbsoluteMinutes,
   durationMinutes,
   minutesToTime,
+  resizedBlockTop,
   snapMinutes,
   timeBlockHeight,
   timeToMinutes,
@@ -81,6 +82,16 @@ describe("timelineGeometry cross-midnight helpers", () => {
 
     it("matches HOUR_HEIGHT for a normal same-day hour", () => {
       expect(timeBlockHeight("09:00", "10:00")).toBe(HOUR_HEIGHT);
+    });
+  });
+
+  describe("resizedBlockTop", () => {
+    it("moves the visual top edge while keeping the original absolute anchor", () => {
+      expect(resizedBlockTop(720, "2026-07-01", "09:00", "2026-07-01", "08:30")).toBe(680);
+    });
+
+    it("preserves cross-day movement in a continuous timeline", () => {
+      expect(resizedBlockTop(1880, "2026-07-02", "23:30", "2026-07-03", "00:30")).toBe(1960);
     });
   });
 

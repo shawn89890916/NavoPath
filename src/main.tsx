@@ -29,6 +29,7 @@ import {
   TIMELINE_START as GEOMETRY_TIMELINE_START,
   TIMELINE_END as GEOMETRY_TIMELINE_END,
   HOUR_HEIGHT,
+  resizedBlockTop,
   type TimelineViewMode,
 } from "./timelineGeometry";
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
@@ -54,7 +55,7 @@ import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate
 import { useInAppDialog } from "./InAppDialog";
 import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
 import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
-import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingColorInput, SettingActionButton, SettingDivider, SettingComingSoon, SettingDescription } from "./components/SettingsControls";
+import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingColorInput, SettingActionButton, SettingDivider, SettingDescription } from "./components/SettingsControls";
 import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
@@ -391,7 +392,7 @@ function themeVars(settings: Settings, mode: Mode) {
     "--timeline-font-scale": String(fontScale),
   } as CSSProperties;
 }
-type ResizePreview = { taskId: string; start: string; end: string } | null;
+type ResizePreview = { taskId: string; start: string; end: string; startDate: string } | null;
 type ScheduleSuggestion = SchedulePreview; // legacy alias kept for compatibility; replaced by SchedulePreview
 type QuickSchedule = { startTime: string; title: string; projectId: string; isAllDay?: boolean } | null;
 type BuiltInScheduleTemplateId = "school" | "study";
@@ -4543,6 +4544,12 @@ function App() {
     void window.desktopApi.widget.setAlwaysOnTop(settings.widgetAlwaysOnTop !== false);
   }, [settings?.widgetAlwaysOnTop]);
 
+  useEffect(() => {
+    if (!window.desktopApi?.compactWindow) return;
+    if (settings?.compactWindowAlwaysOnTop === undefined) return;
+    void window.desktopApi.compactWindow.setAlwaysOnTop(settings.compactWindowAlwaysOnTop !== false);
+  }, [settings?.compactWindowAlwaysOnTop]);
+
   function createQuickProject() {
     if (!data || !quickProjectTitle.trim()) return;
     const snapshot = projectSnapshot(data.projects, quickProjectTitle, quickProjectColor);
@@ -5385,14 +5392,14 @@ function App() {
       if (active) window.setTimeout(() => { suppressBlockClickRef.current = false; }, 0);
     };
     const updateTarget = (pointerEvent: PointerEvent) => {
-      const { gridEl, scrollEl, visDays } = getDropGridAndDays();
-      if (!gridEl || !scrollEl) return;
-      const rect = scrollEl.getBoundingClientRect();
-      const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
-      if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
-      if (pointerEvent.clientY < rect.top + 48) scrollEl.scrollTop -= 18;
-      else if (pointerEvent.clientY > rect.bottom - 48) scrollEl.scrollTop += 18;
-      const targetSlot = getDropTargetFromPointer({ clientX: pointerEvent.clientX, clientY: pointerEvent.clientY, gridElement: gridEl, scrollElement: scrollEl, visibleDays: visDays, startHour: dayStartHour });
+      const scrollEl = timelineRef.current;
+      if (scrollEl) {
+        const rect = scrollEl.getBoundingClientRect();
+        const inside = pointerEvent.clientX >= rect.left && pointerEvent.clientX <= rect.right && pointerEvent.clientY >= rect.top && pointerEvent.clientY <= rect.bottom;
+        if (!inside) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
+      }
+      const targetSlot = resolveDropTarget(pointerEvent.clientX, pointerEvent.clientY);
+      if (!targetSlot) { dropTime = ""; setHoverSlot(""); dragTargetDateRef.current = ""; return; }
       dragTargetDateRef.current = targetSlot.date;
       dropTime = targetSlot.startTime;
       setHoverSlot(targetSlot.startTime);
@@ -5796,7 +5803,7 @@ function App() {
     suppressBlockClickRef.current = true;
     setDragCreate(null);
     document.body.classList.add("df-resizing");
-    setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)) });
+    setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)), startDate: task.scheduledDate || timelineWindowAnchorDate });
 
     // Resize works in continuous absolute minutes (relative to
     // `continuousTimelineStartDate`) so that dragging the bottom handle past
@@ -5832,8 +5839,8 @@ function App() {
     };
 
     const move = (moveEvent: MouseEvent) => {
-      const { nextStart, nextEnd } = computeResize(moveEvent.clientX, moveEvent.clientY);
-      setResizePreview({ taskId: task.id, start: nextStart, end: nextEnd });
+      const { nextStart, nextEnd, nextStartDate } = computeResize(moveEvent.clientX, moveEvent.clientY);
+      setResizePreview({ taskId: task.id, start: nextStart, end: nextEnd, startDate: nextStartDate });
     };
     const up = (upEvent: MouseEvent) => {
       if (!data) return;
@@ -11097,9 +11104,15 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const canResize = !isReturnedUnfinished && (isEvent || !recurringLocked);
   const eventId = task.id;
   const sizeClass = height < 56 ? "short" : height >= 120 ? "tall" : "normal";
+  const originalStart = task.scheduledStart || "09:00";
+  const originalDate = task.scheduledDate || preview?.startDate || "1970-01-01";
+  const suppliedTop = typeof extraStyle?.top === "number" ? extraStyle.top : null;
+  const resolvedTop = preview && suppliedTop !== null
+    ? resizedBlockTop(suppliedTop, originalDate, originalStart, preview.startDate || originalDate, start)
+    : suppliedTop ?? top;
   
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ top, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor, ...extraStyle } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
@@ -12868,7 +12881,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 ['templates', lang === 'zh' ? '模板' : 'Templates'],
                 ['habits', lang === 'zh' ? '习惯' : 'Habits'],
                 ['metrics', lang === 'zh' ? '指标' : 'Metrics'],
-                ['widget', lang === 'zh' ? '桌面小组件' : 'Widget'],
+                ['widget', lang === 'zh' ? '桌面窗口' : 'Desktop'],
                 ['data', lang === 'zh' ? '数据与备份' : 'Data & Backup'],
                 ['shortcuts', lang === 'zh' ? '快捷键' : 'Shortcuts'],
                 ['ai', 'Navo AI'],
@@ -12899,10 +12912,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                     { value: "planning", label: lang === "zh" ? "规划" : "Planning" },
                   ]}
                 />}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "默认任务时长" : "Default task duration"}
-                description={lang === "zh" ? "用于快速添加和时间轴点击创建任务。" : "Used by quick-add and click-to-create on the timeline."}
               />
               <SettingRow
                 title={lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}
@@ -12988,11 +12997,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 title={lang === "zh" ? "恢复默认点缀色" : "Restore default accent colors"}
                 control={<SettingActionButton onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
               />
-              <SettingComingSoon
-                title={lang === "zh" ? "深色模式跟随系统" : "Match system dark mode"}
-                description={lang === "zh" ? "当前仅支持手动切换浅色 / 深色。" : "Currently only manual light / dark switching is wired."}
-                note={lang === "zh" ? "即将支持" : "Coming soon"}
-              />
             </SettingSection>}
 
             {settingsSection === "execution" && <SettingSection title={lang === "zh" ? "执行" : "Execution"} description={lang === "zh" ? "时间轴与执行页行为。" : "Timeline and execution-page behavior."}>
@@ -13045,18 +13049,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                   ]}
                 />}
               />
-              <SettingComingSoon
-                title={lang === "zh" ? "显示现在时间线" : "Show now line"}
-                description={lang === "zh" ? "当前版本始终显示，可配置项即将支持。" : "Always shown in this build; a toggle is coming soon."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "点击空白处创建任务" : "Click blank to create task"}
-                description={lang === "zh" ? "在时间轴空白处点击直接新建时间段。" : "Click an empty timeline slot to create a new scheduled task."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "拖拽吸附间隔" : "Drag snap interval"}
-                description={lang === "zh" ? "拖动任务时按指定分钟数对齐。" : "Snap dragged tasks to a minute grid."}
-              />
             </SettingSection>}
 
             {settingsSection === "planning" && <SettingSection title={lang === "zh" ? "规划" : "Planning"} description={lang === "zh" ? "规划页视图与可见性。" : "Planning-page views and visibility."}>
@@ -13072,14 +13064,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 title={lang === "zh" ? "启用列表视图" : "Enable list view"}
                 control={<SettingToggle checked={settings.featureListViewEnabled !== false} ariaLabel={lang === "zh" ? "启用列表视图" : "Enable list view"} onChange={(next) => onSave({ featureListViewEnabled: next })} />}
               />
-              <SettingComingSoon
-                title={lang === "zh" ? "默认规划视图" : "Default planning view"}
-                description={lang === "zh" ? "进入规划页时默认展开的视图。" : "View shown when entering the planning page."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "显示已完成任务" : "Show completed tasks"}
-                description={lang === "zh" ? "在规划树中显示已完成的任务。" : "Show completed tasks in the planning tree."}
-              />
             </SettingSection>}
 
             {settingsSection === "templates" && <SettingSection title={lang === "zh" ? "模板" : "Templates"} description={lang === "zh" ? "把可复用的时间段模板应用到今天。" : "Apply reusable time-block templates to today."}>
@@ -13092,18 +13076,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 title={lang === "zh" ? "管理模板" : "Manage templates"}
                 description={lang === "zh" ? "打开模板编辑弹窗，新建或编辑时间段模板。" : "Open the template editor to create or edit time-block templates."}
                 control={<SettingActionButton onClick={() => onOpenScheduleTemplates?.()} disabled={!onOpenScheduleTemplates}>{lang === "zh" ? "打开模板" : "Open templates"}</SettingActionButton>}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "默认模板" : "Default template"}
-                description={lang === "zh" ? "选择一个模板作为「应用到今天」的默认值。" : "Pick a template to apply by default."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "应用冲突处理" : "Conflict handling"}
-                description={lang === "zh" ? "跳过冲突时间段 / 每次询问 / 仍然添加。" : "Skip conflicting slots / ask each time / add anyway."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "新建时间段默认时长" : "Default period duration"}
-                description={lang === "zh" ? "在模板编辑器中新建时间段时的默认持续时长。" : "Default duration used when creating a new period in the template editor."}
               />
             </SettingSection>}
 
@@ -13209,18 +13181,24 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                   ]}
                 />}
               />
-              <SettingComingSoon
-                title={lang === "zh" ? "未安排时间是否显示" : "Show unscheduled time"}
-                description={lang === "zh" ? "在指标中显示未安排的空白时间段。" : "Surface unscheduled empty time in metrics."}
-              />
             </SettingSection>}
 
             {settingsSection === "widget" && <SettingSection
-              title={lang === "zh" ? "桌面小组件" : "Desktop Widget"}
-              description={Boolean(window.desktopApi?.widget)
-                ? (lang === "zh" ? "桌面端置顶小窗。" : "Always-on-top desktop mini panel.")
+              title={lang === "zh" ? "桌面窗口" : "Desktop Windows"}
+              description={Boolean(window.desktopApi?.widget || window.desktopApi?.compactWindow)
+                ? (lang === "zh" ? "管理完整竖屏小窗与「正在做」小组件。" : "Manage the full portrait window and the current-task widget.")
                 : (lang === "zh" ? "桌面端启用后可用。当前环境未检测到桌面端。" : "Available on the desktop build. No desktop runtime detected in this environment.")}
             >
+              <SettingRow
+                title={lang === "zh" ? "竖屏小窗" : "Portrait window"}
+                description={lang === "zh" ? "在独立窗口中打开完整应用的竖屏布局，不影响「正在做」小组件。" : "Open the complete app in an independent portrait layout without affecting the current-task widget."}
+                control={<><SettingActionButton disabled={!Boolean(window.desktopApi?.compactWindow)} onClick={() => { void window.desktopApi?.compactWindow?.open({ alwaysOnTop: settings.compactWindowAlwaysOnTop !== false }); }}>{lang === "zh" ? "打开" : "Open"}</SettingActionButton><SettingActionButton disabled={!Boolean(window.desktopApi?.compactWindow)} onClick={() => { void window.desktopApi?.compactWindow?.close(); }}>{lang === "zh" ? "关闭" : "Close"}</SettingActionButton></>}
+              />
+              <SettingRow
+                title={lang === "zh" ? "竖屏小窗置顶" : "Portrait window always on top"}
+                control={<SettingToggle checked={settings.compactWindowAlwaysOnTop !== false} disabled={!Boolean(window.desktopApi?.compactWindow)} ariaLabel={lang === "zh" ? "竖屏小窗置顶" : "Portrait window always on top"} onChange={(next) => { onSave({ compactWindowAlwaysOnTop: next }); void window.desktopApi?.compactWindow?.setAlwaysOnTop(next); }} />}
+              />
+              <SettingDivider />
               <SettingRow
                 title={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"}
                 description={lang === "zh" ? "置顶小窗快速查看正在做与计时。" : "Always-on-top mini panel for the current task and timer."}
@@ -13450,10 +13428,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 description={lang === "zh" ? "把 CSV 中的任务合并到当前数据。" : "Merge tasks from a CSV file into the current data."}
                 control={<SettingActionButton onClick={() => importTasksFromCsv()}>{lang === "zh" ? "导入 CSV" : "Import CSV"}</SettingActionButton>}
               />
-              <SettingComingSoon
-                title={lang === "zh" ? "自动备份" : "Automatic backups"}
-                description={lang === "zh" ? "定期把数据快照保存到本地。" : "Periodically save a local data snapshot."}
-              />
               <SettingSection title={lang === "zh" ? "危险操作" : "Danger zone"} tone="danger">
                 <SettingRow
                   title={lang === "zh" ? "清空本地数据" : "Clear local data"}
@@ -13487,22 +13461,6 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               title={lang === "zh" ? "高级" : "Advanced"}
               description={lang === "zh" ? "调试、实验与恢复选项。修改前请确认你了解影响范围。" : "Debug, experimental, and recovery options. Only change these if you understand the impact."}
             >
-              <SettingComingSoon
-                title={lang === "zh" ? "开发者模式" : "Developer mode"}
-                description={lang === "zh" ? "显示调试面板与内部状态。" : "Show the debug panel and internal state."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "显示调试信息" : "Show debug info"}
-                description={lang === "zh" ? "在工作区显示性能与状态标记。" : "Surface performance and status markers in the workspace."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "实验功能" : "Experimental features"}
-                description={lang === "zh" ? "尚未稳定的功能开关。" : "Unstabilized feature toggles."}
-              />
-              <SettingComingSoon
-                title={lang === "zh" ? "性能模式" : "Performance mode"}
-                description={lang === "zh" ? "降低动效与重渲染以适配低端设备。" : "Reduce motion and re-renders for lower-end devices."}
-              />
               <SettingSection title={lang === "zh" ? "危险操作" : "Danger zone"} tone="danger">
                 <SettingRow
                   title={lang === "zh" ? "重置所有设置" : "Reset all settings"}

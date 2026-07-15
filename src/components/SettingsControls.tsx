@@ -19,7 +19,6 @@ import React, { type ReactNode } from "react";
  *   - SettingTextInput    (text input)
  *   - SettingActionButton (secondary or danger action button)
  *   - SettingDivider      (fine rule between groups)
- *   - SettingComingSoon   (disabled placeholder row for unimplemented settings)
  *   - SettingDescription  (small muted description text)
  */
 
@@ -246,28 +245,6 @@ export function SettingActionButton({
 
 export function SettingDivider() {
   return <hr className="df-settings-divider" />;
-}
-
-export function SettingComingSoon({
-  title,
-  description,
-  note = "即将支持",
-}: {
-  title: ReactNode;
-  description?: ReactNode;
-  note?: ReactNode;
-}) {
-  return (
-    <div className="df-settings-row df-settings-row--coming-soon" data-disabled="true">
-      <div className="df-settings-row-label">
-        <span className="df-settings-row-title">{title}</span>
-        {description ? <span className="df-settings-row-desc">{description}</span> : null}
-      </div>
-      <div className="df-settings-row-control">
-        <span className="df-settings-coming-soon-tag">{note}</span>
-      </div>
-    </div>
-  );
 }
 
 export function SettingDescription({ children }: { children: ReactNode }) {

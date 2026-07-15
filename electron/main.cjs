@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nat
 const fs = require("node:fs");
 const path = require("node:path");
 const { createWidgetWindowService } = require("./widget-window.cjs");
+const { createCompactWindowService } = require("./compact-window.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -1267,9 +1268,22 @@ const widgetWindowService = createWidgetWindowService({
 });
 widgetWindowService.registerIpc();
 
+const compactWindowService = createCompactWindowService({
+  BrowserWindow,
+  app,
+  ipcMain,
+  screen,
+  fs,
+  env: process.env,
+  preloadPath: path.join(__dirname, "preload.cjs"),
+  localIndexPath: path.join(__dirname, "..", "dist", "index.html"),
+  iconPath: widgetIconPath,
+});
+compactWindowService.registerIpc();
+
 // Relay: widget renderer → main window (action requests)
 ipcMain.on("widget:action", (_event, action) => {
-  const main = BrowserWindow.getAllWindows().find((w) => !widgetWindowService.ownsWindow(w) && !w.isDestroyed());
+  const main = BrowserWindow.getAllWindows().find((w) => !widgetWindowService.ownsWindow(w) && !compactWindowService.ownsWindow(w) && !w.isDestroyed());
   if (main) main.webContents.send("widget:action", action);
 });
 

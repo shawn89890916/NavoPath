@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld("desktopApi", {
   readExternalPluginEntry: (pluginId) => ipcRenderer.invoke("plugins:readExternalEntry", pluginId),
   writeSnapshot: (payload) => ipcRenderer.invoke("backup:writeSnapshot", payload),
   readLatestSnapshot: () => ipcRenderer.invoke("backup:readLatest"),
+  compactWindow: {
+    open: (options) => ipcRenderer.invoke("compact-window:open", options),
+    close: () => ipcRenderer.invoke("compact-window:close"),
+    setAlwaysOnTop: (enabled) => ipcRenderer.invoke("compact-window:set-always-on-top", Boolean(enabled)),
+  },
   widget: {
     open: () => ipcRenderer.invoke("widget:open"),
     close: () => ipcRenderer.invoke("widget:close"),

@@ -479,6 +479,8 @@ export interface Settings {
   widgetAlwaysOnTop?: boolean;
   /** 启动时自动打开小组件。 */
   widgetOpenOnLaunch?: boolean;
+  /** Full-app portrait window always-on-top preference (desktop only). */
+  compactWindowAlwaysOnTop?: boolean;
   widgetAppearance?: WidgetAppearance;
   widgetTimerPreferences?: WidgetTimerPreferences;
   widgetAppearanceMigrated?: boolean;
@@ -711,6 +713,11 @@ declare global {
       readExternalPluginEntry?: (pluginId: string) => Promise<{ id: string; code: string; path: string; missing: boolean }>;
       writeSnapshot?: (payload: { data?: PlannerData | null; settings?: Partial<Settings> | null; authUser?: { id?: string; email?: string } | null }) => Promise<{ ok: boolean; path?: string; stampedPath?: string; error?: string }>;
       readLatestSnapshot?: () => Promise<{ ok: boolean; payload?: { exportedAt?: string; appVersion?: string; data?: PlannerData | null; settings?: Settings | null; authUser?: { id?: string; email?: string } | null }; reason?: string; error?: string }>;
+      compactWindow?: {
+        open: (options?: { alwaysOnTop?: boolean }) => Promise<boolean>;
+        close: () => Promise<boolean>;
+        setAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
+      };
       widget?: {
         open: () => Promise<boolean>;
         close: () => Promise<boolean>;

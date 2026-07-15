@@ -292,3 +292,22 @@ export function timeBlockHeight(startTime: string, endTime: string, startHour = 
   const dur = Math.max(durationMinutes(startTime, endTime), SLOT_MINUTES);
   return Math.max((dur / 60) * hourHeight, SLOT_HEIGHT);
 }
+
+/**
+ * Keep a start-edge resize preview anchored to its original absolute timeline
+ * coordinate. This is needed when a parent supplies a continuous cross-day
+ * `top`: changing only the block height would otherwise make the lower edge
+ * move first while the upper edge appears fixed.
+ */
+export function resizedBlockTop(
+  originalTop: number,
+  originalDate: string,
+  originalStart: string,
+  previewDate: string,
+  previewStart: string,
+  hourHeight = HOUR_HEIGHT,
+): number {
+  const originalAbsolute = dateTimeToAbsoluteMinutes(originalDate, originalStart, originalDate);
+  const previewAbsolute = dateTimeToAbsoluteMinutes(previewDate, previewStart, originalDate);
+  return originalTop + ((previewAbsolute - originalAbsolute) / 60) * hourHeight;
+}
