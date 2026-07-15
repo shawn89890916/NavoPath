@@ -7592,7 +7592,7 @@ function App() {
                 aria-pressed={compactExecuteView === "schedule"}
                 onClick={() => setCompactExecuteView((view) => view === "tasks" ? "schedule" : "tasks")}
               >
-                {compactExecuteView === "tasks" ? <><ProductIcon compact /><span>{lang === "zh" ? "任务" : "Tasks"}</span></> : <><span>{lang === "zh" ? "日程" : "Schedule"}</span><ProductIcon compact /></>}
+                {compactExecuteView === "tasks" ? <><ProductIcon compact /><span>Tasks</span></> : <><span>Schedule</span><ProductIcon compact /></>}
               </button>
             </nav>
             {compactExecuteView === "schedule" && (

@@ -311,20 +311,20 @@
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs {
-    height: 36px !important;
+    height: 38px !important;
     gap: 0 !important;
     padding: 0 !important;
-    border: 1px solid var(--paper-rule-strong) !important;
-    border-radius: 7px !important;
-    background: color-mix(in srgb, var(--surface-main) 90%, var(--text-main) 10%) !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs button {
-    min-width: 110px !important;
-    height: 34px !important;
-    padding: 0 10px !important;
+    min-width: 116px !important;
+    height: 38px !important;
+    padding: 0 9px !important;
     border: 1px solid var(--paper-rule-strong) !important;
-    border-radius: 4px !important;
+    border-radius: 6px !important;
     color: var(--text-muted) !important;
     background: transparent !important;
     box-shadow: none !important;
@@ -332,7 +332,7 @@
     align-items: center !important;
     justify-content: space-between !important;
     gap: 12px !important;
-    font: 700 11px/1 var(--paper-sans) !important;
+    font: 700 12px/1 var(--paper-sans) !important;
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs button.active {
@@ -353,9 +353,9 @@
   }
 
   #root .df-app.mode-execute .df-compact-execute-tabs .dayflow-icon.compact {
-    width: 23px !important;
-    height: 23px !important;
-    min-width: 23px !important;
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
     margin: 0 !important;
   }
 
