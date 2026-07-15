@@ -111,6 +111,15 @@ describe("WidgetView", () => {
     expect(html).toContain('data-theme="dark"');
     expect(html).toContain('data-phase="overrun"');
     expect(html).toContain('aria-label="More"');
+    expect(html).toContain("Overdue");
+  });
+
+  it("shows the next timeline task with a start countdown and no start control", () => {
+    const html = renderToStaticMarkup(<WidgetView snapshot={{ ...snapshot, timelineState: "upcoming", timerDisplaySeconds: 300, timerRunning: false }} density="full" onToggleTimer={() => undefined} onTogglePopover={() => undefined} onMove={() => undefined} onResize={() => undefined} />);
+    expect(html).toContain(snapshot.taskTitle);
+    expect(html).toContain("Starts in");
+    expect(html).toContain("5:00");
+    expect(html).not.toContain('aria-label="Start timer"');
   });
 
   it("lets native popover events override stale snapshot state in both directions", () => {

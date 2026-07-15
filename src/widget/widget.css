@@ -42,10 +42,11 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
 }
 .df-widget-right { display: flex; align-items: center; justify-content: flex-end; align-self: stretch; min-width: 0; gap: clamp(6px, 8cqh, 16px); }
 .df-widget-timer {
-  display: flex; align-items: center; justify-content: center; align-self: stretch; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--widget-timer);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: stretch; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--widget-timer);
   font-family: "Cascadia Mono", Consolas, monospace; font-size: clamp(22px, 34cqh, 46px); font-size: calc(clamp(22px, 34cqh, 46px) * var(--widget-font-scale)); font-weight: 750; line-height: 1;
   letter-spacing: -.035em; text-align: center; white-space: nowrap; cursor: pointer; touch-action: none; -webkit-app-region: no-drag;
 }
+.df-widget-timer-context { color: currentColor; font-family: var(--widget-font); font-size: calc(clamp(9px, 11cqh, 12px) * var(--widget-font-scale)); font-weight: 650; line-height: 1.1; letter-spacing: .04em; }
 .df-widget-icon-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
   width: clamp(44px, 54cqh, 58px); height: clamp(44px, 54cqh, 58px); padding: 0;

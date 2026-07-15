@@ -1,0 +1,16 @@
+{
+    "cookies":  [
+
+                ],
+    "origins":  [
+                    {
+                        "localStorage":  [
+                                             {
+                                                 "value":  "{\"activeMode\":\"planning\",\"theme\":\"light\",\"language\":\"zh\",\"featureKanbanViewEnabled\":true,\"featureQuadrantViewEnabled\":true,\"featureListViewEnabled\":true}",
+                                                 "name":  "planner-preview-settings"
+                                             }
+                                         ],
+                        "origin":  "http://127.0.0.1:5173"
+                    }
+                ]
+}

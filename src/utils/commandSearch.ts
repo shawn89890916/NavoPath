@@ -1,4 +1,5 @@
 import type { PlannerData, Settings } from "../types";
+import { SETTINGS_SEARCH_ENTRIES, settingsSearchPath } from "../settingsNavigation";
 import { focusTargetForRecord, type TimelineFocusTarget } from "./timelineRecords";
 
 export type CommandKind = "task" | "project" | "event" | "note" | "habit" | "setting";
@@ -14,7 +15,7 @@ export type CommandSearchResult = {
   focusTarget?: TimelineFocusTarget;
 };
 
-export function buildCommandSearchIndex(data: PlannerData, _settings: Settings): CommandSearchResult[] {
+export function buildCommandSearchIndex(data: PlannerData, settings: Settings): CommandSearchResult[] {
   const taskResults = (data.tasks || []).map((task): CommandSearchResult => {
     const record = (task.timelineRecords || []).find((item) => item.executionStatus === "scheduled");
     return {
@@ -43,10 +44,15 @@ export function buildCommandSearchIndex(data: PlannerData, _settings: Settings):
     text: habit.title.toLowerCase(),
     actions: ["open", "schedule_now"],
   }));
-  const settingResults: CommandSearchResult[] = [
-    { id: "setting:shortcuts", kind: "setting", title: "Shortcuts", subtitle: "Settings", text: "shortcuts keyboard hotkeys kuaijiejian", actions: ["open"] },
-    { id: "setting:productivity", kind: "setting", title: "Productivity", subtitle: "Settings", text: "productivity habits metrics templates widget", actions: ["open"] },
-  ];
+  const language = settings.language || "en";
+  const settingResults: CommandSearchResult[] = SETTINGS_SEARCH_ENTRIES.map((item) => ({
+    id: `setting:${item.id}`,
+    kind: "setting",
+    title: language === "zh" ? item.labelZh : item.labelEn,
+    subtitle: settingsSearchPath(item, language),
+    text: [item.labelZh, item.labelEn, item.descriptionZh, item.descriptionEn, item.keywords].filter(Boolean).join(" "),
+    actions: ["open"],
+  }));
   return [...taskResults, ...projectResults, ...habitResults, ...settingResults];
 }
 

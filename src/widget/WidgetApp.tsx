@@ -152,14 +152,18 @@ export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, 
   const pointer = useRef<{ startX: number; startY: number; lastX: number; lastY: number; dragged: boolean } | null>(null);
   const suppressNextClick = useRef(false);
   const showTask = density === "full";
-  const showPrimaryControl = density === "full" && !(snapshot.timerRuntime.mode === "countdown" && snapshot.timerRuntime.running);
+  const timelineActive = snapshot.timelineState === undefined || snapshot.timelineState === "active";
+  const showPrimaryControl = density === "full" && timelineActive && !(snapshot.timerRuntime.mode === "countdown" && snapshot.timerRuntime.running && snapshot.timerRunning);
   const showMoreControl = density !== "timerOnly";
-  const effectiveRunning = snapshot.timerRuntime.mode === "stopwatch" ? snapshot.timerRunning : snapshot.timerRuntime.running;
+  const effectiveRunning = timelineActive && (snapshot.timerRuntime.mode === "stopwatch" ? snapshot.timerRunning : snapshot.timerRuntime.running && snapshot.timerRunning);
   const runningPomodoro = snapshot.timerRuntime.mode === "pomodoro" && effectiveRunning;
   const pomodoroBreak = runningPomodoro && snapshot.timerRuntime.phase === "break";
   const controlLabel = runningPomodoro
     ? pomodoroBreak ? (zh ? "正在休息，点击暂停" : "Resting — click to pause") : (zh ? "正在专注，点击暂停" : "Focusing — click to pause")
     : effectiveRunning ? (zh ? "暂停计时" : "Pause timer") : (zh ? "开始计时" : "Start timer");
+  const timerContext = snapshot.timelineState === "upcoming"
+    ? (zh ? "距开始" : "Starts in")
+    : snapshot.timerPhase === "overrun" ? (zh ? "已超时" : "Overdue") : "";
 
   const onTimerPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -183,10 +187,11 @@ export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, 
   return (
     <main className="df-widget-root" data-density={density} data-theme={snapshot.theme} data-phase={snapshot.timerPhase} style={appearanceStyle(snapshot)}>
       <section className="df-widget-card" aria-label={zh ? "桌面小组件" : "Desktop widget"}>
-        {showTask && <span className="df-widget-task-title" title={snapshot.taskTitle}>{snapshot.taskTitle || (zh ? "暂无任务" : "No active task")}</span>}
+        {showTask && <span className="df-widget-task-title" title={snapshot.taskTitle}>{snapshot.taskTitle || (zh ? "暂无后续任务" : "No upcoming task")}</span>}
         <div className="df-widget-right">
           <div className="df-widget-timer" onPointerDown={onTimerPointerDown} onPointerMove={onTimerPointerMove} onPointerUp={onTimerPointerUp} onPointerCancel={() => { pointer.current = null; suppressNextClick.current = false; }}>
-            {formatTimer(snapshot.timerDisplaySeconds)}
+            {timerContext && <span className="df-widget-timer-context">{timerContext}</span>}
+            <span>{snapshot.timelineState === "empty" ? "--:--" : formatTimer(snapshot.timerDisplaySeconds)}</span>
           </div>
           {showPrimaryControl && <button type="button" className="df-widget-icon-btn" aria-label={controlLabel} title={controlLabel} onClick={onToggleTimer}>{runningPomodoro ? (pomodoroBreak ? <Sprout size={18} strokeWidth={1.8} aria-hidden="true" /> : <Cherry size={18} strokeWidth={1.8} aria-hidden="true" />) : effectiveRunning ? <Pause size={18} strokeWidth={1.8} aria-hidden="true" /> : <Play size={18} strokeWidth={1.8} aria-hidden="true" />}</button>}
           {showMoreControl && <button type="button" className="df-widget-icon-btn" aria-label={zh ? "更多" : "More"} aria-haspopup="dialog" aria-expanded={snapshot.popoverOpen} onClick={onTogglePopover}><MoreHorizontal size={18} strokeWidth={1.8} aria-hidden="true" /></button>}

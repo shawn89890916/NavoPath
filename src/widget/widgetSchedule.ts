@@ -6,16 +6,47 @@ const timePart = (value: Date) => `${String(value.getHours()).padStart(2, "0")}:
 
 export type TimelineRecordBounds = { recordId: string; startAt: number; endAt: number };
 
+export type WidgetTimelineSelection = TimelineRecordBounds & {
+  task: Task;
+  state: "active" | "upcoming";
+};
+
+function recordBounds(record: TimelineRecord) {
+  const startAt = parse(record.scheduledDate, record.scheduledStart);
+  let endAt = parse(record.scheduledEndDate || record.scheduledDate, record.scheduledEnd);
+  if (endAt <= startAt && !record.scheduledEndDate) endAt += 86_400_000;
+  return { record, startAt, endAt };
+}
+
+export function resolveWidgetTimelineSelection(tasks: Task[], now = Date.now()): WidgetTimelineSelection | undefined {
+  const candidates = tasks.flatMap((task) => {
+    if (task.completed || task.id.startsWith("preview_")) return [];
+    return (task.timelineRecords || [])
+      .filter((record) => record.executionStatus === "scheduled" && record.scheduledDate && record.scheduledStart && record.scheduledEnd)
+      .map(recordBounds)
+      .filter((item) => Number.isFinite(item.startAt) && Number.isFinite(item.endAt))
+      .map((item) => ({ task, recordId: item.record.id, startAt: item.startAt, endAt: item.endAt }));
+  });
+  const active = candidates
+    .filter((item) => item.startAt <= now && item.endAt > now)
+    .sort((a, b) => b.startAt - a.startAt || a.endAt - b.endAt)[0];
+  if (active) return { ...active, state: "active" };
+  const upcoming = candidates
+    .filter((item) => item.startAt > now)
+    .sort((a, b) => a.startAt - b.startAt || a.endAt - b.endAt)[0];
+  return upcoming ? { ...upcoming, state: "upcoming" } : undefined;
+}
+
+export function nextOverrunExtensionEnd(currentEndAt: number, now: number, intervalMinutes = 15): number | undefined {
+  const intervalMs = Math.max(1, Math.round(intervalMinutes)) * 60_000;
+  const intervals = Math.floor((now - currentEndAt) / intervalMs);
+  return intervals >= 1 ? currentEndAt + intervals * intervalMs : undefined;
+}
+
 export function timelineRecordBounds(task?: Task | null, recordId?: string, now = Date.now()): TimelineRecordBounds | undefined {
   if (!task) return undefined;
   const records = (task.timelineRecords || []).filter((record) => record.executionStatus === "scheduled" && record.scheduledDate && record.scheduledStart && record.scheduledEnd);
-  const toBounds = (record: TimelineRecord) => {
-    const startAt = parse(record.scheduledDate, record.scheduledStart);
-    let endAt = parse(record.scheduledEndDate || record.scheduledDate, record.scheduledEnd);
-    if (endAt <= startAt && !record.scheduledEndDate) endAt += 86_400_000;
-    return { record, startAt, endAt };
-  };
-  const candidates = records.map(toBounds).filter((item) => Number.isFinite(item.startAt) && Number.isFinite(item.endAt));
+  const candidates = records.map(recordBounds).filter((item) => Number.isFinite(item.startAt) && Number.isFinite(item.endAt));
   const selected = (recordId ? candidates.find((item) => item.record.id === recordId) : undefined)
     || candidates.find((item) => item.startAt <= now && item.endAt >= now)
     || candidates.filter((item) => item.startAt > now).sort((a, b) => a.startAt - b.startAt)[0]

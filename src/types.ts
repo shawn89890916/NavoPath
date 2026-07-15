@@ -355,6 +355,7 @@ export interface WidgetTimerRuntime {
   pausedAt?: number;
   countdownTargetAt?: number;
   countdownTaskId?: string;
+  countdownRecordId?: string;
   pomodoroPlan?: WidgetPomodoroPhase[];
   currentPomodoroPhaseIndex?: number;
 }
@@ -652,6 +653,7 @@ export interface WidgetSnapshot {
   taskScheduleRecordId?: string;
   taskScheduleStartAt?: number;
   taskScheduleEndAt?: number;
+  timelineState?: "active" | "upcoming" | "empty";
   taskProjectColor?: string;
   /** 计时累计秒数。 */
   elapsedSeconds: number;

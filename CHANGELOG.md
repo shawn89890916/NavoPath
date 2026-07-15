@@ -6,10 +6,16 @@
 - 桌面端新增独立于「正在做」小组件的完整竖屏窗口：默认以 420 × 760 打开，可自由调整大小，并可单独开启或关闭始终置顶。
 
 ### 修复
+- 修复桌面小组件未按当前时间轴定位任务、正计时与倒计时绑定错误的问题：现在会显示当前任务；没有当前任务时显示距下一任务开始的时间；倒计时到任务截止时间后切换为带「已超时」标注的红色正计时，并在每超时 15 分钟时将当前任务块延长 15 分钟。
 - 修复从任务块上边缘调整时间时预览先改变下边界的问题；上边缘与高度现在在同一帧按跨天绝对坐标更新。
 - 修复习惯无法稳定拖入日、三日、周及跨天时间轴的问题；习惯现在与普通候选任务共用一致的时间轴命中与落点计算。
 - 习惯拖拽现在与普通候选任务保持一致，只显示单一浮动任务卡片，不再出现重复透明框；原列表布局仍会保留以避免跳动。
 - 设置页不再显示任何尚未实现的「即将支持」占位设置。
+- 修复 AI 拆解子任务后结果无法正常预览和采用的问题；拆解建议现在按顺序显示并写回原任务，任务详情中的勾选框也与子任务名保持齐平。
+
+### 改进
+- 设置页由 15 个并列入口收敛为「通用、外观、工作流、账户与数据、高级」五类，新增中英文设置搜索、移动端分类选择器和高级详情页；原有设置与即时保存保持不变，旧入口仍会定位到新的准确位置。
+- 任务详情的子任务标题栏新增 AI 自动拆解图标，并将手动添加改为相邻的纯图标操作；两者均沿用当前主题与「规划建议」图标语言。
 
 ## 2026-07-15 · Timeline drag fixes and independent portrait window
 
@@ -17,10 +23,16 @@
 - Added a complete desktop portrait window independent from the current-task widget. It opens at 420 × 760 by default, remains resizable, and has its own always-on-top control.
 
 ### Fixed
+- Fixed the desktop widget selecting tasks outside the current timeline slot and binding stopwatch/countdown state to the wrong task. It now shows the current task, counts down to the next task when the timeline is idle, switches deadline countdowns to a labeled red overdue stopwatch, and extends the current task block by 15 minutes at each completed 15-minute overrun interval.
 - Fixed start-edge task resizing previewing a lower-boundary change first; the top edge and height now update in the same frame using continuous cross-day coordinates.
 - Fixed habits failing to drag reliably into day, three-day, week, and continuous timelines by sharing the same target and drop calculation used by regular candidate tasks.
 - Habit dragging now matches regular candidate tasks and shows a single floating task card without a duplicate transparent frame, while keeping the original list layout stable.
 - Removed every unimplemented “Coming soon” placeholder setting from Settings.
+- Fixed AI-generated subtask breakdowns failing to preview and apply correctly; suggestions now appear in order and write back to the original task, while detail checkboxes align with subtask names.
+
+### Improved
+- Consolidated Settings from 15 peer entries into General, Appearance, Workflow, Account & Data, and Advanced, with bilingual search, a mobile category picker, and focused Advanced detail pages. Existing settings and instant-save behavior remain intact, while legacy targets still resolve to their exact new locations.
+- Added an AI breakdown icon beside the now icon-only manual add action in task details, using the active theme and the same icon language as Plan Suggestions.
 
 ## 2026-07-13 · 小组件截止时间联动计时器
 

@@ -237,6 +237,7 @@ export function normalizeWidgetTimerRuntime(
     if (isValidCountdownTarget(value?.countdownTargetAt)) {
       runtime.countdownTargetAt = value!.countdownTargetAt!;
       if (typeof value?.countdownTaskId === "string") runtime.countdownTaskId = value.countdownTaskId;
+      if (typeof value?.countdownRecordId === "string") runtime.countdownRecordId = value.countdownRecordId;
       if (phase === "countdown") runtime.phaseEndsAt = runtime.countdownTargetAt;
     } else {
       running = false;
@@ -345,6 +346,7 @@ export function resetWidgetTimerRuntime(
 ): WidgetTimerRuntime {
   const reset = createWidgetTimerRuntime(runtime.mode, now, preferenceValue, runtime.countdownTargetAt);
   if (runtime.mode === "countdown" && runtime.countdownTaskId) reset.countdownTaskId = runtime.countdownTaskId;
+  if (runtime.mode === "countdown" && runtime.countdownRecordId) reset.countdownRecordId = runtime.countdownRecordId;
   return { ...reset, running: false, pausedAt: now };
 }
 

@@ -50,12 +50,14 @@ import {
 import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProjectCompletion, workflowStatusForPatch } from "./utils/productivityModel";
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
+import { appendAiSubtasks } from "./utils/aiSubtasks";
 import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
 import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
 import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
 import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingColorInput, SettingActionButton, SettingDivider, SettingDescription } from "./components/SettingsControls";
+import { SETTINGS_CATEGORIES, normalizeSettingsTarget, searchSettings, settingsDetailLabel, settingsSearchPath, settingsTargetForSearchId, type SettingsCategory, type SettingsTarget, type SettingsTargetInput } from "./settingsNavigation";
 import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
@@ -83,9 +85,8 @@ import {
   normalizeWidgetTimerRuntime,
   resolveWidgetCountdownTarget,
   scheduleWidgetCountdown,
-  taskDueDateTargetAt,
 } from "./widget/widgetTimer";
-import { extendActiveTimelineRecord, timelineRecordBounds } from "./widget/widgetSchedule";
+import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
@@ -214,26 +215,6 @@ type SchedulePreview = {
 type AutoScheduleState = "idle" | "generating" | "preview" | "committing" | "error";
 type TimelineFocusSource = "schedule" | "autoschedule" | "recurrence" | "placement";
 type TimelineFocusTarget = { date: string; startTime?: string; taskId?: string; source: TimelineFocusSource };
-type SettingsSection =
-  | "general"
-  | "appearance"
-  | "execution"
-  | "planning"
-  | "templates"
-  | "habits"
-  | "metrics"
-  | "widget"
-  | "data"
-  | "shortcuts"
-  | "ai"
-  | "mcp"
-  | "plugins"
-  | "account"
-  | "advanced"
-  // Legacy aliases kept so persisted utilityPanel.section values from older
-  // builds still resolve to a sensible default instead of rendering nothing.
-  | "page"
-  | "features";
 type PlacementPreview = {
   taskId: string;
   date: string;
@@ -1752,7 +1733,7 @@ function App() {
   const layerTriggerRef = useRef(new Map<string, HTMLElement>());
   const [habitPanel, setHabitPanel] = useState<"overview" | "detail" | null>(null);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
-  const [settingsSectionTarget, setSettingsSectionTarget] = useState<SettingsSection>("general");
+  const [settingsSectionTarget, setSettingsSectionTarget] = useState<SettingsTarget>({ category: "general" });
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [toast, setToast] = useState("");
@@ -1775,6 +1756,7 @@ function App() {
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [clarifyLoading, setClarifyLoading] = useState(false);
+  const [subtaskAiBusyId, setSubtaskAiBusyId] = useState("");
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const [yearOverviewOpen, setYearOverviewOpen] = useState(false);
   const [overviewYear, setOverviewYear] = useState(() => new Date(`${todayIso()}T00:00:00`).getFullYear());
@@ -4246,21 +4228,52 @@ function App() {
 
   /** Build a WidgetSnapshot from the current live React state. */
   function buildWidgetSnapshot(): WidgetSnapshot {
-    const task = timerTask || headerTask;
-    const project = task?.projectId ? projects.find((p) => String(p.id) === String(task.projectId)) || null : null;
     const snapshotNow = Date.now();
-    const schedule = timelineRecordBounds(task);
+    const snapshotTasks = dataRef.current?.tasks || tasks;
+    let selection = resolveWidgetTimelineSelection(snapshotTasks, snapshotNow);
+    if (widgetTimerRuntime.mode === "countdown" && widgetTimerRuntime.running && widgetTimerRuntime.countdownTaskId && widgetTimerRuntime.countdownTargetAt && snapshotNow >= widgetTimerRuntime.countdownTargetAt) {
+      const overrunTask = snapshotTasks.find((item) => item.id === widgetTimerRuntime.countdownTaskId);
+      const overrunBounds = timelineRecordBounds(overrunTask, widgetTimerRuntime.countdownRecordId, widgetTimerRuntime.countdownTargetAt - 1);
+      if (overrunTask && overrunBounds) selection = { task: overrunTask, ...overrunBounds, state: "active" };
+    }
+    const task = selection?.task;
+    const project = task?.projectId ? projects.find((p) => String(p.id) === String(task.projectId)) || null : null;
     const widgetTimerTick = advanceWidgetTimer(widgetTimerRuntime, widgetTimerPreferences, snapshotNow);
+    const taskTimerMatches = Boolean(task && timerTaskId === task.id);
+    let timerDisplaySeconds = getWidgetTimerSnapshotDisplaySeconds(
+      widgetTimerPreferences.mode,
+      widgetTimerTick.displaySeconds,
+      taskTimerMatches ? timerElapsedBaseRef.current : 0,
+      taskTimerMatches && timerRunning,
+      taskTimerMatches ? timerStartedAtRef.current : null,
+      snapshotNow,
+    );
+    let timerPhase = widgetTimerTick.runtime.phase;
+    if (selection?.state === "upcoming") {
+      timerDisplaySeconds = Math.max(0, Math.ceil((selection.startAt - snapshotNow) / 1_000));
+      timerPhase = "countdown";
+    } else if (selection?.state === "active" && widgetTimerPreferences.mode === "countdown") {
+      const sameCountdown = widgetTimerRuntime.countdownTaskId === task?.id
+        && (!widgetTimerRuntime.countdownRecordId || widgetTimerRuntime.countdownRecordId === selection.recordId);
+      const targetAt = sameCountdown && widgetTimerRuntime.countdownTargetAt
+        ? widgetTimerRuntime.countdownTargetAt
+        : selection.endAt;
+      timerDisplaySeconds = Math.max(0, Math.ceil(Math.abs(targetAt - snapshotNow) / 1_000));
+      timerPhase = snapshotNow >= targetAt ? "overrun" : "countdown";
+    } else if (!selection) {
+      timerDisplaySeconds = 0;
+    }
     return {
       taskId: task?.id,
       taskTitle: task?.title || "",
       taskDueDate: task?.dueDate,
-      taskScheduleRecordId: schedule?.recordId,
-      taskScheduleStartAt: schedule?.startAt,
-      taskScheduleEndAt: schedule?.endAt,
+      taskScheduleRecordId: selection?.recordId,
+      taskScheduleStartAt: selection?.startAt,
+      taskScheduleEndAt: selection?.endAt,
+      timelineState: selection?.state || "empty",
       taskProjectColor: project?.color,
       elapsedSeconds: timerElapsed,
-      timerRunning,
+      timerRunning: taskTimerMatches && timerRunning,
       candidateCount: todayCandidates.length,
       lang,
       alwaysOnTop: settings?.widgetAlwaysOnTop !== false,
@@ -4269,31 +4282,22 @@ function App() {
       theme: settings?.theme === "dark" ? "dark" : "light",
       timerPreferences: widgetTimerPreferences,
       timerRuntime: widgetTimerTick.runtime,
-      timerDisplaySeconds: getWidgetTimerSnapshotDisplaySeconds(
-        widgetTimerPreferences.mode,
-        widgetTimerTick.displaySeconds,
-        timerElapsedBaseRef.current,
-        timerRunning,
-        timerStartedAtRef.current,
-        snapshotNow,
-      ),
-      timerPhase: widgetTimerTick.runtime.phase,
+      timerDisplaySeconds,
+      timerPhase,
       popoverOpen: widgetPopoverOpen,
     };
   }
 
-  const widgetScheduleSyncMinuteRef = useRef(0);
-  function syncActiveTaskScheduleFromTimer(actualEnd: number, force = false) {
+  function syncActiveTaskScheduleFromTimer(actualEnd: number) {
     const currentData = dataRef.current;
-    const activeId = timerTaskRef.current || headerTask?.id;
-    if (!currentData || !activeId) return;
-    const task = currentData.tasks.find((item) => item.id === activeId);
-    const bounds = timelineRecordBounds(task);
-    if (!task || !bounds || actualEnd <= bounds.endAt) return;
-    const minute = Math.floor(actualEnd / 60_000);
-    if (!force && widgetScheduleSyncMinuteRef.current === minute) return;
-    widgetScheduleSyncMinuteRef.current = minute;
-    const updatedTask = extendActiveTimelineRecord(task, bounds.recordId, actualEnd);
+    const runtime = widgetTimerRuntimeRef.current;
+    if (!currentData || runtime.mode !== "countdown" || runtime.phase !== "overrun" || !runtime.countdownTaskId || !runtime.countdownTargetAt) return;
+    const task = currentData.tasks.find((item) => item.id === runtime.countdownTaskId);
+    const bounds = timelineRecordBounds(task, runtime.countdownRecordId, runtime.countdownTargetAt - 1);
+    if (!task || !bounds) return;
+    const extendedEnd = nextOverrunExtensionEnd(bounds.endAt, actualEnd);
+    if (!extendedEnd) return;
+    const updatedTask = extendActiveTimelineRecord(task, bounds.recordId, extendedEnd);
     if (updatedTask === task) return;
     void saveData({ ...currentData, tasks: currentData.tasks.map((item) => item.id === task.id ? updatedTask : item) });
   }
@@ -4313,22 +4317,28 @@ function App() {
         break;
       case "timerStart":
         if (action.taskId) startTimer(action.taskId);
-        else if (headerTask) startTimer(headerTask.id);
+        else {
+          const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], Date.now());
+          if (selection?.state === "active") startTimer(selection.task.id);
+        }
         break;
       case "timerPause":
-        syncActiveTaskScheduleFromTimer(Date.now(), true);
+        syncActiveTaskScheduleFromTimer(Date.now());
         pauseTimer();
         break;
       case "timerResume":
         resumeTimer();
         break;
       case "timerStop":
-        syncActiveTaskScheduleFromTimer(Date.now(), true);
+        syncActiveTaskScheduleFromTimer(Date.now());
         stopAndSaveTimer();
         break;
       case "complete":
         if (action.taskId) toggleTaskDone(action.taskId);
-        else if (headerTask) toggleTaskDone(headerTask.id);
+        else {
+          const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], Date.now());
+          if (selection?.state === "active") toggleTaskDone(selection.task.id);
+        }
         break;
       case "setAlwaysOnTop":
         void window.desktopApi?.widget?.setAlwaysOnTop(action.enabled);
@@ -4356,18 +4366,19 @@ function App() {
         timerStartedAtRef.current = null;
         setTimerRunning(false);
         setTimerStartedAt(null);
-        const activeTask = timerTask || headerTask;
-        const countdownTargetAt = action.mode === "countdown" ? (timelineRecordBounds(activeTask)?.endAt ?? taskDueDateTargetAt(activeTask?.dueDate)) : undefined;
+        const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], now);
+        const activeTask = selection?.task;
+        const countdownTargetAt = action.mode === "countdown" ? selection?.endAt : undefined;
         const { preferences, runtime: transitionedRuntime } = createWidgetTimerModeTransition(
           action.mode,
           widgetTimerPreferences,
           now,
           countdownTargetAt,
         );
-        let runtime: WidgetTimerRuntime = action.mode === "countdown" && activeTask
-          ? { ...transitionedRuntime, countdownTaskId: activeTask.id }
+        let runtime: WidgetTimerRuntime = action.mode === "countdown" && activeTask && selection
+          ? { ...transitionedRuntime, countdownTaskId: activeTask.id, countdownRecordId: selection.recordId }
           : transitionedRuntime;
-        const scheduleEnd = timelineRecordBounds(activeTask)?.endAt;
+        const scheduleEnd = selection?.endAt;
         if (action.mode === "pomodoro" && scheduleEnd && scheduleEnd > now) runtime = createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, preferences);
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
@@ -4385,7 +4396,7 @@ function App() {
         const now = Date.now();
         const preferences = normalizeWidgetTimerPreferences(action.draft);
         if (preferences.mode !== widgetTimerRuntimeRef.current.mode && widgetTimerRuntimeRef.current.running) {
-          syncActiveTaskScheduleFromTimer(now, true);
+          syncActiveTaskScheduleFromTimer(now);
           if (widgetTimerRuntimeRef.current.mode === "stopwatch") pauseTimerAt(now);
           else advanceWidgetTimerNow();
           widgetManagesTaskTimerRef.current = false;
@@ -4393,14 +4404,18 @@ function App() {
           setTimerRunning(false);
           setTimerStartedAt(null);
         }
-        const activeTask = timerTask || headerTask;
+        const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], now);
+        const activeTask = selection?.task;
         const target = preferences.mode === "countdown"
-          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current, timelineRecordBounds(activeTask)?.endAt)
+          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current, selection?.endAt)
           : undefined;
         let runtime: WidgetTimerRuntime = createWidgetTimerModeTransition(preferences.mode, preferences, now, target).runtime;
-        const scheduleEnd = timelineRecordBounds(activeTask)?.endAt;
+        const scheduleEnd = selection?.endAt;
         if (preferences.mode === "pomodoro" && scheduleEnd && scheduleEnd > now) runtime = createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, preferences);
-        if (preferences.mode === "countdown" && activeTask) runtime.countdownTaskId = activeTask.id;
+        if (preferences.mode === "countdown" && activeTask && selection) {
+          runtime.countdownTaskId = activeTask.id;
+          runtime.countdownRecordId = selection.recordId;
+        }
         widgetTimerRuntimeRef.current = runtime;
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
@@ -4411,14 +4426,18 @@ function App() {
       case "resetWidgetTimer": {
         const now = Date.now();
         const preferences = normalizeWidgetTimerPreferences(action.draft);
-        const activeTask = timerTask || headerTask;
+        const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], now);
+        const activeTask = selection?.task;
         const target = preferences.mode === "countdown"
-          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current, timelineRecordBounds(activeTask)?.endAt)
+          ? resolveWidgetCountdownTarget(activeTask?.dueDate, activeTask?.id, widgetTimerRuntimeRef.current, selection?.endAt)
           : undefined;
         let runtime: WidgetTimerRuntime = createWidgetTimerModeTransition(preferences.mode, preferences, now, target).runtime;
-        const scheduleEnd = timelineRecordBounds(activeTask)?.endAt;
+        const scheduleEnd = selection?.endAt;
         if (preferences.mode === "pomodoro" && scheduleEnd && scheduleEnd > now) runtime = createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, preferences);
-        if (preferences.mode === "countdown" && activeTask) runtime.countdownTaskId = activeTask.id;
+        if (preferences.mode === "countdown" && activeTask && selection) {
+          runtime.countdownTaskId = activeTask.id;
+          runtime.countdownRecordId = selection.recordId;
+        }
         widgetTimerRuntimeRef.current = runtime;
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
@@ -4427,14 +4446,15 @@ function App() {
       }
       case "scheduleWidgetCountdown": {
         const duration = Math.round(action.durationMinutes);
-        const activeTask = timerTask || headerTask;
+        const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], Date.now());
+        const activeTask = selection?.task;
         const currentData = dataRef.current;
         if (!activeTask || !currentData || !Number.isInteger(duration) || duration < 1 || duration > 1_440) break;
         const now = Date.now();
         const scheduled = scheduleWidgetCountdown(activeTask, new Date(now), duration);
         const record = createScheduledRecord(activeTask, scheduled.record.scheduledDate, scheduled.record.scheduledStart, duration);
         void saveData({ ...currentData, tasks: currentData.tasks.map((task) => task.id === activeTask.id ? { ...task, timelineRecords: [...(task.timelineRecords || []), record] } : task) });
-        const runtime = { ...createWidgetTimerRuntime("countdown", now, { ...widgetTimerPreferences, mode: "countdown" }, scheduled.countdownTargetAt), running: false, pausedAt: now, countdownTaskId: activeTask.id };
+        const runtime = { ...createWidgetTimerRuntime("countdown", now, { ...widgetTimerPreferences, mode: "countdown" }, scheduled.countdownTargetAt), running: false, pausedAt: now, countdownTaskId: activeTask.id, countdownRecordId: record.id };
         widgetTimerRuntimeRef.current = runtime;
         widgetTimerAdvancedAtRef.current = now;
         widgetTimerRemainderMsRef.current = 0;
@@ -4443,18 +4463,21 @@ function App() {
       }
       case "toggleWidgetTimer": {
         const now = Date.now();
-        const current = widgetTimerRuntimeRef.current;
+        const selection = resolveWidgetTimelineSelection(dataRef.current?.tasks || [], now);
+        if (selection?.state !== "active") break;
+        let current = widgetTimerRuntimeRef.current;
         if (current.mode === "stopwatch") {
+          if (timerTaskRef.current && timerTaskRef.current !== selection.task.id) stopAndSaveTimer();
           const taskAction = getStopwatchTaskTimerAction(
-            timerTaskRef.current,
+            timerTaskRef.current === selection.task.id ? timerTaskRef.current : null,
             timerElapsedBaseRef.current,
             timerStartedAtRef.current,
             now,
           );
-          if (taskAction.type === "pause") { syncActiveTaskScheduleFromTimer(now, true); pauseTimerAt(now); }
+          if (taskAction.type === "pause") { syncActiveTaskScheduleFromTimer(now); pauseTimerAt(now); }
           else if (taskAction.type === "resume") resumeTimer();
-          else if (headerTask) startTimer(headerTask.id);
-          const running = taskAction.type !== "pause" && (Boolean(timerTaskRef.current) || Boolean(headerTask));
+          else startTimer(selection.task.id);
+          const running = taskAction.type !== "pause";
           const runtime = { ...current, running, ...(running ? {} : { pausedAt: now }) };
           if (running) delete runtime.pausedAt;
           widgetManagesTaskTimerRef.current = false;
@@ -4463,8 +4486,17 @@ function App() {
           setWidgetTimerRuntime(runtime);
           break;
         }
+        if (current.mode === "countdown" && (current.countdownTaskId !== selection.task.id || current.countdownRecordId !== selection.recordId)) {
+          current = {
+            ...createWidgetTimerRuntime("countdown", now, widgetTimerPreferences, selection.endAt),
+            running: false,
+            pausedAt: now,
+            countdownTaskId: selection.task.id,
+            countdownRecordId: selection.recordId,
+          };
+        }
         if (current.running) {
-          syncActiveTaskScheduleFromTimer(now, true);
+          syncActiveTaskScheduleFromTimer(now);
           advanceWidgetTimerNow();
           const advanced = widgetTimerRuntimeRef.current;
           const runtime = { ...advanced, running: false, pausedAt: now };
@@ -4477,7 +4509,7 @@ function App() {
           setWidgetTimerRuntime(runtime);
         } else {
           if (current.mode === "countdown" && current.countdownTargetAt === undefined) break;
-          const scheduleEnd = timelineRecordBounds(timerTask || headerTask)?.endAt;
+          const scheduleEnd = selection.endAt;
           const prepared = current.mode === "pomodoro" && scheduleEnd && scheduleEnd > now
             ? createDeadlineAlignedPomodoroRuntime(now, scheduleEnd, widgetTimerPreferences)
             : current;
@@ -4487,7 +4519,7 @@ function App() {
           widgetTimerRuntimeRef.current = runtime;
           setWidgetTimerRuntime(runtime);
           widgetManagesTaskTimerRef.current = true;
-          if (!timerTaskRef.current && headerTask) startTimer(headerTask.id);
+          if (timerTaskRef.current !== selection.task.id) startTimer(selection.task.id);
           const countsAsWork = countsWidgetTimerPhaseAsWork(current.phase);
           timerElapsedBaseRef.current = timerElapsedRef.current;
           timerStartedAtRef.current = countsAsWork ? now : null;
@@ -4506,6 +4538,8 @@ function App() {
   // once) always calls the current closure with up-to-date state.
   const widgetActionHandlerRef = useRef(handleWidgetAction);
   widgetActionHandlerRef.current = handleWidgetAction;
+  const widgetSnapshotBuilderRef = useRef(buildWidgetSnapshot);
+  widgetSnapshotBuilderRef.current = buildWidgetSnapshot;
 
   // Register the widget action listener once. Desktop-only.
   useEffect(() => {
@@ -4514,6 +4548,12 @@ function App() {
       widgetActionHandlerRef.current(action);
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!window.desktopApi?.widget) return;
+    const interval = window.setInterval(() => window.desktopApi?.widget?.pushSnapshot(widgetSnapshotBuilderRef.current()), 1_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   // Push a fresh snapshot to the widget whenever relevant state changes so
@@ -6374,6 +6414,18 @@ function App() {
     const previousTasks: Task[] = [];
     let focus: TimelineFocusTarget | undefined;
     for (const action of selected) {
+      if (action.type === "create_subtasks" && action.taskId && action.subtasks?.length) {
+        const index = nextTasks.findIndex((task) => task.id === action.taskId);
+        if (index !== -1) {
+          if (!previousTasks.some((task) => task.id === nextTasks[index].id)) previousTasks.push(nextTasks[index]);
+          nextTasks[index] = {
+            ...nextTasks[index],
+            subtasks: appendAiSubtasks(nextTasks[index].subtasks, action.subtasks, () => uid("subtask"), now),
+            updatedAt: now,
+          };
+        }
+        continue;
+      }
       if (action.type === "import_schedule_item" && action.title && action.date) {
         const a = action as Record<string, any>;
         if (a.kind === "event") {
@@ -6713,6 +6765,22 @@ function App() {
   async function confirmAiAction(action: AiAction, messageId?: string, actionIndex?: number) {
     const currentData = dataRef.current;
     if (!currentData) return;
+    if (action.type === "create_subtasks" && action.taskId && action.subtasks?.length) {
+      const target = currentData.tasks.find((task) => task.id === action.taskId);
+      if (!target) {
+        showToast(lang === "zh" ? "未找到要拆解的任务" : "The task to break down was not found");
+        return;
+      }
+      const now = new Date().toISOString();
+      const subtasks = appendAiSubtasks(target.subtasks, action.subtasks, () => uid("subtask"), now);
+      await saveData({
+        ...currentData,
+        tasks: currentData.tasks.map((task) => task.id === target.id ? { ...task, subtasks, updatedAt: now } : task),
+      });
+      if (messageId) removeAiMessageAction(messageId, action, actionIndex);
+      showToast(lang === "zh" ? `已添加 ${subtasks.length - (target.subtasks || []).length} 个子任务` : `Added ${subtasks.length - (target.subtasks || []).length} subtasks`);
+      return;
+    }
     if (action.type === "import_schedule_item" && action.title && action.date) {
       const a = action as Record<string, any>;
       const now = new Date().toISOString();
@@ -6913,6 +6981,53 @@ function App() {
     setAutoScheduleState(previews.length > 0 ? "preview" : "idle");
     if (previews.length === 0 && result.unscheduledTasks.length > 0) {
       showToast(`${t(lang, "toast.noContinuousSlot").replace("%COUNT%", String(result.unscheduledTasks.length))}`);
+    }
+  }
+
+  async function generateTaskSubtasks(taskId: string) {
+    const snapshot = dataRef.current;
+    const task = snapshot?.tasks.find((item) => item.id === taskId);
+    if (!snapshot || !task || subtaskAiBusyId) return;
+    setSubtaskAiBusyId(taskId);
+    try {
+      const result = await callAiAssistant({
+        mode: "suggest_subtasks",
+        model: settings?.model,
+        reasoningMode: settings?.reasoningMode || "instant",
+        message: lang === "zh" ? `把任务“${task.title}”拆解为可执行的子任务` : `Break “${task.title}” into actionable subtasks`,
+        context: {
+          language: lang,
+          taskId: task.id,
+          taskTitle: task.title,
+          focusTask: {
+            id: task.id,
+            title: task.title,
+            notes: task.notes || "",
+            estimatedMinutes: Math.round((task.estimatedHours || 0.5) * 60),
+            existingSubtasks: (task.subtasks || []).map((subtask) => subtask.title),
+          },
+        },
+      });
+      if (!result.ok) throw new Error(result.error.message);
+      const action = result.actions.find((item): item is Extract<AiAction, { type: "create_subtasks" }> => item.type === "create_subtasks");
+      if (!action?.subtasks?.length) throw new Error("AI did not return subtasks");
+      const latest = dataRef.current;
+      const latestTask = latest?.tasks.find((item) => item.id === taskId);
+      if (!latest || !latestTask) return;
+      const now = new Date().toISOString();
+      const subtasks = appendAiSubtasks(latestTask.subtasks, action.subtasks, () => uid("subtask"), now);
+      const addedCount = subtasks.length - (latestTask.subtasks || []).length;
+      await saveData({
+        ...latest,
+        tasks: latest.tasks.map((item) => item.id === taskId ? { ...item, subtasks, updatedAt: now } : item),
+      });
+      showToast(addedCount > 0
+        ? (lang === "zh" ? `AI 已添加 ${addedCount} 个子任务` : `AI added ${addedCount} subtasks`)
+        : (lang === "zh" ? "没有新的子任务可添加" : "No new subtasks to add"));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : (lang === "zh" ? "AI 拆解失败，请重试" : "AI breakdown failed. Please retry."));
+    } finally {
+      setSubtaskAiBusyId("");
     }
   }
 
@@ -7184,9 +7299,9 @@ function App() {
     setPendingTimelineFocus({ date: nowDate, startTime: nowTime, source: "schedule" });
   }
 
-  function openSettingsSection(section: SettingsSection) {
+  function openSettingsSection(section: SettingsTargetInput) {
     rememberLayerTrigger("utility");
-    setSettingsSectionTarget(section);
+    setSettingsSectionTarget(normalizeSettingsTarget(section));
     setUtilityPanel("settings");
   }
 
@@ -7226,7 +7341,7 @@ function App() {
       return;
     }
     if (result.kind === "setting") {
-      openSettingsSection(result.id === "setting:shortcuts" ? "shortcuts" : "features");
+      openSettingsSection(settingsTargetForSearchId(result.id.replace(/^setting:/, "")) || "general");
       return;
     }
     if (result.kind === "task") {
@@ -8662,8 +8777,8 @@ function App() {
       {!settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} lang={lang} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => setUtilityPanel("settings")} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} />}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
@@ -11286,7 +11401,7 @@ function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties;
 
 function EditDrawer(props: {
   type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; clarifyLoading?: boolean; onCreateProject: (title: string) => string;
-  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; lang: Language;
+  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language;
 }) {
   const dialog = useInAppDialog(props.lang);
   const [newProjectTitle, setNewProjectTitle] = useState("");
@@ -11809,10 +11924,25 @@ function EditDrawer(props: {
         <section className="df-detail-subtasks-new">
           <div className="df-detail-section-head">
             <h3>{t(props.lang, "drawer.subtasks")}</h3>
-            <button type="button" className="df-detail-add-btn" onClick={() => void addSubtask()}>
-              <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v8M2 6h8"/></svg>
-              <span>{t(props.lang, "drawer.addSubtask")}</span>
-            </button>
+            <div className="df-detail-subtask-tools">
+              {props.aiEnabled && <button
+                type="button"
+                className={`df-detail-add-btn df-detail-icon-tool df-detail-ai-subtasks${props.subtaskAiLoading ? " loading" : ""}`}
+                title={props.lang === "zh" ? "AI 自动拆解" : "Break down with AI"}
+                aria-label={props.lang === "zh" ? `使用 AI 拆解“${props.task.title}”` : `Break down “${props.task.title}” with AI`}
+                disabled={props.subtaskAiLoading}
+                onClick={() => props.onGenerateSubtasks(props.task!.id)}
+              >
+                <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M10 2.5l1.1 3.2 3.4 1.1-3.4 1.1L10 11.1 8.9 7.9 5.5 6.8l3.4-1.1L10 2.5z" />
+                  <path d="M4.8 11.5l.7 2 2.1.7-2.1.7-.7 2-.7-2-2.1-.7 2.1-.7.7-2z" />
+                  <path d="M15.6 12.5l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5.5-1.4z" />
+                </svg>
+              </button>}
+              <button type="button" className="df-detail-add-btn df-detail-icon-tool" title={t(props.lang, "drawer.addSubtask")} aria-label={t(props.lang, "drawer.addSubtask")} onClick={() => void addSubtask()}>
+                <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2v8M2 6h8"/></svg>
+              </button>
+            </div>
           </div>
           <div className="df-subtask-list-new">
             {(props.task.subtasks || []).length === 0 ? (
@@ -11867,8 +11997,9 @@ function EditDrawer(props: {
   );
 }
 
-function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
+function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
   const projects = projectList || [];
+  const tasks = taskList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
@@ -11990,6 +12121,11 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
             const projectName = (a.projectName as string) || undefined;
             const projectId = (a.projectId as string) || undefined;
             const reason = typeof a.reason === 'string' ? a.reason : undefined;
+            const isSubtaskAction = patchedAction.type === "create_subtasks";
+            const subtaskSuggestions = isSubtaskAction ? (patchedAction.subtasks || []) : [];
+            const targetTaskTitle = isSubtaskAction
+              ? tasks.find((task) => task.id === patchedAction.taskId)?.title || (lang === "zh" ? "所选任务" : "Selected task")
+              : "";
             const isAccepted = patchedAction.type === "none";
             const proj = projectId ? projects.find((p: any) => String(p.id) === String(projectId)) : null;
             const finalProjectName = projectName || proj?.title || text.unassigned;
@@ -12000,24 +12136,32 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
               {patchedAction.type === "import_schedule_item" && <input className="df-ai-import-check" type="checkbox" checked={message.selectedActions?.[i] !== false} onChange={() => onToggleAction(message.id, i)} />}
               {projColor && <span className="df-ai-task-strip" style={{ background: projColor }} />}
               <div className="df-ai-task-body">
-                <div className="df-ai-task-row-top">
-                  <strong>{title}</strong>
-                  {start && end && <button className="df-ai-chip-button mono" onClick={() => toggleMenu(message.id, i, "time")}>{start} - {end}</button>}
-                </div>
-                <div className="df-ai-task-row-mid">
-                  <span className="df-ai-task-project">{text.task}</span>
-                  <button className="df-ai-chip-button" onClick={() => toggleMenu(message.id, i, "project")}># {finalProjectName}</button>
-                  {a.recurrence ? <span className="df-ai-task-project">↻ {(a.recurrence as any).frequency}</span> : null}
-                </div>
-                <div className="df-ai-task-row-bot">
-                  {dur && <button className="df-ai-chip-button" onClick={() => toggleMenu(message.id, i, "duration")}>{formatMinutes(dur)}</button>}
-                  {date && <span className="df-ai-task-dur">{date}</span>}
-                  {reason && <small>{reason}</small>}
-                  {typeof a.warning === "string" && <small>{a.warning}</small>}
-                </div>
-                {menuIs(message.id, i, "time") && <div className="df-ai-action-menu">{timeOptions.map((option) => <button key={option} onClick={() => patchTime(message.id, i, a, option)}>{option}</button>)}</div>}
-                {menuIs(message.id, i, "duration") && <div className="df-ai-action-menu">{durationOptions.map((option) => <button key={option} onClick={() => patchDuration(message.id, i, a, option)}>{formatMinutes(option)}</button>)}</div>}
-                {menuIs(message.id, i, "project") && <div className="df-ai-action-menu"><button onClick={() => { onPatchAction(message.id, i, { projectId: "", projectName: "" }); setEditMenu(null); }}>{text.unassigned}</button>{projects.map((project) => <button key={project.id} onClick={() => { onPatchAction(message.id, i, { projectId: project.id, projectName: project.title }); setEditMenu(null); }}><span className="df-ai-project-dot" style={{ background: project.color || "var(--accent-active)" }} />{project.title}</button>)}</div>}
+                {isSubtaskAction ? <>
+                  <div className="df-ai-task-row-top"><strong>{lang === "zh" ? `拆解「${targetTaskTitle}」` : `Break down “${targetTaskTitle}”`}</strong></div>
+                  <ul className="df-ai-subtask-preview">
+                    {subtaskSuggestions.map((subtask, subtaskIndex) => <li key={`${subtask.title}-${subtaskIndex}`}><span>{subtaskIndex + 1}</span><strong>{subtask.title}</strong>{subtask.estimateMinutes ? <small>{formatMinutes(subtask.estimateMinutes)}</small> : null}</li>)}
+                  </ul>
+                  {reason && <div className="df-ai-task-row-bot"><small>{reason}</small></div>}
+                </> : <>
+                  <div className="df-ai-task-row-top">
+                    <strong>{title}</strong>
+                    {start && end && <button className="df-ai-chip-button mono" onClick={() => toggleMenu(message.id, i, "time")}>{start} - {end}</button>}
+                  </div>
+                  <div className="df-ai-task-row-mid">
+                    <span className="df-ai-task-project">{text.task}</span>
+                    <button className="df-ai-chip-button" onClick={() => toggleMenu(message.id, i, "project")}># {finalProjectName}</button>
+                    {a.recurrence ? <span className="df-ai-task-project">↻ {(a.recurrence as any).frequency}</span> : null}
+                  </div>
+                  <div className="df-ai-task-row-bot">
+                    {dur && <button className="df-ai-chip-button" onClick={() => toggleMenu(message.id, i, "duration")}>{formatMinutes(dur)}</button>}
+                    {date && <span className="df-ai-task-dur">{date}</span>}
+                    {reason && <small>{reason}</small>}
+                    {typeof a.warning === "string" && <small>{a.warning}</small>}
+                  </div>
+                  {menuIs(message.id, i, "time") && <div className="df-ai-action-menu">{timeOptions.map((option) => <button key={option} onClick={() => patchTime(message.id, i, a, option)}>{option}</button>)}</div>}
+                  {menuIs(message.id, i, "duration") && <div className="df-ai-action-menu">{durationOptions.map((option) => <button key={option} onClick={() => patchDuration(message.id, i, a, option)}>{formatMinutes(option)}</button>)}</div>}
+                  {menuIs(message.id, i, "project") && <div className="df-ai-action-menu"><button onClick={() => { onPatchAction(message.id, i, { projectId: "", projectName: "" }); setEditMenu(null); }}>{text.unassigned}</button>{projects.map((project) => <button key={project.id} onClick={() => { onPatchAction(message.id, i, { projectId: project.id, projectName: project.title }); setEditMenu(null); }}><span className="df-ai-project-dot" style={{ background: project.color || "var(--accent-active)" }} />{project.title}</button>)}</div>}
+                </>}
               </div>
               {!isAccepted && (
                 <div className="df-ai-task-actions">
@@ -12561,16 +12705,68 @@ function PluginRuntimePanel({ settings, data, onSave, onSaveData, lang }: { sett
   );
 }
 
-function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose, onSave, onWidgetAction, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang, onOpenScheduleTemplates }: { kind: "settings" | "about"; settings: Settings; initialSection?: SettingsSection; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onWidgetAction: (action: WidgetAction) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language; onOpenScheduleTemplates?: () => void }) {
-  // Map any persisted legacy section id ("page" / "features") onto the new
-  // canonical category so older builds land on a real settings group instead
-  // of an empty panel.
-  const resolvedInitial: SettingsSection = initialSection === "page" ? "general" : initialSection === "features" ? "planning" : (initialSection || "general");
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>(resolvedInitial);
+function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose, onSave, onWidgetAction, onSaveData, onClearChatHistory, onShowAbout, onSignOut, onDeleteAccount, onSyncNow, isManualSyncing, cloudReady, lang, onOpenScheduleTemplates }: { kind: "settings" | "about"; settings: Settings; initialSection?: SettingsTargetInput; data: PlannerData; authEmail: string; onClose: () => void; onSave: (patch: Partial<Settings>) => void; onWidgetAction: (action: WidgetAction) => void; onSaveData: (next: PlannerData) => void; onClearChatHistory: () => void; onShowAbout: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; onSyncNow?: (direction?: "push" | "pull" | "both") => Promise<boolean> | void; isManualSyncing?: boolean; cloudReady?: boolean; lang: Language; onOpenScheduleTemplates?: () => void }) {
+  const resolvedInitial = normalizeSettingsTarget(initialSection);
+  const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>(resolvedInitial);
+  const [settingsQuery, setSettingsQuery] = useState("");
+  const [accentSettingsOpen, setAccentSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [widgetThemeOpen, setWidgetThemeOpen] = useState<"light" | "dark">("light");
+  const [integrationTab, setIntegrationTab] = useState<"plugins" | "mcp">("plugins");
+  const settingsContentRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const settingsResults = useMemo(() => searchSettings(settingsQuery, lang), [settingsQuery, lang]);
   useEffect(() => {
-    if (initialSection) setSettingsSection(resolvedInitial);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (initialSection) setSettingsTarget(normalizeSettingsTarget(initialSection));
   }, [initialSection]);
+  useEffect(() => {
+    if (kind !== "settings") return;
+    closeButtonRef.current?.focus();
+  }, [kind]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+  useEffect(() => {
+    if (settingsTarget.anchor === "accent-colors") setAccentSettingsOpen(true);
+    if (settingsTarget.anchor === "shortcuts") setShortcutsOpen(true);
+    if (settingsTarget.anchor?.startsWith("widget-light")) setWidgetThemeOpen("light");
+    if (settingsTarget.anchor?.startsWith("widget-dark")) setWidgetThemeOpen("dark");
+    if (settingsTarget.anchor === "mcp") setIntegrationTab("mcp");
+    if (settingsTarget.anchor === "plugins") setIntegrationTab("plugins");
+  }, [settingsTarget.anchor]);
+  useEffect(() => {
+    const content = settingsContentRef.current;
+    if (!content) return;
+    const handle = window.requestAnimationFrame(() => {
+      const anchor = settingsTarget.anchor
+        ? content.querySelector<HTMLElement>(`[data-settings-anchor="${settingsTarget.anchor}"]`)
+        : null;
+      if (!anchor) {
+        content.scrollTop = 0;
+        return;
+      }
+      content.scrollTop = Math.max(0, anchor.offsetTop - 12);
+      anchor.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [settingsTarget]);
+
+  function navigateSettings(target: SettingsTarget) {
+    if (target.anchor === "accent-colors") setAccentSettingsOpen(true);
+    if (target.anchor === "shortcuts") setShortcutsOpen(true);
+    if (target.anchor?.startsWith("widget-light")) setWidgetThemeOpen("light");
+    if (target.anchor?.startsWith("widget-dark")) setWidgetThemeOpen("dark");
+    if (target.anchor === "mcp") setIntegrationTab("mcp");
+    if (target.anchor === "plugins") setIntegrationTab("plugins");
+    setSettingsTarget(target);
+    setSettingsQuery("");
+  }
   const [confirmResetSettings, setConfirmResetSettings] = useState(false);
   const [confirmClearLocalData, setConfirmClearLocalData] = useState(false);
   const [clearLocalDataPhrase, setClearLocalDataPhrase] = useState("");
@@ -12796,42 +12992,77 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
   return (
     <>
       <div className="df-utility-backdrop" onMouseDown={onClose} />
-      <aside className="df-utility-panel">
+      <aside className="df-utility-panel" role="dialog" aria-modal="true" aria-labelledby="df-utility-title">
         <div className="df-utility-head">
-          <h2>{kind === "settings" ? t(lang, "settings.settings") : t(lang, "settings.aboutNavo")}</h2>
-          <button className="df-icon-action i-close" aria-label={t(lang, "settings.close")} onClick={onClose} />
+          <h2 id="df-utility-title">{kind === "settings" ? t(lang, "settings.settings") : t(lang, "settings.aboutNavo")}</h2>
+          <button ref={closeButtonRef} className="df-icon-action i-close" aria-label={t(lang, "settings.close")} onClick={onClose} />
         </div>
         {kind === "settings" ? (
           <div className="df-utility-body df-settings-shell">
-            <nav className="df-settings-nav" aria-label={lang === "zh" ? "设置分区" : "Settings sections"}>
-              {([
-                ['general', lang === 'zh' ? '通用' : 'General'],
-                ['appearance', lang === 'zh' ? '外观' : 'Appearance'],
-                ['execution', lang === 'zh' ? '执行' : 'Execution'],
-                ['planning', lang === 'zh' ? '规划' : 'Planning'],
-                ['templates', lang === 'zh' ? '模板' : 'Templates'],
-                ['habits', lang === 'zh' ? '习惯' : 'Habits'],
-                ['metrics', lang === 'zh' ? '指标' : 'Metrics'],
-                ['widget', lang === 'zh' ? '桌面窗口' : 'Desktop'],
-                ['data', lang === 'zh' ? '数据与备份' : 'Data & Backup'],
-                ['shortcuts', lang === 'zh' ? '快捷键' : 'Shortcuts'],
-                ['ai', 'Navo AI'],
-                ['mcp', 'MCP'],
-                ['plugins', lang === 'zh' ? '插件' : 'Plugins'],
-                ['account', lang === 'zh' ? '账户' : 'Account'],
-                ['advanced', lang === 'zh' ? '高级' : 'Advanced'],
-              ] as const).map(([id, label]) => (
-                <button type="button" key={id} className={settingsSection === id ? "active" : ""} aria-current={settingsSection === id ? "page" : undefined} onClick={() => setSettingsSection(id)}>{label}</button>
-              ))}
-            </nav>
-            <div className="df-settings-content">
-            {settingsSection === "general" && <SettingSection title={lang === "zh" ? "通用" : "General"} description={lang === "zh" ? "影响时间轴、指标、模板与跨天任务的基础设置。" : "Foundational preferences that affect the timeline, metrics, templates, and cross-day tasks."}>
+            <div className="df-settings-rail">
+              <label className="df-settings-search">
+                <span className="df-visually-hidden">{lang === "zh" ? "搜索设置" : "Search settings"}</span>
+                <input
+                  type="search"
+                  value={settingsQuery}
+                  placeholder={lang === "zh" ? "搜索设置" : "Search settings"}
+                  onChange={(event) => setSettingsQuery(event.target.value)}
+                  aria-controls="df-settings-search-results"
+                  aria-expanded={Boolean(settingsQuery.trim())}
+                />
+              </label>
+              {settingsQuery.trim() && <div id="df-settings-search-results" className="df-settings-search-results" role="listbox">
+                {settingsResults.length > 0 ? settingsResults.map((result) => (
+                  <button
+                    type="button"
+                    role="option"
+                    key={result.id}
+                    onClick={() => navigateSettings(result.target)}
+                  >
+                    <strong>{lang === "zh" ? result.labelZh : result.labelEn}</strong>
+                    <span>{settingsSearchPath(result, lang)}</span>
+                  </button>
+                )) : <p>{lang === "zh" ? "没有找到相关设置" : "No matching settings"}</p>}
+              </div>}
+              <label className="df-settings-mobile-category">
+                <span className="df-visually-hidden">{lang === "zh" ? "设置分类" : "Settings category"}</span>
+                <select value={settingsTarget.category} onChange={(event) => navigateSettings({ category: event.target.value as SettingsCategory })}>
+                  {SETTINGS_CATEGORIES.map((category) => <option key={category.id} value={category.id}>{lang === "zh" ? category.labelZh : category.labelEn}</option>)}
+                </select>
+              </label>
+              <nav className="df-settings-nav" aria-label={lang === "zh" ? "设置分区" : "Settings sections"}>
+                {SETTINGS_CATEGORIES.map((category) => (
+                  <button type="button" key={category.id} className={settingsTarget.category === category.id ? "active" : ""} aria-current={settingsTarget.category === category.id ? "page" : undefined} onClick={() => navigateSettings({ category: category.id })}>{lang === "zh" ? category.labelZh : category.labelEn}</button>
+                ))}
+              </nav>
+            </div>
+            <div ref={settingsContentRef} className="df-settings-content">
+            {settingsTarget.category === "advanced" && settingsTarget.detail && <div className="df-settings-detail-head">
+              <button type="button" onClick={() => navigateSettings({ category: "advanced" })}>← {lang === "zh" ? "高级" : "Advanced"}</button>
+              <span>{settingsDetailLabel(settingsTarget.detail, lang)}</span>
+            </div>}
+            {settingsTarget.category === "general" && <SettingSection anchor="general-basics" title={lang === "zh" ? "基础" : "Basics"} description={lang === "zh" ? "语言、时间边界与启动位置。" : "Language, time boundary, and startup destination."}>
               <SettingRow
+                anchor="language"
+                title={lang === "zh" ? "语言" : "Language"}
+                control={<SettingSelect<Language>
+                  value={settings.language || lang}
+                  ariaLabel={lang === "zh" ? "语言" : "Language"}
+                  onChange={(value) => onSave({ language: value })}
+                  options={[
+                    { value: "zh", label: "中文" },
+                    { value: "en", label: "English" },
+                  ]}
+                />}
+              />
+              <SettingRow
+                anchor="day-start"
                 title={lang === "zh" ? "一天开始时间" : "Day start time"}
                 description={lang === "zh" ? "决定时间轴的起始分界，影响跨天滚动与统计范围。" : "Sets the boundary used by the timeline, cross-day scroll, and metric ranges."}
                 control={<SettingTextInput type="time" value={settings.dayStartTime || "00:00"} ariaLabel={lang === "zh" ? "一天开始时间" : "Day start time"} onChange={(value) => onSave({ dayStartTime: value })} />}
               />
               <SettingRow
+                anchor="default-page"
                 title={lang === "zh" ? "默认打开页面" : "Default page"}
                 description={lang === "zh" ? "启动时优先进入执行或规划。" : "Choose whether the app opens on Execution or Planning."}
                 control={<SettingSelect<Settings["activeMode"]>
@@ -12844,15 +13075,11 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                   ]}
                 />}
               />
-              <SettingRow
-                title={lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}
-                description={lang === "zh" ? "重新触发首次使用引导流程。" : "Re-trigger the first-run onboarding flow."}
-                control={<SettingActionButton onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始" : "Restart"}</SettingActionButton>}
-              />
             </SettingSection>}
 
-            {settingsSection === "appearance" && <SettingSection title={lang === "zh" ? "外观" : "Appearance"} description={lang === "zh" ? "纸面风格、字体与点缀色。" : "Paper surface, typography, and accent color."}>
+            {settingsTarget.category === "appearance" && <SettingSection title={lang === "zh" ? "外观" : "Appearance"} description={lang === "zh" ? "纸面风格、字体与克制的点缀色。" : "Paper surface, typography, and restrained accent color."}>
               <SettingRow
+                anchor="theme"
                 title={t(lang, "settings.uiMode")}
                 control={<SettingSelect<Settings["theme"]>
                   value={settings.theme}
@@ -12865,18 +13092,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 />}
               />
               <SettingRow
-                title={t(lang, "settings.language")}
-                control={<SettingSelect<Language>
-                  value={settings.language || lang}
-                  ariaLabel={t(lang, "settings.language")}
-                  onChange={(value) => onSave({ language: value })}
-                  options={[
-                    { value: "zh", label: "中文" },
-                    { value: "en", label: "English" },
-                  ]}
-                />}
-              />
-              <SettingRow
+                anchor="typography"
                 title={lang === "zh" ? "字体风格" : "Typography"}
                 control={<SettingSelect<Settings["typographyStyle"]>
                   value={settings.typographyStyle || "editorial"}
@@ -12890,6 +13106,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 />}
               />
               <SettingRow
+                anchor="timeline-font"
                 title={lang === "zh" ? "时间轴字体大小" : "Timeline font size"}
                 description={lang === "zh" ? "调整时间轴任务标题字号。" : "Scale the timeline task title font size."}
                 control={
@@ -12909,29 +13126,33 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 }
               />
               <SettingRow
+                anchor="task-block-fill"
                 title={lang === "zh" ? "任务块颜色填充" : "Fill task block with project color"}
                 description={lang === "zh" ? "以归属项目色整块填充（开启）或仅描边（关闭）。" : "Fill the whole block with project color (on) or use a thin outline (off)."}
                 control={<SettingToggle checked={Boolean(settings.taskBlockFill)} ariaLabel={lang === "zh" ? "任务块颜色填充" : "Fill task block with project color"} onChange={(next) => onSave({ taskBlockFill: next })} />}
               />
-              <SettingRow
-                title={t(lang, "settings.hideCompleted")}
-                description={lang === "zh" ? "在时间轴上隐藏已完成任务。" : "Hide completed tasks from the timeline."}
-                control={<SettingToggle checked={Boolean(settings.hideCompleted)} ariaLabel={t(lang, "settings.hideCompleted")} onChange={(next) => onSave({ hideCompleted: next })} />}
-              />
-              <SettingDivider />
-              <SettingDescription>{lang === "zh" ? "强调色：仅作为细线、勾选与当前时间标记的点缀色，不主导布局。" : "Accent colors: used only for fine rules, checkboxes, and the current-time marker — never as dominant fills."}</SettingDescription>
-              <div className="df-settings-accent-row">
-                <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
-                <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
+              <div className="df-settings-disclosure" data-settings-anchor="accent-colors" tabIndex={-1}>
+                <button type="button" className="df-settings-disclosure-toggle" aria-expanded={accentSettingsOpen} onClick={() => setAccentSettingsOpen((open) => !open)}>
+                  <span><strong>{lang === "zh" ? "自定义点缀色" : "Customize accent colors"}</strong><small>{lang === "zh" ? "用于细线、勾选与当前时间标记。" : "Used for fine rules, checks, and the current-time marker."}</small></span>
+                  <i aria-hidden="true">{accentSettingsOpen ? "−" : "+"}</i>
+                </button>
+                {accentSettingsOpen && <div className="df-settings-disclosure-body">
+                  <SettingDescription>{lang === "zh" ? "点缀色不会作为大面积填充；恢复后使用当前纸面主题的默认墨色。" : "Accent colors never become dominant fills; restore returns to the current paper theme's default ink."}</SettingDescription>
+                  <div className="df-settings-accent-row">
+                    <ThemeColorSetting label={t(lang, "settings.executeAccent")} presets={settings.theme === "dark" ? EXECUTE_THEME_PRESETS_DARK : EXECUTE_THEME_PRESETS_LIGHT} value={settings.executeAccentColor || defaultAccent} onChange={(color) => onSave({ executeAccentColor: color })} />
+                    <ThemeColorSetting label={t(lang, "settings.planningAccent")} presets={settings.theme === "dark" ? PLANNING_THEME_PRESETS_DARK : PLANNING_THEME_PRESETS_LIGHT} value={settings.planningAccentColor || defaultAccent} onChange={(color) => onSave({ planningAccentColor: color })} />
+                  </div>
+                  <SettingRow
+                    title={lang === "zh" ? "恢复默认点缀色" : "Restore default accent colors"}
+                    control={<SettingActionButton onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
+                  />
+                </div>}
               </div>
-              <SettingRow
-                title={lang === "zh" ? "恢复默认点缀色" : "Restore default accent colors"}
-                control={<SettingActionButton onClick={() => onSave({ executeAccentColor: "", planningAccentColor: "" })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
-              />
             </SettingSection>}
 
-            {settingsSection === "execution" && <SettingSection title={lang === "zh" ? "执行" : "Execution"} description={lang === "zh" ? "时间轴与执行页行为。" : "Timeline and execution-page behavior."}>
+            {settingsTarget.category === "general" && <SettingSection anchor="execution-defaults" title={lang === "zh" ? "执行默认项" : "Execution defaults"} description={lang === "zh" ? "时间轴、专注与完成任务的默认行为。" : "Default timeline, focus, and completed-task behavior."}>
               <SettingRow
+                anchor="default-timeline"
                 title={lang === "zh" ? "默认时间轴视图" : "Default timeline view"}
                 control={<SettingSelect<NonNullable<Settings["defaultTimelineView"]>>
                   value={settings.defaultTimelineView || "daily"}
@@ -12946,11 +13167,13 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 />}
               />
               <SettingRow
+                anchor="continuous-scroll"
                 title={lang === "zh" ? "开启无限跨天滚动" : "Continuous cross-day scroll"}
                 description={lang === "zh" ? "时间轴可连续滚动到前后日期。" : "The timeline scrolls continuously across days."}
                 control={<SettingToggle checked={settings.continuousCrossDayScroll !== false} ariaLabel={lang === "zh" ? "无限跨天滚动" : "Continuous cross-day scroll"} onChange={(next) => onSave({ continuousCrossDayScroll: next })} />}
               />
               <SettingRow
+                anchor="focus-mode"
                 title={lang === "zh" ? "默认专注模式" : "Default focus mode"}
                 description={lang === "zh" ? "进入专注时默认使用的计时方式。" : "Timer mode used when entering focus."}
                 control={<SettingSelect<NonNullable<Settings["focusModeDefault"]>>
@@ -12965,6 +13188,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 />}
               />
               <SettingRow
+                anchor="idle-threshold"
                 title={lang === "zh" ? "空闲阈值" : "Idle threshold"}
                 description={lang === "zh" ? "超过该时长未操作视为空闲，0 表示关闭。" : "Idle minutes before the timer auto-pauses; 0 disables."}
                 control={<SettingSelect<string>
@@ -12980,9 +13204,15 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                   ]}
                 />}
               />
+              <SettingRow
+                anchor="hide-completed"
+                title={t(lang, "settings.hideCompleted")}
+                description={lang === "zh" ? "在时间轴上隐藏已完成任务。" : "Hide completed tasks from the timeline."}
+                control={<SettingToggle checked={Boolean(settings.hideCompleted)} ariaLabel={t(lang, "settings.hideCompleted")} onChange={(next) => onSave({ hideCompleted: next })} />}
+              />
             </SettingSection>}
 
-            {settingsSection === "planning" && <SettingSection title={lang === "zh" ? "规划" : "Planning"} description={lang === "zh" ? "规划页视图与可见性。" : "Planning-page views and visibility."}>
+            {settingsTarget.category === "workflow" && <SettingSection anchor="planning-views" title={lang === "zh" ? "规划视图" : "Planning views"} description={lang === "zh" ? "选择规划页中可用的组织方式。" : "Choose the organization views available on Planning."}>
               <SettingRow
                 title={lang === "zh" ? "启用看板视图" : "Enable Kanban view"}
                 control={<SettingToggle checked={settings.featureKanbanViewEnabled !== false} ariaLabel={lang === "zh" ? "启用看板视图" : "Enable Kanban view"} onChange={(next) => onSave({ featureKanbanViewEnabled: next })} />}
@@ -12997,7 +13227,26 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
             </SettingSection>}
 
-            {settingsSection === "templates" && <SettingSection title={lang === "zh" ? "模板" : "Templates"} description={lang === "zh" ? "把可复用的时间段模板应用到今天。" : "Apply reusable time-block templates to today."}>
+            {settingsTarget.category === "workflow" && <SettingSection anchor="smart-scheduling" title={lang === "zh" ? "智能排程" : "Smart scheduling"} description={lang === "zh" ? "定义自动排程使用的工作时段与任务间隔。" : "Define the working window and task spacing used by automatic scheduling."}>
+              <SettingRow
+                anchor="schedule-start"
+                title={lang === "zh" ? "规划开始" : "Planning starts"}
+                control={<SettingTextInput type="time" value={settings.scheduleDayStartTime || "08:00"} ariaLabel={lang === "zh" ? "规划开始" : "Planning starts"} onChange={(value) => onSave({ scheduleDayStartTime: value })} />}
+              />
+              <SettingRow
+                anchor="schedule-end"
+                title={lang === "zh" ? "规划结束" : "Planning ends"}
+                control={<SettingTextInput type="time" value={settings.dayEndTime || "22:00"} ariaLabel={lang === "zh" ? "规划结束" : "Planning ends"} onChange={(value) => onSave({ dayEndTime: value })} />}
+              />
+              <SettingRow
+                anchor="schedule-buffer"
+                title={lang === "zh" ? "任务缓冲" : "Task buffer"}
+                description={lang === "zh" ? "自动排程在相邻任务间预留的时间。" : "Time reserved between adjacent automatically scheduled tasks."}
+                control={<SettingNumberInput value={settings.scheduleBufferMinutes ?? 5} min={0} max={60} step={5} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "任务缓冲" : "Task buffer"} onChange={(value) => onSave({ scheduleBufferMinutes: Math.max(0, Math.min(60, value)) })} />}
+              />
+            </SettingSection>}
+
+            {settingsTarget.category === "workflow" && <SettingSection anchor="templates" title={lang === "zh" ? "模板" : "Templates"} description={lang === "zh" ? "把可复用的时间段模板应用到今天。" : "Apply reusable time-block templates to today."}>
               <SettingRow
                 title={lang === "zh" ? "启用模板功能" : "Enable templates"}
                 description={lang === "zh" ? "关闭后隐藏今日候选顶栏的「模板」入口。" : "When off, the Templates button in the today-candidate header is hidden."}
@@ -13010,7 +13259,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
             </SettingSection>}
 
-            {settingsSection === "habits" && <SettingSection title={lang === "zh" ? "习惯" : "Habits"} description={lang === "zh" ? "每日 / 每周重复行为的开关与显示。" : "Toggles and visibility for daily / weekly recurring behaviors."}>
+            {settingsTarget.category === "workflow" && <SettingSection anchor="habits" title={lang === "zh" ? "习惯" : "Habits"} description={lang === "zh" ? "每日 / 每周重复行为的开关与显示。" : "Toggles and visibility for daily / weekly recurring behaviors."}>
               <SettingRow
                 title={lang === "zh" ? "启用习惯功能" : "Enable habits"}
                 description={lang === "zh" ? "关闭后隐藏今日候选中的习惯区与习惯入口。" : "When off, the habits area in today's candidates and habit entries are hidden."}
@@ -13037,7 +13286,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
             </SettingSection>}
 
-            {settingsSection === "metrics" && <SettingSection title={lang === "zh" ? "指标" : "Metrics"} description={lang === "zh" ? "规划页指标视图的默认范围与分组。" : "Default range and grouping for the planning-page metrics view."}>
+            {settingsTarget.category === "workflow" && <SettingSection anchor="metrics" title={lang === "zh" ? "指标" : "Metrics"} description={lang === "zh" ? "规划页指标视图的默认范围与分组。" : "Default range and grouping for the planning-page metrics view."}>
               <SettingRow
                 title={lang === "zh" ? "启用指标视图" : "Enable metrics view"}
                 description={lang === "zh" ? "关闭后隐藏规划页的「指标」视图入口。" : "When off, the Metrics entry in the planning view switcher is hidden."}
@@ -13114,13 +13363,29 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
             </SettingSection>}
 
-            {settingsSection === "widget" && <SettingSection
+            {settingsTarget.category === "advanced" && !settingsTarget.detail && <SettingSection title={lang === "zh" ? "高级" : "Advanced"} description={lang === "zh" ? "仅在需要时进入对应详情；所有项目仍可通过搜索直接找到。" : "Open a detail only when needed; every setting remains directly searchable."}>
+              {([
+                ["ai", "Navo AI", lang === "zh" ? "模型、自动化行为与记忆" : "Models, automation behavior, and memory"],
+                ["widget", lang === "zh" ? "桌面窗口" : "Desktop Windows", lang === "zh" ? "竖屏小窗、桌面小组件与计时" : "Portrait window, desktop widget, and timer"],
+                ["integrations", lang === "zh" ? "插件与 MCP" : "Plugins & MCP", lang === "zh" ? "扩展、工具与远程连接" : "Extensions, tools, and remote connections"],
+                ["recovery", lang === "zh" ? "恢复与重置" : "Recovery & Reset", lang === "zh" ? "恢复默认设置" : "Restore default settings"],
+              ] as const).map(([detail, label, description]) => (
+                <button key={detail} type="button" className="df-settings-detail-link" onClick={() => navigateSettings({ category: "advanced", detail })}>
+                  <span><strong>{label}</strong><small>{description}</small></span>
+                  <i aria-hidden="true">→</i>
+                </button>
+              ))}
+            </SettingSection>}
+
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "widget" && <SettingSection
+              anchor="desktop-window-settings"
               title={lang === "zh" ? "桌面窗口" : "Desktop Windows"}
               description={Boolean(window.desktopApi?.widget || window.desktopApi?.compactWindow)
                 ? (lang === "zh" ? "管理完整竖屏小窗与「正在做」小组件。" : "Manage the full portrait window and the current-task widget.")
                 : (lang === "zh" ? "桌面端启用后可用。当前环境未检测到桌面端。" : "Available on the desktop build. No desktop runtime detected in this environment.")}
             >
               <SettingRow
+                anchor="portrait-window"
                 title={lang === "zh" ? "竖屏小窗" : "Portrait window"}
                 description={lang === "zh" ? "在独立窗口中打开完整应用的竖屏布局，不影响「正在做」小组件。" : "Open the complete app in an independent portrait layout without affecting the current-task widget."}
                 control={<><SettingActionButton disabled={!Boolean(window.desktopApi?.compactWindow)} onClick={() => { void window.desktopApi?.compactWindow?.open({ alwaysOnTop: settings.compactWindowAlwaysOnTop !== false }); }}>{lang === "zh" ? "打开" : "Open"}</SettingActionButton><SettingActionButton disabled={!Boolean(window.desktopApi?.compactWindow)} onClick={() => { void window.desktopApi?.compactWindow?.close(); }}>{lang === "zh" ? "关闭" : "Close"}</SettingActionButton></>}
@@ -13131,6 +13396,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
               <SettingDivider />
               <SettingRow
+                anchor="desktop-widget"
                 title={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"}
                 description={lang === "zh" ? "置顶小窗快速查看正在做与计时。" : "Always-on-top mini panel for the current task and timer."}
                 control={<SettingToggle checked={settings.featureWidgetEnabled !== false} disabled={!Boolean(window.desktopApi?.widget)} ariaLabel={lang === "zh" ? "启用桌面小组件" : "Enable desktop widget"} onChange={(next) => onSave({ featureWidgetEnabled: next })} />}
@@ -13150,6 +13416,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
               <SettingDivider />
               <SettingRow
+                anchor="widget-font"
                 title={lang === "zh" ? "字体" : "Font family"}
                 control={<SettingSelect value={widgetAppearance.fontFamily} ariaLabel={lang === "zh" ? "小组件字体" : "Widget font family"} onChange={(fontFamily) => saveWidgetAppearance({ fontFamily })} options={[
                   { value: "system-ui, sans-serif", label: lang === "zh" ? "系统字体" : "System" },
@@ -13162,19 +13429,24 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 title={lang === "zh" ? "字号比例" : "Font scale"}
                 control={<SettingNumberInput value={widgetAppearance.fontScale} min={0.5} max={2} step={0.05} suffix="×" ariaLabel={lang === "zh" ? "小组件字号比例" : "Widget font scale"} onChange={(fontScale) => saveWidgetAppearance({ fontScale })} />}
               />
-              {(["light", "dark"] as const).map((theme) => {
+              <SettingDivider />
+              <div className="df-settings-subtabs" role="tablist" aria-label={lang === "zh" ? "小组件外观主题" : "Widget appearance theme"}>
+                {(["light", "dark"] as const).map((theme) => <button key={theme} type="button" role="tab" aria-selected={widgetThemeOpen === theme} className={widgetThemeOpen === theme ? "active" : ""} onClick={() => setWidgetThemeOpen(theme)}>{theme === "light" ? (lang === "zh" ? "浅色" : "Light") : (lang === "zh" ? "深色" : "Dark")}</button>)}
+              </div>
+              {(() => {
+                const theme = widgetThemeOpen;
                 const themeName = theme === "light" ? (lang === "zh" ? "浅色" : "Light") : (lang === "zh" ? "深色" : "Dark");
                 const colors = widgetAppearance[theme];
-                return <React.Fragment key={theme}>
-                  <SettingDivider />
-                  <SettingRow title={lang === "zh" ? `${themeName}背景` : `${themeName} background`} control={<SettingColorInput value={colors.backgroundColor} ariaLabel={lang === "zh" ? `${themeName}背景颜色` : `${themeName} background color`} onChange={(backgroundColor) => saveWidgetThemeColor(theme, { backgroundColor })} />} />
-                  <SettingRow title={lang === "zh" ? `${themeName}文字` : `${themeName} text`} control={<SettingColorInput value={colors.fontColor} ariaLabel={lang === "zh" ? `${themeName}文字颜色` : `${themeName} text color`} onChange={(fontColor) => saveWidgetThemeColor(theme, { fontColor })} />} />
-                  <SettingRow title={lang === "zh" ? `${themeName}计时` : `${themeName} timer`} control={<SettingColorInput value={colors.timerColor} ariaLabel={lang === "zh" ? `${themeName}计时颜色` : `${themeName} timer color`} onChange={(timerColor) => saveWidgetThemeColor(theme, { timerColor })} />} />
-                  <SettingRow title={lang === "zh" ? `${themeName}超时` : `${themeName} overrun`} control={<SettingColorInput value={colors.overrunColor} ariaLabel={lang === "zh" ? `${themeName}超时颜色` : `${themeName} overrun color`} onChange={(overrunColor) => saveWidgetThemeColor(theme, { overrunColor })} />} />
-                </React.Fragment>;
-              })}
+                return <div className="df-settings-theme-fields" data-settings-anchor={theme === "light" ? "widget-light" : "widget-dark"} tabIndex={-1}>
+                  <SettingRow anchor={`widget-${theme}-background`} title={lang === "zh" ? `${themeName}背景` : `${themeName} background`} control={<SettingColorInput value={colors.backgroundColor} ariaLabel={lang === "zh" ? `${themeName}背景颜色` : `${themeName} background color`} onChange={(backgroundColor) => saveWidgetThemeColor(theme, { backgroundColor })} />} />
+                  <SettingRow anchor={`widget-${theme}-text`} title={lang === "zh" ? `${themeName}文字` : `${themeName} text`} control={<SettingColorInput value={colors.fontColor} ariaLabel={lang === "zh" ? `${themeName}文字颜色` : `${themeName} text color`} onChange={(fontColor) => saveWidgetThemeColor(theme, { fontColor })} />} />
+                  <SettingRow anchor={`widget-${theme}-timer`} title={lang === "zh" ? `${themeName}计时` : `${themeName} timer`} control={<SettingColorInput value={colors.timerColor} ariaLabel={lang === "zh" ? `${themeName}计时颜色` : `${themeName} timer color`} onChange={(timerColor) => saveWidgetThemeColor(theme, { timerColor })} />} />
+                  <SettingRow anchor={`widget-${theme}-overrun`} title={lang === "zh" ? `${themeName}超时` : `${themeName} overrun`} control={<SettingColorInput value={colors.overrunColor} ariaLabel={lang === "zh" ? `${themeName}超时颜色` : `${themeName} overrun color`} onChange={(overrunColor) => saveWidgetThemeColor(theme, { overrunColor })} />} />
+                </div>;
+              })()}
               <SettingDivider />
               <SettingRow
+                anchor="widget-timer"
                 title={lang === "zh" ? "计时模式" : "Timer mode"}
                 control={<SettingSelect value={widgetTimerDraft.mode} ariaLabel={lang === "zh" ? "小组件计时模式" : "Widget timer mode"} onChange={(mode) => updateWidgetTimerDraft({ mode })} options={[
                   { value: "stopwatch", label: lang === "zh" ? "正计时" : "Stopwatch" },
@@ -13182,16 +13454,20 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                   { value: "countdown", label: lang === "zh" ? "倒计时" : "Countdown" },
                 ]} />}
               />
-              <SettingRow title={lang === "zh" ? "专注时长" : "Focus duration"} control={<SettingNumberInput value={widgetTimerDraft.focusMinutes} min={1} max={180} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "番茄钟专注时长" : "Pomodoro focus duration"} onChange={(focusMinutes) => updateWidgetTimerDraft({ focusMinutes })} />} />
-              <SettingRow title={lang === "zh" ? "休息时长" : "Break duration"} control={<SettingNumberInput value={widgetTimerDraft.breakMinutes} min={1} max={60} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "番茄钟休息时长" : "Pomodoro break duration"} onChange={(breakMinutes) => updateWidgetTimerDraft({ breakMinutes })} />} />
-              <SettingRow title={lang === "zh" ? "循环轮数" : "Pomodoro rounds"} control={<SettingNumberInput value={widgetTimerDraft.rounds} min={1} max={12} step={1} ariaLabel={lang === "zh" ? "番茄钟循环轮数" : "Pomodoro rounds"} onChange={(rounds) => updateWidgetTimerDraft({ rounds })} />} />
-              <SettingRow title={lang === "zh" ? "倒计时时长" : "Countdown duration"} control={<SettingNumberInput value={Math.round(widgetTimerDraft.countdownSeconds / 60)} min={1} max={1440} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "倒计时时长" : "Countdown duration"} onChange={(minutes) => updateWidgetTimerDraft({ countdownSeconds: minutes * 60 })} />} />
+              {widgetTimerDraft.mode === "pomodoro" && <>
+                <SettingRow title={lang === "zh" ? "专注时长" : "Focus duration"} control={<SettingNumberInput value={widgetTimerDraft.focusMinutes} min={1} max={180} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "番茄钟专注时长" : "Pomodoro focus duration"} onChange={(focusMinutes) => updateWidgetTimerDraft({ focusMinutes })} />} />
+                <SettingRow title={lang === "zh" ? "休息时长" : "Break duration"} control={<SettingNumberInput value={widgetTimerDraft.breakMinutes} min={1} max={60} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "番茄钟休息时长" : "Pomodoro break duration"} onChange={(breakMinutes) => updateWidgetTimerDraft({ breakMinutes })} />} />
+                <SettingRow title={lang === "zh" ? "循环轮数" : "Pomodoro rounds"} control={<SettingNumberInput value={widgetTimerDraft.rounds} min={1} max={12} step={1} ariaLabel={lang === "zh" ? "番茄钟循环轮数" : "Pomodoro rounds"} onChange={(rounds) => updateWidgetTimerDraft({ rounds })} />} />
+              </>}
+              {widgetTimerDraft.mode === "countdown" && <SettingRow title={lang === "zh" ? "倒计时时长" : "Countdown duration"} control={<SettingNumberInput value={Math.round(widgetTimerDraft.countdownSeconds / 60)} min={1} max={1440} step={1} suffix={lang === "zh" ? "分钟" : "min"} ariaLabel={lang === "zh" ? "倒计时时长" : "Countdown duration"} onChange={(minutes) => updateWidgetTimerDraft({ countdownSeconds: minutes * 60 })} />} />}
+              {widgetTimerDraft.mode === "stopwatch" && <SettingDescription>{lang === "zh" ? "正计时无需设置时长。" : "Stopwatch mode has no duration settings."}</SettingDescription>}
               <SettingRow
                 title={lang === "zh" ? "计时器操作" : "Timer actions"}
                 control={<><SettingActionButton onClick={() => setWidgetTimerDraft(widgetTimerSettings)}>{lang === "zh" ? "取消" : "Cancel"}</SettingActionButton><SettingActionButton onClick={() => onWidgetAction({ type: "resetWidgetTimer", draft: widgetTimerDraft })}>{lang === "zh" ? "重置计时器" : "Reset timer"}</SettingActionButton><SettingActionButton onClick={() => onWidgetAction({ type: "saveTimerSettings", draft: widgetTimerDraft })}>{lang === "zh" ? "保存" : "Save"}</SettingActionButton></>}
               />
               <SettingDivider />
               <SettingRow
+                anchor="widget-reset"
                 title={lang === "zh" ? "恢复默认外观" : "Restore default appearance"}
                 control={<SettingActionButton onClick={() => onSave({ widgetAppearance: structuredClone(DEFAULT_WIDGET_APPEARANCE), widgetAppearanceMigrated: true })}>{lang === "zh" ? "恢复" : "Restore"}</SettingActionButton>}
               />
@@ -13201,62 +13477,87 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 control={<SettingActionButton disabled={!Boolean(window.desktopApi?.widget)} onClick={() => { void window.desktopApi?.widget?.setBounds({ x: 80, y: 80, width: 400, height: 80 }); }}>{lang === "zh" ? "重置" : "Reset"}</SettingActionButton>}
               />
             </SettingSection>}
-            {settingsSection === "shortcuts" && <section className="df-settings-group"><h3>{lang === "zh" ? "快捷键" : "Shortcuts"}</h3>
-              <p className="df-settings-desc">{lang === "zh" ? "固定快捷键参考。本版本暂不支持自定义。" : "Fixed shortcut reference. Custom shortcuts are not enabled in this version."}</p>
-              <div className="df-shortcut-reference">
-                {shortcutGroups.map((group) => (
-                  <section key={group.scope} className="df-shortcut-group">
-                    <h4>{shortcutScopeLabel(group.scope)}</h4>
-                    <div className="df-shortcut-list">
-                      {group.shortcuts.map((shortcut) => (
-                        <div key={shortcut.id} className="df-shortcut-row">
-                          <span>{lang === "zh" ? shortcut.labelZh : shortcut.labelEn}</span>
-                          <kbd>{shortcut.keys.join(" / ")}</kbd>
+            {settingsTarget.category === "general" && <SettingSection anchor="general-help" title={lang === "zh" ? "帮助" : "Help"}>
+              <SettingRow
+                anchor="restart-onboarding"
+                title={lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}
+                description={lang === "zh" ? "重新触发首次使用引导流程。" : "Re-trigger the first-run onboarding flow."}
+                control={<SettingActionButton onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始" : "Restart"}</SettingActionButton>}
+              />
+              <div className="df-settings-disclosure" data-settings-anchor="shortcuts" tabIndex={-1}>
+                <button
+                  type="button"
+                  className="df-settings-disclosure-toggle"
+                  aria-expanded={shortcutsOpen}
+                  onClick={() => setShortcutsOpen((open) => !open)}
+                >
+                  <span><strong>{lang === "zh" ? "快捷键参考" : "Shortcut reference"}</strong><small>{lang === "zh" ? "查看固定快捷键" : "View fixed shortcuts"}</small></span>
+                  <span aria-hidden="true">{shortcutsOpen ? "−" : "+"}</span>
+                </button>
+                {shortcutsOpen && <div className="df-settings-disclosure-body">
+                  <p className="df-settings-desc">{lang === "zh" ? "本版本暂不支持自定义快捷键。" : "Custom shortcuts are not enabled in this version."}</p>
+                  <div className="df-shortcut-reference">
+                    {shortcutGroups.map((group) => (
+                      <section key={group.scope} className="df-shortcut-group">
+                        <h4>{shortcutScopeLabel(group.scope)}</h4>
+                        <div className="df-shortcut-list">
+                          {group.shortcuts.map((shortcut) => (
+                            <div key={shortcut.id} className="df-shortcut-row">
+                              <span>{lang === "zh" ? shortcut.labelZh : shortcut.labelEn}</span>
+                              <kbd>{shortcut.keys.join(" / ")}</kbd>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+                      </section>
+                    ))}
+                  </div>
+                </div>}
               </div>
-            </section>}
-            {settingsSection === "ai" && <section className="df-settings-group"><h3>Navo AI</h3>
-            <p className="df-settings-desc">{lang === "zh" ? "模型由服务端网关自动路由；即使 AI 暂时不可用，本地估时、分类与排程仍可工作。" : "Models are routed by the server gateway. Local estimation, classification, and scheduling keep working if AI is unavailable."}</p>
-            <label className="df-utility-select">{lang === "zh" ? "高级模型偏好" : "Advanced model preference"}<input value={settings.model} readOnly /></label>
-            <label className="df-utility-select">{lang === "zh" ? "思考模式" : "Reasoning mode"}<select value={settings.reasoningMode || "instant"} onChange={(event) => onSave({ reasoningMode: event.target.value as Settings["reasoningMode"] })}><option value="instant">{lang === "zh" ? "即时" : "Instant"}</option>{reasoningModesForModel(settings.model).includes("high") && <option value="high">High</option>}{reasoningModesForModel(settings.model).includes("xhigh") && <option value="xhigh">Xhigh</option>}</select></label>
-            <label className="df-utility-check"><input type="checkbox" checked={settings.autoEstimateTaskDuration !== false} onChange={(event) => onSave({ autoEstimateTaskDuration: event.target.checked })} />{lang === "zh" ? "创建任务时自动估算用时" : "Estimate duration when creating tasks"}</label>
-            <label className="df-utility-check"><input type="checkbox" checked={settings.autoAssignTaskProject !== false} onChange={(event) => onSave({ autoAssignTaskProject: event.target.checked })} />{lang === "zh" ? "高置信度时自动归入已有项目" : "Auto-assign to an existing project at high confidence"}</label>
-            <div className="df-settings-divider" />
-            <label className="df-utility-select">{lang === "zh" ? "规划开始" : "Planning starts"}<input type="time" value={settings.scheduleDayStartTime || "08:00"} onChange={(event) => onSave({ scheduleDayStartTime: event.target.value })} /></label>
-            <label className="df-utility-select">{lang === "zh" ? "规划结束" : "Planning ends"}<input type="time" value={settings.dayEndTime || "22:00"} onChange={(event) => onSave({ dayEndTime: event.target.value })} /></label>
-            <label className="df-utility-select">{lang === "zh" ? "任务缓冲（分钟）" : "Task buffer (minutes)"}<input type="number" min="0" max="60" step="5" value={settings.scheduleBufferMinutes ?? 5} onChange={(event) => onSave({ scheduleBufferMinutes: Math.max(0, Math.min(60, Number(event.target.value) || 0)) })} /></label>
-            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.aiMemoryEnabled)} onChange={(event) => onSave({ aiMemoryEnabled: event.target.checked })} />{t(lang, "settings.allowAiContext")}</label>
-            <label className="df-utility-check"><input type="checkbox" checked={Boolean(settings.hideAi)} onChange={(event) => onSave({ hideAi: event.target.checked })} />{t(lang, "settings.hideAllAi")}</label>
-            <button className="df-ai-clear-history" onClick={() => { const now = new Date().toISOString(); onSaveData({ ...data, aiProfile: { version: 1, updatedAt: now, historySince: now, durationByProject: {}, projectTokenWeights: {}, preferredStartHourByProject: {}, feedback: { durationCorrections: 0, projectCorrections: 0, assignmentUndos: 0, scheduleAccepts: 0, scheduleRejects: 0 } } }); }}>{lang === "zh" ? "重置个性化学习" : "Reset personalization"}</button>
-            <section className="df-ai-memory-settings">
-              <div className="df-ai-memory-settings-head">
-                <div><strong>AI 记忆</strong><small>{visibleMemories.length} 条会参与上下文</small></div>
-                <button onClick={addManualMemory}>新增</button>
-              </div>
-              <div className="df-ai-memory-list">
-                {visibleMemories.length === 0 && <p className="df-ai-memory-empty">还没有保存的记忆。你可以手动新增，或在 AI 对话中保存选中内容。</p>}
-                {visibleMemories.map((memory) => (
-                  <article key={memory.id} className={`df-ai-memory-item ${memory.pinned ? "pinned" : ""}`}>
-                    <textarea value={memory.content} onChange={(event) => saveMemory(memory.id, { content: event.target.value })} />
-                    <input value={(memory.tags || []).join(", ")} onChange={(event) => saveMemory(memory.id, { tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} placeholder="tags" />
-                    {memory.sourceMessages && memory.sourceMessages.length > 0 && <small>保存自 {memory.sourceMessages.length} 条对话原文</small>}
-                    <div className="df-ai-memory-actions">
-                      <span>{memory.source || "auto"}</span>
-                      <button onClick={() => saveMemory(memory.id, { pinned: !memory.pinned })}>{memory.pinned ? "取消置顶" : "置顶"}</button>
-                      <button className="danger-lite" onClick={() => saveMemory(memory.id, { archived: true })}>删除</button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-              <button className="df-ai-clear-history" disabled={(data.chat || []).length === 0} onClick={onClearChatHistory}>清空对话历史</button>
-            </section>
-            </section>}
-            {settingsSection === "mcp" && <section className="df-settings-group"><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
-            {settingsSection === "plugins" && <section className="df-settings-group">
+            </SettingSection>}
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "ai" && <SettingSection title="Navo AI" description={lang === "zh" ? "模型由服务端网关自动路由；本地估时、分类与排程在 AI 不可用时仍可工作。" : "Models are routed by the server gateway; local estimation, classification, and scheduling still work when AI is unavailable."}>
+              <SettingRow anchor="ai-model" title={lang === "zh" ? "高级模型偏好" : "Advanced model preference"} control={<input className="df-settings-input df-utility-input" value={settings.model} aria-label={lang === "zh" ? "高级模型偏好" : "Advanced model preference"} readOnly />} />
+              <SettingRow anchor="ai-reasoning" title={lang === "zh" ? "思考模式" : "Reasoning mode"} control={<SettingSelect value={settings.reasoningMode || "instant"} ariaLabel={lang === "zh" ? "思考模式" : "Reasoning mode"} onChange={(value) => onSave({ reasoningMode: value as Settings["reasoningMode"] })} options={[
+                { value: "instant", label: lang === "zh" ? "即时" : "Instant" },
+                ...reasoningModesForModel(settings.model).filter((mode) => mode === "high" || mode === "xhigh").map((mode) => ({ value: mode, label: mode === "xhigh" ? "Xhigh" : "High" })),
+              ]} />} />
+              <SettingRow anchor="ai-estimate" title={lang === "zh" ? "自动估算任务用时" : "Estimate task duration"} control={<SettingToggle checked={settings.autoEstimateTaskDuration !== false} ariaLabel={lang === "zh" ? "自动估算任务用时" : "Estimate task duration"} onChange={(next) => onSave({ autoEstimateTaskDuration: next })} />} />
+              <SettingRow anchor="ai-project" title={lang === "zh" ? "自动归入项目" : "Auto-assign project"} description={lang === "zh" ? "仅在判断置信度较高时归入已有项目。" : "Assign to an existing project only at high confidence."} control={<SettingToggle checked={settings.autoAssignTaskProject !== false} ariaLabel={lang === "zh" ? "自动归入项目" : "Auto-assign project"} onChange={(next) => onSave({ autoAssignTaskProject: next })} />} />
+              <SettingRow anchor="ai-memory" title={t(lang, "settings.allowAiContext")} description={lang === "zh" ? "启用后，下方才显示可参与上下文的记忆。" : "When enabled, memories available to context appear below."} control={<SettingToggle checked={Boolean(settings.aiMemoryEnabled)} ariaLabel={t(lang, "settings.allowAiContext")} onChange={(next) => onSave({ aiMemoryEnabled: next })} />} />
+              <SettingRow anchor="hide-ai" title={t(lang, "settings.hideAllAi")} control={<SettingToggle checked={Boolean(settings.hideAi)} ariaLabel={t(lang, "settings.hideAllAi")} onChange={(next) => onSave({ hideAi: next })} />} />
+              <SettingRow
+                anchor="ai-reset"
+                title={lang === "zh" ? "AI 数据操作" : "AI data actions"}
+                description={lang === "zh" ? "重置个性化不会删除任务；清空对话只移除对话历史。" : "Resetting personalization keeps tasks; clearing conversations removes chat history only."}
+                control={<><SettingActionButton onClick={() => { const now = new Date().toISOString(); onSaveData({ ...data, aiProfile: { version: 1, updatedAt: now, historySince: now, durationByProject: {}, projectTokenWeights: {}, preferredStartHourByProject: {}, feedback: { durationCorrections: 0, projectCorrections: 0, assignmentUndos: 0, scheduleAccepts: 0, scheduleRejects: 0 } } }); }}>{lang === "zh" ? "重置个性化" : "Reset personalization"}</SettingActionButton><SettingActionButton disabled={(data.chat || []).length === 0} onClick={onClearChatHistory}>{lang === "zh" ? "清空对话" : "Clear conversations"}</SettingActionButton></>}
+              />
+              {Boolean(settings.aiMemoryEnabled) && <section className="df-ai-memory-settings" data-settings-anchor="ai-memory-list" tabIndex={-1}>
+                <div className="df-ai-memory-settings-head">
+                  <div><strong>{lang === "zh" ? "AI 记忆" : "AI memory"}</strong><small>{lang === "zh" ? `${visibleMemories.length} 条会参与上下文` : `${visibleMemories.length} available to context`}</small></div>
+                  <button onClick={addManualMemory}>{lang === "zh" ? "新增" : "Add"}</button>
+                </div>
+                <div className="df-ai-memory-list">
+                  {visibleMemories.length === 0 && <p className="df-ai-memory-empty">{lang === "zh" ? "还没有保存的记忆。可在这里新增，或从 AI 对话保存。" : "No saved memories yet. Add one here or save one from an AI conversation."}</p>}
+                  {visibleMemories.map((memory) => (
+                    <article key={memory.id} className={`df-ai-memory-item ${memory.pinned ? "pinned" : ""}`}>
+                      <textarea value={memory.content} onChange={(event) => saveMemory(memory.id, { content: event.target.value })} />
+                      <input value={(memory.tags || []).join(", ")} onChange={(event) => saveMemory(memory.id, { tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} placeholder="tags" />
+                      {memory.sourceMessages && memory.sourceMessages.length > 0 && <small>{lang === "zh" ? `保存自 ${memory.sourceMessages.length} 条对话原文` : `Saved from ${memory.sourceMessages.length} messages`}</small>}
+                      <div className="df-ai-memory-actions">
+                        <span>{memory.source || "auto"}</span>
+                        <button onClick={() => saveMemory(memory.id, { pinned: !memory.pinned })}>{memory.pinned ? (lang === "zh" ? "取消置顶" : "Unpin") : (lang === "zh" ? "置顶" : "Pin")}</button>
+                        <button className="danger-lite" onClick={() => saveMemory(memory.id, { archived: true })}>{lang === "zh" ? "删除" : "Delete"}</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>}
+            </SettingSection>}
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && <div className="df-settings-subtabs df-settings-integration-tabs" role="tablist" aria-label={lang === "zh" ? "插件与 MCP" : "Plugins and MCP"}>
+              <button type="button" role="tab" aria-selected={integrationTab === "plugins"} className={integrationTab === "plugins" ? "active" : ""} onClick={() => { setIntegrationTab("plugins"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "plugins" }); }}>{lang === "zh" ? "插件" : "Plugins"}</button>
+              <button type="button" role="tab" aria-selected={integrationTab === "mcp"} className={integrationTab === "mcp" ? "active" : ""} onClick={() => { setIntegrationTab("mcp"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "mcp" }); }}>MCP</button>
+            </div>}
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "mcp" && <section className="df-settings-group" data-settings-anchor="mcp" tabIndex={-1}><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "plugins" && <section className="df-settings-group" data-settings-anchor="plugins" tabIndex={-1}>
               <h3>{lang === "zh" ? "插件" : "Plugins"}</h3>
               <p className="df-settings-desc">{lang === "zh" ? "这里会显示内置插件，以及桌面端用户插件目录中的本地插件。启用本地插件后会加载它的 manifest.json 和 index.js。" : "This list includes built-in plugins and desktop local plugins from the user plugin directory. Enabling a local plugin loads its manifest.json and index.js."}</p>
 
@@ -13330,7 +13631,8 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               <div className="df-settings-subhead">{lang === "zh" ? "已启用工具" : "Enabled tools"}</div>
               <PluginRuntimePanel settings={settings} data={data} onSave={onSave} onSaveData={onSaveData} lang={lang} />
             </section>}
-            {settingsSection === "data" && <SettingSection
+            {settingsTarget.category === "account-data" && <SettingSection
+              anchor="data-backup"
               title={lang === "zh" ? "数据与备份" : "Data & Backup"}
               description={lang === "zh" ? "导出、导入与本地数据清理。导入会覆盖当前数据，请谨慎操作。" : "Export, import, and local-data cleanup. Importing overwrites current data — proceed with care."}
             >
@@ -13361,6 +13663,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               />
               <SettingSection title={lang === "zh" ? "危险操作" : "Danger zone"} tone="danger">
                 <SettingRow
+                  anchor="clear-local-data"
                   title={lang === "zh" ? "清空本地数据" : "Clear local data"}
                   description={lang === "zh" ? "删除当前浏览器 / 桌面端的所有本地数据（任务、项目、习惯、时间记录、设置）。云端数据不受影响。" : "Removes all local data on this browser / desktop build (tasks, projects, habits, time entries, settings). Cloud data is unaffected."}
                   control={<SettingActionButton tone="danger" onClick={() => setConfirmClearLocalData(true)}>{lang === "zh" ? "清空…" : "Clear…"}</SettingActionButton>}
@@ -13368,32 +13671,33 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               </SettingSection>
             </SettingSection>}
 
-            {settingsSection === "account" && <section className="df-settings-group"><h3>{lang === "zh" ? "账户" : "Account"}</h3>
+            {settingsTarget.category === "account-data" && <section className="df-settings-group" data-settings-anchor="account" tabIndex={-1}><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
                 <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
                 <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /></div>
               </section>
               <SubscriptionPanel lang={lang} />
               {authEmail && <p className="df-settings-account">{authEmail}</p>}
-              <SyncSettingsControl
-                settings={settings}
-                lang={lang}
-                cloudReady={Boolean(cloudReady)}
-                isManualSyncing={Boolean(isManualSyncing)}
-                onChange={(patch) => onSave(patch)}
-                onSyncNow={onSyncNow}
-              />
-              <DesktopUpdateControl lang={lang} />
-              <AutoLaunchToggle lang={lang} />
-              <AccountMoreSection lang={lang} onShowAbout={onShowAbout} onSignOut={onSignOut} onDeleteAccount={onDeleteAccount} />
+              <div data-settings-anchor="sync" tabIndex={-1}><SyncSettingsControl
+                  settings={settings}
+                  lang={lang}
+                  cloudReady={Boolean(cloudReady)}
+                  isManualSyncing={Boolean(isManualSyncing)}
+                  onChange={(patch) => onSave(patch)}
+                  onSyncNow={onSyncNow}
+                /></div>
+              <div data-settings-anchor="updates" tabIndex={-1}><DesktopUpdateControl lang={lang} /></div>
+              <div data-settings-anchor="auto-launch" tabIndex={-1}><AutoLaunchToggle lang={lang} /></div>
+              <div data-settings-anchor="delete-account" tabIndex={-1}><AccountMoreSection lang={lang} onShowAbout={onShowAbout} onSignOut={onSignOut} onDeleteAccount={onDeleteAccount} /></div>
             </section>}
 
-            {settingsSection === "advanced" && <SettingSection
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "recovery" && <SettingSection
               title={lang === "zh" ? "高级" : "Advanced"}
               description={lang === "zh" ? "调试、实验与恢复选项。修改前请确认你了解影响范围。" : "Debug, experimental, and recovery options. Only change these if you understand the impact."}
             >
               <SettingSection title={lang === "zh" ? "危险操作" : "Danger zone"} tone="danger">
                 <SettingRow
+                  anchor="reset-settings"
                   title={lang === "zh" ? "重置所有设置" : "Reset all settings"}
                   description={lang === "zh" ? "把所有设置项恢复为默认值。任务、项目、习惯、时间记录等数据不会删除。" : "Restore every setting to its default. Tasks, projects, habits, and time entries are not affected."}
                   control={<SettingActionButton tone="danger" onClick={() => setConfirmResetSettings(true)}>{lang === "zh" ? "重置…" : "Reset…"}</SettingActionButton>}

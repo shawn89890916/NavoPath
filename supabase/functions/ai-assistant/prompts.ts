@@ -58,6 +58,13 @@ Every action must have:
 Use recurrence only when explicitly stated, or when a date range plus strong context such as a class timetable supports a reliable inference. Otherwise keep the item single.
 Never invent project IDs. Omit invalid or content-free items. Use Chinese text. ${ctx.projectsInfo}${contextSuffix(ctx)}`;
 
+export const suggestSubtasksPrompt = (ctx: PromptContext) => `You break one existing NavoPath task into concrete, ordered subtasks.
+Reply ONLY in valid JSON. Use ${ctx.language === "zh" ? "Chinese" : "English"} for every user-facing string.
+The focused task is supplied in the request and context. Do not create a new top-level task and do not schedule anything.
+Return exactly this shape:
+{"reply":"已拆解为可执行的子任务。","steps":[{"label":"分析任务","status":"done"},{"label":"生成子任务","status":"done"}],"actions":[{"type":"create_subtasks","taskId":"the supplied task id","subtasks":[{"title":"concrete action","estimateMinutes":30}],"reason":"brief explanation"}],"memories":[]}
+Create 3-8 non-overlapping subtasks in execution order. Each title must begin with a verb, be independently completable, and stay concise. Preserve useful existing subtasks and do not repeat them. Never invent a task id.${contextSuffix(ctx)}`;
+
 export const chatPrompt = (ctx: PromptContext) => `You are NavoPath, an AI time-blocking assistant. Reply ONLY in valid JSON. No markdown, no code fences, no text outside the JSON object.
 Use ${ctx.language === "zh" ? "Chinese" : "English"} for reply, step labels, reasons, notes, warnings, and memories unless the user explicitly asks for another language.
 
@@ -100,6 +107,7 @@ CRITICAL RULES:
 * NEVER set "title" to null/undefined/empty. Extract a real name from the user's message.
 * NEVER embed JSON objects in "reply". reply is a plain text sentence.
 * If nothing to schedule: {"reply":"需要更多信息才能安排。","steps":[{"label":"等待补充","status":"done"}],"actions":[],"memories":[]}
+* When the user asks to break down, split, decompose, or create subtasks for an existing task, return one action shaped as {"type":"create_subtasks","taskId":"existing task id from context","subtasks":[{"title":"concrete action","estimateMinutes":30}],"reason":"brief note"}. Do not create or schedule a new top-level task.
 * If last assistant message ended with "?" and user replied short (≤30 chars), MERGE into previous request.
 * "今天晚上" → 20:00. "下午三点" → 15:00. "晚上八点" → 20:00. "上午九点" → 09:00.
 * "半小时" → 30 min. "一个半小时" → 90 min. No time specified → 60 min default.

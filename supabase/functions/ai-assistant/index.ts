@@ -4,7 +4,7 @@
 // Set secret: supabase secrets set SILICONFLOW_API_KEY=sk-xxx
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { chatPrompt, importSchedulePrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
+import { chatPrompt, importSchedulePrompt, suggestSubtasksPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
 import { AiGatewayError, callAiGateway, type AiProviderConfig } from "./gateway.ts";
 
 function localDateForTimeZone(timeZone: string) {
@@ -220,6 +220,8 @@ async function plannerStage(
     ? `You estimate task duration and choose an existing project. Return JSON only: {"reply":"","steps":[],"actions":[],"memories":[],"enrichment":{"durationMinutes":15-240,"projectId":"existing id or empty","confidence":0-1}}. Never invent a project. ${ctx.projectsInfo}`
     : mode === "summarize_memory"
     ? summarizeMemoryPrompt(ctx)
+    : mode === "suggest_subtasks"
+      ? suggestSubtasksPrompt(ctx)
     : mode === "import_schedule"
       ? importSchedulePrompt(ctx)
       : chatPrompt(ctx);

@@ -27,14 +27,20 @@ export function SettingSection({
   description,
   children,
   tone = "normal",
+  anchor,
 }: {
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
   tone?: "normal" | "danger";
+  anchor?: string;
 }) {
   return (
-    <section className={`df-settings-group${tone === "danger" ? " df-settings-group--danger" : ""}`}>
+    <section
+      className={`df-settings-group${tone === "danger" ? " df-settings-group--danger" : ""}`}
+      data-settings-anchor={anchor}
+      tabIndex={anchor ? -1 : undefined}
+    >
       <header className="df-settings-group-head">
         <h3 className="df-settings-group-title">{title}</h3>
         {description ? <p className="df-settings-group-desc">{description}</p> : null}
@@ -50,15 +56,22 @@ export function SettingRow({
   control,
   disabled,
   children,
+  anchor,
 }: {
   title: ReactNode;
   description?: ReactNode;
   control?: ReactNode;
   disabled?: boolean;
   children?: ReactNode;
+  anchor?: string;
 }) {
   return (
-    <div className="df-settings-row" data-disabled={disabled ? "true" : undefined}>
+    <div
+      className="df-settings-row"
+      data-disabled={disabled ? "true" : undefined}
+      data-settings-anchor={anchor}
+      tabIndex={anchor ? -1 : undefined}
+    >
       <div className="df-settings-row-label">
         <span className="df-settings-row-title">{title}</span>
         {description ? <span className="df-settings-row-desc">{description}</span> : null}

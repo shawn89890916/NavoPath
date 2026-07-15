@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>步程 · 把长期目标，拆成今天就能走的一步</title>
+<style>
+  /* ====== Design tokens — aligned with NavoPath ====== */
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --container: 1120px;
+  }
+  [data-theme="dark"] {
+    --bg-app: #1A1A1A;
+    --bg-app-soft: #1E1E1E;
+    --surface-main: #252525;
+    --surface-raised: #2A2A2A;
+    --surface-card: #222222;
+    --text-main: #E8E8E8;
+    --text-strong: #F4F4F4;
+    --text-muted: #999999;
+    --text-faint: #666666;
+    --border-soft: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.04);
+    --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.28);
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 14px rgba(0, 0, 0, 0.18);
+    --header-bg: rgba(26, 26, 26, 0.82);
+    --header-border: rgba(255, 255, 255, 0.06);
+    --accent: #E2A65A;          /* 暖琥珀 — 与 NavoPath 同源 */
+    --accent-soft: rgba(226, 166, 90, 0.14);
+    --accent-strong: #F0B872;
+    --good: #6FBF73;
+    --bad: #E07B6E;
+    --code-bg: #1B1B1B;
+  }
+  [data-theme="light"] {
+    --bg-app: #FAFAF7;
+    --bg-app-soft: #F4F2EC;
+    --surface-main: #FFFFFF;
+    --surface-raised: #FFFFFF;
+    --surface-card: #FFFFFF;
+    --text-main: #1B1B1F;
+    --text-strong: #0B0B0E;
+    --text-muted: #6B6B73;
+    --text-faint: #A3A3AC;
+    --border-soft: rgba(15, 15, 20, 0.08);
+    --border-subtle: rgba(15, 15, 20, 0.04);
+    --shadow-soft: 0 14px 34px rgba(20, 20, 30, 0.08);
+    --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.02), 0 6px 18px rgba(20, 20, 30, 0.05);
+    --header-bg: rgba(250, 250, 247, 0.82);
+    --header-border: rgba(15, 15, 20, 0.06);
+    --accent: #B97A2C;
+    --accent-soft: rgba(185, 122, 44, 0.10);
+    --accent-strong: #8E5A1E;
+    --good: #2E7D32;
+    --bad: #B0413E;
+    --code-bg: #F1EFEA;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-main);
+    background: var(--bg-app);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background 0.3s var(--ease), color 0.3s var(--ease);
+  }
+  ::selection { background: var(--accent-soft); color: var(--text-strong); }
+
+  /* ====== Layout primitives ====== */
+  .container {
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .section {
+    padding: 96px 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .section:first-of-type { border-top: 0; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  h1, h2, h3 { letter-spacing: -0.01em; color: var(--text-strong); }
+  h2 {
+    font-size: 36px;
+    line-height: 1.2;
+    margin: 0 0 14px;
+  }
+  h3 { font-size: 18px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; color: var(--text-muted); }
+  .lede {
+    font-size: 18px;
+    color: var(--text-muted);
+    max-width: 640px;
+  }
+
+  /* ====== Nav ====== */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--header-bg);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--header-border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    height: 60px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: var(--text-strong);
+    text-decoration: none;
+    font-size: 15px;
+  }
+  .brand-mark {
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #1A1A1A;
+    display: grid; place-items: center;
+    font-size: 14px; font-weight: 700;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .nav-links {
+    display: flex;
+    gap: 22px;
+    margin-left: 14px;
+    font-size: 14px;
+  }
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s var(--ease);
+  }
+  .nav-links a:hover { color: var(--text-strong); }
+  .nav-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: all 0.15s var(--ease);
+  }
+  .icon-btn:hover { color: var(--text-strong); border-color: var(--text-muted); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+  }
+  .btn-primary { background: var(--accent); color: #1A1A1A; }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-ghost { background: transparent; color: var(--text-main); border-color: var(--border-soft); }
+  .btn-ghost:hover { border-color: var(--text-muted); }
+
+  /* ====== Hero ====== */
+  .hero { padding: 110px 0 90px; position: relative; overflow: hidden; }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(800px 400px at 20% 0%, var(--accent-soft), transparent 60%),
+      radial-gradient(600px 300px at 90% 10%, var(--accent-soft), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .hero-inner { position: relative; z-index: 1; }
+  .hero h1 {
+    font-size: clamp(40px, 6vw, 64px);
+    line-height: 1.05;
+    margin: 0 0 22px;
+    max-width: 820px;
+  }
+  .hero h1 .accent { color: var(--accent); }
+  .hero .lede { font-size: 19px; max-width: 620px; }
+  .hero-cta { display: flex; gap: 12px; margin-top: 30px; }
+  .hero-meta {
+    margin-top: 38px;
+    display: flex; gap: 28px; flex-wrap: wrap;
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+  .hero-meta span b { color: var(--text-main); font-weight: 500; }
+
+  /* ====== Problem cards ====== */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-card);
+  }
+  .card .icon {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: grid; place-items: center;
+    font-size: 16px;
+    margin-bottom: 14px;
+  }
+  .card h3 { font-size: 16px; }
+  .card p { font-size: 14px; }
+
+  /* ====== App mockup (CSS only) ====== */
+  .mockup-wrap {
+    margin-top: 48px;
+    border-radius: var(--radius-xl);
+    background: var(--surface-main);
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--shadow-soft);
+    padding: 18px;
+    overflow: hidden;
+  }
+  .mockup-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px 14px;
+  }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-faint); opacity: 0.5; }
+  .mockup-dot:nth-child(1) { background: #E07B6E; opacity: 0.8; }
+  .mockup-dot:nth-child(2) { background: #E2A65A; opacity: 0.8; }
+  .mockup-dot:nth-child(3) { background: #6FBF73; opacity: 0.8; }
+  .mockup-shell {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    background: var(--bg-app-soft);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    min-height: 460px;
+    overflow: hidden;
+  }
+  .mockup-side {
+    padding: 20px 16px;
+    border-right: 1px solid var(--border-soft);
+  }
+  .mockup-side h4 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text-faint); margin: 0 0 12px; font-weight: 500;
+  }
+  .mockup-goal {
+    background: var(--surface-raised);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .mockup-goal .gt { font-size: 13px; color: var(--text-strong); font-weight: 500; margin-bottom: 6px; }
+  .mockup-goal .gp { font-size: 11px; color: var(--text-faint); }
+  .mockup-goal .gbar {
+    height: 4px; border-radius: 2px;
+    background: var(--bg-app);
+    margin-top: 8px; overflow: hidden;
+  }
+  .mockup-goal .gbar > i {
+    display: block; height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .mockup-goal.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft) inset; }
+  .mockup-main { padding: 20px 24px; }
+  .mockup-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .mockup-head h5 { margin: 0; font-size: 15px; color: var(--text-strong); font-weight: 600; }
+  .mockup-head .date { font-size: 12px; color: var(--text-faint); }
+  .mockup-step {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border-subtle);
+  }
+  .mockup-step:last-child { border-bottom: 0; }
+  .mockup-step .t { font-size: 11px; color: var(--text-faint); padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .mockup-step .b { display: flex; align-items: center; gap: 10px; }
+  .mockup-step .dot {
+    width: 14px; height: 14px; border-radius: 4px;
+    border: 1.5px solid var(--text-faint);
+    flex-shrink: 0;
+  }
+  .mockup-step.done .dot { background: var(--good); border-color: var(--good); }
+  .mockup-step.now .dot { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .mockup-step .tt { font-size: 13px; color: var(--text-main); }
+  .mockup-step.done .tt { color: var(--text-faint); text-decoration: line-through; }
+
+  /* ====== Personas ====== */
+  .persona {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 20px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+  }
+  .avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: grid; place-items: center;
+    font-size: 18px; font-weight: 600;
+  }
+  .persona h3 { margin-bottom: 4px; }
+  .persona p { margin: 0; font-size: 13px; }
+  .persona .tag {
+    font-size: 11px; color: var(--text-faint);
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border-soft);
+    white-space: nowrap;
+  }
+  .personas { display: grid; gap: 12px; margin-top: 32px; }
+
+  /* ====== Feature grid ====== */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 40px;
+  }
+  .feature {
+    padding: 22px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+  }
+  .feature .ico {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+  .feature h3 { font-size: 15px; }
+  .feature p { font-size: 13px; }
+
+  /* ====== Metrics ====== */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    margin-top: 40px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+    overflow: hidden;
+  }
+  .metric {
+    padding: 32px 24px;
+    text-align: center;
+    border-right: 1px solid var(--border-soft);
+  }
+  .metric:last-child { border-right: 0; }
+  .metric .n {
+    font-size: 40px; font-weight: 600; color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .metric .n .u { font-size: 20px; color: var(--text-muted); margin-left: 4px; }
+  .metric .l { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ====== Before / After ====== */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 32px;
+  }
+  .compare-col {
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    border: 1px solid var(--border-soft);
+  }
+  .compare-col.bad { background: rgba(224, 123, 110, 0.06); }
+  .compare-col.good { background: rgba(111, 191, 115, 0.06); }
+  .compare-col h3 { display: flex; align-items: center; gap: 8px; }
+  .compare-col h3 .pill {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    font-weight: 500;
+  }
+  .compare-col.bad h3 .pill { background: rgba(224,123,110,0.18); color: var(--bad); }
+  .compare-col.good h3 .pill { background: rgba(111,191,115,0.18); color: var(--good); }
+  .compare-col ul { padding-left: 18px; margin: 12px 0 0; color: var(--text-muted); font-size: 14px; }
+  .compare-col li { margin-bottom: 6px; }
+
+  /* ====== Footer / CTA ====== */
+  .cta {
+    text-align: center;
+    padding: 80px 0 100px;
+  }
+  .cta h2 { font-size: 32px; }
+  .cta p { max-width: 520px; margin: 0 auto 22px; }
+
+  footer {
+    border-top: 1px solid var(--border-subtle);
+    padding: 28px 0;
+    color: var(--text-faint);
+    font-size: 13px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  footer a { color: var(--text-muted); text-decoration: none; }
+  footer a:hover { color: var(--text-main); }
+
+  /* ====== Reveal animation ====== */
+  .reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ====== Responsive ====== */
+  @media (max-width: 880px) {
+    .grid-3, .features, .metrics { grid-template-columns: 1fr; }
+    .metric { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+    .metric:last-child { border-bottom: 0; }
+    .compare { grid-template-columns: 1fr; }
+    .mockup-shell { grid-template-columns: 1fr; }
+    .mockup-side { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+    .features { grid-template-columns: 1fr 1fr; }
+    .nav-links { display: none; }
+  }
+  @media (max-width: 540px) {
+    .features { grid-template-columns: 1fr; }
+    .section { padding: 64px 0; }
+    .hero { padding: 70px 0 60px; }
+    h2 { font-size: 28px; }
+    .hero h1 { font-size: 38px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== NAV ========== -->
+<header class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">步</span>
+      步程 · Bùchéng
+    </a>
+    <nav class="nav-links">
+      <a href="#problem">痛点</a>
+      <a href="#solution">方案</a>
+      <a href="#users">用户</a>
+      <a href="#value">价值</a>
+    </nav>
+    <div class="nav-right">
+      <button class="icon-btn" id="themeToggle" aria-label="切换主题">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+      <a class="btn btn-ghost" href="#cta">了解产品</a>
+    </div>
+  </div>
+</header>
+
+<!-- ========== HERO ========== -->
+<section class="hero" id="top">
+  <div class="container hero-inner">
+    <span class="eyebrow">生活服务赛道 · TRAE Work 创意方案</span>
+    <h1>想做的事<br/>今天就能开始。</h1>
+    <p class="lede">
+      你有多少计划躺在收藏夹里？"半年瘦 20 斤"、"装修一套房子"、"陪孩子读完 52 本绘本"——想法很好，但拆不开今天该做什么。<b>步程</b>帮你把这些想了很久的事，拆成今天通勤路上就能做完的 1–2 件小事。
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#solution">看看怎么拆</a>
+      <a class="btn btn-ghost" href="#users">谁在用</a>
+    </div>
+    <div class="hero-meta">
+      <span><b>来源</b> NavoPath 升学场景验证</span>
+      <span><b>完成率</b> 从 10% 提升到 70%</span>
+      <span><b>每天</b> 1.8 次 · 平均 5 分钟</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PROBLEM ========== -->
+<section class="section" id="problem">
+  <div class="container">
+    <span class="eyebrow">1 · 想解决什么问题</span>
+    <h2>目标不缺，缺的是"今天做什么"。</h2>
+    <p class="lede">你不是没决心——你只是不知道今天这一步到底该迈在哪儿。</p>
+
+    <div class="grid-3" style="margin-top:40px;">
+      <div class="card reveal">
+        <div class="icon">①</div>
+        <h3>想做的事，拆不开</h3>
+        <p>"半年瘦 20 斤"听起来很清楚，但今天到底跑几公里、吃什么？想不清楚，就干脆不做。</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon">②</div>
+        <h3>工具太多，管不住</h3>
+        <p>健身用 Keep、读书用微信读书、装修用 Excel——每个 App 只管一件事，没人管"你这个人的全部"。</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon">③</div>
+        <h3>断了几天，就放弃</h3>
+        <p>忙了一周没顾上，心里就慌了："算了，下个月再说。"没人帮你复盘、没人把节奏调回来。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SOLUTION ========== -->
+<section class="section" id="solution">
+  <div class="container">
+    <span class="eyebrow">2 · 大概是什么产品</span>
+    <h2>帮你把"想做的事"拆成"今天能做的事"。</h2>
+    <p class="lede">你说"我想半年瘦 20 斤"，步程帮你拆成数周的训练计划，再落到今天要做的 2 件小事。做完打勾，看得见自己在靠近。</p>
+
+    <!-- App mockup -->
+    <div class="mockup-wrap reveal">
+      <div class="mockup-bar">
+        <span class="mockup-dot"></span>
+        <span class="mockup-dot"></span>
+        <span class="mockup-dot"></span>
+      </div>
+      <div class="mockup-shell">
+        <aside class="mockup-side">
+          <h4>我的长期目标</h4>
+          <div class="mockup-goal">
+            <div class="gt">半年瘦 20 斤</div>
+            <div class="gp">健康 · 第 12 周 / 24 周</div>
+            <div class="gbar"><i style="width:50%"></i></div>
+          </div>
+          <div class="mockup-goal active">
+            <div class="gt">装修新房 95㎡</div>
+            <div class="gp">生活 · 第 3 周 / 16 周</div>
+            <div class="gbar"><i style="width:18%"></i></div>
+          </div>
+          <div class="mockup-goal">
+            <div class="gt">陪 6 岁女儿英语启蒙</div>
+            <div class="gp">家庭 · 第 1 周 / 52 周</div>
+            <div class="gbar"><i style="width:2%"></i></div>
+          </div>
+          <div class="mockup-goal">
+            <div class="gt">考下 PMP 证书</div>
+            <div class="gp">职业 · 第 0 周 / 12 周</div>
+            <div class="gbar"><i style="width:0%"></i></div>
+          </div>
+        </aside>
+        <div class="mockup-main">
+          <div class="mockup-head">
+            <h5>今天 · 2026-06-23</h5>
+            <span class="date">装修新房 95㎡ · Day 18</span>
+          </div>
+          <div class="mockup-step done">
+            <span class="t">07:30</span>
+            <div class="b">
+              <span class="dot"></span>
+              <span class="tt">联系 3 家全屋定制商家，索要报价清单</span>
+            </div>
+          </div>
+          <div class="mockup-step done">
+            <span class="t">10:00</span>
+            <div class="b">
+              <span class="dot"></span>
+              <span class="tt">在小红书收藏 5 个玄关鞋柜真实案例</span>
+            </div>
+          </div>
+          <div class="mockup-step now">
+            <span class="t">14:00</span>
+            <div class="b">
+              <span class="dot"></span>
+              <span class="tt">和设计师视频 30 分钟：确认水电点位</span>
+            </div>
+          </div>
+          <div class="mockup-step">
+            <span class="t">21:00</span>
+            <div class="b">
+              <span class="dot"></span>
+              <span class="tt">把今天 3 个报价拍照归档到步程</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== USERS ========== -->
+<section class="section" id="users">
+  <div class="container">
+    <span class="eyebrow">3 · 目标用户及场景</span>
+    <h2>每一个"想做却没开始"的人。</h2>
+    <p class="lede">他们不是没有决心，是没人把"决心"翻译成"今天做什么"。</p>
+
+    <div class="personas">
+      <div class="persona reveal">
+        <div class="avatar">小</div>
+        <div>
+          <h3>小敏 · 28 岁 · 互联网产品</h3>
+          <p>想半年瘦 20 斤、年底前学完西班牙语。每天通勤 40 分钟地铁、晚饭后有 1 小时。</p>
+        </div>
+        <span class="tag">通勤时看今天要做什么</span>
+      </div>
+      <div class="persona reveal">
+        <div class="avatar">陈</div>
+        <div>
+          <h3>陈先生 · 35 岁 · 新房装修</h3>
+          <p>刚收了 95㎡ 的房子，预算 30 万，想 3 个月内开工。每晚 9 点后才有时间看装修进度。</p>
+        </div>
+        <span class="tag">晚饭后打卡、调明天计划</span>
+      </div>
+      <div class="persona reveal">
+        <div class="avatar">林</div>
+        <div>
+          <h3>林姐 · 32 岁 · 全职妈妈</h3>
+          <p>想陪 6 岁女儿英语启蒙一年，看完 52 本绘本；同时自己备考 PMP。时间碎片多，注意力短。</p>
+        </div>
+        <span class="tag">周日晚上复盘、重排下周</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== FEATURES ========== -->
+<section class="section" id="features">
+  <div class="container">
+    <span class="eyebrow">4 · 核心能力</span>
+    <h2>把"想做的事"变成"今天能做的事"，靠这四件。</h2>
+
+    <div class="features">
+      <div class="feature reveal">
+        <span class="ico">说一句就拆</span>
+        <h3>你定目标，我来拆</h3>
+        <p>输入"半年瘦 20 斤"，自动生成 24 周的训练和饮食计划，再落到今天要做的 2 件小事。</p>
+      </div>
+      <div class="feature reveal">
+        <span class="ico">落到时间轴</span>
+        <h3>像日历一样自然</h3>
+        <p>今天要做的事自动排到时间轴里，手机上看、电脑上打卡，随时切换，像用日历一样顺手。</p>
+      </div>
+      <div class="feature reveal">
+        <span class="ico">多端同步</span>
+        <h3>手机 / 网页 / 桌面</h3>
+        <p>地铁上用手机看今天的计划，回家用电脑打卡，换设备不丢进度，本地和云端都存一份。</p>
+      </div>
+      <div class="feature reveal">
+        <span class="ico">温柔接住你</span>
+        <h3>断了也能续上</h3>
+        <p>忙了几天没顾上？不指责，帮你复盘原因、把节奏调慢、给一句鼓励。坚持 21 天，给你一份成就报告。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== COMPARE ========== -->
+<section class="section">
+  <div class="container">
+    <span class="eyebrow">5 · 没有步程 vs 有步程</span>
+    <h2>同样是想"瘦 20 斤"，体验完全不一样。</h2>
+
+    <div class="compare">
+      <div class="compare-col bad reveal">
+        <h3>没有步程 <span class="pill">现在的你</span></h3>
+        <ul>
+          <li>下载好几个 App，每个只管一件事</li>
+          <li>新年立的目标，三月就忘了</li>
+          <li>忙了两天没顾上，就"算了下个月再说"</li>
+          <li>进度只能靠脑子估，看不见摸不着</li>
+        </ul>
+      </div>
+      <div class="compare-col good reveal">
+        <h3>有了步程 <span class="pill">你想成为的样子</span></h3>
+        <ul>
+          <li>一个 App 管所有目标，帮你拆到今天</li>
+          <li>每天通勤 5 分钟：今天就这两件事</li>
+          <li>忙了几天没顾上？帮你把节奏调回来</li>
+          <li>进度条看得见，每一步都算数</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== VALUE ========== -->
+<section class="section" id="value">
+  <div class="container">
+    <span class="eyebrow">6 · 价值与意义</span>
+    <h2>帮更多人把想做的事变成做到的事。</h2>
+
+    <div class="metrics">
+      <div class="metric reveal">
+        <div class="n">70<span class="u">%</span></div>
+        <div class="l">长期目标完成率（NavoPath 已验证）</div>
+      </div>
+      <div class="metric reveal">
+        <div class="n">1.8<span class="u">次/天</span></div>
+        <div class="l">每天打开 1.8 次，平均 5 分钟</div>
+      </div>
+      <div class="metric reveal">
+        <div class="n">168<span class="u">–368 元/年</span></div>
+        <div class="l">年度订阅，复购率高、流失率低</div>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:32px;">
+      <div class="card reveal">
+        <div class="icon">▎商业</div>
+        <h3>卖的是"陪跑"，不是"课程"</h3>
+        <p>Keep 卖课、得到卖课，本质都是卖内容。步程卖的是"陪你走到终点"——订阅制、复购率高，毛利结构更健康。</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon">▎效率</div>
+        <h3>不用想太多，跟着做就行</h3>
+        <p>每天只需要花 5 分钟做一个小决定：现在做哪一件。不用再纠结"今天该干什么"，行动变得特别简单。</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon">▎社会</div>
+        <h3>让"长期主义"不再难</h3>
+        <p>让减肥、装修、陪家人、考证这些真正重要的事，不再输给刷短视频。帮更多人重新分配注意力，把时间花在值得的地方。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CTA ========== -->
+<section class="section cta" id="cta">
+  <div class="container">
+    <span class="eyebrow">下一步</span>
+    <h2>和 NavoPath 一起，帮更多人<br/>把想做的事变成做到的事。</h2>
+    <p>步程不是一个凭空想出来的 App——它是 NavoPath 在升学规划里验证过的方法，现在想把它带给更多人。拆解、同步、复盘，这些能力我们已经跑通了，剩下的就是把它放到更广阔的生活场景里。</p>
+    <div class="hero-cta" style="justify-content:center;">
+      <a class="btn btn-primary" href="https://www.navopath.com" target="_blank" rel="noopener">访问 NavoPath</a>
+      <a class="btn btn-ghost" href="https://github.com/shawn89890916/NavoPath-planner" target="_blank" rel="noopener">查看开源项目</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container" style="display:flex;justify-content:space-between;width:100%;flex-wrap:wrap;gap:12px;">
+    <span>© 2026 步程 · Bùchéng — 生活服务赛道创意方案 · 由 NavoPath 团队构思</span>
+    <span><a href="https://www.navopath.com">navopath.com</a> · <a href="#top">回到顶部 ↑</a></span>
+  </div>
+</footer>
+
+<script>
+  // ====== Theme toggle (dark / light) ======
+  const root = document.documentElement;
+  const themeBtn = document.getElementById("themeToggle");
+  const themeIcon = document.getElementById("themeIcon");
+  const moon = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+  const sun = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>';
+
+  function setTheme(theme) {
+    root.setAttribute("data-theme", theme);
+    themeIcon.innerHTML = theme === "dark" ? sun : moon;
+    try { localStorage.setItem("bucheng-theme", theme); } catch (_) {}
+  }
+  let saved = null;
+  try { saved = localStorage.getItem("bucheng-theme"); } catch (_) {}
+  if (saved === "light" || saved === "dark") {
+    setTheme(saved);
+  } else {
+    const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+    setTheme(prefersLight ? "light" : "dark");
+  }
+  themeBtn.addEventListener("click", () => {
+    setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
+
+  // ====== Reveal on scroll ======
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add("in");
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+</script>
+</body>
+</html>
