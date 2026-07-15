@@ -7764,7 +7764,7 @@ function App() {
             )}
             <div className="df-candidate-list">
               {visibleCandidates.length === 0 && !hasActiveHabits ? (
-                <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span>{compactLayout && <img className="df-empty-add-guidance" src="/empty-add-guidance.png" alt="" aria-hidden="true" />}</div>
+                <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span>{compactLayout && <img className="df-empty-add-guidance" src="/empty-add-guidance-v2.png" alt="" aria-hidden="true" />}</div>
               ) : groupByProject ? (
                 Array.from(
                   visibleCandidates.reduce((map, task) => {
