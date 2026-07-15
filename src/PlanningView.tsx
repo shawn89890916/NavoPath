@@ -1384,6 +1384,7 @@ export default function PlanningView(props: {
   const svgLines = useTreeLines(treeRef, safeProjects, viewFilteredTasks, props.collapsed, collapsedSubtasks);
 
   const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
+  const showLongRangeGuide = viewFilteredTasks.length <= 1;
 
   const projectColor = useCallback((projectId?: string) => {
     if (!projectId) return UNASSIGNED_COLOR;
@@ -2159,6 +2160,13 @@ export default function PlanningView(props: {
               )}
           </aside>
           <div className="df-tree-wrap">
+            {showLongRangeGuide && (
+              <aside className="df-planning-longrange-guide" role="note">
+                <span>{props.lang === "zh" ? "长期任务，从这里开始规划" : "Plan long-range work here"}</span>
+                <strong>{props.lang === "zh" ? "先建立项目，再拆成任务，最后排进日程。" : "Create a project, break it into tasks, then schedule it."}</strong>
+                <div aria-hidden="true"><b>01 {props.lang === "zh" ? "项目" : "Project"}</b><i>→</i><b>02 {props.lang === "zh" ? "任务" : "Tasks"}</b><i>→</i><b>03 {props.lang === "zh" ? "排程" : "Schedule"}</b></div>
+              </aside>
+            )}
             <div className="df-planning-filter-corner">
               {viewMode !== "metrics" && (
               <div className="df-filter-popover-anchor">

@@ -1745,6 +1745,7 @@ function App() {
   const [candidateProjectFilters, setCandidateProjectFilters] = useState<string[]>([]);
   const [candidateFilterOpen, setCandidateFilterOpen] = useState(false);
   const [candidateFilterCategory, setCandidateFilterCategory] = useState<"project" | "completed">("project");
+  const [scheduleGuideOpen, setScheduleGuideOpen] = useState(true);
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(() => new Set());
   const completionHandlesRef = useRef(new Map<string, ReturnType<typeof scheduleMotionCommit> | null>());
   const [groupByProject, setGroupByProject] = useState(false);
@@ -7749,6 +7750,19 @@ function App() {
                 {lang === "zh" ? "松手后移回今日候选" : "Release to return to Today's Candidates"}
               </div>
             )}
+            {compactLayout && compactExecuteView === "tasks" && scheduleGuideOpen && visibleCandidates.length > 0 && (
+              <aside className="df-schedule-drop-guide" aria-label={lang === "zh" ? "将任务拖入时间轴的提示" : "Drag tasks into the timeline hint"}>
+                <svg viewBox="0 0 64 40" aria-hidden="true">
+                  <rect x="3" y="10" width="18" height="18" rx="3" />
+                  <path d="M8 16h8M8 21h5M25 19h14" strokeDasharray="2 3" />
+                  <path d="m36 15 4 4-4 4" />
+                  <path d="M47 7v26M56 7v26" />
+                  <path d="M44 14h15M44 22h15M44 30h15" />
+                </svg>
+                <span>{lang === "zh" ? "拖入日程，让今天的任务落在具体时间里" : "Drag into Schedule to give today’s tasks a time"}</span>
+                <button type="button" aria-label={lang === "zh" ? "关闭提示" : "Dismiss hint"} onClick={() => setScheduleGuideOpen(false)}>×</button>
+              </aside>
+            )}
             {(dailyCapacityRisk.level !== "comfortable" || schedulePreviews.length > 0 || scheduleUnscheduled.length > 0) && (
               <div className="df-ai-plan-feedback" role="status">
                 {dailyCapacityRisk.level !== "comfortable" && <span className={`df-ai-capacity-inline ${dailyCapacityRisk.level}`}>{lang === "zh" ? `容量${dailyCapacityRisk.level === "high" ? "超载" : "偏紧"}：待安排 ${formatMinutes(dailyCapacityRisk.demandMinutes)}，剩余 ${formatMinutes(dailyCapacityRisk.availableMinutes)}` : `Capacity ${dailyCapacityRisk.level === "high" ? "overloaded" : "tight"}: ${formatMinutes(dailyCapacityRisk.demandMinutes)} to place, ${formatMinutes(dailyCapacityRisk.availableMinutes)} free`}</span>}
@@ -7943,8 +7957,8 @@ function App() {
                   </button>
                 )}
                 {showBackToNow && (
-                  <button className="df-back-to-now" type="button" onClick={goToNow} title={lang === "zh" ? "回到现在" : "Back to now"}>
-                    {lang === "zh" ? "回到现在" : "Back to now"}
+                  <button className="df-back-to-now" type="button" onClick={goToNow} title={lang === "zh" ? "回到现在" : "Back to now"} aria-label={lang === "zh" ? "回到现在" : "Back to now"}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8v4h4" /><path d="M5.5 12a7 7 0 1 0 2-4.8" /></svg>
                   </button>
                 )}
                 {(timelineView === "3day" || timelineView === "weekly") ? (() => {

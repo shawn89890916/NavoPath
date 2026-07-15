@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 本轮补充 / Current update
+
+### 修复
+- 竖屏执行页新增可关闭的「任务 → 日程」线稿引导，提示将任务拖进时间轴；三天/周视图改为完整顶部控制栏与下移的日期信息，时间轴文字进一步收紧，「回到现在」改为回环箭头图标。底部 Dock 在浅色/深色主题下分别使用纸白/墨黑底色。
+- 竖屏规划页在任务为空或极少时不再使用插图，而是显示强指示型「长期任务，从这里开始规划」说明，清晰给出项目 → 任务 → 排程的路径。
+
+### Fixed
+- Added a dismissible portrait "task → schedule" line guide that explains dragging tasks into the timeline. Three-day and weekly views now use a full top control rail with lower, more compact date information; Back to now is a clean return-arrow icon. The Dock uses paper white in light mode and ink black in dark mode.
+- Replaced the sparse-state Planning illustration with a strong text-led long-range planning guide: project → tasks → schedule.
+
 ## 2026-07-15 · 时间轴拖拽修复与独立竖屏窗口
 
 ### 新增
