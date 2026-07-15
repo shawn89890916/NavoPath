@@ -3,12 +3,14 @@
 ## 本轮补充 / Current update
 
 ### 修复
+- 浅色模式 Dock 改为纯白背景；竖屏 Tasks / Schedule 去除通用图标，改为 Tasks 的「NavoPath 标志 → 文字」与 Schedule 的「文字 → NavoPath 标志」结构。
 - 竖屏 Tasks / Schedule 改为统一纸面底上的图标文字分段控件，Planning 视图切换同步改为紧凑的内嵌分段形式；三日/周标尺收窄并改为左对齐小字，日期进一步放大，回到现在缩小并右上对齐，Dock 使用纯黑底。
 - 竖屏拖拽引导改为嵌入式任务到时间轴示意，并以「探索 NavoPath · 15 分钟」作为首个默认引导任务；Dock 恢复深色墨水底。
 - 竖屏执行页新增可关闭的「任务 → 日程」线稿引导，提示将任务拖进时间轴；三天/周视图改为完整顶部控制栏与下移的日期信息，时间轴文字进一步收紧，「回到现在」改为回环箭头图标。底部 Dock 在浅色/深色主题下分别使用纸白/墨黑底色。
 - 竖屏规划页在任务为空或极少时不再使用插图，而是显示强指示型「长期任务，从这里开始规划」说明，清晰给出项目 → 任务 → 排程的路径。
 
 ### Fixed
+- Set the light-mode Dock to pure white. Portrait Tasks / Schedule no longer use generic icons: Tasks uses “NavoPath mark → label” while Schedule uses “label → NavoPath mark”.
 - Rebuilt portrait Tasks / Schedule as icon-and-label paper segments and made Planning views use the same compact inset segmented control. The three-day/week ruler is narrower with smaller left-aligned time labels, dates are larger, Back to now is smaller and upper-right aligned, and the Dock uses a pure-black background.
 - Reworked the portrait drag guide as an embedded task-to-timeline demonstration, using “Explore NavoPath · 15 min” as the first default guide task; restored the Dock to a deep ink surface.
 - Added a dismissible portrait "task → schedule" line guide that explains dragging tasks into the timeline. Three-day and weekly views now use a full top control rail with lower, more compact date information; Back to now is a clean return-arrow icon. The Dock uses paper white in light mode and ink black in dark mode.

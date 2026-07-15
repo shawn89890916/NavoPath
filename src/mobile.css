@@ -54,6 +54,17 @@
     z-index: 30 !important;
   }
 
+  #root .df-app:not(.theme-dark) .df-mobile-dock {
+    background: #fff !important;
+    color: var(--text-main) !important;
+  }
+
+  #root .df-app:not(.theme-dark) .df-mobile-dock-action,
+  #root .df-app:not(.theme-dark) .df-mobile-mode-switch button,
+  #root .df-app:not(.theme-dark) .df-mobile-mode-switch button.active {
+    color: var(--text-main) !important;
+  }
+
   #root .df-app .df-mobile-dock-action {
     width: 48px !important;
     min-width: 48px !important;
@@ -338,6 +349,18 @@
     stroke-width: 1.45 !important;
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs .dayflow-icon.compact {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+    margin: 0 !important;
+  }
+
+  #root .df-app.mode-execute .df-compact-execute-tabs .dayflow-icon img {
+    width: 100% !important;
+    height: 100% !important;
   }
 
   #root .df-app.mode-execute .df-compact-date-arrow,

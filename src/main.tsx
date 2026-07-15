@@ -7588,10 +7588,10 @@ function App() {
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button className={compactExecuteView === "tasks" ? "active" : ""} onClick={() => setCompactExecuteView("tasks")}>
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3.5h8M4 8h8M4 12.5h5" /><path d="M2 3.5h.01M2 8h.01M2 12.5h.01" /></svg><span>{lang === "zh" ? "任务" : "Tasks"}</span>
+                <ProductIcon compact /><span>{lang === "zh" ? "任务" : "Tasks"}</span>
               </button>
               <button className={compactExecuteView === "schedule" ? "active" : ""} onClick={() => setCompactExecuteView("schedule")}>
-                <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5" /><path d="M5 2v2M11 2v2M2.5 6h11M5 8.5h2M5 11h4" /></svg><span>{lang === "zh" ? "日程" : "Schedule"}</span>
+                <span>{lang === "zh" ? "日程" : "Schedule"}</span><ProductIcon compact />
               </button>
             </nav>
             {compactExecuteView === "schedule" && (
