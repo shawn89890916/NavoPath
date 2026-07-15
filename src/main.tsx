@@ -7587,11 +7587,12 @@ function App() {
         <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
-              <button className={compactExecuteView === "tasks" ? "active" : ""} onClick={() => setCompactExecuteView("tasks")}>
-                <ProductIcon compact /><span>{lang === "zh" ? "任务" : "Tasks"}</span>
-              </button>
-              <button className={compactExecuteView === "schedule" ? "active" : ""} onClick={() => setCompactExecuteView("schedule")}>
-                <span>{lang === "zh" ? "日程" : "Schedule"}</span><ProductIcon compact />
+              <button
+                className={`active ${compactExecuteView === "schedule" ? "schedule-state" : "tasks-state"}`}
+                aria-pressed={compactExecuteView === "schedule"}
+                onClick={() => setCompactExecuteView((view) => view === "tasks" ? "schedule" : "tasks")}
+              >
+                {compactExecuteView === "tasks" ? <><ProductIcon compact /><span>{lang === "zh" ? "任务" : "Tasks"}</span></> : <><span>{lang === "zh" ? "日程" : "Schedule"}</span><ProductIcon compact /></>}
               </button>
             </nav>
             {compactExecuteView === "schedule" && (
