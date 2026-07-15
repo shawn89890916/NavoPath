@@ -47,6 +47,7 @@ html:has(.df-widget-popover-root), body:has(.df-widget-popover-root), #root:has(
   letter-spacing: -.035em; text-align: center; white-space: nowrap; cursor: pointer; touch-action: none; -webkit-app-region: no-drag;
 }
 .df-widget-timer-context { color: currentColor; font-family: var(--widget-font); font-size: calc(clamp(9px, 11cqh, 12px) * var(--widget-font-scale)); font-weight: 650; line-height: 1.1; letter-spacing: .04em; }
+.df-widget-timer-display { margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; cursor: pointer; }
 .df-widget-icon-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
   width: clamp(44px, 54cqh, 58px); height: clamp(44px, 54cqh, 58px); padding: 0;

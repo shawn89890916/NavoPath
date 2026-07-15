@@ -72,8 +72,9 @@ function getWidgetApi(): WidgetApiWithPopover | undefined {
   return window.desktopApi?.widget;
 }
 
-function formatTimer(seconds: number): string {
+export function formatTimer(seconds: number, precision: "minutes" | "seconds" = "seconds"): string {
   const value = Math.max(0, Math.floor(seconds));
+  if (precision === "minutes") return `${Math.floor(value / 60)} min`;
   const hours = Math.floor(value / 3600);
   const minutes = Math.floor((value % 3600) / 60);
   const remaining = value % 60;
@@ -149,6 +150,7 @@ function WidgetResizeHandles({ onResize }: { onResize: WidgetViewProps["onResize
 
 export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, onMove, onResize }: WidgetViewProps) {
   const zh = snapshot.lang === "zh";
+  const [timerPrecision, setTimerPrecision] = useState<"minutes" | "seconds">("seconds");
   const pointer = useRef<{ startX: number; startY: number; lastX: number; lastY: number; dragged: boolean } | null>(null);
   const suppressNextClick = useRef(false);
   const showTask = density === "full";
@@ -184,6 +186,10 @@ export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, 
     suppressNextClick.current = dragged;
     window.setTimeout(() => { suppressNextClick.current = false; }, 0);
   };
+  const toggleTimerPrecision = () => {
+    if (suppressNextClick.current) return;
+    setTimerPrecision((precision) => precision === "seconds" ? "minutes" : "seconds");
+  };
   return (
     <main className="df-widget-root" data-density={density} data-theme={snapshot.theme} data-phase={snapshot.timerPhase} style={appearanceStyle(snapshot)}>
       <section className="df-widget-card" aria-label={zh ? "桌面小组件" : "Desktop widget"}>
@@ -191,7 +197,7 @@ export function WidgetView({ snapshot, density, onToggleTimer, onTogglePopover, 
         <div className="df-widget-right">
           <div className="df-widget-timer" onPointerDown={onTimerPointerDown} onPointerMove={onTimerPointerMove} onPointerUp={onTimerPointerUp} onPointerCancel={() => { pointer.current = null; suppressNextClick.current = false; }}>
             {timerContext && <span className="df-widget-timer-context">{timerContext}</span>}
-            <span>{snapshot.timelineState === "empty" ? "--:--" : formatTimer(snapshot.timerDisplaySeconds)}</span>
+            <button type="button" className="df-widget-timer-display" aria-label={zh ? "切换分钟或秒显示" : "Toggle minute or second display"} title={zh ? "点击切换分钟或秒显示" : "Click to toggle minute or second display"} onClick={toggleTimerPrecision}>{snapshot.timelineState === "empty" ? "--:--" : formatTimer(snapshot.timerDisplaySeconds, timerPrecision)}</button>
           </div>
           {showPrimaryControl && <button type="button" className="df-widget-icon-btn" aria-label={controlLabel} title={controlLabel} onClick={onToggleTimer}>{runningPomodoro ? (pomodoroBreak ? <Sprout size={18} strokeWidth={1.8} aria-hidden="true" /> : <Cherry size={18} strokeWidth={1.8} aria-hidden="true" />) : effectiveRunning ? <Pause size={18} strokeWidth={1.8} aria-hidden="true" /> : <Play size={18} strokeWidth={1.8} aria-hidden="true" />}</button>}
           {showMoreControl && <button type="button" className="df-widget-icon-btn" aria-label={zh ? "更多" : "More"} aria-haspopup="dialog" aria-expanded={snapshot.popoverOpen} onClick={onTogglePopover}><MoreHorizontal size={18} strokeWidth={1.8} aria-hidden="true" /></button>}

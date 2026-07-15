@@ -117,6 +117,7 @@ function createWidgetWindowService(deps) {
         preload: deps.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
+        backgroundThrottling: false,
       },
     });
 
@@ -176,6 +177,7 @@ function createWidgetWindowService(deps) {
         preload: deps.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
+        backgroundThrottling: false,
       },
     });
     popoverWindow = popover;

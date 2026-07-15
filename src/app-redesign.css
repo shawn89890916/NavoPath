@@ -7626,6 +7626,12 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   color: var(--accent-active);
   font-size: 9px;
 }
+.df-candidate-filter-anchor { position: relative; display: inline-flex; }
+.df-candidate-panel .df-filter-trigger { width: 30px !important; min-width: 30px !important; min-height: 30px !important; }
+.df-candidate-filter-menu { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; display: grid; grid-template-columns: 132px minmax(170px, 1fr); width: min(350px, calc(100vw - 28px)); max-height: min(300px, calc(100vh - 120px)); overflow: auto; border: 1px solid var(--paper-rule-strong); background: var(--surface-main); color: var(--text-main); box-shadow: var(--paper-float-shadow); }
+.df-candidate-filter-menu .df-filter-categories { border-right: 1px solid var(--paper-rule); }
+.df-candidate-filter-menu .df-filter-options-view { min-width: 0; }
+.df-candidate-filter-menu .df-filter-reset { grid-column: 1 / -1; }
 .df-filter-trigger:hover,
 .df-filter-trigger:focus-visible,
 .df-filter-trigger.active {

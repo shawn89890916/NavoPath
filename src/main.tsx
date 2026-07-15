@@ -1742,6 +1742,9 @@ function App() {
   const toastTimerRef = useRef<number | null>(null);
   const undoSnapshotRef = useRef<{ committedTaskIds: string[]; clearedSourceTaskIds: string[]; removedFromCandidate: Set<string> } | null>(null);
   const [showCompletedCandidates, setShowCompletedCandidates] = useState(false);
+  const [candidateProjectFilters, setCandidateProjectFilters] = useState<string[]>([]);
+  const [candidateFilterOpen, setCandidateFilterOpen] = useState(false);
+  const [candidateFilterCategory, setCandidateFilterCategory] = useState<"project" | "completed">("project");
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(() => new Set());
   const completionHandlesRef = useRef(new Map<string, ReturnType<typeof scheduleMotionCommit> | null>());
   const [groupByProject, setGroupByProject] = useState(false);
@@ -2206,6 +2209,8 @@ function App() {
     setFullscreen(false);
     setSimpleView(false);
     setShowCompletedCandidates(false);
+    setCandidateProjectFilters([]);
+    setCandidateFilterOpen(false);
     setGroupByProject(false);
     setToast("");
     setToastAction(null);
@@ -3690,7 +3695,14 @@ function App() {
     console.table(info);
   }, [conflictLayout, tasks, timelineView, timelineDate]);
 
-  const visibleCandidates = showCompletedCandidates ? [...todayEventCandidates, ...todayCandidates, ...completedCandidates] : [...todayEventCandidates, ...todayCandidates];
+  const visibleCandidates = (showCompletedCandidates ? [...todayEventCandidates, ...todayCandidates, ...completedCandidates] : [...todayEventCandidates, ...todayCandidates])
+    .filter((task) => candidateProjectFilters.length === 0 || candidateProjectFilters.includes(String(task.projectId || "")));
+  const candidateFilterActiveCount = candidateProjectFilters.length + (showCompletedCandidates ? 1 : 0);
+  const toggleCandidateProjectFilter = (projectId: string) => {
+    setCandidateProjectFilters((current) => current.includes(projectId)
+      ? current.filter((id) => id !== projectId)
+      : [...current, projectId]);
+  };
   const headerTask = useMemo(
     () => timerTask || todayCandidates.find((task) => task.workflowStatus === "doing") || todayCandidates[0] || null,
     [timerTask, todayCandidates],
@@ -7632,7 +7644,40 @@ function App() {
                 {(timelineView === "3day" || timelineView === "weekly" || timelineView === "month") && (
                   <button className="df-icon-action" data-tip={t(lang, "candidate.collapse")} aria-label={t(lang, "candidate.collapse")} onClick={() => { setCandidatePanelCollapsed(true); setFullscreen(false); }} style={{ fontSize: "14px", lineHeight: 1, padding: "0 2px" }}>«</button>
                 )}
-                <button className={`df-icon-action i-check ${showCompletedCandidates ? "active" : ""}`} data-tip={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} aria-label={showCompletedCandidates ? t(lang, "candidate.hideCompleted") : t(lang, "candidate.showCompleted")} onClick={() => setShowCompletedCandidates((value) => !value)} />
+                <div className="df-candidate-filter-anchor">
+                  <button
+                    type="button"
+                    className={`df-filter-trigger${candidateFilterOpen ? " active" : ""}${candidateFilterActiveCount > 0 ? " has-active" : ""}`}
+                    aria-expanded={candidateFilterOpen}
+                    aria-label={lang === "zh" ? "筛选候选任务" : "Filter candidates"}
+                    title={lang === "zh" ? "筛选" : "Filter"}
+                    onClick={() => setCandidateFilterOpen((open) => !open)}
+                  >
+                    <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 4h12M5 9h8M7 14h4" /></svg>
+                    {candidateFilterActiveCount > 0 && <b>{candidateFilterActiveCount}</b>}
+                  </button>
+                  {candidateFilterOpen && <div className="df-candidate-filter-menu" onClick={(event) => event.stopPropagation()}>
+                    <div className="df-filter-categories">
+                      <button type="button" className={`df-filter-cat-row${candidateFilterCategory === "project" ? " active" : ""}${candidateProjectFilters.length > 0 ? " has-active" : ""}`} onMouseEnter={() => setCandidateFilterCategory("project")} onFocus={() => setCandidateFilterCategory("project")}>
+                        <span className="df-filter-cat-icon" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M2 4v7h10V5H7L5.5 3.5H2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg></span>
+                        <span className="df-filter-cat-label">{lang === "zh" ? "项目" : "Project"}</span>
+                        {candidateProjectFilters.length > 0 && <span className="df-filter-cat-count">{candidateProjectFilters.length}</span>}
+                      </button>
+                      <button type="button" className={`df-filter-cat-row${candidateFilterCategory === "completed" ? " active" : ""}${showCompletedCandidates ? " has-active" : ""}`} onMouseEnter={() => setCandidateFilterCategory("completed")} onFocus={() => setCandidateFilterCategory("completed")}>
+                        <span className="df-filter-cat-icon" aria-hidden="true"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M4.5 7l1.8 1.8L9.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                        <span className="df-filter-cat-label">{lang === "zh" ? "已完成" : "Completed"}</span>
+                        {showCompletedCandidates && <span className="df-filter-cat-count">1</span>}
+                      </button>
+                    </div>
+                    <div className="df-filter-options-view">
+                      <div className="df-filter-options-title">{candidateFilterCategory === "project" ? (lang === "zh" ? "项目" : "Project") : (lang === "zh" ? "已完成" : "Completed")}</div>
+                      {candidateFilterCategory === "project"
+                        ? projects.filter((project) => candidateProjectFilters.includes(String(project.id)) || [...todayCandidates, ...completedCandidates].some((task) => String(task.projectId || "") === String(project.id))).map((project) => <label key={project.id} className={`df-filter-option${candidateProjectFilters.includes(String(project.id)) ? " checked" : ""}`}><input type="checkbox" checked={candidateProjectFilters.includes(String(project.id))} onChange={() => toggleCandidateProjectFilter(String(project.id))} /><span className="df-filter-option-dot" style={{ background: project.color || "var(--accent-active)" }} /><span>{project.title}</span></label>)
+                        : <label className={`df-filter-option${showCompletedCandidates ? " checked" : ""}`}><input type="checkbox" checked={showCompletedCandidates} onChange={() => setShowCompletedCandidates((value) => !value)} /><span>{lang === "zh" ? "显示已完成" : "Show completed"}</span></label>}
+                    </div>
+                    {candidateFilterActiveCount > 0 && <button type="button" className="df-filter-reset" onClick={() => { setCandidateProjectFilters([]); setShowCompletedCandidates(false); }}>{lang === "zh" ? "清除全部" : "Clear all"}</button>}
+                  </div>}
+                </div>
                 <button className={`df-icon-action i-layers ${groupByProject ? "active" : ""}`} data-tip={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} aria-label={groupByProject ? t(lang, "candidate.ungroup") : t(lang, "candidate.groupByProject")} onClick={() => setGroupByProject((v) => !v)} />
                 <button
                   className="df-icon-action"

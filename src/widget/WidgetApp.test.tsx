@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 import type { WidgetSnapshot } from "../types";
-import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, getAdjacentTimerMode, getClampedTooltipPosition, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, requiresRunningTimerModeConfirmation, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
+import { TimerModeTabs, WidgetPopoverUtilities, WidgetPopoverView, WidgetTimerSettingsView, WidgetView, didWidgetPointerDrag, formatTimer, getAdjacentTimerMode, getClampedTooltipPosition, getWidgetResizeDirection, getWidgetResizeFixedEdges, opacityAction, requiresRunningTimerModeConfirmation, resizeWidgetBounds, shouldToggleTimerClick, withPopoverState } from "./WidgetApp";
 
 const snapshot: WidgetSnapshot = {
   taskId: "task-1",
@@ -35,6 +35,11 @@ it("requires confirmation only when switching away from a running mode", () => {
   expect(requiresRunningTimerModeConfirmation(true, "stopwatch", "pomodoro")).toBe(true);
   expect(requiresRunningTimerModeConfirmation(false, "stopwatch", "pomodoro")).toBe(false);
   expect(requiresRunningTimerModeConfirmation(true, "pomodoro", "pomodoro")).toBe(false);
+});
+
+it("formats widget time by minutes or seconds", () => {
+  expect(formatTimer(125, "minutes")).toBe("2 min");
+  expect(formatTimer(125, "seconds")).toBe("2:05");
 });
 
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean };
