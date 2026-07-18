@@ -1,3 +1,5 @@
+const { resolveDevAppUrl } = require("./renderer-security.cjs");
+
 const DEFAULT_COMPACT_WIDTH = 420;
 const DEFAULT_COMPACT_HEIGHT = 760;
 const MIN_COMPACT_WIDTH = 360;
@@ -44,16 +46,17 @@ function createCompactWindowService(deps) {
         preload: deps.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
+        sandbox: true,
       },
     });
+    deps.rendererPolicy?.secureWindowNavigation(compactWindow, deps.openExternal);
 
     const createdWindow = compactWindow;
     const useLocalFile = deps.app.isPackaged || (deps.fs.existsSync(deps.localIndexPath) && !deps.env.VITE_DEV_SERVER_URL);
     if (useLocalFile) {
       createdWindow.loadFile(deps.localIndexPath, { query: { compactWindow: "1" } });
     } else {
-      const baseUrl = deps.env.VITE_DEV_SERVER_URL || deps.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
-      createdWindow.loadURL(`${baseUrl}/app?compactWindow=1`);
+      createdWindow.loadURL(resolveDevAppUrl(deps.env.VITE_DEV_SERVER_URL, { compactWindow: 1 }).toString());
     }
     createdWindow.once("ready-to-show", () => {
       if (compactWindow === createdWindow && !createdWindow.isDestroyed()) createdWindow.show();

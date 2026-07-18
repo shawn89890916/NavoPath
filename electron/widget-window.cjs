@@ -1,3 +1,5 @@
+const { resolveDevAppUrl } = require("./renderer-security.cjs");
+
 const WIDGET_MIN_WIDTH = 128;
 const WIDGET_MAX_WIDTH = 860;
 const WIDGET_MIN_HEIGHT = 56;
@@ -117,16 +119,17 @@ function createWidgetWindowService(deps) {
         preload: deps.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
+        sandbox: true,
         backgroundThrottling: false,
       },
     });
+    deps.rendererPolicy?.secureWindowNavigation(widgetWindow, deps.openExternal);
 
     const useLocalFile = deps.app.isPackaged || (deps.fs.existsSync(deps.localIndexPath) && !deps.env.VITE_DEV_SERVER_URL);
     if (useLocalFile) {
       widgetWindow.loadFile(deps.localIndexPath, { query: { widget: "1" } });
     } else {
-      const baseUrl = deps.env.VITE_DEV_SERVER_URL || deps.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
-      widgetWindow.loadURL(`${baseUrl}/app?widget=1`);
+      widgetWindow.loadURL(resolveDevAppUrl(deps.env.VITE_DEV_SERVER_URL, { widget: 1 }).toString());
     }
     widgetWindow.once("ready-to-show", () => widgetWindow?.show());
     widgetWindow.on("move", () => closePopover());
@@ -177,17 +180,18 @@ function createWidgetWindowService(deps) {
         preload: deps.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
+        sandbox: true,
         backgroundThrottling: false,
       },
     });
+    deps.rendererPolicy?.secureWindowNavigation(popover, deps.openExternal);
     popoverWindow = popover;
     popover.setPosition(position.x, position.y);
     const useLocalFile = deps.app.isPackaged || (deps.fs.existsSync(deps.localIndexPath) && !deps.env.VITE_DEV_SERVER_URL);
     if (useLocalFile) {
       popover.loadFile(deps.localIndexPath, { query: { widgetPopover: "1" } });
     } else {
-      const baseUrl = deps.env.VITE_DEV_SERVER_URL || deps.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
-      popover.loadURL(`${baseUrl}/app?widgetPopover=1`);
+      popover.loadURL(resolveDevAppUrl(deps.env.VITE_DEV_SERVER_URL, { widgetPopover: 1 }).toString());
     }
     popover.once("ready-to-show", () => {
       if (popoverWindow !== popover || popover.isDestroyed()) return;

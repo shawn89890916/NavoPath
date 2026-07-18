@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createWidgetWindowService } = require("./widget-window.cjs");
 const { createCompactWindowService } = require("./compact-window.cjs");
+const { createRendererPolicy, resolveDevAppUrl } = require("./renderer-security.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -28,6 +29,31 @@ function getAutoUpdater() {
 }
 
 app.setName("NavoPath");
+
+const localIndexPath = app.isPackaged
+  ? path.join(app.getAppPath(), "dist", "index.html")
+  : path.join(__dirname, "..", "dist", "index.html");
+const rendererPolicy = createRendererPolicy({
+  localIndexPath,
+  devServerUrl: app.isPackaged ? "" : process.env.VITE_DEV_SERVER_URL,
+});
+function handleTrusted(channel, handler) {
+  ipcMain.handle(channel, (event, ...args) => {
+    rendererPolicy.assertTrustedSender(event);
+    return handler(event, ...args);
+  });
+}
+function onTrusted(channel, listener) {
+  ipcMain.on(channel, (event, ...args) => {
+    try {
+      rendererPolicy.assertTrustedSender(event);
+    } catch {
+      return;
+    }
+    listener(event, ...args);
+  });
+}
+const trustedIpcMain = { handle: handleTrusted, on: onTrusted };
 
 const DEFAULT_MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
@@ -997,37 +1023,7 @@ function createWindow() {
     ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
     : path.join(__dirname, "..", "public", "navopath-icon.png");
 
-  // Determine app URL: prefer local built file, fall back to dev server or remote
-  let appUrl;
-  let allowedOrigin;
-  const localIndex = path.join(__dirname, "..", "dist", "index.html");
-  const useLocalFile = app.isPackaged || (fs.existsSync(localIndex) && !process.env.VITE_DEV_SERVER_URL);
-  if (useLocalFile) {
-    // Production or local build: load local file
-    const indexPath = app.isPackaged
-      ? path.join(app.getAppPath(), "dist", "index.html")
-      : localIndex;
-    appUrl = new URL(`file://${indexPath}`);
-    allowedOrigin = "file://";
-  } else {
-    // Development with dev server
-    const configuredUrl = process.env.VITE_DEV_SERVER_URL || process.env.NAVOPATH_APP_URL || "https://navopath-xiaoyang.pages.dev";
-    appUrl = new URL("/app", configuredUrl);
-    allowedOrigin = appUrl.origin;
-  }
-
-  const isWorkspaceUrl = (url) => {
-    try {
-      const target = new URL(url);
-      if (app.isPackaged) {
-        // In production, allow local files
-        return target.protocol === "file:";
-      }
-      return target.origin === allowedOrigin && (target.pathname === "/app" || target.pathname.startsWith("/app/"));
-    } catch {
-      return false;
-    }
-  };
+  const useLocalFile = app.isPackaged || (fs.existsSync(localIndexPath) && !process.env.VITE_DEV_SERVER_URL);
 
   const win = new BrowserWindow({
     width: 1440,
@@ -1042,6 +1038,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       backgroundThrottling: false
     }
   });
@@ -1061,25 +1058,12 @@ function createWindow() {
     console.error(`[did-fail-load] code=${errorCode} desc=${errorDescription} url=${validatedURL}`);
   });
 
-  win.webContents.on("will-navigate", (e, url) => {
-    if (!isWorkspaceUrl(url)) {
-      e.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isWorkspaceUrl(url)) {
-      return { action: "allow" };
-    }
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
+  rendererPolicy.secureWindowNavigation(win, (url) => shell.openExternal(url));
 
   if (useLocalFile) {
-    win.loadFile(app.isPackaged ? path.join(app.getAppPath(), "dist", "index.html") : localIndex);
+    win.loadFile(localIndexPath);
   } else {
-    win.loadURL(appUrl.toString());
+    win.loadURL(resolveDevAppUrl(process.env.VITE_DEV_SERVER_URL).toString());
   }
 }
 
@@ -1148,31 +1132,31 @@ app.on("window-all-closed", () => {
   }
 });
 
-ipcMain.handle("planner:getData", () => readData());
-ipcMain.handle("planner:saveData", (_event, data) => saveData(data));
-ipcMain.handle("planner:applyActions", (_event, actions) => applyActions(actions));
-ipcMain.handle("planner:resetSeed", () => {
+handleTrusted("planner:getData", () => readData());
+handleTrusted("planner:saveData", (_event, data) => saveData(data));
+handleTrusted("planner:applyActions", (_event, actions) => applyActions(actions));
+handleTrusted("planner:resetSeed", () => {
   backupCurrentData("before-reset");
   return saveData(normalizePlannerData(seedData()));
 });
-ipcMain.handle("settings:get", () => getSettings());
-ipcMain.handle("settings:save", (_event, settings) => saveSettings(settings));
-ipcMain.handle("settings:selectBackgroundImage", () => selectBackgroundImage());
-ipcMain.handle("auth-storage:get", (_event, key) => readAuthStorage(key));
-ipcMain.handle("auth-storage:set", (_event, key, value) => writeAuthStorage(key, value));
-ipcMain.handle("auth-storage:remove", (_event, key) => removeAuthStorage(key));
-ipcMain.handle("plugins:listExternal", () => readExternalPluginManifests());
-ipcMain.handle("plugins:readExternalEntry", (_event, pluginId) => readExternalPluginEntry(pluginId));
-ipcMain.handle("ai:chat", (_event, payload) => callDeepSeek(payload));
-ipcMain.handle("updater:getState", () => updateState);
-ipcMain.handle("updater:check", async () => {
+handleTrusted("settings:get", () => getSettings());
+handleTrusted("settings:save", (_event, settings) => saveSettings(settings));
+handleTrusted("settings:selectBackgroundImage", () => selectBackgroundImage());
+handleTrusted("auth-storage:get", (_event, key) => readAuthStorage(key));
+handleTrusted("auth-storage:set", (_event, key, value) => writeAuthStorage(key, value));
+handleTrusted("auth-storage:remove", (_event, key) => removeAuthStorage(key));
+handleTrusted("plugins:listExternal", () => readExternalPluginManifests());
+handleTrusted("plugins:readExternalEntry", (_event, pluginId) => readExternalPluginEntry(pluginId));
+handleTrusted("ai:chat", (_event, payload) => callDeepSeek(payload));
+handleTrusted("updater:getState", () => updateState);
+handleTrusted("updater:check", async () => {
   try {
     return await checkForDesktopUpdate(true);
   } catch (error) {
     return publishUpdateState({ status: "error", message: error instanceof Error ? error.message : String(error) });
   }
 });
-ipcMain.handle("updater:install", () => {
+handleTrusted("updater:install", () => {
   if (updateState.status !== "downloaded") return false;
   setImmediate(() => {
     const autoUpdater = getAutoUpdater();
@@ -1189,14 +1173,14 @@ ipcMain.handle("updater:install", () => {
 });
 
 // Auto-launch at system startup (toggled from Settings)
-ipcMain.handle("autolaunch:get", () => {
+handleTrusted("autolaunch:get", () => {
   try {
     return app.getLoginItemSettings().openAtLogin;
   } catch {
     return false;
   }
 });
-ipcMain.handle("autolaunch:set", (_event, enabled) => {
+handleTrusted("autolaunch:set", (_event, enabled) => {
   try {
     app.setLoginItemSettings({ openAtLogin: !!enabled });
     return app.getLoginItemSettings().openAtLogin;
@@ -1207,7 +1191,7 @@ ipcMain.handle("autolaunch:set", (_event, enabled) => {
 
 // Local JSON snapshot — written on every app launch (and on demand) so users
 // always have an offline backup next to their auth session in userData.
-ipcMain.handle("backup:writeSnapshot", (_event, payload) => {
+handleTrusted("backup:writeSnapshot", (_event, payload) => {
   try {
     const { dir } = getPaths();
     fs.mkdirSync(dir, { recursive: true });
@@ -1237,7 +1221,7 @@ ipcMain.handle("backup:writeSnapshot", (_event, payload) => {
   }
 });
 
-ipcMain.handle("backup:readLatest", () => {
+handleTrusted("backup:readLatest", () => {
   try {
     const { dir } = getPaths();
     const latestPath = path.join(dir, "navopath-snapshot-latest.json");
@@ -1258,37 +1242,41 @@ const widgetIconPath = app.isPackaged
 const widgetWindowService = createWidgetWindowService({
   BrowserWindow,
   app,
-  ipcMain,
+  ipcMain: trustedIpcMain,
   screen,
   fs,
   path,
   env: process.env,
   preloadPath: path.join(__dirname, "preload.cjs"),
-  localIndexPath: path.join(__dirname, "..", "dist", "index.html"),
+  localIndexPath,
   iconPath: widgetIconPath,
+  rendererPolicy,
+  openExternal: (url) => shell.openExternal(url),
 });
 widgetWindowService.registerIpc();
 
 const compactWindowService = createCompactWindowService({
   BrowserWindow,
   app,
-  ipcMain,
+  ipcMain: trustedIpcMain,
   screen,
   fs,
   env: process.env,
   preloadPath: path.join(__dirname, "preload.cjs"),
-  localIndexPath: path.join(__dirname, "..", "dist", "index.html"),
+  localIndexPath,
   iconPath: widgetIconPath,
+  rendererPolicy,
+  openExternal: (url) => shell.openExternal(url),
 });
 compactWindowService.registerIpc();
 
 // Relay: widget renderer → main window (action requests)
-ipcMain.on("widget:action", (_event, action) => {
+onTrusted("widget:action", (_event, action) => {
   const main = BrowserWindow.getAllWindows().find((w) => !widgetWindowService.ownsWindow(w) && !compactWindowService.ownsWindow(w) && !w.isDestroyed());
   if (main) main.webContents.send("widget:action", action);
 });
 
 // Relay: main window → widget renderer (snapshot pushes)
-ipcMain.on("widget:push-snapshot", (_event, snapshot) => {
+onTrusted("widget:push-snapshot", (_event, snapshot) => {
   widgetWindowService.broadcastSnapshot(snapshot);
 });
