@@ -9,6 +9,11 @@ export default defineConfig({
     port: 5173
   },
   build: {
+    minify: "terser",
+    terserOptions: {
+      compress: { passes: 2 },
+      format: { comments: false },
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {

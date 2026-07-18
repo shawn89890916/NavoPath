@@ -17,6 +17,9 @@
 - 竖屏执行页新增可关闭的「任务 → 日程」线稿引导，提示将任务拖进时间轴；三天/周视图改为完整顶部控制栏与下移的日期信息，时间轴文字进一步收紧，「回到现在」改为回环箭头图标。底部 Dock 在浅色/深色主题下分别使用纸白/墨黑底色。
 - 竖屏规划页在任务为空或极少时不再使用插图，而是显示强指示型「长期任务，从这里开始规划」说明，清晰给出项目 → 任务 → 排程的路径。
 
+### 改进
+- 优化首次加载性能：首页与桌面小组件资源改为按需加载，主工作区不再提前下载这些界面资源，并通过更紧凑的生产构建降低首屏脚本与样式体积。
+
 ### Added
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
@@ -32,6 +35,9 @@
 - Added a dismissible portrait "task → schedule" line guide that explains dragging tasks into the timeline. Three-day and weekly views now use a full top control rail with lower, more compact date information; Back to now is a clean return-arrow icon. The Dock uses paper white in light mode and ink black in dark mode.
 - Replaced the sparse-state Planning illustration with a strong text-led long-range planning guide: project → tasks → schedule.
 
+### Improved
+- Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
+
 ## 2026-07-18 · iOS 原生工程与 Windows 开发流程
 
 ### 新增
@@ -40,6 +46,9 @@
 ### 修复
 - 收紧桌面端安全边界：主窗口、竖屏窗口与小组件只加载本地应用或回环地址的开发服务，阻止远程页面访问认证存储、备份、插件、更新等桌面能力，并拦截不受信任的页面导航与新窗口。
 
+### 改进
+- 优化首次加载性能：首页与桌面小组件资源改为按需加载，主工作区不再提前下载这些界面资源，并通过更紧凑的生产构建降低首屏脚本与样式体积。
+
 ## 2026-07-18 · Native iOS project and Windows development workflow
 
 ### Added
@@ -47,6 +56,9 @@
 
 ### Fixed
 - Hardened desktop security boundaries: the main window, portrait window, and widget now load only the local app or a loopback development server, block remote pages from desktop capabilities such as authentication storage, backups, plugins, and updates, and reject untrusted navigation and new windows.
+
+### Improved
+- Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
 ## 2026-07-15 · 时间轴拖拽修复与独立竖屏窗口
 

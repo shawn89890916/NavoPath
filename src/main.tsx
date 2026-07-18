@@ -65,7 +65,6 @@ import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
-import { WidgetApp, WidgetPopoverApp } from "./widget/WidgetApp";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
 import {
   DEFAULT_WIDGET_RUNTIME,
@@ -90,7 +89,6 @@ import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimel
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
-import "./landing.css";
 import "./navopath-buttons.css";
 import "./mobile.css";
 import "./task-block.css";
@@ -98,6 +96,8 @@ import "./task-block.css";
 installBrowserFallback();
 
 const ChangelogPage = lazy(() => import("./ChangelogPage"));
+const WidgetAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetApp })));
+const WidgetPopoverAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetPopoverApp })));
 
 const todayIso = () => localIsoDate();
 const TIMELINE_START = 0;
@@ -14113,9 +14113,9 @@ const isWidgetPopoverRoute = new URLSearchParams(window.location.search).get("wi
 const isWidgetRoute = new URLSearchParams(window.location.search).get("widget") === "1";
 root.render(
   isWidgetPopoverRoute
-    ? <WidgetPopoverApp />
+    ? <Suspense fallback={null}><WidgetPopoverAppLazy /></Suspense>
     : isWidgetRoute
-    ? <WidgetApp />
+    ? <Suspense fallback={null}><WidgetAppLazy /></Suspense>
     : window.location.pathname === "/changelog"
       ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
       : window.location.pathname === "/plugin-guide"

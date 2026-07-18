@@ -4,6 +4,7 @@ import { TaskBlock } from "./components/TaskBlock";
 import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 import { SLOT_HEIGHT, SLOT_MINUTES, addMinutes, minutesToTime, timeToMinutes } from "./timelineGeometry";
 import { MOTION, prefersReducedMotion } from "./motion";
+import "./landing.css";
 
 type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
