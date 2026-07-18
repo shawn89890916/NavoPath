@@ -20,6 +20,12 @@
     transform: translateZ(0);
   }
 
+  html.is-native-ios #root .df-app {
+    inset: 0 !important;
+    padding-top: env(safe-area-inset-top) !important;
+    border-radius: 0 !important;
+  }
+
   #root .df-app .df-execute,
   #root .df-app .df-planning {
     height: 100% !important;
