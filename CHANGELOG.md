@@ -19,6 +19,7 @@
 - 竖屏规划页在任务为空或极少时不再使用插图，而是显示强指示型「长期任务，从这里开始规划」说明，清晰给出项目 → 任务 → 排程的路径。
 
 ### 改进
+- 加快网站登录进入工作区的速度：密码认证成功后不再重复等待云端资料查询，工作区初始化统一负责加载资料，并可更早复用本机缓存呈现界面。
 - 优化首次加载性能：首页与桌面小组件资源改为按需加载，主工作区不再提前下载这些界面资源，并通过更紧凑的生产构建降低首屏脚本与样式体积。
 
 ### Added
@@ -38,6 +39,7 @@
 - Replaced the sparse-state Planning illustration with a strong text-led long-range planning guide: project → tasks → schedule.
 
 ### Improved
+- Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
 ## 2026-07-18 · iOS 原生工程与 Windows 开发流程
@@ -50,6 +52,7 @@
 - 收紧桌面端安全边界：主窗口、竖屏窗口与小组件只加载本地应用或回环地址的开发服务，阻止远程页面访问认证存储、备份、插件、更新等桌面能力，并拦截不受信任的页面导航与新窗口。
 
 ### 改进
+- 加快网站登录进入工作区的速度：密码认证成功后不再重复等待云端资料查询，工作区初始化统一负责加载资料，并可更早复用本机缓存呈现界面。
 - 优化首次加载性能：首页与桌面小组件资源改为按需加载，主工作区不再提前下载这些界面资源，并通过更紧凑的生产构建降低首屏脚本与样式体积。
 
 ## 2026-07-18 · Native iOS project and Windows development workflow
@@ -62,6 +65,7 @@
 - Hardened desktop security boundaries: the main window, portrait window, and widget now load only the local app or a loopback development server, block remote pages from desktop capabilities such as authentication storage, backups, plugins, and updates, and reject untrusted navigation and new windows.
 
 ### Improved
+- Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
 ## 2026-07-15 · 时间轴拖拽修复与独立竖屏窗口

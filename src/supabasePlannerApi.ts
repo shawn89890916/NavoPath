@@ -395,7 +395,6 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(authErrorMessage(error.message));
       cachedUser = data.user ?? null;
-      if (data.user) await ensureProfile(data.user, true);
       return { user: publicUser(data.user) };
     },
 

@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe("createSupabasePlannerApi", () => {
-  it("keeps login usable when cloud profile queries hit the Supabase schema cache error", async () => {
+  it("finishes password authentication before loading the cloud profile", async () => {
     const schemaCacheError = {
       message: "Could not query the database for the schema cache",
     };
@@ -40,6 +40,7 @@ describe("createSupabasePlannerApi", () => {
     const api = createSupabasePlannerApi("https://supabase.test", "anon");
 
     await expect(api.signIn?.("user@example.com", "password")).resolves.toEqual({ user });
+    expect(maybeSingle).not.toHaveBeenCalled();
 
     const bootstrap = await api.getBootstrap?.({ force: true });
     expect(bootstrap?.auth.user).toEqual(user);
