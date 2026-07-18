@@ -29,7 +29,32 @@ jobs:
       - name: Check changelog
         run: node scripts/changelog-maintain.mjs --check
 
-      - name: Build and publish desktop release
-        run: npm run dist -- --publish always
+      - name: Build desktop release
+        run: npm run dist -- --publish never
+
+      - name: Publish desktop release assets
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $tag = "v$version"
+          $assets = @(
+            "D:/navopath-build/latest.yml",
+            "D:/navopath-build/NavoPath-Setup.exe",
+            "D:/navopath-build/NavoPath-Setup.exe.blockmap",
+            "D:/navopath-build/NavoPath-Portable.exe"
+          )
+
+          foreach ($asset in $assets) {
+            if (-not (Test-Path -LiteralPath $asset)) {
+              throw "Required desktop release asset is missing: $asset"
+            }
+          }
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --verify-tag --title "NavoPath $tag"
+          }
+
+          gh release upload $tag @assets --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
