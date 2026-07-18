@@ -11237,7 +11237,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
     end = addMinutes(start, computedDuration);
     calculatedDurationMinutes = computedDuration;
   }
-  
+
   const top = timeBlockTop(start, dayStartHour);
   const height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT);
   const durationMinutes = calculatedDurationMinutes;
@@ -11279,7 +11279,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const resolvedTop = preview && suppliedTop !== null
     ? resizedBlockTop(suppliedTop, originalDate, originalStart, preview.startDate || originalDate, start)
     : suppliedTop ?? top;
-  
+
   return (
     <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
@@ -12602,7 +12602,7 @@ function exportDataAsJson(data: PlannerData, settings: Settings) {
 function exportTasksAsCsv(data: PlannerData) {
   const headers = ["ID", "Title", "Project", "Status", "Due Date", "Estimated Hours", "Priority", "Created At", "Completed"];
   const projectMap = new Map(data.projects.map((p) => [p.id, p.title]));
-  
+
   const rows = data.tasks.map((task) => {
     const projectTitle = projectMap.get(task.projectId || "") || "";
     const status = task.completed ? "Completed" : (task.plannedForDate ? "Scheduled" : "Pending");
@@ -12618,7 +12618,7 @@ function exportTasksAsCsv(data: PlannerData) {
       task.completed ? "Yes" : "No",
     ].join(",");
   });
-  
+
   const csvContent = [headers.join(","), ...rows].join("\n");
   const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -12976,7 +12976,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
       ],
     });
   };
-  
+
   const importDataFromJson = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -13004,7 +13004,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     };
     input.click();
   };
-  
+
   const importTasksFromCsv = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -13045,7 +13045,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               }
             }
             values.push(current);
-            
+
             const id = values[0] || `task_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
             const title = values[1] || "Untitled Task";
             const projectTitle = values[2] || "";
@@ -13055,7 +13055,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
             const priority = (values[6] as Task["priority"]) || "medium";
             const createdAt = values[7] || new Date().toISOString();
             const completed = values[8]?.toLowerCase() === "yes";
-            
+
             return {
               id,
               title,
@@ -13072,7 +13072,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               updatedAt: new Date().toISOString(),
             };
           });
-          
+
           // Merge imported tasks with existing tasks
           const existingIds = new Set(data.tasks.map((t) => t.id));
           const newTasks = tasks.filter((t) => !existingIds.has(t.id));
