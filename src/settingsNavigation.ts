@@ -16,6 +16,7 @@ export type LegacySettingsSection =
   | "shortcuts"
   | "ai"
   | "mcp"
+  | "calendar"
   | "plugins"
   | "account"
   | "advanced"
@@ -57,6 +58,7 @@ const legacyTargets: Record<LegacySettingsSection, SettingsTarget> = {
   shortcuts: { category: "general", anchor: "shortcuts" },
   ai: { category: "advanced", detail: "ai" },
   mcp: { category: "advanced", detail: "integrations", anchor: "mcp" },
+  calendar: { category: "advanced", detail: "integrations", anchor: "calendar-feed" },
   plugins: { category: "advanced", detail: "integrations", anchor: "plugins" },
   account: { category: "account-data", anchor: "account" },
   advanced: { category: "advanced" },
@@ -80,6 +82,7 @@ export function settingsCategoryLabel(category: SettingsCategory, lang: Language
 }
 
 export function settingsDetailLabel(detail: SettingsDetail, lang: Language): string {
+  if (detail === "integrations") return lang === "zh" ? "日历与集成" : "Calendar & Integrations";
   const labels: Record<SettingsDetail, [string, string]> = {
     ai: ["Navo AI", "Navo AI"],
     widget: ["桌面窗口", "Desktop Windows"],
@@ -110,6 +113,7 @@ const entry = (
 ): SettingsSearchEntry => ({ id, target: { ...target, anchor: target.anchor ?? id }, labelZh, labelEn, keywords, descriptionZh, descriptionEn });
 
 export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
+  entry("calendar-feed", { category: "advanced", detail: "integrations" }, "日历订阅", "Calendar subscription", "webcal ics iPhone Notion Calendar 日历 同步 订阅"),
   entry("language", { category: "general" }, "语言", "Language", "中文 English locale"),
   entry("day-start", { category: "general" }, "一天开始时间", "Day start time", "timeline boundary 跨天"),
   entry("default-page", { category: "general" }, "默认打开页面", "Default page", "启动 执行 规划 execution planning"),

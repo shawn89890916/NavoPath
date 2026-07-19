@@ -42,6 +42,16 @@
 - Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
+## 2026-07-19 · 私有日历订阅
+
+### 新增
+- 新增可撤销的私有 Webcal 日历订阅：登录用户可在“设置 → 高级 → 日历与集成”生成只读链接，将时间轴排程、日历事件和未排程任务截止日订阅到 iPhone、Notion Calendar 等日历；完整令牌仅显示一次，更换或撤销后旧链接立即失效。
+
+## 2026-07-19 · Private calendar subscriptions
+
+### Added
+- Added revocable private Webcal subscriptions. Signed-in users can create a read-only link in Settings → Advanced → Calendar & Integrations for timeline blocks, calendar events, and unscheduled task deadlines in iPhone, Notion Calendar, and other calendar clients. The complete token is shown once, and replacing or revoking it immediately invalidates the old link.
+
 ## 2026-07-18 · iOS 原生工程与 Windows 开发流程
 
 ### 新增

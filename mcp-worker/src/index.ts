@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
+import { buildCalendarFeed } from "./calendarFeed";
 
 interface Env {
   SUPABASE_URL: string;
@@ -39,6 +40,16 @@ async function authenticate(request: Request, env: Env) {
   const match = (await query.json() as Array<{ id: string; user_id: string }>)[0];
   if (!match) return null;
   void db(env, `navopath_mcp_tokens?id=eq.${match.id}`, { method: "PATCH", body: JSON.stringify({ last_used_at: now() }) });
+  return match.user_id;
+}
+
+async function authenticateCalendarToken(token: string, env: Env, ctx: ExecutionContext) {
+  if (!/^nvc_[a-f0-9]{64}$/.test(token)) return null;
+  const query = await db(env, `navopath_calendar_tokens?select=id,user_id&token_hash=eq.${await sha256(token)}&revoked_at=is.null&limit=1`);
+  if (!query.ok) return null;
+  const match = (await query.json() as Array<{ id: string; user_id: string }>)[0];
+  if (!match) return null;
+  ctx.waitUntil(db(env, `navopath_calendar_tokens?id=eq.${match.id}`, { method: "PATCH", body: JSON.stringify({ last_used_at: now() }) }));
   return match.user_id;
 }
 
@@ -153,6 +164,24 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
     if (url.pathname === "/") return new Response(JSON.stringify({ name: env.MCP_SERVER_NAME, endpoint: "/mcp", transport: "streamable-http", version: "2.0.0" }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    const calendarMatch = url.pathname.match(/^\/calendar\/(nvc_[a-f0-9]{64})\.ics$/);
+    if (calendarMatch) {
+      if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
+      const userId = await authenticateCalendarToken(calendarMatch[1], env, ctx);
+      if (!userId) return new Response("Calendar subscription not found", { status: 404, headers: { "cache-control": "no-store" } });
+      const profile = await getProfile(env, userId);
+      const etag = `W/\"navopath-calendar-${profile.revision}\"`;
+      const headers = {
+        "content-type": "text/calendar; charset=utf-8",
+        "content-disposition": "inline; filename=navopath.ics",
+        "cache-control": "private, max-age=300, no-transform",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        etag,
+      };
+      if (request.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
+      return new Response(request.method === "HEAD" ? null : buildCalendarFeed(profile.data), { headers });
+    }
     if (url.pathname !== "/mcp") return new Response("Not found", { status: 404 });
     const userId = await authenticate(request, env);
     if (!userId) return new Response(JSON.stringify({ error: "Invalid or revoked bearer token" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });

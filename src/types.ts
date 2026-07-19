@@ -81,6 +81,13 @@ export interface AiFieldInference {
   userOverridden?: boolean;
 }
 
+export interface CalendarFeedTokenMetadata {
+  id: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
 export interface TaskAiInference {
   duration?: AiFieldInference & { minutes: number };
   project?: AiFieldInference & { projectId: string };
@@ -580,6 +587,9 @@ export interface PlannerApi {
   listMcpTokens?: () => Promise<McpTokenMetadata[]>;
   createMcpToken?: (name: string) => Promise<{ token: string; metadata: McpTokenMetadata }>;
   revokeMcpToken?: (id: string) => Promise<void>;
+  listCalendarFeedTokens?: () => Promise<CalendarFeedTokenMetadata[]>;
+  createCalendarFeedToken?: () => Promise<{ token: string; metadata: CalendarFeedTokenMetadata }>;
+  revokeCalendarFeedToken?: (id: string) => Promise<void>;
   selectBackgroundImage: () => Promise<{ path: string }>;
   chat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
 }

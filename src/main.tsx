@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
 import { callAiAssistant, type AiAction, type AiChatMessage, type AiMemoryPatch, type AiStep } from "./aiAssistantApi";
 import type { ParsedAttachment } from "./fileParser";
 import { reasoningModesForModel } from "./utils/aiModels";
@@ -152,6 +152,13 @@ function externalManifestToPlugin(
   };
 }
 const MCP_ENDPOINT = import.meta.env.VITE_MCP_ENDPOINT || "https://navopath-mcp.shawn89890916.workers.dev/mcp";
+function calendarFeedUrl(token: string) {
+  const endpoint = new URL(MCP_ENDPOINT);
+  endpoint.pathname = `${endpoint.pathname.replace(/\/mcp\/?$/, "").replace(/\/$/, "")}/calendar/${token}.ics`;
+  endpoint.search = "";
+  endpoint.hash = "";
+  return endpoint.toString();
+}
 const DONATION_URL = "https://afdian.com/a/233cxy/plan";
 const TIME_OPTIONS = Array.from({ length: ((TIMELINE_END - TIMELINE_START) * 60) / SLOT_MINUTES }, (_, index) => {
   return minutesToTime(TIMELINE_START * 60 + index * SLOT_MINUTES);
@@ -12412,6 +12419,92 @@ function McpTokenManager({ lang }: { lang: Language }) {
   );
 }
 
+function CalendarFeedManager({ lang }: { lang: Language }) {
+  const [tokens, setTokens] = useState<CalendarFeedTokenMetadata[]>([]);
+  const [feedUrl, setFeedUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const api = window.plannerApi;
+  const supported = Boolean(api.listCalendarFeedTokens && api.createCalendarFeedToken && api.revokeCalendarFeedToken);
+  const refresh = useCallback(async () => {
+    if (!api.listCalendarFeedTokens) { setLoading(false); return; }
+    try {
+      setError("");
+      setTokens(await api.listCalendarFeedTokens());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+  useEffect(() => { if (supported) void refresh(); else setLoading(false); }, [refresh, supported]);
+  const copyFeedUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(feedUrl);
+      setNotice(lang === "zh" ? "订阅链接已复制" : "Subscription link copied");
+      window.setTimeout(() => setNotice(""), 1800);
+    } catch {
+      setError(lang === "zh" ? "复制失败，请手动选择链接。" : "Copy failed. Select the link manually.");
+    }
+  };
+  const createFeed = async () => {
+    if (!api.createCalendarFeedToken) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const created = await api.createCalendarFeedToken();
+      setFeedUrl(calendarFeedUrl(created.token));
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="df-mcp-settings df-calendar-settings">
+      <strong>{lang === "zh" ? "只读日历订阅" : "Read-only calendar subscription"}</strong>
+      <p>{supported
+        ? (lang === "zh" ? "将时间轴排程、日历事件和未排程任务的截止日订阅到 iPhone、Notion Calendar 或其他日历。链接包含私密令牌，请勿公开分享。" : "Subscribe to timeline blocks, calendar events, and unscheduled task deadlines from iPhone, Notion Calendar, or another calendar. The link contains a private token; do not share it publicly.")
+        : (lang === "zh" ? "登录云端账户后可生成日历订阅链接。" : "Sign in to a cloud account to create a calendar subscription link.")}</p>
+      {supported && <button className="df-calendar-generate" type="button" disabled={busy} onClick={() => void createFeed()}>{busy
+        ? (lang === "zh" ? "正在生成…" : "Generating…")
+        : tokens.length > 0
+          ? (lang === "zh" ? "更换订阅链接" : "Replace subscription link")
+          : (lang === "zh" ? "生成订阅链接" : "Create subscription link")}</button>}
+      {feedUrl && <div className="df-mcp-token">
+        <small>{lang === "zh" ? "此完整链接只显示一次；更换链接会让旧订阅失效。" : "This complete link is shown once. Replacing it invalidates the old subscription."}</small>
+        <code>{feedUrl}</code>
+        <div className="df-calendar-actions">
+          <button type="button" onClick={() => void copyFeedUrl()}>{lang === "zh" ? "复制链接" : "Copy link"}</button>
+          <button type="button" onClick={() => { window.location.href = feedUrl.replace(/^https?:/, "webcal:"); }}>{lang === "zh" ? "在日历中订阅" : "Subscribe in Calendar"}</button>
+        </div>
+      </div>}
+      {error && <p className="df-mcp-status error" role="alert">{error}</p>}
+      {notice && <p className="df-mcp-status" role="status">{notice}</p>}
+      {loading && <p className="df-mcp-status">{lang === "zh" ? "正在读取订阅状态…" : "Loading subscription status…"}</p>}
+      {!loading && supported && tokens.length === 0 && !error && <p className="df-mcp-status muted">{lang === "zh" ? "还没有有效订阅。" : "No active subscription yet."}</p>}
+      {tokens.map((token) => <div className="df-mcp-token-row" key={token.id}><span><strong>{lang === "zh" ? "NavoPath 日历" : "NavoPath Calendar"}</strong><small>{token.tokenPrefix}… · {new Date(token.createdAt).toLocaleDateString()}</small></span><button type="button" disabled={busy} onClick={async () => {
+        if (!api.revokeCalendarFeedToken) return;
+        setBusy(true);
+        setError("");
+        try {
+          await api.revokeCalendarFeedToken(token.id);
+          setFeedUrl("");
+          await refresh();
+        } catch (caught) {
+          setError(caught instanceof Error ? caught.message : String(caught));
+        } finally {
+          setBusy(false);
+        }
+      }}>{lang === "zh" ? "撤销" : "Revoke"}</button></div>)}
+    </section>
+  );
+}
+
 function SyncSettingsControl({
   settings,
   lang,
@@ -12834,7 +12927,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
   const [accentSettingsOpen, setAccentSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [widgetThemeOpen, setWidgetThemeOpen] = useState<"light" | "dark">("light");
-  const [integrationTab, setIntegrationTab] = useState<"plugins" | "mcp">("plugins");
+  const [integrationTab, setIntegrationTab] = useState<"calendar" | "plugins" | "mcp">("calendar");
   const settingsContentRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const settingsResults = useMemo(() => searchSettings(settingsQuery, lang), [settingsQuery, lang]);
@@ -12886,6 +12979,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     if (target.anchor?.startsWith("widget-dark")) setWidgetThemeOpen("dark");
     if (target.anchor === "mcp") setIntegrationTab("mcp");
     if (target.anchor === "plugins") setIntegrationTab("plugins");
+    if (target.anchor === "calendar-feed") setIntegrationTab("calendar");
     setSettingsTarget(target);
     setSettingsQuery("");
   }
@@ -13489,7 +13583,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               {([
                 ["ai", "Navo AI", lang === "zh" ? "模型、自动化行为与记忆" : "Models, automation behavior, and memory"],
                 ["widget", lang === "zh" ? "桌面窗口" : "Desktop Windows", lang === "zh" ? "竖屏小窗、桌面小组件与计时" : "Portrait window, desktop widget, and timer"],
-                ["integrations", lang === "zh" ? "插件与 MCP" : "Plugins & MCP", lang === "zh" ? "扩展、工具与远程连接" : "Extensions, tools, and remote connections"],
+                ["integrations", lang === "zh" ? "日历与集成" : "Calendar & Integrations", lang === "zh" ? "日历订阅、扩展、工具与远程连接" : "Calendar subscriptions, extensions, tools, and remote connections"],
                 ["recovery", lang === "zh" ? "恢复与重置" : "Recovery & Reset", lang === "zh" ? "恢复默认设置" : "Restore default settings"],
               ] as const).map(([detail, label, description]) => (
                 <button key={detail} type="button" className="df-settings-detail-link" onClick={() => navigateSettings({ category: "advanced", detail })}>
@@ -13674,10 +13768,12 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 </div>
               </section>}
             </SettingSection>}
-            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && <div className="df-settings-subtabs df-settings-integration-tabs" role="tablist" aria-label={lang === "zh" ? "插件与 MCP" : "Plugins and MCP"}>
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && <div className="df-settings-subtabs df-settings-integration-tabs" role="tablist" aria-label={lang === "zh" ? "日历与集成" : "Calendar and integrations"}>
+              <button type="button" role="tab" aria-selected={integrationTab === "calendar"} className={integrationTab === "calendar" ? "active" : ""} onClick={() => { setIntegrationTab("calendar"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "calendar-feed" }); }}>{lang === "zh" ? "日历订阅" : "Calendar"}</button>
               <button type="button" role="tab" aria-selected={integrationTab === "plugins"} className={integrationTab === "plugins" ? "active" : ""} onClick={() => { setIntegrationTab("plugins"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "plugins" }); }}>{lang === "zh" ? "插件" : "Plugins"}</button>
               <button type="button" role="tab" aria-selected={integrationTab === "mcp"} className={integrationTab === "mcp" ? "active" : ""} onClick={() => { setIntegrationTab("mcp"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "mcp" }); }}>MCP</button>
             </div>}
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "calendar" && <section className="df-settings-group" data-settings-anchor="calendar-feed" tabIndex={-1}><h3>{lang === "zh" ? "日历订阅" : "Calendar Subscription"}</h3><CalendarFeedManager lang={lang} /></section>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "mcp" && <section className="df-settings-group" data-settings-anchor="mcp" tabIndex={-1}><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "plugins" && <section className="df-settings-group" data-settings-anchor="plugins" tabIndex={-1}>
               <h3>{lang === "zh" ? "插件" : "Plugins"}</h3>

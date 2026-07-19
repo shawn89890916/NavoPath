@@ -1,5 +1,5 @@
 import { createClient, type User } from "@supabase/supabase-js";
-import type { AiAction, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
+import type { AiAction, CalendarFeedTokenMetadata, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
 import { fallbackData, normalizeData } from "./browserFallback";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
 import { DEFAULT_WIDGET_TIMER_PREFERENCES, normalizeWidgetTimerPreferences } from "./widget/widgetTimer";
@@ -21,6 +21,10 @@ async function sha256(value: string) {
 
 function tokenMetadata(row: any): McpTokenMetadata {
   return { id: row.id, name: row.name, tokenPrefix: row.token_prefix, createdAt: row.created_at, lastUsedAt: row.last_used_at || undefined };
+}
+
+function calendarTokenMetadata(row: any): CalendarFeedTokenMetadata {
+  return { id: row.id, tokenPrefix: row.token_prefix, createdAt: row.created_at, lastUsedAt: row.last_used_at || undefined };
 }
 
 const defaultSettings: Settings = {
@@ -604,6 +608,28 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     revokeMcpToken: async (id) => {
       await requireUser();
       const { error } = await supabase.rpc("revoke_mcp_token", { token_id: id });
+      if (error) throw new Error(error.message);
+    },
+    listCalendarFeedTokens: async () => {
+      await requireUser();
+      const { data, error } = await supabase.rpc("list_calendar_feed_tokens");
+      if (error) throw new Error(error.message);
+      return (data || []).map(calendarTokenMetadata);
+    },
+    createCalendarFeedToken: async () => {
+      await requireUser();
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      const token = `nvc_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+      const { data, error } = await supabase.rpc("create_calendar_feed_token", {
+        token_digest: await sha256(token),
+        token_label_prefix: token.slice(0, 12),
+      });
+      if (error) throw new Error(error.message);
+      return { token, metadata: calendarTokenMetadata(data?.[0]) };
+    },
+    revokeCalendarFeedToken: async (id) => {
+      await requireUser();
+      const { error } = await supabase.rpc("revoke_calendar_feed_token", { token_id: id });
       if (error) throw new Error(error.message);
     },
 

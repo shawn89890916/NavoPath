@@ -1117,6 +1117,15 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 .df-mcp-status { color:var(--accent-active) !important; }
 .df-mcp-status.error { color:var(--danger) !important; }
 .df-mcp-status.muted { color:var(--text-faint) !important; }
+.df-calendar-generate { min-height:40px; width:max-content; padding:6px 2px; border:0; border-bottom:1px solid var(--accent-active); border-radius:0; color:var(--accent-active); background:var(--paper-note); cursor:pointer; }
+.df-calendar-generate:disabled { opacity:.5; cursor:not-allowed; }
+.df-calendar-generate:focus-visible { outline:1px solid var(--accent-active); outline-offset:2px; }
+.df-calendar-actions { display:flex; align-items:center; flex-wrap:wrap; gap:14px; }
+.df-calendar-actions button { min-height:34px; padding:4px 2px; border:0; border-bottom:1px solid var(--paper-rule); border-radius:0; color:var(--text-muted); background:transparent; cursor:pointer; }
+.df-calendar-actions button:hover { color:var(--accent-active); border-bottom-color:var(--accent-active); }
+.df-calendar-actions button:active,.df-calendar-generate:active { transform:translateY(1px); }
+.df-calendar-actions button:focus-visible { outline:1px solid var(--accent-active); outline-offset:2px; }
+@media (pointer:coarse) { .df-calendar-generate,.df-calendar-actions button { min-height:44px; } }
 @media (max-width:680px) {
   .df-utility-panel:has(.df-settings-shell) { inset:0 !important; width:100vw !important; max-height:100vh !important; border-radius:0 !important; }
   .df-settings-shell { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr); gap:14px; }
@@ -8578,4 +8587,3 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   .df-settings-disclosure-toggle,
   .df-settings-subtabs button { transition: none; }
 }
-
