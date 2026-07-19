@@ -3041,7 +3041,10 @@ function App() {
       if (!silent) showToast(lang === "zh" ? "同步功能初始化中，请稍后再试。" : "Sync is initializing, please try again later.");
       return false;
     }
-    if (!silent) setIsManualSyncing(true);
+    if (!silent) {
+      setIsManualSyncing(true);
+      showToast(t(lang, "sync.syncing"));
+    }
     try {
       if (direction === "push" || direction === "both") {
         if (pendingDataSaveRef.current) await flushPendingSave({ urgent: true });
@@ -12434,6 +12437,16 @@ function McpTokenManager({ lang }: { lang: Language }) {
   );
 }
 
+function calendarFeedErrorMessage(caught: unknown, lang: Language) {
+  const message = caught instanceof Error ? caught.message : String(caught);
+  if (/schema cache|connection pool|time(?:d )?out|failed to fetch|503/i.test(message)) {
+    return lang === "zh"
+      ? "云服务暂时不可用，本地数据不会丢失。请稍后重试。"
+      : "The cloud service is temporarily unavailable. Your local data is safe; please try again shortly.";
+  }
+  return message;
+}
+
 function CalendarFeedManager({ lang }: { lang: Language }) {
   const [tokens, setTokens] = useState<CalendarFeedTokenMetadata[]>([]);
   const [feedUrl, setFeedUrl] = useState("");
@@ -12449,7 +12462,7 @@ function CalendarFeedManager({ lang }: { lang: Language }) {
       setError("");
       setTokens(await api.listCalendarFeedTokens());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setError(calendarFeedErrorMessage(caught, lang));
     } finally {
       setLoading(false);
     }
@@ -12474,7 +12487,7 @@ function CalendarFeedManager({ lang }: { lang: Language }) {
       setFeedUrl(calendarFeedUrl(created.token));
       await refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setError(calendarFeedErrorMessage(caught, lang));
     } finally {
       setBusy(false);
     }
@@ -12511,7 +12524,7 @@ function CalendarFeedManager({ lang }: { lang: Language }) {
           setFeedUrl("");
           await refresh();
         } catch (caught) {
-          setError(caught instanceof Error ? caught.message : String(caught));
+          setError(calendarFeedErrorMessage(caught, lang));
         } finally {
           setBusy(false);
         }

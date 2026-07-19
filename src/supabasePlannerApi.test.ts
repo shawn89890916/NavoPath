@@ -13,6 +13,7 @@ beforeEach(() => {
     location: { origin: "https://navopath.test", href: "https://navopath.test/app" },
     history: { replaceState: vi.fn() },
     setTimeout,
+    clearTimeout,
   });
 });
 
@@ -174,5 +175,36 @@ describe("createSupabasePlannerApi", () => {
 
     expect(created?.metadata.id).toBe("token_1");
     expect(rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops retrying when the cloud service never responds", async () => {
+    const timeoutSpy = vi.spyOn(window, "setTimeout").mockImplementation((handler: TimerHandler) => {
+      if (typeof handler === "function") handler();
+      return {} as ReturnType<typeof setTimeout>;
+    });
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout").mockImplementation(() => undefined);
+    const user = { id: "user_1", email: "user@example.com" };
+    const abortSignal = vi.fn(() => new Promise(() => undefined));
+    const rpc = vi.fn(() => ({ abortSignal }));
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
+        onAuthStateChange: vi.fn(),
+      },
+      rpc,
+    });
+
+    try {
+      const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+      const api = createSupabasePlannerApi("https://supabase.test", "anon");
+      const result = api.createCalendarFeedToken?.().catch((error) => error);
+
+      await expect(result).resolves.toEqual(expect.objectContaining({ message: "Cloud request timed out. Please try again." }));
+      expect(rpc).toHaveBeenCalledTimes(2);
+      expect(abortSignal).toHaveBeenCalledTimes(2);
+    } finally {
+      timeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+    }
   });
 });

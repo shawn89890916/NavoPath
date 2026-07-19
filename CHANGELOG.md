@@ -46,6 +46,7 @@
 
 ### 本次补充
 - 顶栏搜索按钮左侧新增“立即同步”入口，可直接推送本地改动并拉取同账号的最新云端数据。
+- 同步按钮点击后会立即显示进度反馈；云端请求若无响应会主动超时并有限重试，不再让同步或订阅按钮无限等待。
 - 修复生成日历订阅时偶发连接池超时的问题，瞬时数据库连接故障现在会自动重试。
 - 修复习惯及每日完成状态未参与跨设备合并、导致一端的旧数据覆盖另一端更新的问题。
 - 修复今日候选任务名居中及展开详情错位的问题；所有候选任务名现统一左对齐，展开时标题与操作按钮保持同行，备注区域不再显示阴影。
@@ -61,6 +62,7 @@
 
 ### Current additions and fixes
 - Added a Sync now action immediately left of Search in the top bar, providing direct push-and-pull sync for the signed-in account.
+- Sync now provides immediate progress feedback, while unresponsive cloud requests are actively timed out and retried only once so sync and subscription actions cannot wait indefinitely.
 - Fixed intermittent connection-pool timeouts while generating calendar subscriptions by retrying transient database connection failures.
 - Fixed habits and daily completion states being omitted from cross-device merges, which allowed stale data on one device to overwrite newer updates from another.
 - Fixed centered candidate task names and the misaligned expanded detail layout. Candidate task names are now consistently left-aligned, expanded titles stay beside their actions, and the notes surface no longer has a shadow.

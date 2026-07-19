@@ -186,6 +186,8 @@ function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+const CLOUD_REQUEST_TIMEOUT_MS = 5_000;
+
 function emailConfirmationRedirectUrl() {
   return new URL("/app?auth_callback=1", window.location.origin).toString();
 }
@@ -247,12 +249,32 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     return user;
   }
 
-  async function retryTransientRpc(call: () => any) {
+  async function runCloudRequest(call: () => any) {
+    const controller = new AbortController();
+    let timeoutId = 0;
+    const request = Promise.resolve().then(() => {
+      const pending = call();
+      return typeof pending?.abortSignal === "function" ? pending.abortSignal(controller.signal) : pending;
+    }).catch((error) => ({ data: null, error: { message: error instanceof Error ? error.message : String(error) } }));
+    const timeout = new Promise((resolve) => {
+      timeoutId = window.setTimeout(() => {
+        controller.abort();
+        resolve({ data: null, error: { message: "Cloud request timed out. Please try again." } });
+      }, CLOUD_REQUEST_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([request, timeout]);
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function retryTransientRequest(call: () => any) {
     let result: any;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      result = await call();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      result = await runCloudRequest(call);
       if (!result.error || !isRetryableProfileError(result.error.message)) return result;
-      if (attempt < 2) await wait(260 * (attempt + 1));
+      if (attempt === 0) await wait(260);
     }
     return result;
   }
@@ -271,29 +293,11 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       return profileCache;
     };
     const pending = (async () => {
-      let data: any = null;
-      let error: any = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const result = await supabase
-          .from(PROFILE_TABLE)
-          .select("data, settings, revision")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        data = result.data;
-        error = result.error;
-        if (!error || !isRetryableProfileError(error.message)) break;
-        await wait(260 * (attempt + 1));
-      }
-
-      if (error && isRetryableProfileError(error.message)) {
-        const fallback = await supabase
-          .from(PROFILE_TABLE)
-          .select("data, settings")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        data = fallback.data;
-        error = fallback.error;
-      }
+      const { data, error } = await retryTransientRequest(() => supabase
+        .from(PROFILE_TABLE)
+        .select("data, settings, revision")
+        .eq("user_id", user.id)
+        .maybeSingle());
 
       if (error) {
         if (isRetryableProfileError(error.message)) return useTemporaryProfile();
@@ -314,21 +318,15 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         onboardingVersion: 0,
         onboardingStep: "add" as const,
       };
-      let insertError: any = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const result = await supabase
-          .from(PROFILE_TABLE)
-          .insert({
-            user_id: user.id,
-            data: initialData,
-            settings: initialSettings,
-            created_at: now(),
-            updated_at: now()
-          });
-        insertError = result.error;
-        if (!insertError || !isRetryableProfileError(insertError.message)) break;
-        await wait(260 * (attempt + 1));
-      }
+      const { error: insertError } = await retryTransientRequest(() => supabase
+        .from(PROFILE_TABLE)
+        .insert({
+          user_id: user.id,
+          data: initialData,
+          settings: initialSettings,
+          created_at: now(),
+          updated_at: now()
+        }));
 
       if (insertError) {
         if (isRetryableProfileError(insertError.message)) return useTemporaryProfile();
@@ -351,7 +349,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const nextData = patch.data ? mergePlannerData(current.data, normalizeData(patch.data)) : current.data;
       const nextSettings = patch.settings ? mergeSettings({ ...current.settings, ...patch.settings }) : current.settings;
-      const { data: rows, error } = await retryTransientRpc(() => supabase.rpc("save_dayflow_profile", {
+      const { data: rows, error } = await retryTransientRequest(() => supabase.rpc("save_dayflow_profile", {
         expected_revision: current.revision,
         next_data: nextData,
         next_settings: nextSettings,
@@ -592,11 +590,11 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
           listener({ data: next.data, settings: next.settings, revision: next.revision });
         };
         const reconcileAfterConnect = async () => {
-          const { data: row, error } = await supabase
+          const { data: row, error } = await retryTransientRequest(() => supabase
             .from(PROFILE_TABLE)
             .select("data, settings, revision")
             .eq("user_id", user.id)
-            .maybeSingle();
+            .maybeSingle());
           if (!disposed && !error) emitIfNewer(row);
         };
         channel = supabase.channel(`dayflow-profile-${user.id}`)
@@ -637,7 +635,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
     listCalendarFeedTokens: async () => {
       await requireUser();
-      const { data, error } = await retryTransientRpc(() => supabase.rpc("list_calendar_feed_tokens"));
+      const { data, error } = await retryTransientRequest(() => supabase.rpc("list_calendar_feed_tokens"));
       if (error) throw new Error(error.message);
       return (data || []).map(calendarTokenMetadata);
     },
@@ -646,7 +644,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       const bytes = crypto.getRandomValues(new Uint8Array(32));
       const token = `nvc_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
       const tokenDigest = await sha256(token);
-      const { data, error } = await retryTransientRpc(() => supabase.rpc("create_calendar_feed_token", {
+      const { data, error } = await retryTransientRequest(() => supabase.rpc("create_calendar_feed_token", {
         token_digest: tokenDigest,
         token_label_prefix: token.slice(0, 12),
       }));
@@ -655,7 +653,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
     revokeCalendarFeedToken: async (id) => {
       await requireUser();
-      const { error } = await retryTransientRpc(() => supabase.rpc("revoke_calendar_feed_token", { token_id: id }));
+      const { error } = await retryTransientRequest(() => supabase.rpc("revoke_calendar_feed_token", { token_id: id }));
       if (error) throw new Error(error.message);
     },
 
