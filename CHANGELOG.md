@@ -47,10 +47,16 @@
 ### 新增
 - 新增可撤销的私有 Webcal 日历订阅：登录用户可在“设置 → 高级 → 日历与集成”生成只读链接，将时间轴排程、日历事件和未排程任务截止日订阅到 iPhone、Notion Calendar 等日历；完整令牌仅显示一次，更换或撤销后旧链接立即失效。
 
+### 修复
+- 修复日历订阅数据库迁移后 PostgREST schema cache 未及时重建、导致云端资料查询暂时返回 503 的问题。
+
 ## 2026-07-19 · Private calendar subscriptions
 
 ### Added
 - Added revocable private Webcal subscriptions. Signed-in users can create a read-only link in Settings → Advanced → Calendar & Integrations for timeline blocks, calendar events, and unscheduled task deadlines in iPhone, Notion Calendar, and other calendar clients. The complete token is shown once, and replacing or revoking it immediately invalidates the old link.
+
+### Fixed
+- Fixed a PostgREST schema-cache refresh failure after the calendar-subscription migration that temporarily returned 503 responses for cloud profile queries.
 
 ## 2026-07-18 · iOS 原生工程与 Windows 开发流程
 
