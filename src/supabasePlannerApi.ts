@@ -116,7 +116,7 @@ function mergeSettings(settings: unknown): Settings {
   return { ...defaultSettings, ...stored };
 }
 
-const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "timeEntries", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
+const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "habits", "habitDailyStates", "timeEntries", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
 
 function itemTime(item: any) {
   return Date.parse(item?.updatedAt || item?.createdAt || item?.savedAt || "") || 0;
@@ -179,7 +179,7 @@ function authErrorMessage(message: string) {
 }
 
 function isRetryableProfileError(message = "") {
-  return /schema cache|Could not query the database|timeout|temporarily|PGRST/i.test(message);
+  return /schema cache|Could not query the database|time(?:d )?out|connection pool|temporarily|PGRST/i.test(message);
 }
 
 function wait(ms: number) {
@@ -245,6 +245,16 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     const user = await getUser();
     if (!user) throw new Error("请先登录 NavoPath。");
     return user;
+  }
+
+  async function retryTransientRpc(call: () => any) {
+    let result: any;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      result = await call();
+      if (!result.error || !isRetryableProfileError(result.error.message)) return result;
+      if (attempt < 2) await wait(260 * (attempt + 1));
+    }
+    return result;
   }
 
   async function ensureProfile(user: User, force = false) {
@@ -341,11 +351,11 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const nextData = patch.data ? mergePlannerData(current.data, normalizeData(patch.data)) : current.data;
       const nextSettings = patch.settings ? mergeSettings({ ...current.settings, ...patch.settings }) : current.settings;
-      const { data: rows, error } = await supabase.rpc("save_dayflow_profile", {
+      const { data: rows, error } = await retryTransientRpc(() => supabase.rpc("save_dayflow_profile", {
         expected_revision: current.revision,
         next_data: nextData,
         next_settings: nextSettings,
-      });
+      }));
       if (!error && rows?.[0]) {
         profileCache = { data: normalizeData(rows[0].data), settings: mergeSettings(rows[0].settings), revision: Number(rows[0].revision) };
         return profileCache;
@@ -627,7 +637,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
     listCalendarFeedTokens: async () => {
       await requireUser();
-      const { data, error } = await supabase.rpc("list_calendar_feed_tokens");
+      const { data, error } = await retryTransientRpc(() => supabase.rpc("list_calendar_feed_tokens"));
       if (error) throw new Error(error.message);
       return (data || []).map(calendarTokenMetadata);
     },
@@ -635,16 +645,17 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       await requireUser();
       const bytes = crypto.getRandomValues(new Uint8Array(32));
       const token = `nvc_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-      const { data, error } = await supabase.rpc("create_calendar_feed_token", {
-        token_digest: await sha256(token),
+      const tokenDigest = await sha256(token);
+      const { data, error } = await retryTransientRpc(() => supabase.rpc("create_calendar_feed_token", {
+        token_digest: tokenDigest,
         token_label_prefix: token.slice(0, 12),
-      });
+      }));
       if (error) throw new Error(error.message);
       return { token, metadata: calendarTokenMetadata(data?.[0]) };
     },
     revokeCalendarFeedToken: async (id) => {
       await requireUser();
-      const { error } = await supabase.rpc("revoke_calendar_feed_token", { token_id: id });
+      const { error } = await retryTransientRpc(() => supabase.rpc("revoke_calendar_feed_token", { token_id: id }));
       if (error) throw new Error(error.message);
     },
 

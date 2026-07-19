@@ -7583,6 +7583,21 @@ function App() {
           </nav>
           <div className="df-header-right">
           <button
+            className={`df-user-avatar df-header-sync${isManualSyncing ? " is-syncing" : ""}`}
+            type="button"
+            disabled={isManualSyncing}
+            onClick={() => void handleSyncNow()}
+            aria-label={lang === "zh" ? "立即同步" : "Sync now"}
+            title={lang === "zh" ? "立即同步" : "Sync now"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 7h-5V2" />
+              <path d="M20 7a8 8 0 0 0-13.7-2.7L4 7" />
+              <path d="M4 17h5v5" />
+              <path d="M4 17a8 8 0 0 0 13.7 2.7L20 17" />
+            </svg>
+          </button>
+          <button
             className="df-user-avatar"
             type="button"
             onClick={() => { setCommandOpen(true); setCommandQuery(""); }}

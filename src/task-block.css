@@ -3011,3 +3011,43 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
     border-radius: 6px !important;
   }
 }
+
+/* Today candidates keep task copy left-aligned in both collapsed and expanded states. */
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"] .df-candidate-main {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"] .df-candidate-title {
+  width: 100%;
+  margin-inline: 0 !important;
+  text-align: left !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"] .df-task-card-more-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"] .df-task-card-more-head > .df-candidate-main {
+  grid-column: auto !important;
+  display: flex !important;
+  flex: 1 1 auto !important;
+  align-self: center !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-direction: row !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"] .df-task-card-more-head .df-candidate-title {
+  width: auto;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"] .df-task-card-more-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}

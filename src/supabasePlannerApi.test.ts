@@ -120,4 +120,59 @@ describe("createSupabasePlannerApi", () => {
     unsubscribe?.();
     expect(removeChannel).toHaveBeenCalledWith(channelApi);
   });
+
+  it("merges habits and daily habit states by id when saving from another device", async () => {
+    const user = { id: "user_1", email: "user@example.com" };
+    const remoteHabit = { id: "habit_remote", title: "Remote habit", defaultDurationMinutes: 20, createdAt: "2026-07-19T00:00:00.000Z", updatedAt: "2026-07-19T01:00:00.000Z" };
+    const remoteState = { id: "state_remote", habitId: remoteHabit.id, date: "2026-07-19", completed: true, createdAt: "2026-07-19T01:00:00.000Z", updatedAt: "2026-07-19T01:00:00.000Z" };
+    const baseData = {
+      version: 1, importedSeedVersion: "test", generatedAt: "2026-07-19T00:00:00.000Z",
+      goals: [], projects: [], tasks: [], habits: [remoteHabit], habitDailyStates: [remoteState],
+      timeEntries: [], longTasks: [], events: [], notes: [], drafts: [], chat: [], aiConversations: [], aiMemories: [], taskLayouts: {},
+    };
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { revision: 1, data: baseData, settings: { language: "en" } }, error: null });
+    const from = vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) }));
+    const rpc = vi.fn(async (_name, args) => ({
+      data: [{ revision: 2, data: args.next_data, settings: args.next_settings }],
+      error: null,
+    }));
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
+        onAuthStateChange: vi.fn(),
+      },
+      from,
+      rpc,
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+    await api.getBootstrap?.({ force: true });
+    const localHabit = { id: "habit_local", title: "Local habit", defaultDurationMinutes: 15, createdAt: "2026-07-19T02:00:00.000Z", updatedAt: "2026-07-19T02:00:00.000Z" };
+    const saved = await api.saveData?.({ ...baseData, habits: [localHabit], habitDailyStates: [] });
+
+    expect(saved?.habits?.map((habit) => habit.id).sort()).toEqual(["habit_local", "habit_remote"]);
+    expect(saved?.habitDailyStates).toEqual([remoteState]);
+  });
+
+  it("retries calendar subscription generation after a transient pool timeout", async () => {
+    const user = { id: "user_1", email: "user@example.com" };
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { message: "Timed out acquiring connection from connection pool." } })
+      .mockResolvedValueOnce({ data: [{ id: "token_1", token_prefix: "nvc_12345678", created_at: "2026-07-19T00:00:00.000Z", last_used_at: null }], error: null });
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
+        onAuthStateChange: vi.fn(),
+      },
+      rpc,
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+    const created = await api.createCalendarFeedToken?.();
+
+    expect(created?.metadata.id).toBe("token_1");
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
 });

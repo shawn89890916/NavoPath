@@ -44,6 +44,12 @@
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 
+### 本次补充
+- 顶栏搜索按钮左侧新增“立即同步”入口，可直接推送本地改动并拉取同账号的最新云端数据。
+- 修复生成日历订阅时偶发连接池超时的问题，瞬时数据库连接故障现在会自动重试。
+- 修复习惯及每日完成状态未参与跨设备合并、导致一端的旧数据覆盖另一端更新的问题。
+- 修复今日候选任务名居中及展开详情错位的问题；所有候选任务名现统一左对齐，展开时标题与操作按钮保持同行，备注区域不再显示阴影。
+
 ### 新增
 - 新增可撤销的私有 Webcal 日历订阅：登录用户可在“设置 → 高级 → 日历与集成”生成只读链接，将时间轴排程、日历事件和未排程任务截止日订阅到 iPhone、Notion Calendar 等日历；完整令牌仅显示一次，更换或撤销后旧链接立即失效。
 
@@ -52,6 +58,12 @@
 - 修复日历订阅数据库迁移后 PostgREST schema cache 未及时重建、导致云端资料查询暂时返回 503 的问题。
 
 ## 2026-07-19 · Realtime cloud sync and private calendar subscriptions
+
+### Current additions and fixes
+- Added a Sync now action immediately left of Search in the top bar, providing direct push-and-pull sync for the signed-in account.
+- Fixed intermittent connection-pool timeouts while generating calendar subscriptions by retrying transient database connection failures.
+- Fixed habits and daily completion states being omitted from cross-device merges, which allowed stale data on one device to overwrite newer updates from another.
+- Fixed centered candidate task names and the misaligned expanded detail layout. Candidate task names are now consistently left-aligned, expanded titles stay beside their actions, and the notes surface no longer has a shadow.
 
 ### Added
 - Added revocable private Webcal subscriptions. Signed-in users can create a read-only link in Settings → Advanced → Calendar & Integrations for timeline blocks, calendar events, and unscheduled task deadlines in iPhone, Notion Calendar, and other calendar clients. The complete token is shown once, and replacing or revoking it immediately invalidates the old link.

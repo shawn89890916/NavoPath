@@ -172,6 +172,14 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   color: var(--text-muted) !important; background: transparent !important; box-shadow: none !important;
 }
 .df-user-avatar:hover { color: var(--text-main) !important; border-color: var(--paper-rule-strong) !important; background: var(--paper-note) !important; }
+.df-user-avatar:disabled { cursor: wait; opacity: .52; }
+.df-header-sync.is-syncing { animation: df-header-sync-pulse 1s ease-in-out infinite alternate; }
+@keyframes df-header-sync-pulse {
+  from { opacity: .38; }
+  to { opacity: .72; }
+}
+
+.df-app .df-card-popover.note-output { box-shadow: none !important; }
 
 /* Desktop workbench */
 .df-execute { height: calc(100vh - 58px) !important; gap: 1px !important; padding: 10px !important; background: transparent !important; }
