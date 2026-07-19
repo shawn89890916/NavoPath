@@ -42,20 +42,22 @@
 - Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
-## 2026-07-19 · 私有日历订阅
+## 2026-07-19 · 实时云同步与私有日历订阅
 
 ### 新增
 - 新增可撤销的私有 Webcal 日历订阅：登录用户可在“设置 → 高级 → 日历与集成”生成只读链接，将时间轴排程、日历事件和未排程任务截止日订阅到 iPhone、Notion Calendar 等日历；完整令牌仅显示一次，更换或撤销后旧链接立即失效。
 
 ### 修复
+- 修复同一账号在网页端与桌面端之间不能实时同步的问题；云端资料更新现在会立即广播到其他在线设备，并在设备重连后自动补取断线期间错过的最新版。
 - 修复日历订阅数据库迁移后 PostgREST schema cache 未及时重建、导致云端资料查询暂时返回 503 的问题。
 
-## 2026-07-19 · Private calendar subscriptions
+## 2026-07-19 · Realtime cloud sync and private calendar subscriptions
 
 ### Added
 - Added revocable private Webcal subscriptions. Signed-in users can create a read-only link in Settings → Advanced → Calendar & Integrations for timeline blocks, calendar events, and unscheduled task deadlines in iPhone, Notion Calendar, and other calendar clients. The complete token is shown once, and replacing or revoking it immediately invalidates the old link.
 
 ### Fixed
+- Fixed realtime syncing between the web and desktop apps for the same account. Cloud profile updates now reach other online devices immediately, with an automatic revision check after reconnecting to recover changes missed while offline.
 - Fixed a PostgREST schema-cache refresh failure after the calendar-subscription migration that temporarily returned 503 responses for cloud profile queries.
 
 ## 2026-07-18 · iOS 原生工程与 Windows 开发流程

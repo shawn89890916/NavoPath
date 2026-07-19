@@ -10,6 +10,20 @@ alter table public.dayflow_profiles add column if not exists revision bigint not
 
 alter table public.dayflow_profiles enable row level security;
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'dayflow_profiles'
+  ) then
+    alter publication supabase_realtime add table public.dayflow_profiles;
+  end if;
+end;
+$$;
+
 grant select, insert, update, delete on public.dayflow_profiles to authenticated;
 
 drop policy if exists "dayflow_profiles_select_own" on public.dayflow_profiles;

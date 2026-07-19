@@ -570,17 +570,32 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       let disposed = false;
       void requireUser().then((user) => {
         if (disposed) return;
+        let latestRevision = profileCache?.revision || 0;
+        const emitIfNewer = (row: any) => {
+          if (!row?.data || !row?.settings) return;
+          const next = { data: normalizeData(row.data), settings: mergeSettings(row.settings), revision: Number(row.revision || 0) };
+          const knownRevision = Math.max(latestRevision, profileCache?.revision || 0);
+          latestRevision = knownRevision;
+          if (next.revision <= knownRevision) return;
+          latestRevision = next.revision;
+          profileCache = next;
+          listener({ data: next.data, settings: next.settings, revision: next.revision });
+        };
+        const reconcileAfterConnect = async () => {
+          const { data: row, error } = await supabase
+            .from(PROFILE_TABLE)
+            .select("data, settings, revision")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (!disposed && !error) emitIfNewer(row);
+        };
         channel = supabase.channel(`dayflow-profile-${user.id}`)
           .on("postgres_changes", { event: "UPDATE", schema: "public", table: PROFILE_TABLE, filter: `user_id=eq.${user.id}` }, (payload) => {
-            const row = payload.new as any;
-            if (!row?.data || !row?.settings) return;
-            const next = { data: normalizeData(row.data), settings: mergeSettings(row.settings), revision: Number(row.revision || 0) };
-            if (!profileCache || next.revision > profileCache.revision) {
-              profileCache = next;
-              listener({ data: next.data, settings: next.settings, revision: next.revision });
-            }
+            emitIfNewer(payload.new);
           })
-          .subscribe();
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") void reconcileAfterConnect();
+          });
       }).catch(() => undefined);
       return () => {
         disposed = true;
