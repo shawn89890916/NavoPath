@@ -1,6 +1,5 @@
 import type { AiAction, PlannerApi, PlannerData, Settings, Task, TaskRecurrence } from "./types";
-import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
-import { DEFAULT_WIDGET_TIMER_PREFERENCES, normalizeWidgetTimerPreferences } from "./widget/widgetTimer";
+import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
 import { normalizePlannerDataForClient } from "./utils/dataNormalization";
@@ -95,6 +94,34 @@ function configurePreviewMode() {
     localStorage.removeItem(PREVIEW_MODE_KEY);
   }
   return preview === "local" || useLocalPreviewByDefault || localStorage.getItem(PREVIEW_MODE_KEY) === "1";
+}
+
+type LocalPreviewSettings = Settings & { _apiKey?: string };
+
+export function parseLocalPreviewSettings(raw: string | null): LocalPreviewSettings {
+  let stored: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(raw || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      stored = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // A damaged local settings snapshot should not prevent preview mode loading.
+  }
+
+  const merged = normalizeSettings({
+    displayName: "NavoPath Preview",
+    panelWidths: { left: 310, right: 360 },
+    ...stored,
+  }) as LocalPreviewSettings;
+  if (typeof merged._apiKey === "string" && merged._apiKey && !merged.hasApiKey) {
+    merged.hasApiKey = true;
+    merged.apiKeyPreview = merged.apiKeyPreview
+      || `${merged._apiKey.slice(0, 6)}...${merged._apiKey.slice(-4)}`;
+  } else if (merged._apiKey !== undefined && typeof merged._apiKey !== "string") {
+    delete merged._apiKey;
+  }
+  return merged;
 }
 
 function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
@@ -509,88 +536,8 @@ export function installBrowserFallback() {
   }
 
   function installLocalPreview() {
-  const defaultSettings: Settings = {
-    activeMode: "execute",
-    defaultTimelineView: "daily",
-    continuousCrossDayScroll: true,
-    language: "en",
-    planningView: "tree",
-    metricsRangePreset: "today",
-    metricsGroupBy: "project",
-    metricsDisplayMetric: "percentage",
-    metricsIncludeHabits: "include",
-    metricsCompletionFilter: "all",
-    aiDockOpen: false,
-    appTitle: "NavoPath",
-    model: "deepseek-ai/DeepSeek-V3.2",
-    reasoningMode: "instant",
-    baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
-    hasApiKey: false,
-    apiKeyPreview: "",
-    displayName: "NavoPath Preview",
-    avatarDataUrl: "",
-    onboardingVersion: 2,
-    onboardingStep: "done",
-    dailyFocusTime: "20:00",
-    weekStartsOn: 0,
-    theme: "light",
-    typographyStyle: "editorial",
-    accentColor: "",
-    executeAccentColor: "",
-    planningAccentColor: "",
-    aiTone: "direct",
-    hideCompleted: false,
-    reminderLeadDays: 7,
-    taskNoteDisplay: "summary",
-    glassEnabled: false,
-    backgroundImagePath: "",
-    glassBlur: 18,
-    glassOpacity: 88,
-    backgroundDim: 12,
-    collapsedPanels: [],
-    collapsedSections: [],
-    panelWidths: { left: 310, right: 360 },
-    chatMessageMaxHeight: 220,
-    aiMemoryEnabled: true,
-    hideAi: false,
-    addAdvancedOpen: false,
-    uiStyle: "gradient",
-    dayStartTime: "00:00",
-    scheduleDayStartTime: "08:00",
-    dayEndTime: "22:00",
-    scheduleBufferMinutes: 5,
-    autoEstimateTaskDuration: true,
-    autoAssignTaskProject: true,
-    idleThresholdMinutes: 5,
-    focusModeDefault: "stopwatch",
-    featureKanbanViewEnabled: false,
-    featureQuadrantViewEnabled: false,
-    featureListViewEnabled: false,
-    featureHabitsEnabled: true,
-    featureHabitCandidatesEnabled: true,
-    featureWidgetEnabled: true,
-    widgetAlwaysOnTop: true,
-    widgetOpenOnLaunch: false,
-    compactWindowAlwaysOnTop: true,
-    widgetAppearance: DEFAULT_WIDGET_APPEARANCE,
-    widgetTimerPreferences: DEFAULT_WIDGET_TIMER_PREFERENCES,
-    widgetAppearanceMigrated: false,
-  };
-
   const readSettings = () => {
-    const stored: any = JSON.parse(localStorage.getItem(PREVIEW_SETTINGS_KEY) || "{}");
-    if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
-    if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
-    const merged: any = { ...defaultSettings, ...stored };
-    merged.widgetAppearance = normalizeWidgetAppearance(stored.widgetAppearance);
-    merged.widgetTimerPreferences = normalizeWidgetTimerPreferences(stored.widgetTimerPreferences);
-    if (merged.model === "deepseek-v4-flash" || merged.model === "deepseek-chat" || /^deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(merged.model || "")) merged.model = "deepseek-ai/DeepSeek-V3.2";
-    if (!merged.baseUrl || merged.baseUrl === "https://api.deepseek.com/chat/completions") merged.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
-    if (merged._apiKey && !merged.hasApiKey) {
-      merged.hasApiKey = true;
-      merged.apiKeyPreview = merged.apiKeyPreview || `${merged._apiKey.slice(0, 6)}...${merged._apiKey.slice(-4)}`;
-    }
-    return merged;
+    return parseLocalPreviewSettings(localStorage.getItem(PREVIEW_SETTINGS_KEY));
   };
 
   const writeSettings = (settings: any) => {

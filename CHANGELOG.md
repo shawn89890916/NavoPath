@@ -48,6 +48,7 @@
 - 修复跨午夜的重叠任务未正确并排显示的问题；时间轴现在会把结束时间早于开始时间的任务识别为跨天区间，并稳定计算冲突列。
 - 修复 CSV 导出与重新导入：公式式标题会安全保存为文本，带逗号、引号或换行的任务可完整往返，重新导入时也会按项目名恢复任务归属。
 - 加固 JSON 完整备份导入：旧备份会先迁移缺失集合和设置，非法枚举、尺寸及小组件偏好会回退到安全默认值，损坏或缺少核心集合的文件会在覆盖任何当前数据前被拒绝。
+- 统一云端、本地预览与备份导入的设置迁移规则；本地预览仍保留专属名称和面板宽度，且损坏的本地设置快照不再阻止应用启动。
 
 ## 2026-07-26 · Timeline and data export fixes
 
@@ -55,6 +56,7 @@
 - Fixed overlapping tasks that cross midnight not rendering side by side. The timeline now treats an end time at or before the start as a next-day boundary and assigns conflict columns consistently.
 - Fixed CSV export and re-import. Formula-like titles are stored safely as text, tasks containing commas, quotes, or line breaks round-trip intact, and imported tasks recover their project assignment by project name.
 - Hardened full JSON backup imports. Legacy backups now migrate missing collections and settings first, invalid enums, panel sizes, and widget preferences fall back safely, and corrupt files or files missing core collections are rejected before any current data is overwritten.
+- Unified settings migrations across cloud profiles, local preview, and backup imports. Local preview keeps its own display name and panel widths, while a corrupt local settings snapshot can no longer prevent the app from starting.
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 
