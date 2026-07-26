@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAiProfile, predictTaskIntelligence } from "./aiPersonalization";
+import { buildAiProfile, learnedTaskDurationMinutes, predictTaskIntelligence } from "./aiPersonalization";
 import type { PlannerData, Project, Task } from "./types";
 
 const projects: Project[] = [
@@ -39,5 +39,23 @@ describe("AI personalization", () => {
     expect(profile.version).toBe(1);
     expect(profile.durationByProject.portfolio.minutes).toBe(45);
     expect(profile.projectTokenWeights.portfolio).toBeTruthy();
+  });
+
+  it("uses matching task history for legacy duration estimates", () => {
+    const tasks = [
+      task("t1", "ESAT 物理做题", "esat", 75),
+      task("t2", "更新作品集首页", "portfolio", 30),
+    ];
+
+    expect(learnedTaskDurationMinutes("ESAT 数学做题", tasks, "esat")).toBe(75);
+    expect(learnedTaskDurationMinutes("检查邮件", [])).toBe(30);
+  });
+
+  it("preserves cross-midnight duration history", () => {
+    const overnight = task("overnight", "夜间复习", "esat", 60);
+    overnight.scheduledStart = "23:30";
+    overnight.scheduledEnd = "00:30";
+
+    expect(learnedTaskDurationMinutes("夜间复习", [overnight], "esat")).toBe(60);
   });
 });

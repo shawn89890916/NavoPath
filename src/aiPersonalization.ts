@@ -1,4 +1,5 @@
 import type { AiPersonalizationProfile, PlannerData, Project, Task } from "./types";
+import { durationMinutes, SLOT_MINUTES } from "./timelineGeometry";
 
 export const AI_PROFILE_VERSION = 1 as const;
 export const AI_INFERENCE_MODEL_VERSION = "local-profile-v1";
@@ -16,6 +17,37 @@ export function tokenizeTaskTitle(title: string): string[] {
     Array.from({ length: Math.max(chunk.length - 1, 0) }, (_, index) => chunk.slice(index, index + 2)),
   );
   return Array.from(new Set([...latin, ...grams])).filter((token) => token.length >= 2);
+}
+
+function taskDurationMinutes(task: Task): number {
+  if (task.scheduledStart && task.scheduledEnd) {
+    return Math.max(durationMinutes(task.scheduledStart, task.scheduledEnd), SLOT_MINUTES);
+  }
+  return Math.max(Math.round((task.estimatedHours || 0.5) * 60), SLOT_MINUTES);
+}
+
+export function learnedTaskDurationMinutes(title: string, tasks: Task[], projectId?: string): number {
+  const tokens = tokenizeTaskTitle(title);
+  const fallback = /复习|做题|刷题|essay|文书|编程|coding|debug|项目|申请|准备/i.test(title) ? 60
+    : /整理|检查|回复|阅读|确认|查看|邮件/i.test(title) ? 30
+      : 45;
+  const scored = tasks
+    .filter((task) => task.title && Math.round((task.estimatedHours || 0) * 60) >= SLOT_MINUTES)
+    .map((task) => {
+      const taskTokens = tokenizeTaskTitle(task.title);
+      const overlap = tokens.filter((token) => taskTokens.includes(token)).length;
+      const projectBoost = projectId && task.projectId === projectId ? 2 : 0;
+      const score = overlap + projectBoost;
+      return { score, minutes: taskDurationMinutes(task) };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+  if (scored.length === 0) return fallback;
+  const weighted = scored.reduce((sum, item) => sum + item.minutes * item.score, 0);
+  const weight = scored.reduce((sum, item) => sum + item.score, 0);
+  const estimate = Math.round((weighted / Math.max(weight, 1)) / SLOT_MINUTES) * SLOT_MINUTES;
+  return Math.min(Math.max(estimate, SLOT_MINUTES), 180);
 }
 
 function roundToQuarterHour(minutes: number): number {
