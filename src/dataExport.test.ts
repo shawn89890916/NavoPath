@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPlannerBackupJson, buildTasksCsv, parseTaskCsvRows, parseTasksCsv } from "./dataExport";
+import { buildPlannerBackupJson, buildTasksCsv, parsePlannerBackupJson, parseTaskCsvRows, parseTasksCsv } from "./dataExport";
 import type { PlannerData, Project, Settings, Task } from "./types";
 
 function task(id: string, title: string, projectId?: string): Task {
@@ -50,6 +50,52 @@ describe("planner backup export", () => {
       data,
       settings,
     });
+  });
+
+  it("normalizes legacy backups before applying them", () => {
+    const legacyData = plannerData([task("task", "Legacy task")]);
+    delete (legacyData as Partial<PlannerData>).aiMemories;
+    const backup = parsePlannerBackupJson(JSON.stringify({
+      data: legacyData,
+      settings: {
+        language: "zh",
+        theme: "dark",
+        model: "deepseek-chat",
+        executeAccentColor: "#C69CF9",
+      },
+    }));
+
+    expect(backup.data.aiMemories).toEqual([]);
+    expect(backup.data.scheduleTemplates).toEqual([]);
+    expect(backup.settings.language).toBe("zh");
+    expect(backup.settings.theme).toBe("dark");
+    expect(backup.settings.model).toBe("deepseek-ai/DeepSeek-V3.2");
+    expect(backup.settings.executeAccentColor).toBe("");
+  });
+
+  it("rejects corrupt data and replaces invalid settings with safe defaults", () => {
+    expect(() => parsePlannerBackupJson("{broken")).toThrow();
+    expect(() => parsePlannerBackupJson(JSON.stringify({
+      data: { projects: [] },
+      settings: {},
+    }))).toThrow("required collections");
+
+    const backup = parsePlannerBackupJson(JSON.stringify({
+      data: plannerData([]),
+      settings: {
+        activeMode: "destroy",
+        language: 42,
+        syncIntervalMinutes: -5,
+        panelWidths: { left: -1, right: "wide" },
+        widgetTimerPreferences: { mode: "invalid", focusMinutes: -10 },
+      },
+    }));
+    expect(backup.settings.activeMode).toBe("execute");
+    expect(backup.settings.language).toBe("en");
+    expect(backup.settings.syncIntervalMinutes).toBe(60);
+    expect(backup.settings.panelWidths).toEqual({ left: 360, right: 390 });
+    expect(backup.settings.widgetTimerPreferences?.mode).toBe("stopwatch");
+    expect(backup.settings.widgetTimerPreferences?.focusMinutes).toBe(25);
   });
 });
 

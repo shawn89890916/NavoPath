@@ -13,7 +13,7 @@ import {
   pickMemoriesForContext,
   toAiHistory,
 } from "./aiContext";
-import { exportDataAsJson, exportTasksAsCsv, parseTasksCsv } from "./dataExport";
+import { exportDataAsJson, exportTasksAsCsv, parsePlannerBackupJson, parseTasksCsv } from "./dataExport";
 import type { ParsedAttachment } from "./fileParser";
 import { reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks, type UnscheduledTask } from "./autoSchedule";
@@ -12624,14 +12624,10 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
       reader.onload = (event) => {
         try {
           const content = event.target?.result as string;
-          const parsed = JSON.parse(content);
-          if (parsed.data && parsed.settings) {
-            onSaveData(parsed.data);
-            onSave(parsed.settings);
-            alert(lang === "zh" ? "数据导入成功！" : "Data imported successfully!");
-          } else {
-            alert(lang === "zh" ? "数据导入失败，文件格式不正确。" : "Import failed: invalid file format.");
-          }
+          const backup = parsePlannerBackupJson(content);
+          onSaveData(backup.data);
+          onSave(backup.settings);
+          alert(lang === "zh" ? "数据导入成功！" : "Data imported successfully!");
         } catch {
           alert(lang === "zh" ? "数据导入失败，无法解析文件。" : "Import failed: unable to parse file.");
         }

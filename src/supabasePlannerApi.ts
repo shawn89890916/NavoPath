@@ -1,8 +1,7 @@
 import { createClient, type User } from "@supabase/supabase-js";
 import type { AiAction, CalendarFeedTokenMetadata, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
 import { fallbackData, normalizeData } from "./browserFallback";
-import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
-import { DEFAULT_WIDGET_TIMER_PREFERENCES, normalizeWidgetTimerPreferences } from "./widget/widgetTimer";
+import { getDefaultSettings, normalizeSettings } from "./defaultSettings";
 
 const PROFILE_TABLE = "dayflow_profiles";
 
@@ -27,93 +26,12 @@ function calendarTokenMetadata(row: any): CalendarFeedTokenMetadata {
   return { id: row.id, tokenPrefix: row.token_prefix, createdAt: row.created_at, lastUsedAt: row.last_used_at || undefined };
 }
 
-const defaultSettings: Settings = {
-  activeMode: "execute",
-  defaultTimelineView: "daily",
-  continuousCrossDayScroll: true,
-  language: "en",
-  planningView: "tree",
-  metricsRangePreset: "today",
-  metricsGroupBy: "project",
-  metricsDisplayMetric: "percentage",
-  metricsIncludeHabits: "include",
-  metricsCompletionFilter: "all",
-  aiDockOpen: false,
-  appTitle: "NavoPath",
-  model: "deepseek-ai/DeepSeek-V3.2",
-  reasoningMode: "instant",
-  baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
-  hasApiKey: false,
-  apiKeyPreview: "",
-  displayName: "NavoPath",
-  avatarDataUrl: "",
-  onboardingVersion: 2,
-  onboardingStep: "done",
-  dailyFocusTime: "20:00",
-  weekStartsOn: 0,
-  theme: "light",
-  typographyStyle: "editorial",
-  accentColor: "",
-  executeAccentColor: "",
-  planningAccentColor: "",
-  aiTone: "direct",
-  hideCompleted: false,
-  reminderLeadDays: 7,
-  taskNoteDisplay: "summary",
-  glassEnabled: false,
-  backgroundImagePath: "",
-  glassBlur: 18,
-  glassOpacity: 88,
-  backgroundDim: 12,
-  collapsedPanels: [],
-  collapsedSections: [],
-  panelWidths: { left: 360, right: 390 },
-  chatMessageMaxHeight: 220,
-  aiMemoryEnabled: true,
-  hideAi: false,
-  addAdvancedOpen: false,
-  uiStyle: "gradient",
-  dayStartTime: "00:00",
-  scheduleDayStartTime: "08:00",
-  dayEndTime: "22:00",
-  scheduleBufferMinutes: 5,
-  autoEstimateTaskDuration: true,
-  autoAssignTaskProject: true,
-  syncIntervalMinutes: 60,
-  lastSyncedAt: undefined,
-  idleThresholdMinutes: 5,
-  focusModeDefault: "stopwatch",
-  featureKanbanViewEnabled: false,
-  featureQuadrantViewEnabled: false,
-  featureListViewEnabled: false,
-  featureHabitsEnabled: true,
-  featureHabitCandidatesEnabled: true,
-  featureWidgetEnabled: true,
-  widgetAlwaysOnTop: true,
-  widgetOpenOnLaunch: false,
-  compactWindowAlwaysOnTop: true,
-  widgetAppearance: DEFAULT_WIDGET_APPEARANCE,
-  widgetTimerPreferences: DEFAULT_WIDGET_TIMER_PREFERENCES,
-  widgetAppearanceMigrated: false,
-};
-
 function publicUser(user: User | null) {
   return user ? { id: user.id, email: user.email } : null;
 }
 
 function mergeSettings(settings: unknown): Settings {
-  const stored = { ...((settings || {}) as Partial<Settings>) };
-  if (stored.executeAccentColor === "#C69CF9") stored.executeAccentColor = "";
-  if (stored.planningAccentColor === "#CAFF72") stored.planningAccentColor = "";
-  if (stored.model === "deepseek-v4-flash" || stored.model === "deepseek-chat" || /^deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(stored.model || "")) stored.model = "deepseek-ai/DeepSeek-V3.2";
-  if (!stored.baseUrl || stored.baseUrl === "https://api.deepseek.com/chat/completions") stored.baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
-  // Migrate syncIntervalMinutes: accept legacy plain numbers, fall back to default 60, normalize invalid values
-  if (typeof stored.syncIntervalMinutes !== "number" || !Number.isFinite(stored.syncIntervalMinutes) || stored.syncIntervalMinutes < 0) {
-    stored.syncIntervalMinutes = 60;
-  }
-  stored.widgetAppearance = normalizeWidgetAppearance(stored.widgetAppearance);
-  stored.widgetTimerPreferences = normalizeWidgetTimerPreferences(stored.widgetTimerPreferences);
-  return { ...defaultSettings, ...stored };
+  return normalizeSettings(settings);
 }
 
 const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "habits", "habitDailyStates", "timeEntries", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
@@ -285,7 +203,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     const useTemporaryProfile = () => {
       const initialData = emptyCloudData();
       const initialSettings = {
-        ...defaultSettings,
+        ...getDefaultSettings(),
         onboardingVersion: 0,
         onboardingStep: "add" as const,
       };
@@ -314,7 +232,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
       const initialData = emptyCloudData();
       const initialSettings = {
-        ...defaultSettings,
+        ...getDefaultSettings(),
         onboardingVersion: 0,
         onboardingStep: "add" as const,
       };

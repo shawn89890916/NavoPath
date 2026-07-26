@@ -1,4 +1,6 @@
 import type { PlannerData, Project, Settings, Task } from "./types";
+import { normalizeData } from "./browserFallback";
+import { normalizeSettings } from "./defaultSettings";
 
 export const TASK_CSV_HEADERS = [
   "ID",
@@ -43,6 +45,25 @@ function csvCell(value: unknown) {
 
 export function buildPlannerBackupJson(data: PlannerData, settings: Settings, exportedAt = new Date().toISOString()) {
   return JSON.stringify({ exportedAt, version: data.version, data, settings }, null, 2);
+}
+
+export function parsePlannerBackupJson(content: string): { data: PlannerData; settings: Settings } {
+  const parsed: unknown = JSON.parse(content);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid planner backup envelope.");
+  }
+  const { data, settings } = parsed as { data?: unknown; settings?: unknown };
+  if (!data || typeof data !== "object" || Array.isArray(data) || !settings || typeof settings !== "object" || Array.isArray(settings)) {
+    throw new Error("Planner backup is missing data or settings.");
+  }
+  const candidate = data as Partial<PlannerData>;
+  if (!Array.isArray(candidate.tasks) || !Array.isArray(candidate.projects)) {
+    throw new Error("Planner backup is missing required collections.");
+  }
+  return {
+    data: normalizeData(candidate as PlannerData),
+    settings: normalizeSettings(settings),
+  };
 }
 
 export function buildTasksCsv(data: PlannerData) {
