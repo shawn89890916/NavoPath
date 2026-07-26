@@ -85,7 +85,7 @@ import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
-import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, shouldApplyRemoteRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
+import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
@@ -1617,6 +1617,7 @@ function App() {
   const dataRef = useRef<PlannerData | null>(null);
   const settingsRef = useRef<Settings | null>(null);
   const loadedWorkspaceKeyRef = useRef("");
+  const workspaceLoadVersionRef = useRef(0);
   const localFallbackAppliedRef = useRef(false);
   const pendingDataSaveRef = useRef<QueuedDataSave | null>(null);
   const dataSaveTimerRef = useRef<number | null>(null);
@@ -1679,13 +1680,16 @@ function App() {
   useEffect(() => {
     if (!authState?.user || !window.plannerApi.subscribeToRemoteChanges) return;
     const userId = authState.user.id;
+    const workspaceKey = `cloud:${userId}`;
     return window.plannerApi.subscribeToRemoteChanges((remote) => {
+      const incomingRevision = Number(remote.revision || 0);
+      if (!shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
       if (pendingDataSaveRef.current || pendingSettingsSaveRef.current || dataSaveInFlightRef.current || settingsSaveInFlightRef.current) {
         queuedRemoteRefreshRef.current = true;
         return;
       }
       const migratedData = migrateLegacyHabitTracker(remote.data, remote.settings.pluginConfigs);
-      remoteRevisionRef.current = Math.max(remoteRevisionRef.current, remote.revision || 0);
+      remoteRevisionRef.current = Math.max(remoteRevisionRef.current, incomingRevision);
       dataRef.current = migratedData;
       settingsRef.current = remote.settings;
       setData(migratedData);
@@ -1738,6 +1742,7 @@ function App() {
   }, [mode]);
 
   function resetWorkspaceUi() {
+    workspaceLoadVersionRef.current += 1;
     pendingDataSaveRef.current = null;
     pendingSettingsSaveRef.current = null;
     dataSaveVersionRef.current += 1;
@@ -1754,6 +1759,10 @@ function App() {
     dataSaveRetryTimerRef.current = null;
     settingsSaveTimerRef.current = null;
     settingsSaveRetryTimerRef.current = null;
+    queuedRemoteRefreshRef.current = false;
+    remoteRevisionRef.current = 0;
+    if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = null;
     setModeState("execute");
     setCompactExecuteView("schedule");
     setQuickAddOpen(false);
@@ -1812,13 +1821,20 @@ function App() {
   }
 
   async function loadInitial() {
+    let loadVersion = workspaceLoadVersionRef.current + 1;
+    workspaceLoadVersionRef.current = loadVersion;
     let attemptedCloudUser = false;
     try {
     const api = await waitForPlannerApi();
     const auth = (await api.getAuthState?.()) || { mode: "local" as const, user: null, configured: false };
+    if (!isCurrentWorkspaceLoad(loadVersion, workspaceLoadVersionRef.current)) return;
     attemptedCloudUser = auth.mode === "cloud" && Boolean(auth.user);
     const workspaceKey = auth.mode === "cloud" ? `cloud:${auth.user?.id || "signed-out"}` : "local";
-    if (loadedWorkspaceKeyRef.current && loadedWorkspaceKeyRef.current !== workspaceKey) resetWorkspaceUi();
+    if (loadedWorkspaceKeyRef.current && loadedWorkspaceKeyRef.current !== workspaceKey) {
+      resetWorkspaceUi();
+      loadVersion = workspaceLoadVersionRef.current + 1;
+      workspaceLoadVersionRef.current = loadVersion;
+    }
     loadedWorkspaceKeyRef.current = workspaceKey;
     setAuthState(auth);
     if (auth.mode === "cloud" && !auth.user) {
@@ -1844,6 +1860,8 @@ function App() {
         data: await api.getData(),
         settings: await api.getSettings()
       };
+    if (!isCurrentWorkspaceLoad(loadVersion, workspaceLoadVersionRef.current)
+      || loadedWorkspaceKeyRef.current !== workspaceKey) return;
     const resolved = resolveBootstrap(cached, bootstrap.data, bootstrap.settings);
     let nextData = resolved.data;
     let nextSettings = resolved.settings;
@@ -1897,6 +1915,7 @@ function App() {
       console.warn("[loadInitial] snapshot write failed:", snapshotErr);
     }
     } catch (err) {
+      if (!isCurrentWorkspaceLoad(loadVersion, workspaceLoadVersionRef.current)) return;
       console.error("Failed to load initial data:", err);
       if (attemptedCloudUser) {
         const message = err instanceof Error ? err.message : String(err);
@@ -2143,10 +2162,13 @@ function App() {
     window.addEventListener("beforeunload", flushForLifecycle);
     window.addEventListener("online", handleOnline);
     return () => {
+      workspaceLoadVersionRef.current += 1;
       if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
       if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
       if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
       if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
+      if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", flushForLifecycle);
       window.removeEventListener("beforeunload", flushForLifecycle);
@@ -6367,10 +6389,11 @@ function App() {
       || dataSaveInFlightRef.current
       || settingsSaveInFlightRef.current)) return;
     queuedRemoteRefreshRef.current = false;
+    const workspaceKey = loadedWorkspaceKeyRef.current;
     const bootstrap = await window.plannerApi.getBootstrap?.({ force: true });
     if (!bootstrap?.data || !bootstrap.settings) return;
     const incomingRevision = Number(bootstrap.revision || 0);
-    if (!shouldApplyRemoteRevision(remoteRevisionRef.current, incomingRevision)) return;
+    if (!shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
     const resolved = resolveBootstrap(options.force ? null : readBootstrapCache(authState?.user?.id), bootstrap.data, bootstrap.settings, { preferRemote: options.force });
     if (!resolved.data || !resolved.settings) return;
     remoteRevisionRef.current = Math.max(remoteRevisionRef.current, incomingRevision);

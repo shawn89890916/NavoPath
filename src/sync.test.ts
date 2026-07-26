@@ -4,9 +4,11 @@ import {
   SyncScheduler,
   formatLastSyncedAt,
   isManualOnly,
+  isCurrentWorkspaceLoad,
   presetForMinutes,
   readSyncInterval,
   shouldApplyRemoteRevision,
+  shouldApplyWorkspaceRevision,
   shouldRequeueFailedSave,
 } from "./sync";
 
@@ -23,6 +25,17 @@ describe("sync race guards", () => {
     expect(shouldApplyRemoteRevision(5, 5)).toBe(true);
     expect(shouldApplyRemoteRevision(5, 6)).toBe(true);
     expect(shouldApplyRemoteRevision(5, 0)).toBe(true);
+  });
+
+  it("rejects responses for a workspace that is no longer active", () => {
+    expect(shouldApplyWorkspaceRevision("cloud:a", "cloud:b", 5, 6)).toBe(false);
+    expect(shouldApplyWorkspaceRevision("cloud:a", "cloud:a", 5, 4)).toBe(false);
+    expect(shouldApplyWorkspaceRevision("cloud:a", "cloud:a", 5, 6)).toBe(true);
+  });
+
+  it("accepts only the latest workspace load", () => {
+    expect(isCurrentWorkspaceLoad(3, 3)).toBe(true);
+    expect(isCurrentWorkspaceLoad(2, 3)).toBe(false);
   });
 });
 

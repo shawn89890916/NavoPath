@@ -57,6 +57,20 @@ export function shouldApplyRemoteRevision(currentRevision: number, incomingRevis
   return incomingRevision <= 0 || incomingRevision >= currentRevision;
 }
 
+export function shouldApplyWorkspaceRevision(
+  expectedWorkspaceKey: string,
+  currentWorkspaceKey: string,
+  currentRevision: number,
+  incomingRevision: number,
+) {
+  return expectedWorkspaceKey === currentWorkspaceKey
+    && shouldApplyRemoteRevision(currentRevision, incomingRevision);
+}
+
+export function isCurrentWorkspaceLoad(loadVersion: number, currentVersion: number) {
+  return loadVersion === currentVersion;
+}
+
 export function isManualOnly(intervalMinutes: number | null | undefined) {
   return !intervalMinutes || intervalMinutes <= 0;
 }
