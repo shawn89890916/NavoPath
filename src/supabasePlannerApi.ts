@@ -579,11 +579,6 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
 
     selectBackgroundImage: async () => ({ path: "" }),
-
-    chat: async () => ({
-      reply: "公开网页版暂不保存个人 AI API Key。你仍然可以使用本地版的 AI 设置，或后续接入服务端安全代理。",
-      actions: []
-    })
   };
 
   return api;

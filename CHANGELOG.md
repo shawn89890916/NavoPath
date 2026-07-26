@@ -54,7 +54,7 @@
 - 修复跨设备删除后旧任务、项目、习惯等资料再次出现的问题；完整资料保存现在会记录删除时间，同步冲突会保留更新较新的删除或重建结果。
 - 修复强制仅拉取与后台保存并发时，本地旧请求可能在拉取后重新入队或覆盖结果的问题；仅拉取现在会作废并等待在途保存，迟到的旧 revision 响应也会被忽略。
 - 加固账号会话隔离：快速登录或切换账号时，上一工作区迟到的加载、实时更新、云端资料缓存及延迟快照不会再落入当前会话；待邮箱确认的注册不会误判为已登录，失败的登出也会保留现有会话。
-- 本地预览在浏览器存储被禁用或空间不足时会自动使用会话内存继续保存，不再中断加载与编辑；清除本地 AI API Key 现在也会彻底移除密钥。
+- 本地预览在浏览器存储被禁用或空间不足时会自动使用会话内存继续保存，不再中断加载与编辑；旧版本遗留的个人 AI API Key 会从本地设置中清除，公开网页不再保留或直连第三方模型密钥。
 
 ## 2026-07-26 · Timeline and data export fixes
 
@@ -68,7 +68,7 @@
 - Fixed tasks, projects, habits, and other records reappearing after deletion on another device. Full-profile saves now record deletion times, and sync conflicts preserve whichever deletion or recreation happened later.
 - Fixed forced pull-only sync racing with background saves, which could requeue an old local request or overwrite the pulled result. Pull-only sync now invalidates and waits for in-flight saves, and late responses with older revisions are ignored.
 - Strengthened account-session isolation. During rapid sign-ins or account switches, late workspace loads, realtime updates, cloud-profile caches, and delayed snapshots from the previous account can no longer reach the current session. Signups awaiting email confirmation are no longer treated as signed in, and a failed sign-out preserves the existing session.
-- Local preview now falls back to in-session memory when browser storage is blocked or full, so loading and editing can continue. Clearing the local AI API key now removes it completely.
+- Local preview now falls back to in-session memory when browser storage is blocked or full, so loading and editing can continue. Personal AI API keys left by older versions are removed from local settings, and the public web app no longer stores them or connects directly to third-party model endpoints.
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 

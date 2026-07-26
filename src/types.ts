@@ -583,7 +583,7 @@ export interface PlannerApi {
   applyActions: (actions: AiAction[]) => Promise<{ data: PlannerData; applied: Array<{ type: string; id: string; title: string }> }>;
   resetSeed: () => Promise<PlannerData>;
   getSettings: () => Promise<Settings>;
-  saveSettings: (settings: Partial<Settings> & { apiKey?: string; clearApiKey?: boolean }) => Promise<Settings>;
+  saveSettings: (settings: Partial<Settings>) => Promise<Settings>;
   listMcpTokens?: () => Promise<McpTokenMetadata[]>;
   createMcpToken?: (name: string) => Promise<{ token: string; metadata: McpTokenMetadata }>;
   revokeMcpToken?: (id: string) => Promise<void>;
@@ -591,7 +591,6 @@ export interface PlannerApi {
   createCalendarFeedToken?: () => Promise<{ token: string; metadata: CalendarFeedTokenMetadata }>;
   revokeCalendarFeedToken?: (id: string) => Promise<void>;
   selectBackgroundImage: () => Promise<{ path: string }>;
-  chat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
 }
 
 export interface DesktopUpdateState {

@@ -146,6 +146,10 @@ function configurePreviewMode() {
   const params = new URLSearchParams(window.location.search);
   const preview = params.get("preview");
   const useLocalPreviewByDefault = shouldUseLocalPreviewByDefault(window.location.hostname, window.location.pathname, preview);
+  const storedSettings = previewStorage.getItem(PREVIEW_SETTINGS_KEY);
+  if (storedSettings) {
+    previewStorage.setItem(PREVIEW_SETTINGS_KEY, JSON.stringify(parseLocalPreviewSettings(storedSettings)));
+  }
   if (preview === "local") previewStorage.setItem(PREVIEW_MODE_KEY, "1");
   if (preview === "cloud" || preview === "off") previewStorage.removeItem(PREVIEW_MODE_KEY);
   // Migration: earlier builds persisted the runtime fallback to localStorage, which
@@ -157,31 +161,7 @@ function configurePreviewMode() {
   return preview === "local" || useLocalPreviewByDefault || previewStorage.getItem(PREVIEW_MODE_KEY) === "1";
 }
 
-type LocalPreviewSettings = Settings & { _apiKey?: string };
-
-type LocalPreviewSettingsPatch = Partial<Settings> & { apiKey?: string; clearApiKey?: boolean };
-
-export function mergeLocalPreviewSettings(previous: LocalPreviewSettings, patch: LocalPreviewSettingsPatch): LocalPreviewSettings {
-  const { apiKey: requestedApiKey, clearApiKey, ...settings } = patch;
-  let apiKey = previous._apiKey || "";
-  let apiKeyPreview = previous.apiKeyPreview || "";
-  if (clearApiKey) {
-    apiKey = "";
-    apiKeyPreview = "";
-  } else if (requestedApiKey) {
-    apiKey = requestedApiKey;
-    apiKeyPreview = `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`;
-  }
-  return {
-    ...previous,
-    ...settings,
-    _apiKey: apiKey,
-    apiKeyPreview,
-    hasApiKey: Boolean(apiKey),
-  };
-}
-
-export function parseLocalPreviewSettings(raw: string | null): LocalPreviewSettings {
+export function parseLocalPreviewSettings(raw: string | null): Settings {
   let stored: Record<string, unknown> = {};
   try {
     const parsed: unknown = JSON.parse(raw || "{}");
@@ -192,19 +172,16 @@ export function parseLocalPreviewSettings(raw: string | null): LocalPreviewSetti
     // A damaged local settings snapshot should not prevent preview mode loading.
   }
 
-  const merged = normalizeSettings({
+  delete stored._apiKey;
+  delete stored.apiKey;
+  delete stored.clearApiKey;
+  return normalizeSettings({
     displayName: "NavoPath Preview",
     panelWidths: { left: 310, right: 360 },
     ...stored,
-  }) as LocalPreviewSettings;
-  if (typeof merged._apiKey === "string" && merged._apiKey && !merged.hasApiKey) {
-    merged.hasApiKey = true;
-    merged.apiKeyPreview = merged.apiKeyPreview
-      || `${merged._apiKey.slice(0, 6)}...${merged._apiKey.slice(-4)}`;
-  } else if (merged._apiKey !== undefined && typeof merged._apiKey !== "string") {
-    delete merged._apiKey;
-  }
-  return merged;
+    hasApiKey: false,
+    apiKeyPreview: "",
+  });
 }
 
 function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
@@ -641,13 +618,11 @@ export function installBrowserFallback() {
     return parseLocalPreviewSettings(previewStorage.getItem(PREVIEW_SETTINGS_KEY));
   };
 
-  const writeSettings = (settings: LocalPreviewSettingsPatch) => {
+  const writeSettings = (settings: Partial<Settings>) => {
     const prev = readSettings();
-    const next = mergeLocalPreviewSettings(prev, settings);
+    const next = normalizeSettings({ ...prev, ...settings, hasApiKey: false, apiKeyPreview: "" });
     previewStorage.setItem(PREVIEW_SETTINGS_KEY, JSON.stringify(next));
-    const safe: any = { ...next };
-    delete safe._apiKey;
-    return safe;
+    return next;
   };
 
   const api: PlannerApi = {
@@ -708,67 +683,6 @@ export function installBrowserFallback() {
     getSettings: async () => readSettings(),
     saveSettings: async (settings) => writeSettings(settings),
     selectBackgroundImage: async () => ({ path: "" }),
-    chat: async (payload: { messages: Array<{ role: string; content: string }>; draftText?: string }) => {
-      const settings = readSettings();
-      const apiKey = settings._apiKey || "";
-      if (!apiKey) {
-        return { reply: "请先在本地预览设置里配置 DeepSeek API Key。", actions: [] };
-      }
-
-      const hasSystemMessage = payload.messages.length > 0 && payload.messages[0].role === "system";
-      const messages: Array<{ role: string; content: string }> = [
-        ...(hasSystemMessage
-          ? []
-          : [{
-            role: "system",
-            content: "你是 NavoPath 助手。需要创建任务/备注/记忆时，只返回 JSON：{\"reply\":\"...\",\"actions\":[...]}。",
-          }]),
-        ...payload.messages.slice(-10),
-        ...(payload.draftText ? [{ role: "user", content: payload.draftText }] : []),
-      ];
-
-      try {
-          const res = await fetch(settings.baseUrl || "https://api.siliconflow.cn/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-              model: settings.model || "deepseek-ai/DeepSeek-V3.2",
-            messages,
-            temperature: 0.7,
-            max_tokens: 4096,
-          }),
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          return { reply: `API 请求失败 (${res.status})：${errorText.slice(0, 200)}`, actions: [] };
-        }
-
-        const json = await res.json();
-        const replyText = json.choices?.[0]?.message?.content || "";
-        const fenced = replyText.match(/```(?:json)?\s*([\s\S]*?)```/i);
-        const jsonSource = fenced ? fenced[1] : replyText;
-        const firstBrace = jsonSource.indexOf("{");
-        const lastBrace = jsonSource.lastIndexOf("}");
-
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          try {
-            const parsed = JSON.parse(jsonSource.slice(firstBrace, lastBrace + 1));
-            const cleanReply = parsed.reply || replyText.replace(/```[\s\S]*?```/g, "").trim() || replyText;
-            return { reply: cleanReply, actions: Array.isArray(parsed.actions) ? parsed.actions : [] };
-          } catch {
-            // fall through to plain reply
-          }
-        }
-
-        return { reply: replyText, actions: [] };
-      } catch (err) {
-        return { reply: `网络错误：${err instanceof Error ? err.message : String(err)}`, actions: [] };
-      }
-    },
   };
 
   window.plannerApi = api;

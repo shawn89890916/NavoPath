@@ -213,7 +213,7 @@ type AddType = "task" | "project" | "event";
 type CompactExecuteView = "tasks" | "schedule";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
 type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day" | "week"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
-type SettingsPatch = Partial<Settings> & { apiKey?: string; clearApiKey?: boolean };
+type SettingsPatch = Partial<Settings>;
 type QueuedDataSave = { payload: PlannerData; version: number };
 type QueuedSettingsSave = { payload: SettingsPatch; version: number };
 
@@ -2601,18 +2601,10 @@ function App() {
   async function saveSettings(patch: SettingsPatch) {
     const current = settingsRef.current || settings;
     if (!current) return;
-    const optimisticPatch = { ...patch };
-    delete optimisticPatch.apiKey;
-    delete optimisticPatch.clearApiKey;
-    const optimistic = { ...current, ...optimisticPatch };
-    const payload: SettingsPatch = {
-      ...optimistic,
-      ...(patch.apiKey ? { apiKey: patch.apiKey } : {}),
-      ...(patch.clearApiKey ? { clearApiKey: patch.clearApiKey } : {}),
-    };
+    const optimistic = { ...current, ...patch };
     const version = settingsSaveVersionRef.current + 1;
     settingsSaveVersionRef.current = version;
-    pendingSettingsSaveRef.current = { payload, version };
+    pendingSettingsSaveRef.current = { payload: optimistic, version };
     settingsRef.current = optimistic;
     setSettings(optimistic);
     if (optimistic.language) setLang(optimistic.language);

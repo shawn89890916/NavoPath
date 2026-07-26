@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   createResilientStorage,
   fallbackData,
-  mergeLocalPreviewSettings,
   normalizeData,
   parseLocalPreviewData,
   parseLocalPreviewSettings,
@@ -28,24 +27,6 @@ describe("browser fallback preview mode", () => {
     expect(storage.getItem("planner")).toBeNull();
   });
 
-  it("clears local preview API keys without persisting control fields", () => {
-    const previous = parseLocalPreviewSettings(JSON.stringify({
-      _apiKey: "1234567890",
-      hasApiKey: true,
-      apiKeyPreview: "123456...7890",
-    }));
-    const cleared = mergeLocalPreviewSettings(previous, {
-      clearApiKey: true,
-      apiKey: "ignored-when-clearing",
-    });
-
-    expect(cleared._apiKey).toBe("");
-    expect(cleared.hasApiKey).toBe(false);
-    expect(cleared.apiKeyPreview).toBe("");
-    expect(cleared).not.toHaveProperty("apiKey");
-    expect(cleared).not.toHaveProperty("clearApiKey");
-  });
-
   it("defaults localhost dev app routes to local preview unless cloud mode is explicit", () => {
     expect(shouldUseLocalPreviewByDefault("127.0.0.1", "/app", null)).toBe(true);
     expect(shouldUseLocalPreviewByDefault("localhost", "/app", null)).toBe(true);
@@ -66,8 +47,9 @@ describe("browser fallback preview mode", () => {
     expect(settings.language).toBe("zh");
     expect(settings.model).toBe("deepseek-ai/DeepSeek-V3.2");
     expect(settings.executeAccentColor).toBe("");
-    expect(settings.hasApiKey).toBe(true);
-    expect(settings.apiKeyPreview).toBe("123456...7890");
+    expect(settings.hasApiKey).toBe(false);
+    expect(settings.apiKeyPreview).toBe("");
+    expect(settings).not.toHaveProperty("_apiKey");
   });
 
   it("recovers from a corrupt local settings snapshot", () => {
@@ -78,11 +60,20 @@ describe("browser fallback preview mode", () => {
     expect(settings.widgetTimerPreferences?.mode).toBe("stopwatch");
   });
 
-  it("discards malformed local API key values", () => {
-    const settings = parseLocalPreviewSettings(JSON.stringify({ _apiKey: 123456 }));
+  it("scrubs legacy local API key fields", () => {
+    const settings = parseLocalPreviewSettings(JSON.stringify({
+      _apiKey: "legacy-secret",
+      apiKey: "duplicate-secret",
+      clearApiKey: true,
+      hasApiKey: true,
+      apiKeyPreview: "legacy...cret",
+    }));
 
-    expect(settings._apiKey).toBeUndefined();
+    expect(settings).not.toHaveProperty("_apiKey");
+    expect(settings).not.toHaveProperty("apiKey");
+    expect(settings).not.toHaveProperty("clearApiKey");
     expect(settings.hasApiKey).toBe(false);
+    expect(settings.apiKeyPreview).toBe("");
   });
 
   it("rejects corrupt planner snapshots and migrates valid legacy snapshots", () => {
