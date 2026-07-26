@@ -84,6 +84,7 @@ import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { withDeletionTombstones } from "./syncMerge";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
@@ -2490,7 +2491,8 @@ function App() {
 
   async function saveData(next: PlannerData) {
     const savedAt = new Date().toISOString();
-    const optimistic = { ...next, aiProfile: buildAiProfile(next), savedAt };
+    const tracked = withDeletionTombstones(dataRef.current, next, savedAt);
+    const optimistic = { ...tracked, aiProfile: buildAiProfile(tracked), savedAt };
     const version = dataSaveVersionRef.current + 1;
     dataSaveVersionRef.current = version;
     pendingDataSaveRef.current = { payload: optimistic, version };

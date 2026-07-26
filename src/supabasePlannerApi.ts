@@ -2,6 +2,7 @@ import { createClient, type User } from "@supabase/supabase-js";
 import type { AiAction, CalendarFeedTokenMetadata, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
 import { fallbackData, normalizeData } from "./browserFallback";
 import { getDefaultSettings, normalizeSettings } from "./defaultSettings";
+import { mergePlannerData } from "./syncMerge";
 
 const PROFILE_TABLE = "dayflow_profiles";
 
@@ -32,34 +33,6 @@ function publicUser(user: User | null) {
 
 function mergeSettings(settings: unknown): Settings {
   return normalizeSettings(settings);
-}
-
-const SYNC_COLLECTIONS = ["goals", "projects", "tasks", "habits", "habitDailyStates", "timeEntries", "longTasks", "notes", "drafts", "aiConversations", "aiMemories", "scheduleTemplates"] as const;
-
-function itemTime(item: any) {
-  return Date.parse(item?.updatedAt || item?.createdAt || item?.savedAt || "") || 0;
-}
-
-function mergePlannerData(remote: PlannerData, local: PlannerData): PlannerData {
-  const deleted = { ...(remote.sync?.deleted || {}), ...(local.sync?.deleted || {}) };
-  const merged: any = { ...remote, ...local, sync: { deleted } };
-  for (const collection of SYNC_COLLECTIONS) {
-    const byId = new Map<string, any>();
-    for (const item of ((remote as any)[collection] || [])) if (item?.id) byId.set(item.id, item);
-    for (const item of ((local as any)[collection] || [])) {
-      if (!item?.id) continue;
-      const current = byId.get(item.id);
-      if (!current || itemTime(item) >= itemTime(current)) byId.set(item.id, item);
-    }
-    merged[collection] = Array.from(byId.values()).filter((item: any) => {
-      const deletedAt = Date.parse(deleted[`${collection}:${item.id}`] || "") || 0;
-      return deletedAt < itemTime(item);
-    });
-  }
-  merged.chat = local.chat || remote.chat || [];
-  merged.events = local.events || remote.events || [];
-  merged.savedAt = new Date().toISOString();
-  return normalizeData(merged);
 }
 
 function emptyCloudData(): PlannerData {
