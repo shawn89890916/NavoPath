@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData, Settings } from "./types";
-import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 
 const data = (savedAt: string, title: string): PlannerData => ({
   version: 2, importedSeedVersion: "test", generatedAt: savedAt, savedAt, goals: [], projects: [], tasks: [{ id: title, title, dueDate: "2026-06-20", category: "personal", priority: "medium", notes: "", goalId: "", completed: false, createdAt: savedAt, updatedAt: savedAt }], longTasks: [], events: [], notes: [], drafts: [], chat: [], aiConversations: [], aiMemories: [], taskLayouts: {},
@@ -55,5 +55,34 @@ describe("resolveBootstrap", () => {
     expect(result.settings).toBe(remoteSettings);
     expect(result.replayData).toBe(false);
     expect(result.replaySettings).toBe(false);
+  });
+});
+
+describe("parseBootstrapCache", () => {
+  it("rejects corrupt cache envelopes", () => {
+    expect(parseBootstrapCache("{broken")).toBeNull();
+    expect(parseBootstrapCache(JSON.stringify({ data: { projects: [] }, settings: {} }))).toBeNull();
+  });
+
+  it("normalizes cached data, settings, and replay metadata before use", () => {
+    const cachedData = data("2026-06-19T00:00:00Z", "valid") as any;
+    cachedData.tasks.push(null);
+    cachedData.aiMemories = undefined;
+    const parsed = parseBootstrapCache(JSON.stringify({
+      data: cachedData,
+      settings: { language: "invalid", activeMode: "invalid", theme: "dark" },
+      dataDirty: "false",
+      settingsDirty: true,
+      remoteRevision: "7",
+    }));
+
+    expect(parsed?.data.tasks).toHaveLength(1);
+    expect(parsed?.data.aiMemories).toEqual([]);
+    expect(parsed?.settings.language).toBe("en");
+    expect(parsed?.settings.activeMode).toBe("execute");
+    expect(parsed?.settings.theme).toBe("dark");
+    expect(parsed?.dataDirty).toBe(false);
+    expect(parsed?.settingsDirty).toBe(true);
+    expect(parsed?.remoteRevision).toBeUndefined();
   });
 });

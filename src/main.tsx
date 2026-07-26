@@ -83,7 +83,7 @@ import { SETTINGS_CATEGORIES, normalizeSettingsTarget, searchSettings, settingsD
 import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
-import { resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
@@ -721,9 +721,7 @@ function bootstrapCacheKey(userId?: string) {
 
 function readBootstrapCache(userId?: string) {
   try {
-    const raw = localStorage.getItem(bootstrapCacheKey(userId));
-    if (!raw) return null;
-    return JSON.parse(raw) as BootstrapCache;
+    return parseBootstrapCache(localStorage.getItem(bootstrapCacheKey(userId)));
   } catch {
     return null;
   }
