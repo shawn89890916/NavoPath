@@ -51,6 +51,18 @@ import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProj
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { computeConflictLayout, computeConflictStyle } from "./utils/conflictLayout";
+import {
+  addDays,
+  addMonths,
+  buildRecurrenceOccurrenceId,
+  enumerateRecurrenceDates,
+  hasRecurrenceOccurrenceOnDate,
+  hasRecurringRule,
+  isRecurringScheduledTask,
+  matchesOccurrence,
+  parseRecurrenceOccurrenceId,
+  startOfWeekIso,
+} from "./utils/recurrence";
 import { appendAiSubtasks } from "./utils/aiSubtasks";
 import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
@@ -110,7 +122,6 @@ const ATTACHMENT_ACCEPT = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
 const DEFAULT_PROJECT_COLOR = "#584D3D";
 const PROJECT_COLOR_PRESETS = [DEFAULT_PROJECT_COLOR, "#7EA172", "#D7816A", "#0F0326", "#584D3D", "#8B5CF6", "#38BDF8", "#F59E0B", "#EF4444"];
 const COMMON_COLOR_PRESETS = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#1F2937", "#F9FAFB", "#6B7280"];
-const RECURRENCE_OCCURRENCE_MARKER = "__occ__";
 const EXECUTE_THEME_PRESETS_LIGHT = ["#D7816A", "#584D3D", "#7EA172", "#0F0326", "#BE185D", "#D97706", "#2563EB"];
 const EXECUTE_THEME_PRESETS_DARK  = ["#D7816A", "#FBF9FF", "#7EA172", "#584D3D", "#EC4899", "#F59E0B", "#3B82F6"];
 const PLANNING_THEME_PRESETS_LIGHT = ["#7EA172", "#584D3D", "#D7816A", "#0F0326", "#BE185D", "#D97706", "#2563EB"];
@@ -522,101 +533,6 @@ const PlanningViewLazy = lazy(() => import("./PlanningView"));
 const LandingPageLazy = lazy(() => import("./LandingPage"));
 const LOCAL_BOOTSTRAP_PREFIX = "navopath-bootstrap";
 
-function localIso(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function addDays(iso: string, days: number) {
-  const date = new Date(`${iso}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  return localIso(date);
-}
-
-function addMonths(iso: string, months: number) {
-  const date = new Date(`${iso}T00:00:00`);
-  const day = date.getDate();
-  date.setDate(1);
-  date.setMonth(date.getMonth() + months);
-  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  date.setDate(Math.min(day, last));
-  return localIso(date);
-}
-
-function isWeekdayIso(iso: string) {
-  const day = new Date(`${iso}T00:00:00`).getDay();
-  return day >= 1 && day <= 5;
-}
-
-function isWeekendIso(iso: string) {
-  const day = new Date(`${iso}T00:00:00`).getDay();
-  return day === 0 || day === 6;
-}
-
-function enumerateRecurrenceDates(recurrence: TaskRecurrence, visibleDates: Set<string>) {
-  if (!recurrence.startDate || visibleDates.size === 0) return [];
-  const sortedVisibleDates = [...visibleDates].sort();
-  const minDate = sortedVisibleDates[0];
-  const maxDate = sortedVisibleDates[sortedVisibleDates.length - 1];
-  const results: string[] = [];
-  let cursor = recurrence.startDate;
-  let occurrenceCount = 0;
-  const isVisibleMatch = (date: string) => date >= minDate && date <= maxDate && visibleDates.has(date);
-  const advanceCursor = (date: string) => {
-    switch (recurrence.frequency) {
-      case "weekly":
-        return addDays(date, 7);
-      case "biweekly":
-        return addDays(date, 14);
-      case "monthly":
-        return addMonths(date, 1);
-      case "quarterly":
-        return addMonths(date, 3);
-      default:
-        return addDays(date, 1);
-    }
-  };
-  const matchesCursor = (date: string) => {
-    switch (recurrence.frequency) {
-      case "weekdays":
-        return isWeekdayIso(date);
-      case "weekends":
-        return isWeekendIso(date);
-      default:
-        return true;
-    }
-  };
-
-  while (cursor <= maxDate) {
-    if (recurrence.endDate && cursor > recurrence.endDate) break;
-    if (matchesCursor(cursor)) {
-      occurrenceCount += 1;
-      if (!recurrence.count || occurrenceCount <= recurrence.count) {
-        if (isVisibleMatch(cursor)) results.push(cursor);
-      }
-      if (recurrence.count && occurrenceCount >= recurrence.count) break;
-    }
-    cursor = advanceCursor(cursor);
-  }
-
-  return results;
-}
-
-function startOfWeekIso(iso: string) {
-  const date = new Date(`${iso}T00:00:00`);
-  date.setDate(date.getDate() - date.getDay());
-  return localIso(date);
-}
-
-function startOfMonthGridIso(iso: string) {
-  const date = new Date(`${iso}T00:00:00`);
-  date.setDate(1);
-  date.setDate(date.getDate() - date.getDay());
-  return localIso(date);
-}
-
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -626,10 +542,6 @@ function getExecutionLane(task: Task): ExecutionLane | undefined {
   const hasScheduledRecord = (task.timelineRecords || []).some((record) => record.executionStatus === "scheduled");
   if (!task.plannedForDate || hasScheduledRecord || Boolean(task.scheduledDate) || Boolean(task.scheduledStart) || isRecurringScheduledTask(task)) return undefined;
   return "candidate";
-}
-
-function hasRecurringRule(task: Task) {
-  return Boolean(task.recurrence && task.recurrence.frequency !== "none");
 }
 
 function validCategory(value: unknown): Category {
@@ -676,31 +588,6 @@ function isValidAiAction(action: AiAction) {
     validIsoDate(raw.date) &&
     (!raw.startTime || validTime(raw.startTime)) &&
     (!raw.endTime || validTime(raw.endTime));
-}
-
-function isRecurringScheduledTask(task: Task) {
-  return Boolean(
-    task.recurrence &&
-    task.recurrence.frequency !== "none" &&
-    task.recurrence.mode === "scheduled" &&
-    task.recurrence.startDate &&
-    task.recurrence.startTime &&
-    task.recurrence.durationMinutes
-  );
-}
-
-function buildRecurrenceOccurrenceId(taskId: string, date: string, startTime: string) {
-  return `${taskId}${RECURRENCE_OCCURRENCE_MARKER}${date}${RECURRENCE_OCCURRENCE_MARKER}${startTime}`;
-}
-
-function parseRecurrenceOccurrenceId(taskId: string) {
-  const parts = taskId.split(RECURRENCE_OCCURRENCE_MARKER);
-  if (parts.length !== 3) return null;
-  return {
-    taskId: parts[0],
-    scheduledDate: parts[1],
-    scheduledStart: parts[2],
-  };
 }
 
 function minutesToTime(minutes: number) {
@@ -766,17 +653,6 @@ function taskDuration(task: Task) {
     return Math.max(spanDurationMinutes(task.scheduledStart, task.scheduledEnd), SLOT_MINUTES);
   }
   return Math.max(Math.round((task.estimatedHours || 0.5) * 60), SLOT_MINUTES);
-}
-
-function hasRecurrenceOccurrenceOnDate(task: Task, date: string) {
-  if (!isRecurringScheduledTask(task) || !task.recurrence) return false;
-  return enumerateRecurrenceDates(task.recurrence, new Set([date])).includes(date);
-}
-
-function matchesOccurrence(record: TimelineRecord, scheduledDate: string, scheduledStart?: string) {
-  if (record.scheduledDate !== scheduledDate) return false;
-  if (!scheduledStart) return true;
-  return record.scheduledStart === scheduledStart;
 }
 
 function isAllDayTask(task: Task): boolean {
