@@ -475,15 +475,22 @@ export function fallbackData(): PlannerData {
   });
 }
 
-function read(): PlannerData {
-  const raw = localStorage.getItem(PREVIEW_STORAGE_KEY);
-  if (!raw) {
-    const data = fallbackData();
-    localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(data));
-    return data;
+export function parseLocalPreviewData(raw: string | null): PlannerData | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const candidate = parsed as Partial<PlannerData>;
+    if (!Array.isArray(candidate.tasks) || !Array.isArray(candidate.projects)) return null;
+    return normalizeData(candidate as PlannerData);
+  } catch {
+    return null;
   }
-  const parsed = normalizeData(JSON.parse(raw));
-  if (parsed.importedSeedVersion !== PREVIEW_SEED_VERSION) {
+}
+
+function read(): PlannerData {
+  const parsed = parseLocalPreviewData(localStorage.getItem(PREVIEW_STORAGE_KEY));
+  if (!parsed || parsed.importedSeedVersion !== PREVIEW_SEED_VERSION) {
     const data = fallbackData();
     localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(data));
     return data;
@@ -621,8 +628,7 @@ export function installBrowserFallback() {
     selectBackgroundImage: async () => ({ path: "" }),
     chat: async (payload: { messages: Array<{ role: string; content: string }>; draftText?: string }) => {
       const settings = readSettings();
-      const stored: any = JSON.parse(localStorage.getItem(PREVIEW_SETTINGS_KEY) || "{}");
-      const apiKey: string = stored._apiKey || "";
+      const apiKey = settings._apiKey || "";
       if (!apiKey) {
         return { reply: "请先在本地预览设置里配置 DeepSeek API Key。", actions: [] };
       }

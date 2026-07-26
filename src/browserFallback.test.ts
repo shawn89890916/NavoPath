@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseLocalPreviewSettings, shouldUseLocalPreviewByDefault } from "./browserFallback";
+import {
+  fallbackData,
+  parseLocalPreviewData,
+  parseLocalPreviewSettings,
+  shouldUseLocalPreviewByDefault,
+} from "./browserFallback";
 
 describe("browser fallback preview mode", () => {
   it("defaults localhost dev app routes to local preview unless cloud mode is explicit", () => {
@@ -39,5 +44,18 @@ describe("browser fallback preview mode", () => {
 
     expect(settings._apiKey).toBeUndefined();
     expect(settings.hasApiKey).toBe(false);
+  });
+
+  it("rejects corrupt planner snapshots and migrates valid legacy snapshots", () => {
+    expect(parseLocalPreviewData("{broken")).toBeNull();
+    expect(parseLocalPreviewData(JSON.stringify({ projects: [] }))).toBeNull();
+
+    const legacy = fallbackData();
+    delete (legacy as Partial<typeof legacy>).aiMemories;
+    const parsed = parseLocalPreviewData(JSON.stringify(legacy));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.tasks.length).toBeGreaterThan(0);
+    expect(parsed?.aiMemories).toEqual([]);
   });
 });
