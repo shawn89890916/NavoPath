@@ -84,7 +84,7 @@ import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
-import { withDeletionTombstones } from "./syncMerge";
+import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
 import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
@@ -12625,7 +12625,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
         try {
           const content = event.target?.result as string;
           const backup = parsePlannerBackupJson(content);
-          onSaveData(backup.data);
+          onSaveData(preparePlannerDataRestore(backup.data, data));
           onSave(backup.settings);
           alert(lang === "zh" ? "数据导入成功！" : "Data imported successfully!");
         } catch {

@@ -60,6 +60,30 @@ export function withDeletionTombstones(
   return { ...next, sync: { deleted } };
 }
 
+export function preparePlannerDataRestore(
+  data: PlannerData,
+  previous: PlannerData | null = null,
+  restoredAt = new Date().toISOString(),
+): PlannerData {
+  let restoredTime = Date.parse(restoredAt) || Date.now();
+  for (const deletedAt of [
+    ...Object.values(previous?.sync?.deleted || {}),
+    ...Object.values(data.sync?.deleted || {}),
+  ]) {
+    const deletedTime = Date.parse(deletedAt);
+    if (Number.isFinite(deletedTime)) restoredTime = Math.max(restoredTime, deletedTime + 1);
+  }
+  const effectiveRestoredAt = new Date(restoredTime).toISOString();
+  const restored: any = { ...data };
+  for (const collection of SYNC_COLLECTIONS) {
+    restored[collection] = items(data, collection).map((item) => ({
+      ...item,
+      updatedAt: effectiveRestoredAt,
+    }));
+  }
+  return normalizeData(restored);
+}
+
 export function mergePlannerData(
   remote: PlannerData,
   local: PlannerData,

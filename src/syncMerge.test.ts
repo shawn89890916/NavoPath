@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData, Task } from "./types";
-import { mergePlannerData, withDeletionTombstones } from "./syncMerge";
+import { mergePlannerData, preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
 
 function task(id: string, updatedAt: string): Task {
   return {
@@ -68,5 +68,15 @@ describe("sync deletion tombstones", () => {
     const local = data([task("restored", "2026-07-26T11:00:00.000Z")]);
 
     expect(mergePlannerData(remote, local).tasks.map((item) => item.id)).toEqual(["restored"]);
+  });
+
+  it("makes an explicit backup restore newer than existing tombstones", () => {
+    const current = data([], { "tasks:restored": "2026-07-26T12:00:00.000Z" });
+    const backup = data([task("restored", "2026-07-25T09:00:00.000Z")]);
+    const restored = preparePlannerDataRestore(backup, current, "2026-07-26T11:00:00.000Z");
+    const tracked = withDeletionTombstones(current, restored, "2026-07-26T11:00:00.000Z");
+
+    expect(mergePlannerData(current, tracked).tasks.map((item) => item.id)).toEqual(["restored"]);
+    expect(restored.tasks[0].updatedAt).toBe("2026-07-26T12:00:00.001Z");
   });
 });
