@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  createResilientStorage,
   fallbackData,
+  mergeLocalPreviewSettings,
   normalizeData,
   parseLocalPreviewData,
   parseLocalPreviewSettings,
@@ -8,6 +10,42 @@ import {
 } from "./browserFallback";
 
 describe("browser fallback preview mode", () => {
+  it("keeps session writes usable when browser storage is unavailable", () => {
+    const storage = createResilientStorage({
+      getItem: () => "stale",
+      setItem: () => {
+        throw new Error("Quota exceeded");
+      },
+      removeItem: () => {
+        throw new Error("Storage blocked");
+      },
+    });
+
+    expect(storage.getItem("planner")).toBe("stale");
+    storage.setItem("planner", "latest");
+    expect(storage.getItem("planner")).toBe("latest");
+    storage.removeItem("planner");
+    expect(storage.getItem("planner")).toBeNull();
+  });
+
+  it("clears local preview API keys without persisting control fields", () => {
+    const previous = parseLocalPreviewSettings(JSON.stringify({
+      _apiKey: "1234567890",
+      hasApiKey: true,
+      apiKeyPreview: "123456...7890",
+    }));
+    const cleared = mergeLocalPreviewSettings(previous, {
+      clearApiKey: true,
+      apiKey: "ignored-when-clearing",
+    });
+
+    expect(cleared._apiKey).toBe("");
+    expect(cleared.hasApiKey).toBe(false);
+    expect(cleared.apiKeyPreview).toBe("");
+    expect(cleared).not.toHaveProperty("apiKey");
+    expect(cleared).not.toHaveProperty("clearApiKey");
+  });
+
   it("defaults localhost dev app routes to local preview unless cloud mode is explicit", () => {
     expect(shouldUseLocalPreviewByDefault("127.0.0.1", "/app", null)).toBe(true);
     expect(shouldUseLocalPreviewByDefault("localhost", "/app", null)).toBe(true);

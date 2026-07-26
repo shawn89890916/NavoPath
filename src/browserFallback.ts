@@ -9,6 +9,44 @@ const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
 const PREVIEW_MODE_KEY = "navopath-force-local-preview";
 const PREVIEW_SEED_VERSION = "browser-preview-v3";
 
+type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+export function createResilientStorage(storage: StorageLike) {
+  const sessionOverrides = new Map<string, string | null>();
+  return {
+    getItem(key: string) {
+      if (sessionOverrides.has(key)) return sessionOverrides.get(key) ?? null;
+      try {
+        return storage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    setItem(key: string, value: string) {
+      sessionOverrides.set(key, value);
+      try {
+        storage.setItem(key, value);
+      } catch {
+        // Keep the latest value in memory when browser storage is unavailable.
+      }
+    },
+    removeItem(key: string) {
+      sessionOverrides.set(key, null);
+      try {
+        storage.removeItem(key);
+      } catch {
+        // The in-memory tombstone still hides an inaccessible stale value.
+      }
+    },
+  };
+}
+
+const previewStorage = createResilientStorage({
+  getItem: (key) => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+  removeItem: (key) => localStorage.removeItem(key),
+});
+
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -108,18 +146,40 @@ function configurePreviewMode() {
   const params = new URLSearchParams(window.location.search);
   const preview = params.get("preview");
   const useLocalPreviewByDefault = shouldUseLocalPreviewByDefault(window.location.hostname, window.location.pathname, preview);
-  if (preview === "local") localStorage.setItem(PREVIEW_MODE_KEY, "1");
-  if (preview === "cloud" || preview === "off") localStorage.removeItem(PREVIEW_MODE_KEY);
+  if (preview === "local") previewStorage.setItem(PREVIEW_MODE_KEY, "1");
+  if (preview === "cloud" || preview === "off") previewStorage.removeItem(PREVIEW_MODE_KEY);
   // Migration: earlier builds persisted the runtime fallback to localStorage, which
   // trapped users in preview mode forever. If the URL does not explicitly request
   // local preview this cold start, drop the stale flag so the cloud backend is retried.
-  if (preview !== "local" && localStorage.getItem(PREVIEW_MODE_KEY) === "1") {
-    localStorage.removeItem(PREVIEW_MODE_KEY);
+  if (preview !== "local" && previewStorage.getItem(PREVIEW_MODE_KEY) === "1") {
+    previewStorage.removeItem(PREVIEW_MODE_KEY);
   }
-  return preview === "local" || useLocalPreviewByDefault || localStorage.getItem(PREVIEW_MODE_KEY) === "1";
+  return preview === "local" || useLocalPreviewByDefault || previewStorage.getItem(PREVIEW_MODE_KEY) === "1";
 }
 
 type LocalPreviewSettings = Settings & { _apiKey?: string };
+
+type LocalPreviewSettingsPatch = Partial<Settings> & { apiKey?: string; clearApiKey?: boolean };
+
+export function mergeLocalPreviewSettings(previous: LocalPreviewSettings, patch: LocalPreviewSettingsPatch): LocalPreviewSettings {
+  const { apiKey: requestedApiKey, clearApiKey, ...settings } = patch;
+  let apiKey = previous._apiKey || "";
+  let apiKeyPreview = previous.apiKeyPreview || "";
+  if (clearApiKey) {
+    apiKey = "";
+    apiKeyPreview = "";
+  } else if (requestedApiKey) {
+    apiKey = requestedApiKey;
+    apiKeyPreview = `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`;
+  }
+  return {
+    ...previous,
+    ...settings,
+    _apiKey: apiKey,
+    apiKeyPreview,
+    hasApiKey: Boolean(apiKey),
+  };
+}
 
 export function parseLocalPreviewSettings(raw: string | null): LocalPreviewSettings {
   let stored: Record<string, unknown> = {};
@@ -523,10 +583,10 @@ export function parseLocalPreviewData(raw: string | null): PlannerData | null {
 }
 
 function read(): PlannerData {
-  const parsed = parseLocalPreviewData(localStorage.getItem(PREVIEW_STORAGE_KEY));
+  const parsed = parseLocalPreviewData(previewStorage.getItem(PREVIEW_STORAGE_KEY));
   if (!parsed || parsed.importedSeedVersion !== PREVIEW_SEED_VERSION) {
     const data = fallbackData();
-    localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(data));
+    previewStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(data));
     return data;
   }
   return parsed;
@@ -534,7 +594,7 @@ function read(): PlannerData {
 
 function write(data: PlannerData): PlannerData {
   const saved = { ...data, savedAt: now() };
-  localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(saved));
+  previewStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(saved));
   return saved;
 }
 
@@ -546,7 +606,7 @@ let sessionLocalFallback = false;
 export function forceLocalPreviewMode() {
   // Clear any stale persisted preview flag from earlier builds so the next cold
   // start retries the cloud backend instead of being trapped in preview mode.
-  try { localStorage.removeItem(PREVIEW_MODE_KEY); } catch { /* ignore */ }
+  previewStorage.removeItem(PREVIEW_MODE_KEY);
   sessionLocalFallback = true;
   window.plannerApi = undefined as any;
   installBrowserFallback();
@@ -578,25 +638,13 @@ export function installBrowserFallback() {
 
   function installLocalPreview() {
   const readSettings = () => {
-    return parseLocalPreviewSettings(localStorage.getItem(PREVIEW_SETTINGS_KEY));
+    return parseLocalPreviewSettings(previewStorage.getItem(PREVIEW_SETTINGS_KEY));
   };
 
-  const writeSettings = (settings: any) => {
+  const writeSettings = (settings: LocalPreviewSettingsPatch) => {
     const prev = readSettings();
-    let apiKey: string = prev._apiKey || "";
-    let apiKeyPreview = prev.apiKeyPreview || "";
-    if (settings.apiKey) {
-      apiKey = settings.apiKey;
-      apiKeyPreview = `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`;
-    }
-    const next = {
-      ...prev,
-      ...settings,
-      _apiKey: apiKey,
-      apiKeyPreview,
-      hasApiKey: Boolean(apiKey),
-    };
-    localStorage.setItem(PREVIEW_SETTINGS_KEY, JSON.stringify(next));
+    const next = mergeLocalPreviewSettings(prev, settings);
+    previewStorage.setItem(PREVIEW_SETTINGS_KEY, JSON.stringify(next));
     const safe: any = { ...next };
     delete safe._apiKey;
     return safe;
@@ -654,7 +702,7 @@ export function installBrowserFallback() {
       return { data: write(data), applied };
     },
     resetSeed: async () => {
-      localStorage.setItem(`planner-preview-backup-${new Date().toISOString()}`, JSON.stringify(read()));
+      previewStorage.setItem(`planner-preview-backup-${new Date().toISOString()}`, JSON.stringify(read()));
       return write(fallbackData());
     },
     getSettings: async () => readSettings(),
