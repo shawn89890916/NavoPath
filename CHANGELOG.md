@@ -52,6 +52,7 @@
 - 加固共享资料迁移：云端资料、旧备份或本地快照中的单个空值、错误类型及损坏的子任务、时间记录、AI 消息或模板时段会被安全忽略，不再拖垮整份资料加载。
 - 启动缓存现在会在显示或回放未同步改动前校验并迁移资料、设置及同步标记；损坏缓存会被忽略，异常或错误类型的“待同步”标记不会覆盖云端资料。
 - 修复跨设备删除后旧任务、项目、习惯等资料再次出现的问题；完整资料保存现在会记录删除时间，同步冲突会保留更新较新的删除或重建结果。
+- 修复强制仅拉取与后台保存并发时，本地旧请求可能在拉取后重新入队或覆盖结果的问题；仅拉取现在会作废并等待在途保存，迟到的旧 revision 响应也会被忽略。
 
 ## 2026-07-26 · Timeline and data export fixes
 
@@ -63,6 +64,7 @@
 - Hardened shared profile migration. Isolated nulls, invalid value types, and damaged subtasks, timeline records, AI messages, or template slots in cloud profiles, legacy backups, and local snapshots are now ignored instead of preventing the entire profile from loading.
 - Startup caches are now validated and migrated before their data, settings, or unsynced changes are displayed or replayed. Corrupt caches are ignored, and malformed dirty flags can no longer overwrite cloud data.
 - Fixed tasks, projects, habits, and other records reappearing after deletion on another device. Full-profile saves now record deletion times, and sync conflicts preserve whichever deletion or recreation happened later.
+- Fixed forced pull-only sync racing with background saves, which could requeue an old local request or overwrite the pulled result. Pull-only sync now invalidates and waits for in-flight saves, and late responses with older revisions are ignored.
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 

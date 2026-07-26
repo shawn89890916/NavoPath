@@ -85,7 +85,7 @@ import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
-import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, SYNC_INTERVAL_PRESETS } from "./sync";
+import { SyncScheduler, formatLastSyncedAt, presetForMinutes, readSyncInterval, shouldApplyRemoteRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
 import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
@@ -1622,6 +1622,7 @@ function App() {
   const dataSaveTimerRef = useRef<number | null>(null);
   const dataSaveRetryTimerRef = useRef<number | null>(null);
   const dataSaveInFlightRef = useRef(false);
+  const dataSaveWaitersRef = useRef<Array<() => void>>([]);
   const dataSaveVersionRef = useRef(0);
   const dataSaveRetryCountRef = useRef(0);
   const dataSaveNoticeShownRef = useRef(false);
@@ -1629,6 +1630,7 @@ function App() {
   const settingsSaveTimerRef = useRef<number | null>(null);
   const settingsSaveRetryTimerRef = useRef<number | null>(null);
   const settingsSaveInFlightRef = useRef(false);
+  const settingsSaveWaitersRef = useRef<Array<() => void>>([]);
   const settingsSaveVersionRef = useRef(0);
   const settingsSaveRetryCountRef = useRef(0);
   const settingsSaveNoticeShownRef = useRef(false);
@@ -2403,12 +2405,15 @@ function App() {
     }, delay);
   }
 
-  async function flushPendingSave(options: { urgent?: boolean } = {}) {
+  async function flushPendingSave(options: { urgent?: boolean } = {}): Promise<void> {
     if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
     if (dataSaveRetryTimerRef.current) window.clearTimeout(dataSaveRetryTimerRef.current);
     dataSaveTimerRef.current = null;
     dataSaveRetryTimerRef.current = null;
-    if (dataSaveInFlightRef.current) return;
+    if (dataSaveInFlightRef.current) {
+      await new Promise<void>((resolve) => dataSaveWaitersRef.current.push(resolve));
+      return flushPendingSave(options);
+    }
     dataSaveInFlightRef.current = true;
     try {
       while (pendingDataSaveRef.current) {
@@ -2429,28 +2434,34 @@ function App() {
           }
         } catch {
           const latestPending = pendingDataSaveRef.current as QueuedDataSave | null;
-          if (!latestPending || latestPending.version < job.version) {
+          const shouldRetry = shouldRequeueFailedSave(job.version, dataSaveVersionRef.current, latestPending?.version);
+          if (shouldRetry) {
             pendingDataSaveRef.current = job;
+            dataSaveRetryCountRef.current += 1;
+            maybeShowSyncFailureNotice("data");
+            scheduleDataRetry();
           }
-          dataSaveRetryCountRef.current += 1;
-          maybeShowSyncFailureNotice("data");
-          scheduleDataRetry();
           break;
         }
       }
     } finally {
       dataSaveInFlightRef.current = false;
+      const waiters = dataSaveWaitersRef.current.splice(0);
+      waiters.forEach((resolve) => resolve());
       if (pendingDataSaveRef.current && !dataSaveRetryTimerRef.current && !options.urgent) scheduleDataFlush(0);
       else void refreshQueuedRemote();
     }
   }
 
-  async function flushPendingSettings(options: { urgent?: boolean } = {}) {
+  async function flushPendingSettings(options: { urgent?: boolean } = {}): Promise<void> {
     if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
     if (settingsSaveRetryTimerRef.current) window.clearTimeout(settingsSaveRetryTimerRef.current);
     settingsSaveTimerRef.current = null;
     settingsSaveRetryTimerRef.current = null;
-    if (settingsSaveInFlightRef.current) return;
+    if (settingsSaveInFlightRef.current) {
+      await new Promise<void>((resolve) => settingsSaveWaitersRef.current.push(resolve));
+      return flushPendingSettings(options);
+    }
     settingsSaveInFlightRef.current = true;
     try {
       while (pendingSettingsSaveRef.current) {
@@ -2473,17 +2484,20 @@ function App() {
           }
         } catch {
           const latestPending = pendingSettingsSaveRef.current as QueuedSettingsSave | null;
-          if (!latestPending || latestPending.version < job.version) {
+          const shouldRetry = shouldRequeueFailedSave(job.version, settingsSaveVersionRef.current, latestPending?.version);
+          if (shouldRetry) {
             pendingSettingsSaveRef.current = job;
+            settingsSaveRetryCountRef.current += 1;
+            maybeShowSyncFailureNotice("settings");
+            scheduleSettingsRetry();
           }
-          settingsSaveRetryCountRef.current += 1;
-          maybeShowSyncFailureNotice("settings");
-          scheduleSettingsRetry();
           break;
         }
       }
     } finally {
       settingsSaveInFlightRef.current = false;
+      const waiters = settingsSaveWaitersRef.current.splice(0);
+      waiters.forEach((resolve) => resolve());
       if (pendingSettingsSaveRef.current && !settingsSaveRetryTimerRef.current && !options.urgent) scheduleSettingsFlush(0);
       else void refreshQueuedRemote();
     }
@@ -2611,8 +2625,8 @@ function App() {
     }
     try {
       if (direction === "push" || direction === "both") {
-        if (pendingDataSaveRef.current) await flushPendingSave({ urgent: true });
-        if (pendingSettingsSaveRef.current) await flushPendingSettings({ urgent: true });
+        await flushPendingSave({ urgent: true });
+        await flushPendingSettings({ urgent: true });
       } else if (direction === "pull") {
         if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
         if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
@@ -2620,6 +2634,12 @@ function App() {
         settingsSaveTimerRef.current = null;
         pendingDataSaveRef.current = null;
         pendingSettingsSaveRef.current = null;
+        dataSaveVersionRef.current += 1;
+        settingsSaveVersionRef.current += 1;
+        await Promise.all([
+          flushPendingSave({ urgent: true }),
+          flushPendingSettings({ urgent: true }),
+        ]);
         await refreshQueuedRemote({ force: true });
       }
       const result = direction === "push"
@@ -6349,9 +6369,11 @@ function App() {
     queuedRemoteRefreshRef.current = false;
     const bootstrap = await window.plannerApi.getBootstrap?.({ force: true });
     if (!bootstrap?.data || !bootstrap.settings) return;
+    const incomingRevision = Number(bootstrap.revision || 0);
+    if (!shouldApplyRemoteRevision(remoteRevisionRef.current, incomingRevision)) return;
     const resolved = resolveBootstrap(options.force ? null : readBootstrapCache(authState?.user?.id), bootstrap.data, bootstrap.settings, { preferRemote: options.force });
     if (!resolved.data || !resolved.settings) return;
-    remoteRevisionRef.current = bootstrap.revision || remoteRevisionRef.current;
+    remoteRevisionRef.current = Math.max(remoteRevisionRef.current, incomingRevision);
     dataRef.current = resolved.data;
     settingsRef.current = resolved.settings;
     setData(resolved.data);

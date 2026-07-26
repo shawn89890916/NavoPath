@@ -6,7 +6,25 @@ import {
   isManualOnly,
   presetForMinutes,
   readSyncInterval,
+  shouldApplyRemoteRevision,
+  shouldRequeueFailedSave,
 } from "./sync";
+
+describe("sync race guards", () => {
+  it("requeues only the still-current failed save", () => {
+    expect(shouldRequeueFailedSave(2, 2)).toBe(true);
+    expect(shouldRequeueFailedSave(2, 2, 1)).toBe(true);
+    expect(shouldRequeueFailedSave(1, 2)).toBe(false);
+    expect(shouldRequeueFailedSave(1, 2, 2)).toBe(false);
+  });
+
+  it("rejects stale positive remote revisions while allowing unversioned local data", () => {
+    expect(shouldApplyRemoteRevision(5, 4)).toBe(false);
+    expect(shouldApplyRemoteRevision(5, 5)).toBe(true);
+    expect(shouldApplyRemoteRevision(5, 6)).toBe(true);
+    expect(shouldApplyRemoteRevision(5, 0)).toBe(true);
+  });
+});
 
 describe("isManualOnly", () => {
   it("treats 0 / undefined / null as manual-only", () => {

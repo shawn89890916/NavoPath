@@ -44,6 +44,19 @@ export type SyncSchedulerOptions = {
   now?: () => Date;
 };
 
+export function shouldRequeueFailedSave(
+  jobVersion: number,
+  currentVersion: number,
+  pendingVersion?: number,
+) {
+  return jobVersion === currentVersion
+    && (pendingVersion === undefined || pendingVersion < jobVersion);
+}
+
+export function shouldApplyRemoteRevision(currentRevision: number, incomingRevision: number) {
+  return incomingRevision <= 0 || incomingRevision >= currentRevision;
+}
+
 export function isManualOnly(intervalMinutes: number | null | undefined) {
   return !intervalMinutes || intervalMinutes <= 0;
 }
