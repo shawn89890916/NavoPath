@@ -42,15 +42,17 @@
 - Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
-## 2026-07-26 · 跨午夜时间轴冲突布局
+## 2026-07-26 · 时间轴与数据导出修复
 
 ### 修复
 - 修复跨午夜的重叠任务未正确并排显示的问题；时间轴现在会把结束时间早于开始时间的任务识别为跨天区间，并稳定计算冲突列。
+- 修复 CSV 导出与重新导入：公式式标题会安全保存为文本，带逗号、引号或换行的任务可完整往返，重新导入时也会按项目名恢复任务归属。
 
-## 2026-07-26 · Cross-midnight timeline conflict layout
+## 2026-07-26 · Timeline and data export fixes
 
 ### Fixed
 - Fixed overlapping tasks that cross midnight not rendering side by side. The timeline now treats an end time at or before the start as a next-day boundary and assigns conflict columns consistently.
+- Fixed CSV export and re-import. Formula-like titles are stored safely as text, tasks containing commas, quotes, or line breaks round-trip intact, and imported tasks recover their project assignment by project name.
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 

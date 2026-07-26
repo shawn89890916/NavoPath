@@ -13,6 +13,7 @@ import {
   pickMemoriesForContext,
   toAiHistory,
 } from "./aiContext";
+import { exportDataAsJson, exportTasksAsCsv, parseTasksCsv } from "./dataExport";
 import type { ParsedAttachment } from "./fileParser";
 import { reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks, type UnscheduledTask } from "./autoSchedule";
@@ -12265,56 +12266,6 @@ function AutoLaunchToggle({ lang }: { lang: Language }) {
   </section>;
 }
 
-function exportDataAsJson(data: PlannerData, settings: Settings) {
-  const exportData = {
-    exportedAt: new Date().toISOString(),
-    version: data.version,
-    data: data,
-    settings: settings,
-  };
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `navopath-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function exportTasksAsCsv(data: PlannerData) {
-  const headers = ["ID", "Title", "Project", "Status", "Due Date", "Estimated Hours", "Priority", "Created At", "Completed"];
-  const projectMap = new Map(data.projects.map((p) => [p.id, p.title]));
-
-  const rows = data.tasks.map((task) => {
-    const projectTitle = projectMap.get(task.projectId || "") || "";
-    const status = task.completed ? "Completed" : (task.plannedForDate ? "Scheduled" : "Pending");
-    return [
-      task.id,
-      `"${task.title.replace(/"/g, '""')}"`,
-      `"${projectTitle.replace(/"/g, '""')}"`,
-      status,
-      task.dueDate || "",
-      task.estimatedHours || "",
-      task.priority || "",
-      task.createdAt || "",
-      task.completed ? "Yes" : "No",
-    ].join(",");
-  });
-
-  const csvContent = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `navopath-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 function patchPluginConfig(settings: Settings, onSave: (patch: Partial<Settings>) => void, pluginId: string, patch: Record<string, unknown>) {
   const existing = settings.pluginConfigs?.[pluginId] ?? {};
   onSave({ pluginConfigs: { ...(settings.pluginConfigs ?? {}), [pluginId]: { ...existing, ...patch } } });
@@ -12701,62 +12652,11 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
       reader.onload = (event) => {
         try {
           const content = event.target?.result as string;
-          const lines = content.split("\n").filter((line) => line.trim());
-          if (lines.length < 2) {
+          const tasks = parseTasksCsv(content, data.projects);
+          if (tasks.length === 0) {
             alert(lang === "zh" ? "数据导入失败，文件为空或格式不正确。" : "Import failed: file is empty or invalid.");
             return;
           }
-          // Skip header
-          const taskLines = lines.slice(1);
-          const tasks: Task[] = taskLines.map((line) => {
-            // Simple CSV parsing - handles quoted fields
-            const values: string[] = [];
-            let current = "";
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-              const char = line[i];
-              if (char === '"') {
-                if (inQuotes && line[i + 1] === '"') {
-                  current += '"';
-                  i++;
-                } else {
-                  inQuotes = !inQuotes;
-                }
-              } else if (char === "," && !inQuotes) {
-                values.push(current);
-                current = "";
-              } else {
-                current += char;
-              }
-            }
-            values.push(current);
-
-            const id = values[0] || `task_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
-            const title = values[1] || "Untitled Task";
-            const projectTitle = values[2] || "";
-            const status = values[3] || "";
-            const dueDate = values[4] || "";
-            const estimatedHours = values[5] ? Number(values[5]) : undefined;
-            const priority = (values[6] as Task["priority"]) || "medium";
-            const createdAt = values[7] || new Date().toISOString();
-            const completed = values[8]?.toLowerCase() === "yes";
-
-            return {
-              id,
-              title,
-              projectId: "", // Will be matched later
-              category: "personal",
-              priority,
-              notes: "",
-              goalId: "",
-              completed,
-              estimatedHours,
-              dueDate,
-              subtasks: [],
-              createdAt,
-              updatedAt: new Date().toISOString(),
-            };
-          });
 
           // Merge imported tasks with existing tasks
           const existingIds = new Set(data.tasks.map((t) => t.id));
