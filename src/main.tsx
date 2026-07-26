@@ -50,6 +50,7 @@ import {
 import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProjectCompletion, workflowStatusForPatch } from "./utils/productivityModel";
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
+import { computeConflictLayout, computeConflictStyle } from "./utils/conflictLayout";
 import { appendAiSubtasks } from "./utils/aiSubtasks";
 import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
@@ -791,138 +792,6 @@ function replaceNextAction(notes: string, nextAction: string) {
   const line = `下一步：${nextAction.trim()}`;
   if (/下一步[:：]/.test(notes)) return notes.replace(/下一步[:：].*(?:\n|$)/, `${line}\n`).trim();
   return [line, notes].filter(Boolean).join("\n");
-}
-
-/**
- * Computes conflict layout for a set of tasks on the same day.
- * Returns a Map<taskId, { index: number; count: number }> where:
- * - `index` is the column offset (0-based) within the conflict group
- * - `count` is the total number of columns needed (max overlap depth)
- * Non-conflicting tasks are not included in the map (they use default layout).
- */
-/**
- * Compute conflict layout for a set of tasks scheduled on the SAME day.
- *
- * Algorithm (interval graph column layout):
- * 1. Sort by startMinutes (longer duration first if tie)
- * 2. Partition into conflict groups (handles chain conflicts: A overlaps B, B overlaps C)
- * 3. For each group with 2+ intervals, use greedy column packing:
- *    - For each interval, find the first column whose last interval ended ≤ current start
- *    - If none, create a new column
- * 4. Returns a Map<taskId, { index: number; count: number }>
- *    - index: column offset (0-based)
- *    - count: total columns in the group (= max overlap depth)
- *    - Non-conflicting tasks are NOT included (use default full-width layout)
- */
-/**
- * Conflict layout: assigns each overlapping task to a column index.
- * No hard column cap — all overlapping tasks get their own column so
- * nothing is ever hidden behind another block.
- */
-function computeConflictLayout(tasks: Task[], maxColumns = Infinity): Map<string, { index: number; count: number }> {
-  if (tasks.length <= 1) return new Map();
-
-  // Build intervals
-  const intervals = tasks
-    .filter((t): t is Task & { scheduledStart: string; scheduledEnd: string } =>
-      !!t.scheduledStart && !!t.scheduledEnd)
-    .map((t, i) => ({
-      taskId: t.id,
-      startMinutes: timeToMinutes(t.scheduledStart),
-      endMinutes: timeToMinutes(t.scheduledEnd),
-      originalIndex: i,
-    }))
-    .sort((a, b) =>
-      a.startMinutes - b.startMinutes ||
-      (b.endMinutes - b.startMinutes) - (a.endMinutes - a.startMinutes)
-    );
-
-  if (intervals.length <= 1) return new Map();
-
-  // Step 1: Partition into conflict groups (handles chain conflicts)
-  const groups: Array<{ intervals: typeof intervals; columnCount: number }> = [];
-  let currentBatch: typeof intervals = [];
-  let groupEnd = -Infinity;
-
-  for (const iv of intervals) {
-    if (iv.startMinutes < groupEnd) {
-      // Overlaps current group → add to it
-      currentBatch.push(iv);
-      groupEnd = Math.max(groupEnd, iv.endMinutes);
-    } else {
-      // No overlap → close current group, start new one
-      if (currentBatch.length > 0) groups.push({ intervals: currentBatch, columnCount: 0 });
-      currentBatch = [iv];
-      groupEnd = iv.endMinutes;
-    }
-  }
-  if (currentBatch.length > 0) groups.push({ intervals: currentBatch, columnCount: 0 });
-
-  // Only groups with 2+ tasks need conflict layout
-  const multiGroups = groups.filter((g) => g.intervals.length > 1);
-  if (multiGroups.length === 0) return new Map();
-
-  // Step 2: Greedy column packing per group
-  const result = new Map<string, { index: number; count: number }>();
-
-  for (const group of multiGroups) {
-    // Track active columns by their end time
-    const columns: Array<{ end: number }> = [];
-    // Temporary storage for assignment decisions
-    const assignments: Array<{ taskId: string; col: number }> = [];
-
-    for (const iv of group.intervals) {
-      // Find first column whose last interval ended ≤ current start
-      let assignedCol = -1;
-      for (let ci = 0; ci < columns.length; ci++) {
-        if (columns[ci].end <= iv.startMinutes) {
-          assignedCol = ci;
-          columns[ci].end = iv.endMinutes;
-          break;
-        }
-      }
-      // If no column available, create a new one
-      if (assignedCol === -1) {
-        assignedCol = columns.length;
-        columns.push({ end: iv.endMinutes });
-      }
-
-      assignments.push({ taskId: iv.taskId, col: assignedCol });
-    }
-
-    // Now store results with the FINAL column count (clamped by maxColumns)
-    const finalCount = Math.min(columns.length, maxColumns);
-    for (const a of assignments) {
-      result.set(a.taskId, { index: Math.min(a.col, finalCount - 1), count: finalCount });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Compute CSS left/width for a conflict‑laid‑out time block.
- * Always uses strict side-by-side columns so overlapping tasks never cover
- * each other, including in narrow multi-day and fullscreen layouts.
- */
-function computeConflictStyle(
-  taskId: string,
-  layout: Map<string, { index: number; count: number }>,
-  innerWidth: number,
-  baseLeft: number,
-  gap: number,
-  viewMode = "daily",
-): { left: number; width: number; isNarrow: boolean } | null {
-  const cl = layout.get(taskId);
-  if (!cl || cl.count <= 1) return null;
-
-  const effectiveGap = Math.min(gap, innerWidth / Math.max(cl.count * 2, 1));
-  const slotW = Math.max(0, (innerWidth - effectiveGap * (cl.count - 1)) / cl.count);
-  return {
-    left: baseLeft + cl.index * (slotW + effectiveGap),
-    width: slotW,
-    isNarrow: viewMode !== "daily" && slotW < 80,
-  };
 }
 
 function getDropTargetFromPointer({
