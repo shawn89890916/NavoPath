@@ -7,3 +7,4 @@ release-*/
 .playwright-cli/
 .worktrees/
 *.log
+*.bak
