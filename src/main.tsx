@@ -13,7 +13,7 @@ import {
   pickMemoriesForContext,
   toAiHistory,
 } from "./aiContext";
-import { exportDataAsJson, exportTasksAsCsv, parsePlannerBackupJson, parseTasksCsv } from "./dataExport";
+import { exportDataAsJson, exportTasksAsCsv, isImportFileSizeAllowed, parsePlannerBackupJson, parseTasksCsv } from "./dataExport";
 import type { ParsedAttachment } from "./fileParser";
 import { reasoningModesForModel } from "./utils/aiModels";
 import { autoScheduleTasks, type UnscheduledTask } from "./autoSchedule";
@@ -12657,6 +12657,10 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      if (!isImportFileSizeAllowed(file.size, "backup")) {
+        alert(lang === "zh" ? "备份文件超过 20 MB 限制。" : "Backup file exceeds the 20 MB limit.");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
@@ -12681,6 +12685,10 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      if (!isImportFileSizeAllowed(file.size, "tasks")) {
+        alert(lang === "zh" ? "CSV 文件超过 10 MB 限制。" : "CSV file exceeds the 10 MB limit.");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         try {

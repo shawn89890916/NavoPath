@@ -2,6 +2,14 @@ import type { PlannerData, Project, Settings, Task } from "./types";
 import { normalizeData } from "./browserFallback";
 import { normalizeSettings } from "./defaultSettings";
 
+export const MAX_BACKUP_IMPORT_BYTES = 20 * 1024 * 1024;
+export const MAX_TASK_CSV_IMPORT_BYTES = 10 * 1024 * 1024;
+
+export function isImportFileSizeAllowed(size: number, kind: "backup" | "tasks") {
+  const limit = kind === "backup" ? MAX_BACKUP_IMPORT_BYTES : MAX_TASK_CSV_IMPORT_BYTES;
+  return Number.isFinite(size) && size >= 0 && size <= limit;
+}
+
 export const TASK_CSV_HEADERS = [
   "ID",
   "Title",
