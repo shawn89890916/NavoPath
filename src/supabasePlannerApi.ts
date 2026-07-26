@@ -6,6 +6,13 @@ import { mergePlannerData } from "./syncMerge";
 
 const PROFILE_TABLE = "dayflow_profiles";
 
+type ScopedProfile = {
+  userId: string;
+  data: PlannerData;
+  settings: Settings;
+  revision: number;
+};
+
 function uid(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -102,29 +109,46 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
   });
   let cachedUser: User | null | undefined;
   let userPromise: Promise<User | null> | null = null;
-  let profileCache: { data: PlannerData; settings: Settings; revision: number } | null = null;
-  let profilePromise: Promise<{ data: PlannerData; settings: Settings; revision: number }> | null = null;
+  let authVersion = 0;
+  let profileCache: ScopedProfile | null = null;
+  let profilePromise: { userId: string; authVersion: number; value: Promise<ScopedProfile> } | null = null;
 
+  const setCachedUser = (user: User | null) => {
+    const currentUserId = cachedUser?.id ?? null;
+    const nextUserId = user?.id ?? null;
+    if (cachedUser === undefined || currentUserId !== nextUserId) {
+      authVersion += 1;
+      profileCache = null;
+      profilePromise = null;
+    }
+    cachedUser = user;
+    userPromise = null;
+  };
+  const isCurrentAuth = (userId: string, version: number) =>
+    authVersion === version && cachedUser?.id === userId;
+
+  const initialAuthVersion = authVersion;
   void supabase.auth.getSession().then(({ data }) => {
-    cachedUser = data.session?.user ?? null;
+    if (authVersion === initialAuthVersion && cachedUser === undefined) {
+      setCachedUser(data.session?.user ?? null);
+    }
   });
   supabase.auth.onAuthStateChange((_event, session) => {
-    cachedUser = session?.user ?? null;
-    userPromise = null;
-    profileCache = null;
-    profilePromise = null;
+    setCachedUser(session?.user ?? null);
   });
 
   async function getUser() {
     if (cachedUser !== undefined) return cachedUser;
     if (userPromise) return userPromise;
+    const requestAuthVersion = authVersion;
     const pending = supabase.auth.getSession().then(({ data, error }) => {
+      if (authVersion !== requestAuthVersion) return cachedUser ?? null;
       if (error) {
-        cachedUser = null;
+        setCachedUser(null);
         return null;
       }
-      cachedUser = data.session?.user ?? null;
-      return cachedUser;
+      setCachedUser(data.session?.user ?? null);
+      return cachedUser ?? null;
     });
     userPromise = pending;
     try {
@@ -171,8 +195,15 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
   }
 
   async function ensureProfile(user: User, force = false) {
-    if (!force && profileCache) return profileCache;
-    if (!force && profilePromise) return profilePromise;
+    const requestAuthVersion = authVersion;
+    if (!force && profileCache?.userId === user.id) return profileCache;
+    if (!force && profilePromise?.userId === user.id && profilePromise.authVersion === requestAuthVersion) {
+      return profilePromise.value;
+    }
+    const remember = (profile: ScopedProfile) => {
+      if (isCurrentAuth(user.id, requestAuthVersion)) profileCache = profile;
+      return profile;
+    };
     const useTemporaryProfile = () => {
       const initialData = emptyCloudData();
       const initialSettings = {
@@ -180,8 +211,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         onboardingVersion: 0,
         onboardingStep: "add" as const,
       };
-      profileCache = { data: initialData, settings: initialSettings, revision: 0 };
-      return profileCache;
+      return remember({ userId: user.id, data: initialData, settings: initialSettings, revision: 0 });
     };
     const pending = (async () => {
       const { data, error } = await retryTransientRequest(() => supabase
@@ -195,12 +225,12 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         throw new Error(`Cloud profile load failed: ${error.message}`);
       }
       if (data) {
-        profileCache = {
+        return remember({
+          userId: user.id,
           data: normalizeData((data as any).data as PlannerData),
           settings: mergeSettings((data as any).settings),
           revision: Number((data as any).revision || 0),
-        };
-        return profileCache;
+        });
       }
 
       const initialData = emptyCloudData();
@@ -209,6 +239,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         onboardingVersion: 0,
         onboardingStep: "add" as const,
       };
+      if (!isCurrentAuth(user.id, requestAuthVersion)) throw new Error("Account changed while loading profile");
       const { error: insertError } = await retryTransientRequest(() => supabase
         .from(PROFILE_TABLE)
         .insert({
@@ -223,21 +254,22 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         if (isRetryableProfileError(insertError.message)) return useTemporaryProfile();
         throw new Error(`Cloud profile create failed: ${insertError.message}`);
       }
-      profileCache = { data: initialData, settings: initialSettings, revision: 0 };
-      return profileCache;
+      return remember({ userId: user.id, data: initialData, settings: initialSettings, revision: 0 });
     })();
-    profilePromise = pending;
+    profilePromise = { userId: user.id, authVersion: requestAuthVersion, value: pending };
     try {
       return await pending;
     } finally {
-      if (profilePromise === pending) profilePromise = null;
+      if (profilePromise?.value === pending) profilePromise = null;
     }
   }
 
   async function updateProfile(patch: { data?: PlannerData; settings?: Settings }) {
     const user = await requireUser();
+    const requestAuthVersion = authVersion;
     let current = await ensureProfile(user);
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (!isCurrentAuth(user.id, requestAuthVersion)) throw new Error("Account changed while syncing");
       const nextData = patch.data ? mergePlannerData(current.data, normalizeData(patch.data)) : current.data;
       const nextSettings = patch.settings ? mergeSettings({ ...current.settings, ...patch.settings }) : current.settings;
       const { data: rows, error } = await retryTransientRequest(() => supabase.rpc("save_dayflow_profile", {
@@ -246,11 +278,12 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         next_settings: nextSettings,
       }));
       if (!error && rows?.[0]) {
-        profileCache = { data: normalizeData(rows[0].data), settings: mergeSettings(rows[0].settings), revision: Number(rows[0].revision) };
+        if (!isCurrentAuth(user.id, requestAuthVersion)) throw new Error("Account changed while syncing");
+        profileCache = { userId: user.id, data: normalizeData(rows[0].data), settings: mergeSettings(rows[0].settings), revision: Number(rows[0].revision) };
         return profileCache;
       }
       if (!/PROFILE_REVISION_CONFLICT|40001/i.test(error?.message || "") || attempt === 2) throw new Error(error?.message || "Sync failed");
-      profileCache = null;
+      if (profileCache?.userId === user.id) profileCache = null;
       current = await ensureProfile(user, true);
     }
     throw new Error("Sync failed");
@@ -284,7 +317,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         }
       });
       if (error) throw new Error(authErrorMessage(error.message));
-      cachedUser = data.user ?? null;
+      setCachedUser(data.session?.user ?? null);
       if (data.user && data.session) await ensureProfile(data.user, true);
       return {
         user: publicUser(data.user),
@@ -297,7 +330,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     signIn: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(authErrorMessage(error.message));
-      cachedUser = data.user ?? null;
+      setCachedUser(data.user ?? null);
       return { user: publicUser(data.user) };
     },
 
@@ -346,7 +379,7 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
           await new Promise((resolve) => window.setTimeout(resolve, 250));
         }
 
-        cachedUser = sessionUser;
+        setCachedUser(sessionUser);
         return {
           confirmed: Boolean(sessionUser),
           user: publicUser(sessionUser),
@@ -358,19 +391,15 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
 
     signOut: async () => {
-      cachedUser = null;
-      userPromise = null;
-      profileCache = null;
-      profilePromise = null;
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw new Error(error.message);
+      setCachedUser(null);
     },
 
     deleteAccount: async () => {
       const { error } = await supabase.rpc("delete_own_account");
       if (error) throw new Error(error.message);
-      profileCache = null;
-      cachedUser = null;
+      setCachedUser(null);
       await supabase.auth.signOut({ scope: "local" });
     },
 
@@ -468,12 +497,13 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       let channel: ReturnType<typeof supabase.channel> | null = null;
       let disposed = false;
       void requireUser().then((user) => {
-        if (disposed) return;
-        let latestRevision = profileCache?.revision || 0;
+        if (disposed || cachedUser?.id !== user.id) return;
+        let latestRevision = profileCache?.userId === user.id ? profileCache.revision : 0;
         const emitIfNewer = (row: any) => {
-          if (!row?.data || !row?.settings) return;
-          const next = { data: normalizeData(row.data), settings: mergeSettings(row.settings), revision: Number(row.revision || 0) };
-          const knownRevision = Math.max(latestRevision, profileCache?.revision || 0);
+          if (!row?.data || !row?.settings || cachedUser?.id !== user.id) return;
+          const next = { userId: user.id, data: normalizeData(row.data), settings: mergeSettings(row.settings), revision: Number(row.revision || 0) };
+          const cachedRevision = profileCache?.userId === user.id ? profileCache.revision : 0;
+          const knownRevision = Math.max(latestRevision, cachedRevision);
           latestRevision = knownRevision;
           if (next.revision <= knownRevision) return;
           latestRevision = next.revision;

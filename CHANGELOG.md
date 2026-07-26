@@ -53,7 +53,7 @@
 - 启动缓存现在会在显示或回放未同步改动前校验并迁移资料、设置及同步标记；损坏缓存会被忽略，异常或错误类型的“待同步”标记不会覆盖云端资料。
 - 修复跨设备删除后旧任务、项目、习惯等资料再次出现的问题；完整资料保存现在会记录删除时间，同步冲突会保留更新较新的删除或重建结果。
 - 修复强制仅拉取与后台保存并发时，本地旧请求可能在拉取后重新入队或覆盖结果的问题；仅拉取现在会作废并等待在途保存，迟到的旧 revision 响应也会被忽略。
-- 修复快速切换账号时，上一工作区迟到的加载、实时更新或延迟快照可能落入当前会话的问题；切换工作区现在会使旧请求失效并重置同步状态。
+- 加固账号会话隔离：快速登录或切换账号时，上一工作区迟到的加载、实时更新、云端资料缓存及延迟快照不会再落入当前会话；待邮箱确认的注册不会误判为已登录，失败的登出也会保留现有会话。
 
 ## 2026-07-26 · Timeline and data export fixes
 
@@ -66,7 +66,7 @@
 - Startup caches are now validated and migrated before their data, settings, or unsynced changes are displayed or replayed. Corrupt caches are ignored, and malformed dirty flags can no longer overwrite cloud data.
 - Fixed tasks, projects, habits, and other records reappearing after deletion on another device. Full-profile saves now record deletion times, and sync conflicts preserve whichever deletion or recreation happened later.
 - Fixed forced pull-only sync racing with background saves, which could requeue an old local request or overwrite the pulled result. Pull-only sync now invalidates and waits for in-flight saves, and late responses with older revisions are ignored.
-- Fixed late workspace loads, realtime updates, or delayed snapshots from a previous account reaching the current session during rapid account switches. Changing workspaces now invalidates old requests and resets sync state.
+- Strengthened account-session isolation. During rapid sign-ins or account switches, late workspace loads, realtime updates, cloud-profile caches, and delayed snapshots from the previous account can no longer reach the current session. Signups awaiting email confirmation are no longer treated as signed in, and a failed sign-out preserves the existing session.
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 

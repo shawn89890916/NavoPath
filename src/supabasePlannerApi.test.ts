@@ -6,6 +6,49 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: createClientMock,
 }));
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function profileRow(userId: string, title: string, revision = 1) {
+  return {
+    revision,
+    data: {
+      version: 1,
+      importedSeedVersion: "test",
+      generatedAt: "2026-07-19T00:00:00.000Z",
+      goals: [],
+      projects: [],
+      tasks: [{
+        id: `task_${userId}`,
+        title,
+        dueDate: "2026-07-19",
+        category: "personal" as const,
+        priority: "medium" as const,
+        notes: "",
+        goalId: "goal_test",
+        completed: false,
+        createdAt: "2026-07-19T00:00:00.000Z",
+        updatedAt: "2026-07-19T00:00:00.000Z",
+      }],
+      timeEntries: [],
+      longTasks: [],
+      events: [],
+      notes: [],
+      drafts: [],
+      chat: [],
+      aiConversations: [],
+      aiMemories: [],
+      taskLayouts: {},
+    },
+    settings: { language: "en" },
+  };
+}
+
 beforeEach(() => {
   createClientMock.mockReset();
   vi.stubGlobal("window", {
@@ -18,6 +61,153 @@ beforeEach(() => {
 });
 
 describe("createSupabasePlannerApi", () => {
+  it("does not treat an email-confirmation signup as an authenticated session", async () => {
+    const pendingUser = { id: "user_pending", email: "pending@example.com" };
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        onAuthStateChange: vi.fn(),
+        signUp: vi.fn().mockResolvedValue({ data: { user: pendingUser, session: null }, error: null }),
+      },
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+
+    await expect(api.signUp?.("pending@example.com", "password")).resolves.toEqual(expect.objectContaining({
+      user: pendingUser,
+      requiresEmailConfirmation: true,
+    }));
+    await expect(api.getAuthState?.()).resolves.toEqual({
+      mode: "cloud",
+      user: null,
+      configured: true,
+    });
+  });
+
+  it("preserves the cached session when local sign-out fails", async () => {
+    const user = { id: "user_1", email: "user@example.com" };
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
+        onAuthStateChange: vi.fn(),
+        signOut: vi.fn().mockResolvedValue({ error: { message: "Offline" } }),
+      },
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+    await expect(api.getAuthState?.()).resolves.toEqual(expect.objectContaining({ user }));
+
+    await expect(api.signOut?.()).rejects.toThrow("Offline");
+    await expect(api.getAuthState?.()).resolves.toEqual(expect.objectContaining({ user }));
+  });
+
+  it("does not let the initial session lookup overwrite a completed sign-in", async () => {
+    const initialSession = deferred<{ data: { session: null }; error: null }>();
+    const user = { id: "user_new", email: "new@example.com" };
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn(() => initialSession.promise),
+        onAuthStateChange: vi.fn(),
+        signInWithPassword: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      },
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+
+    await api.signIn?.("new@example.com", "password");
+    initialSession.resolve({ data: { session: null }, error: null });
+    await initialSession.promise;
+    await Promise.resolve();
+
+    await expect(api.getAuthState?.()).resolves.toEqual({
+      mode: "cloud",
+      user,
+      configured: true,
+    });
+  });
+
+  it("does not reuse a late profile response after the authenticated user changes", async () => {
+    const userA = { id: "user_a", email: "a@example.com" };
+    const userB = { id: "user_b", email: "b@example.com" };
+    const oldProfile = deferred<{ data: ReturnType<typeof profileRow>; error: null }>();
+    let authHandler: ((_event: string, session: { user: typeof userA } | null) => void) | undefined;
+    const maybeSingle = vi.fn((userId: string) => userId === userA.id
+      ? oldProfile.promise
+      : Promise.resolve({ data: profileRow(userB.id, "User B"), error: null }));
+    const from = vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn((_column: string, userId: string) => ({
+          maybeSingle: () => maybeSingle(userId),
+        })),
+      })),
+    }));
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user: userA } }, error: null }),
+        onAuthStateChange: vi.fn((handler) => {
+          authHandler = handler;
+        }),
+      },
+      from,
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+    await api.getAuthState?.();
+    const staleLoad = api.getBootstrap?.({ force: true });
+    await vi.waitFor(() => expect(maybeSingle).toHaveBeenCalledWith(userA.id));
+
+    authHandler?.("SIGNED_IN", { user: userB });
+    await expect(api.getBootstrap?.({ force: true })).resolves.toEqual(expect.objectContaining({
+      auth: expect.objectContaining({ user: userB }),
+      data: expect.objectContaining({ tasks: [expect.objectContaining({ title: "User B" })] }),
+    }));
+
+    oldProfile.resolve({ data: profileRow(userA.id, "User A"), error: null });
+    await staleLoad;
+    await expect(api.getData()).resolves.toEqual(expect.objectContaining({
+      tasks: [expect.objectContaining({ title: "User B" })],
+    }));
+  });
+
+  it("does not send an old user's pending save after authentication changes", async () => {
+    const userA = { id: "user_a", email: "a@example.com" };
+    const userB = { id: "user_b", email: "b@example.com" };
+    const oldProfile = deferred<{ data: ReturnType<typeof profileRow>; error: null }>();
+    let authHandler: ((_event: string, session: { user: typeof userA } | null) => void) | undefined;
+    const from = vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({ maybeSingle: () => oldProfile.promise })),
+      })),
+    }));
+    const rpc = vi.fn();
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user: userA } }, error: null }),
+        onAuthStateChange: vi.fn((handler) => {
+          authHandler = handler;
+        }),
+      },
+      from,
+      rpc,
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+    await api.getAuthState?.();
+    const save = api.saveData?.(profileRow(userA.id, "Changed").data);
+    await vi.waitFor(() => expect(from).toHaveBeenCalled());
+
+    authHandler?.("SIGNED_IN", { user: userB });
+    oldProfile.resolve({ data: profileRow(userA.id, "User A"), error: null });
+
+    await expect(save).rejects.toThrow("Account changed while syncing");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("finishes password authentication before loading the cloud profile", async () => {
     const schemaCacheError = {
       message: "Could not query the database for the schema cache",
