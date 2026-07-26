@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fallbackData,
+  normalizeData,
   parseLocalPreviewData,
   parseLocalPreviewSettings,
   shouldUseLocalPreviewByDefault,
@@ -57,5 +58,35 @@ describe("browser fallback preview mode", () => {
     expect(parsed).not.toBeNull();
     expect(parsed?.tasks.length).toBeGreaterThan(0);
     expect(parsed?.aiMemories).toEqual([]);
+  });
+
+  it("drops malformed collection entries without discarding valid planner data", () => {
+    const malformed = fallbackData() as any;
+    const validTaskCount = malformed.tasks.length;
+    const damagedTaskId = malformed.tasks[0].id;
+    malformed.projects.push(null, "bad", {});
+    malformed.tasks.push(null, 42, { id: "missing-title" });
+    malformed.events = [null];
+    malformed.notes.push(null);
+    malformed.chat = [null, { role: "user", content: "Keep me" }];
+    malformed.aiConversations = [{ id: "conversation", title: "Valid", messages: [null] }];
+    malformed.aiMemories = [{ id: "memory", content: "Valid", tags: [null, "keep"], sourceMessages: [null] }];
+    malformed.scheduleTemplates = [{ id: "template", title: "Valid", slots: [null] }];
+    malformed.tasks[0].subtasks = [null, { id: "subtask", title: "Keep", subtasks: [null] }];
+    malformed.tasks[0].timelineRecords = [null];
+
+    const normalized = normalizeData(malformed);
+    const damagedTask = normalized.tasks.find((task) => task.id === damagedTaskId);
+
+    expect(normalized.tasks).toHaveLength(validTaskCount);
+    expect(normalized.projects.every((project) => Boolean(project.id && project.title))).toBe(true);
+    expect(normalized.notes).not.toContain(null);
+    expect(normalized.chat).toHaveLength(1);
+    expect(normalized.aiConversations?.[0].messages).toEqual([]);
+    expect(normalized.aiMemories[0].tags).toEqual(["keep"]);
+    expect(normalized.scheduleTemplates?.[0].slots).toEqual([]);
+    expect(damagedTask?.subtasks).toHaveLength(1);
+    expect(damagedTask?.subtasks?.[0].subtasks).toEqual([]);
+    expect(damagedTask?.timelineRecords).toEqual([]);
   });
 });

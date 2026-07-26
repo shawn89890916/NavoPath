@@ -49,6 +49,7 @@
 - 修复 CSV 导出与重新导入：公式式标题会安全保存为文本，带逗号、引号或换行的任务可完整往返，重新导入时也会按项目名恢复任务归属。
 - 加固 JSON 完整备份导入：旧备份会先迁移缺失集合和设置，非法枚举、尺寸及小组件偏好会回退到安全默认值，损坏或缺少核心集合的文件会在覆盖任何当前数据前被拒绝。
 - 统一云端、本地预览与备份导入的设置迁移规则；本地预览仍保留专属名称和面板宽度，且损坏的本地设置或规划数据快照不再阻止应用启动。
+- 加固共享资料迁移：云端资料、旧备份或本地快照中的单个空值、错误类型及损坏的子任务、时间记录、AI 消息或模板时段会被安全忽略，不再拖垮整份资料加载。
 
 ## 2026-07-26 · Timeline and data export fixes
 
@@ -57,6 +58,7 @@
 - Fixed CSV export and re-import. Formula-like titles are stored safely as text, tasks containing commas, quotes, or line breaks round-trip intact, and imported tasks recover their project assignment by project name.
 - Hardened full JSON backup imports. Legacy backups now migrate missing collections and settings first, invalid enums, panel sizes, and widget preferences fall back safely, and corrupt files or files missing core collections are rejected before any current data is overwritten.
 - Unified settings migrations across cloud profiles, local preview, and backup imports. Local preview keeps its own display name and panel widths, while corrupt local settings or planner snapshots can no longer prevent the app from starting.
+- Hardened shared profile migration. Isolated nulls, invalid value types, and damaged subtasks, timeline records, AI messages, or template slots in cloud profiles, legacy backups, and local snapshots are now ignored instead of preventing the entire profile from loading.
 
 ## 2026-07-19 · 实时云同步与私有日历订阅
 

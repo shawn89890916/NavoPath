@@ -1,4 +1,4 @@
-import type { AiAction, PlannerApi, PlannerData, Settings, Task, TaskRecurrence } from "./types";
+import type { AiAction, PlannerApi, PlannerData, Settings, Subtask, Task, TaskRecurrence } from "./types";
 import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
@@ -15,6 +15,29 @@ function uid(prefix: string) {
 
 function now() {
   return new Date().toISOString();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function recordItems<T>(value: T[] | null | undefined): T[];
+function recordItems<T = Record<string, unknown>>(value: unknown): T[];
+function recordItems<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value.filter(isRecord) as T[] : [];
+}
+
+function normalizeSubtasks(value: unknown): Subtask[] {
+  return recordItems<Subtask>(value).map((subtask, index) => ({
+    ...subtask,
+    id: subtask.id || uid("sub"),
+    title: subtask.title || "",
+    completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
+    done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
+    order: typeof subtask.order === "number" ? subtask.order : index,
+    createdAt: subtask.createdAt || now(),
+    subtasks: subtask.subtasks ? normalizeSubtasks(subtask.subtasks) : undefined,
+  }));
 }
 
 function localIso(date: Date) {
@@ -138,18 +161,37 @@ function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
 }
 
 export function normalizeData(data: PlannerData): PlannerData {
-  const migratedTasks = migrateEventsToTasks(data);
-  const chat = (data.chat || []).map((message) => ({
+  const safeData: PlannerData = {
+    ...data,
+    goals: recordItems(data.goals),
+    projects: recordItems(data.projects).filter((project) => typeof project.id === "string" && typeof project.title === "string"),
+    tasks: recordItems(data.tasks).filter((task) => typeof task.id === "string" && typeof task.title === "string"),
+    habits: recordItems(data.habits),
+    habitDailyStates: recordItems(data.habitDailyStates),
+    timeEntries: recordItems(data.timeEntries),
+    longTasks: recordItems(data.longTasks),
+    events: recordItems(data.events).filter((event) => typeof event.id === "string" && typeof event.title === "string"),
+    notes: recordItems(data.notes),
+    drafts: recordItems(data.drafts),
+    chat: recordItems(data.chat),
+    aiConversations: recordItems(data.aiConversations),
+    aiMemories: recordItems(data.aiMemories),
+    scheduleTemplates: recordItems(data.scheduleTemplates),
+    aiProfile: isRecord(data.aiProfile) ? data.aiProfile : undefined,
+    taskLayouts: isRecord(data.taskLayouts) ? data.taskLayouts as PlannerData["taskLayouts"] : {},
+  };
+  const migratedTasks = migrateEventsToTasks(safeData);
+  const chat = safeData.chat.map((message) => ({
     ...message,
     id: message.id || uid("chat"),
     saved: Boolean(message.saved),
   }));
-  const aiConversations = (data.aiConversations && data.aiConversations.length > 0)
-    ? data.aiConversations.map((conversation) => ({
+  const aiConversations = (safeData.aiConversations && safeData.aiConversations.length > 0)
+    ? safeData.aiConversations.map((conversation) => ({
       ...conversation,
       id: conversation.id || uid("conversation"),
       title: conversation.title || "AI 对话",
-      messages: (conversation.messages || []).map((message) => ({
+      messages: recordItems<PlannerData["chat"][number]>(conversation.messages).map((message) => ({
         ...message,
         id: message.id || uid("chat"),
         saved: Boolean(message.saved),
@@ -165,23 +207,23 @@ export function normalizeData(data: PlannerData): PlannerData {
       updatedAt: chat[chat.length - 1]?.createdAt || now(),
     }] : []);
   return normalizePlannerDataForClient(normalizeTreeOrder({
-    ...data,
-    projects: (data.projects || []).map((project) => ({
+    ...safeData,
+    projects: safeData.projects.map((project) => ({
       ...project,
       color: project.color || "#584D3D",
       importance: project.importance || "high",
       urgency: project.urgency || "low",
     })),
-    longTasks: data.longTasks || [],
+    longTasks: safeData.longTasks,
     chat,
     aiConversations,
-    activeAiConversationId: data.activeAiConversationId || aiConversations[0]?.id,
-    aiMemories: (data.aiMemories || []).map((memory) => ({
+    activeAiConversationId: safeData.activeAiConversationId || aiConversations[0]?.id,
+    aiMemories: safeData.aiMemories.map((memory) => ({
       ...memory,
       id: memory.id || uid("memory"),
-      tags: memory.tags || [],
+      tags: Array.isArray(memory.tags) ? memory.tags.filter((tag): tag is string => typeof tag === "string") : [],
       source: memory.source || "auto",
-      sourceMessages: (memory.sourceMessages || []).map((message) => ({
+      sourceMessages: recordItems<PlannerData["chat"][number]>(memory.sourceMessages).map((message) => ({
         ...message,
         id: message.id || uid("chat"),
         saved: true,
@@ -189,11 +231,11 @@ export function normalizeData(data: PlannerData): PlannerData {
       pinned: Boolean(memory.pinned),
       archived: Boolean(memory.archived),
     })),
-    scheduleTemplates: (data.scheduleTemplates || []).map((template) => ({
+    scheduleTemplates: (safeData.scheduleTemplates || []).map((template) => ({
       ...template,
       id: template.id || uid("template"),
       title: template.title || "Template",
-      slots: (template.slots || []).map((slot) => ({
+      slots: recordItems<NonNullable<PlannerData["scheduleTemplates"]>[number]["slots"][number]>(template.slots).map((slot) => ({
         ...slot,
         id: slot.id || uid("slot"),
         label: slot.label || "Period",
@@ -201,26 +243,18 @@ export function normalizeData(data: PlannerData): PlannerData {
       createdAt: template.createdAt || now(),
       updatedAt: template.updatedAt || template.createdAt || now(),
     })),
-    timeEntries: (data.timeEntries || [])
-      .map((entry) => normalizeTimeEntry(entry, data.tasks || []))
+    timeEntries: (safeData.timeEntries || [])
+      .map((entry) => normalizeTimeEntry(entry, safeData.tasks))
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
-    drafts: (data.drafts || []).filter((draft) => draft.title).slice(-10),
-    version: Math.max(data.version || 1, 2),
+    drafts: safeData.drafts.filter((draft) => draft.title).slice(-10),
+    version: Math.max(safeData.version || 1, 2),
     events: [],
-    taskLayouts: data.taskLayouts || {},
-    tasks: [...(data.tasks || []), ...migratedTasks].map((task) => ({
+    tasks: [...safeData.tasks, ...migratedTasks].map((task) => ({
       ...task,
       completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
       workflowStatus: inferWorkflowStatus(task),
-      subtasks: (task.subtasks || []).map((subtask, index) => ({
-        ...subtask,
-        id: subtask.id || uid("sub"),
-        title: subtask.title || "",
-        completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
-        done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
-        order: typeof subtask.order === "number" ? subtask.order : index,
-        createdAt: subtask.createdAt || now(),
-      })),
+      timelineRecords: recordItems(task.timelineRecords),
+      subtasks: normalizeSubtasks(task.subtasks),
       notes: task.notes || "",
     })),
   }));
