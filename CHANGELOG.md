@@ -49,7 +49,7 @@
 - CSV 任务导入现在限制最多 20,000 行，JSON 备份会在迁移前限制嵌套深度与结构节点数，避免小文件在解析后膨胀成异常规模的数据结构。
 - 桌面端外部插件恢复为仅加载经过校验的 manifest 与配置，不再向渲染器暴露或执行插件目录中的脚本，防止插件绕过声明权限访问认证存储和其他桌面能力。
 - 桌面认证 token 不再在系统加密不可用或失败时以可逆 Base64 明文落盘；旧的明文回退凭据会被清除，用户当前会话仍可继续，但下次启动可能需要重新登录。
-- 升级桌面更新与打包链共用的 YAML 解析器，修复特制流式集合可触发指数级解析耗时的高危拒绝服务漏洞。
+- 继续升级桌面更新、打包与边缘函数开发工具链：YAML 解析器、Electron Builder、Wrangler、Axios、Sharp、PostCSS、Tar 等依赖已更新至兼容修复版，消除可在现有版本范围内修复的拒绝服务、路径遍历与请求构造漏洞。
 
 ## 2026-07-27 · Input and plugin security
 
@@ -58,7 +58,7 @@
 - Task CSV imports now allow at most 20,000 rows, while JSON backups limit nesting depth and structural node count before migration, preventing small files from expanding into abnormally large in-memory structures.
 - Desktop external plugins are again limited to validated manifest metadata and configuration. Scripts from plugin directories are no longer exposed to or executed in the renderer, preventing plugins from bypassing declared permissions to access authentication storage or other desktop capabilities.
 - Desktop authentication tokens no longer fall back to reversible Base64 plaintext when system encryption is unavailable or fails. Existing plaintext fallback credentials are removed; the current session can continue, but the next launch may require signing in again.
-- Upgraded the YAML parser shared by desktop updating and packaging, fixing a high-severity denial-of-service vulnerability where crafted flow collections could trigger exponential parsing time.
+- Continued upgrading the desktop update, packaging, and edge-function development toolchain. The YAML parser, Electron Builder, Wrangler, Axios, Sharp, PostCSS, Tar, and related dependencies now use compatible patched releases, eliminating the denial-of-service, path-traversal, and request-construction vulnerabilities fixable within current version ranges.
 
 ## 2026-07-26 · 时间轴与数据导出修复
 
