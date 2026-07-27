@@ -1,8 +1,10 @@
 const fs = require("node:fs");
 
 const MAX_EXTERNAL_PLUGIN_MANIFEST_BYTES = 256 * 1024;
+const MAX_PLUGIN_CONFIG_STRING_LENGTH = 10_000;
 const allowedPluginPermissions = new Set(["tasks", "settings", "ui", "events", "calendar"]);
 const allowedPluginFieldTypes = new Set(["boolean", "number", "string", "select"]);
+const unsafeStorageKeys = new Set(["__proto__", "prototype", ...Object.getOwnPropertyNames(Object.prototype)]);
 
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -22,38 +24,66 @@ function cleanLocalizedText(value) {
   return Object.keys(result).length ? result : undefined;
 }
 
+function isSafeStorageKey(value) {
+  return Boolean(value) && !unsafeStorageKeys.has(value);
+}
+
 function cleanPluginConfigFields(fields) {
   if (!Array.isArray(fields)) return [];
-  return fields.slice(0, 20).flatMap((field) => {
-    if (!isRecord(field)) return [];
+  const result = [];
+  const seenKeys = new Set();
+  for (const field of fields.slice(0, 20)) {
+    if (!isRecord(field)) continue;
     const key = cleanText(field.key).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 64);
     const type = cleanText(field.type);
-    if (!key || !allowedPluginFieldTypes.has(type)) return [];
+    if (!isSafeStorageKey(key) || seenKeys.has(key) || !allowedPluginFieldTypes.has(type)) continue;
     const cleanField = {
       key,
       label: cleanText(field.label, key),
       labelI18n: cleanLocalizedText(field.labelI18n),
       type,
-      default: field.default,
     };
     if (type === "number") {
-      if (Number.isFinite(field.min)) cleanField.min = Number(field.min);
-      if (Number.isFinite(field.max)) cleanField.max = Number(field.max);
+      const min = Number.isFinite(field.min) ? Number(field.min) : undefined;
+      const max = Number.isFinite(field.max) ? Number(field.max) : undefined;
+      if (min !== undefined && max !== undefined && min > max) continue;
+      if (min !== undefined) cleanField.min = min;
+      if (max !== undefined) cleanField.max = max;
+      let value = Number.isFinite(field.default) ? Number(field.default) : 0;
+      if (min !== undefined) value = Math.max(min, value);
+      if (max !== undefined) value = Math.min(max, value);
+      cleanField.default = value;
+    } else if (type === "boolean") {
+      cleanField.default = typeof field.default === "boolean" ? field.default : false;
+    } else if (type === "string") {
+      cleanField.default = typeof field.default === "string"
+        ? field.default.slice(0, MAX_PLUGIN_CONFIG_STRING_LENGTH)
+        : "";
     }
-    if (type === "select" && Array.isArray(field.options)) {
+    if (type === "select") {
+      if (!Array.isArray(field.options)) continue;
+      const seenValues = new Set();
       cleanField.options = field.options.slice(0, 50).flatMap((option) => {
         if (!isRecord(option)) return [];
         const value = cleanText(option.value).slice(0, 100);
-        if (!value) return [];
+        if (!value || seenValues.has(value)) return [];
+        seenValues.add(value);
         return [{
           value,
           label: cleanText(option.label, value),
           labelI18n: cleanLocalizedText(option.labelI18n),
         }];
       });
+      if (cleanField.options.length === 0) continue;
+      cleanField.default = typeof field.default === "string"
+        && cleanField.options.some((option) => option.value === field.default)
+        ? field.default
+        : cleanField.options[0].value;
     }
-    return [cleanField];
-  });
+    seenKeys.add(key);
+    result.push(cleanField);
+  }
+  return result;
 }
 
 function isExternalPluginManifestFileSizeAllowed(size) {
@@ -66,7 +96,7 @@ function readExternalPluginManifest(filePath, folderId, fileSystem = fs) {
   if (!isRecord(manifest)) return null;
   const id = cleanText(manifest.id, folderId).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
   const name = cleanText(manifest.name, id);
-  if (!id || !name) return null;
+  if (!isSafeStorageKey(id) || !name) return null;
   return {
     id,
     name,
@@ -90,6 +120,7 @@ function readExternalPluginManifest(filePath, folderId, fileSystem = fs) {
 
 module.exports = {
   MAX_EXTERNAL_PLUGIN_MANIFEST_BYTES,
+  MAX_PLUGIN_CONFIG_STRING_LENGTH,
   isExternalPluginManifestFileSizeAllowed,
   readExternalPluginManifest,
 };

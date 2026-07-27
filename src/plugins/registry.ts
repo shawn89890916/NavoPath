@@ -21,6 +21,13 @@
  */
 
 export type PluginPermission = "tasks" | "settings" | "ui" | "events" | "calendar";
+export const MAX_PLUGIN_CONFIG_STRING_LENGTH = 10_000;
+
+const unsafeStorageKeys = new Set(["__proto__", "prototype", ...Object.getOwnPropertyNames(Object.prototype)]);
+
+function isSafeStorageKey(value: string): boolean {
+  return Boolean(value) && !unsafeStorageKeys.has(value);
+}
 
 export interface PluginHost {
   /** Read the current planner data (tasks, events, ...). */
@@ -75,6 +82,7 @@ const registry = new Map<string, NavoPlugin>();
 const activePlugins = new Set<string>();
 
 export function register(plugin: NavoPlugin): void {
+  if (!isSafeStorageKey(plugin.id)) return;
   if (registry.has(plugin.id)) {
     // Idempotent — re-registering replaces the previous definition.
   }
@@ -100,10 +108,30 @@ export function resolveConfig(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const field of plugin.configFields) {
+    if (!isSafeStorageKey(field.key)) continue;
+    const fallback = normalizeConfigValue(field, field.default);
     const has = stored && Object.prototype.hasOwnProperty.call(stored, field.key);
-    result[field.key] = has ? (stored as Record<string, unknown>)[field.key] : field.default;
+    const storedValue = has ? (stored as Record<string, unknown>)[field.key] : undefined;
+    result[field.key] = normalizeConfigValue(field, storedValue) ?? fallback;
   }
   return result;
+}
+
+function normalizeConfigValue(field: PluginConfigField, value: unknown): unknown {
+  if (field.type === "boolean") return typeof value === "boolean" ? value : undefined;
+  if (field.type === "string") {
+    return typeof value === "string" ? value.slice(0, MAX_PLUGIN_CONFIG_STRING_LENGTH) : undefined;
+  }
+  if (field.type === "select") {
+    return typeof value === "string" && field.options?.some((option) => option.value === value)
+      ? value
+      : undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  let normalized = value;
+  if (typeof field.min === "number" && Number.isFinite(field.min)) normalized = Math.max(field.min, normalized);
+  if (typeof field.max === "number" && Number.isFinite(field.max)) normalized = Math.min(field.max, normalized);
+  return normalized;
 }
 
 export function pluginText(

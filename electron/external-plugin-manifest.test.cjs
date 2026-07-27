@@ -53,7 +53,7 @@ test("accepts only object-shaped plugin manifests and sanitizes exposed fields",
         type: "number",
         label: "Limit",
         labelI18n: undefined,
-        default: undefined,
+        default: 1,
         min: 1,
         max: 10,
       },
@@ -62,7 +62,7 @@ test("accepts only object-shaped plugin manifests and sanitizes exposed fields",
         type: "select",
         label: "mode",
         labelI18n: undefined,
-        default: undefined,
+        default: "safe",
         options: [{ value: "safe", label: "Safe", labelI18n: undefined }],
       },
     ],
@@ -70,5 +70,33 @@ test("accepts only object-shaped plugin manifests and sanitizes exposed fields",
   });
 
   fileSystem.readFileSync = () => "[]";
+  assert.equal(readExternalPluginManifest("manifest.json", "folder", fileSystem), null);
+});
+
+test("rejects unsafe storage keys and normalizes external config defaults", () => {
+  const fileSystem = {
+    statSync: () => ({ size: 1024 }),
+    readFileSync: () => JSON.stringify({
+      id: "safe-plugin",
+      name: "Safe plugin",
+      configFields: [
+        { key: "__proto__", type: "string", default: "polluted" },
+        { key: "constructor", type: "boolean", default: true },
+        { key: "count", type: "number", min: 1, max: 10, default: 999 },
+        { key: "label", type: "string", default: "x".repeat(12_000) },
+        { key: "mode", type: "select", default: "unknown", options: [{ value: "safe", label: "Safe" }] },
+        { key: "mode!", type: "select", default: "safe", options: [{ value: "other", label: "Other" }] },
+        { key: "missing-options", type: "select", default: "unsafe" },
+      ],
+    }),
+  };
+
+  const plugin = readExternalPluginManifest("manifest.json", "folder", fileSystem);
+  assert.deepEqual(plugin.configFields.map((field) => field.key), ["count", "label", "mode"]);
+  assert.equal(plugin.configFields[0].default, 10);
+  assert.equal(plugin.configFields[1].default.length, 10_000);
+  assert.equal(plugin.configFields[2].default, "safe");
+
+  fileSystem.readFileSync = () => JSON.stringify({ id: "__proto__", name: "Unsafe" });
   assert.equal(readExternalPluginManifest("manifest.json", "folder", fileSystem), null);
 });

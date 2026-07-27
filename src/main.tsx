@@ -87,7 +87,7 @@ import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch"
 import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
 import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
-import { listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
+import { MAX_PLUGIN_CONFIG_STRING_LENGTH, listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
 import {
@@ -12519,8 +12519,11 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
 
   function commitPluginConfig() {
     if (!pluginConfigDialogId) return;
+    const plugin = listRegisteredPlugins().find((item) => item.id === pluginConfigDialogId);
+    if (!plugin) return;
     const existing = settings.pluginConfigs?.[pluginConfigDialogId] ?? {};
-    const merged = { ...existing, ...pluginConfigDraft };
+    const normalized = resolvePluginConfig(plugin, pluginConfigDraft);
+    const merged = plugin.source === "external" ? normalized : { ...existing, ...normalized };
     const nextConfigs = { ...(settings.pluginConfigs ?? {}), [pluginConfigDialogId]: merged };
     onSave({ pluginConfigs: nextConfigs });
     setPluginConfigDialogId(null);
@@ -13459,6 +13462,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                         <span>{pluginText(field.label, field.labelI18n, lang)}</span>
                         <textarea
                           rows={3}
+                          maxLength={MAX_PLUGIN_CONFIG_STRING_LENGTH}
                           value={String(value ?? "")}
                           onChange={(event) => savePluginConfigField(field.key, event.target.value)}
                         />

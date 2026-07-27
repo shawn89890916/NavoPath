@@ -12,6 +12,7 @@ import {
   listPlugins,
   register,
   resolveConfig,
+  type NavoPlugin,
 } from "./registry";
 import { BUILTIN_PLUGINS, bootstrapPlugins, registerBuiltinPlugins } from "./builtin";
 
@@ -52,6 +53,49 @@ describe("plugin registry", () => {
     expect(cfg.focusMinutes).toBe(25);
     expect(cfg.breakMinutes).toBe(5);
     expect(cfg.autoStartBreak).toBe(true);
+  });
+
+  it("normalizes stored config values and ignores unsafe field keys", () => {
+    const plugin: NavoPlugin = {
+      id: "config-safety",
+      name: "Config safety",
+      description: "test",
+      version: "1.0.0",
+      author: "test",
+      icon: "T",
+      permissions: [],
+      configFields: [
+        { key: "__proto__", label: "Unsafe", type: "string", default: "polluted" },
+        { key: "count", label: "Count", type: "number", min: 1, max: 10, default: 5 },
+        { key: "label", label: "Label", type: "string", default: "" },
+        { key: "mode", label: "Mode", type: "select", options: [{ value: "safe", label: "Safe" }], default: "safe" },
+      ],
+    };
+    const config = resolveConfig(plugin, {
+      count: Number.POSITIVE_INFINITY,
+      label: "x".repeat(12_000),
+      mode: "unknown",
+    });
+
+    expect(Object.prototype.hasOwnProperty.call(config, "__proto__")).toBe(false);
+    expect(Object.getPrototypeOf(config)).toBe(Object.prototype);
+    expect(config.count).toBe(5);
+    expect(String(config.label)).toHaveLength(10_000);
+    expect(config.mode).toBe("safe");
+  });
+
+  it("does not register plugins with unsafe storage ids", () => {
+    register({
+      id: "__proto__",
+      name: "Unsafe",
+      description: "test",
+      version: "1.0.0",
+      author: "test",
+      icon: "T",
+      permissions: [],
+      configFields: [],
+    });
+    expect(getPlugin("__proto__")).toBeUndefined();
   });
 
   it("activates a plugin and runs its lifecycle hook", () => {
