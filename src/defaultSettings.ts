@@ -122,6 +122,10 @@ const MAX_PLUGIN_CONFIG_NODES = 50_000;
 const MAX_PLUGIN_CONFIG_OBJECT_KEYS = 5_000;
 const MAX_PLUGIN_CONFIG_ARRAY_ITEMS = 5_000;
 const MAX_PLUGIN_CONFIG_STRING_LENGTH = 10_000;
+const MAX_COLLAPSED_SETTING_ITEMS = 100;
+const MAX_COLLAPSED_SETTING_SCAN = 1_000;
+const MAX_COLLAPSED_SETTING_ID_LENGTH = 100;
+const MAX_AVATAR_DATA_URL_LENGTH = 512 * 1024;
 const OMIT_PLUGIN_CONFIG_VALUE = Symbol("omit-plugin-config-value");
 const unsafeStorageKeys = new Set(["__proto__", "prototype", ...Object.getOwnPropertyNames(Object.prototype)]);
 
@@ -210,6 +214,31 @@ function normalizePluginConfigs(value: Record<string, unknown>): Record<string, 
   return result;
 }
 
+function boundedString(value: unknown, fallback: string, maxLength: number): string {
+  if (typeof value !== "string") return fallback;
+  return value.trim().slice(0, maxLength) || fallback;
+}
+
+function normalizeAvatarDataUrl(value: unknown): string {
+  if (typeof value !== "string" || value.length > MAX_AVATAR_DATA_URL_LENGTH) return "";
+  return /^data:image\/(?:jpeg|png|webp);base64,[a-zA-Z0-9+/]+={0,2}$/i.test(value) ? value : "";
+}
+
+function normalizeCollapsedSettingIds(value: unknown[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  const limit = Math.min(value.length, MAX_COLLAPSED_SETTING_SCAN);
+  for (let index = 0; index < limit && result.length < MAX_COLLAPSED_SETTING_ITEMS; index += 1) {
+    const item = value[index];
+    if (typeof item !== "string") continue;
+    const id = item.trim().slice(0, MAX_COLLAPSED_SETTING_ID_LENGTH);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
+}
+
 /**
  * Migrates and validates persisted or imported settings against the canonical
  * defaults. Unknown keys are preserved for forward compatibility.
@@ -258,15 +287,26 @@ export function normalizeSettings(value: unknown): Settings {
   normalized.taskNoteDisplay = allowedValue(normalized.taskNoteDisplay, ["summary", "collapsed", "full"], defaults.taskNoteDisplay);
   normalized.uiStyle = allowedValue(normalized.uiStyle, ["gradient", "neumorphic"], defaults.uiStyle);
   normalized.focusModeDefault = allowedValue(normalized.focusModeDefault, ["stopwatch", "pomodoro", "flowtime"], defaults.focusModeDefault!);
+  normalized.appTitle = boundedString(stored.appTitle, defaults.appTitle, 120);
+  normalized.displayName = boundedString(stored.displayName, defaults.displayName, 64);
+  normalized.avatarDataUrl = normalizeAvatarDataUrl(stored.avatarDataUrl);
+  normalized.model = boundedString(stored.model, defaults.model, 200);
+  normalized.baseUrl = boundedString(stored.baseUrl, defaults.baseUrl, 2_048);
+  normalized.backgroundImagePath = boundedString(stored.backgroundImagePath, defaults.backgroundImagePath, 4_096);
+  normalized.accentColor = boundedString(stored.accentColor, defaults.accentColor, 64);
+  normalized.executeAccentColor = boundedString(stored.executeAccentColor, defaults.executeAccentColor, 64);
+  normalized.planningAccentColor = boundedString(stored.planningAccentColor, defaults.planningAccentColor, 64);
+  normalized.hasApiKey = false;
+  normalized.apiKeyPreview = "";
   if (typeof normalized.syncIntervalMinutes !== "number" || normalized.syncIntervalMinutes < 0) {
     normalized.syncIntervalMinutes = defaults.syncIntervalMinutes;
   }
 
   normalized.collapsedPanels = Array.isArray(stored.collapsedPanels)
-    ? stored.collapsedPanels.filter((item): item is string => typeof item === "string")
+    ? normalizeCollapsedSettingIds(stored.collapsedPanels)
     : defaults.collapsedPanels;
   normalized.collapsedSections = Array.isArray(stored.collapsedSections)
-    ? stored.collapsedSections.filter((item): item is string => typeof item === "string")
+    ? normalizeCollapsedSettingIds(stored.collapsedSections)
     : defaults.collapsedSections;
   normalized.enabledPlugins = Array.isArray(stored.enabledPlugins)
     ? normalizeEnabledPlugins(stored.enabledPlugins)

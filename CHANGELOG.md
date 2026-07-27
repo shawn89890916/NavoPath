@@ -6,6 +6,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
+- 从云端、缓存或备份恢复设置时，现在会限制昵称、标题、模型标识、URL、背景路径和折叠状态列表的长度与数量，只接受大小受限的 JPEG/PNG/WebP Base64 头像，并统一清除旧版个人 API Key 状态；异常设置不再放大缓存、同步或渲染开销。
 - 插件设置与使用教程现在准确区分可运行的官方内置插件和仅提供经校验 manifest/配置的桌面本地插件；本地项不再被描述为会加载 `index.js` 或显示“运行中”，其权限明确标记为声明信息。外部 manifest 会拒绝对象保留键与重复配置字段，并按类型、数值范围、选项和文本长度规范化配置；来自云端、缓存或备份的插件设置也会去重启用列表，并限制配置数量、嵌套深度、节点、数组及文本规模。
 - 修复长期运行的同步回调可能继续使用应用首次渲染时的空账号状态，导致登录用户的离线缓存误写入本地预览空间、桌面恢复快照缺少当前账号的问题；延迟保存、拉取与快照现在始终读取当前会话。
 - 修复手动与定时同步重叠时可能同时读写云端、连续触发不同方向的手动同步时后一次请求可能被吞掉，以及关闭自动同步或离开工作区后已排队的定时任务仍会运行的问题；所有同步入口现在会安全复用或排队，停止时也会取消尚未开始的纯定时任务。
@@ -29,6 +30,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
+- Settings restored from cloud, cache, or backup now bound the length and count of names, titles, model identifiers, URLs, background paths, and collapsed-state lists; accept only size-bounded JPEG/PNG/WebP Base64 avatars; and consistently clear retired personal API-key state. Malformed settings can no longer amplify cache, sync, or rendering costs.
 - Plugin settings and the usage guide now accurately distinguish executable official built-ins from desktop local plugins that contribute validated manifest metadata and configuration only. Local entries no longer claim to load `index.js` or appear as “Running,” and their permissions are clearly labeled as declarations. External manifests reject reserved object keys and duplicate config fields and normalize values by type, range, options, and text length; plugin settings restored from cloud, cache, or backup also deduplicate enabled IDs and bound config count, nesting, nodes, arrays, and text.
 - Fixed long-lived sync callbacks retaining the empty account state from the app’s first render, which could place a signed-in user’s offline cache in the local-preview workspace and omit the current account from desktop recovery snapshots. Delayed saves, pulls, and snapshots now always read the active session.
 - Fixed manual and scheduled syncs reading or writing the cloud concurrently, consecutive manual syncs in different directions dropping the later request, and queued scheduled work still running after automatic sync was disabled or the workspace was left. All sync entry points now safely share or queue work, while stopping cancels interval-only work that has not started.

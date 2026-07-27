@@ -68,4 +68,35 @@ describe("plugin settings normalization", () => {
     expect(Object.keys(normalized.pluginConfigs ?? {})).toHaveLength(100);
     expect(JSON.stringify(normalized.pluginConfigs?.["deep-plugin"])).not.toContain("leaf");
   });
+
+  it("bounds freeform settings and accepts only compact raster avatar data", () => {
+    const normalized = normalizeSettings({
+      appTitle: ` ${"A".repeat(200)} `,
+      displayName: ` ${"N".repeat(100)} `,
+      avatarDataUrl: `data:image/jpeg;base64,${"A".repeat(600_000)}`,
+      backgroundImagePath: "p".repeat(5_000),
+      model: "m".repeat(500),
+      baseUrl: `https://example.com/${"u".repeat(3_000)}`,
+      hasApiKey: true,
+      apiKeyPreview: "legacy-secret-preview",
+      collapsedPanels: ["left", "left", ...Array.from({ length: 150 }, (_, index) => `panel-${index}`)],
+      collapsedSections: ["today", "today", ...Array.from({ length: 150 }, (_, index) => `section-${index}`)],
+    });
+
+    expect(normalized.appTitle).toHaveLength(120);
+    expect(normalized.displayName).toHaveLength(64);
+    expect(normalized.avatarDataUrl).toBe("");
+    expect(normalized.backgroundImagePath).toHaveLength(4_096);
+    expect(normalized.model).toHaveLength(200);
+    expect(normalized.baseUrl).toHaveLength(2_048);
+    expect(normalized.hasApiKey).toBe(false);
+    expect(normalized.apiKeyPreview).toBe("");
+    expect(normalized.collapsedPanels).toHaveLength(100);
+    expect(normalized.collapsedSections).toHaveLength(100);
+    expect(new Set(normalized.collapsedPanels).size).toBe(normalized.collapsedPanels.length);
+
+    const validAvatar = "data:image/webp;base64,AAAA";
+    expect(normalizeSettings({ avatarDataUrl: validAvatar }).avatarDataUrl).toBe(validAvatar);
+    expect(normalizeSettings({ avatarDataUrl: "data:image/svg+xml;base64,AAAA" }).avatarDataUrl).toBe("");
+  });
 });

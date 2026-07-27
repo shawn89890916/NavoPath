@@ -13356,7 +13356,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
             {settingsTarget.category === "account-data" && <section className="df-settings-group" data-settings-anchor="account" tabIndex={-1}><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
                 <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { void uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
-                <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /></div>
+                <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} maxLength={64} onChange={(event) => onSave({ displayName: event.target.value })} /></div>
               </section>
               <SubscriptionPanel lang={lang} />
               {authEmail && <p className="df-settings-account">{authEmail}</p>}
