@@ -5,6 +5,9 @@ import { normalizeSettings } from "./defaultSettings";
 export const MAX_BACKUP_IMPORT_BYTES = 20 * 1024 * 1024;
 export const MAX_TASK_CSV_IMPORT_BYTES = 10 * 1024 * 1024;
 export const MAX_TASK_CSV_ROWS = 20_000;
+export const MAX_TASK_CSV_ID_LENGTH = 200;
+export const MAX_TASK_CSV_TEXT_LENGTH = 10_000;
+export const MAX_TASK_CSV_METADATA_LENGTH = 200;
 export const MAX_BACKUP_STRUCTURE_DEPTH = 64;
 export const MAX_BACKUP_STRUCTURE_NODES = 500_000;
 
@@ -36,6 +39,18 @@ export type TaskCsvRow = {
   createdAt: string;
   completed: string;
 };
+
+const TASK_CSV_FIELD_LIMITS: Array<[keyof TaskCsvRow, string, number]> = [
+  ["id", "ID", MAX_TASK_CSV_ID_LENGTH],
+  ["title", "Title", MAX_TASK_CSV_TEXT_LENGTH],
+  ["projectTitle", "Project", MAX_TASK_CSV_TEXT_LENGTH],
+  ["status", "Status", MAX_TASK_CSV_METADATA_LENGTH],
+  ["dueDate", "Due Date", MAX_TASK_CSV_METADATA_LENGTH],
+  ["estimatedHours", "Estimated Hours", MAX_TASK_CSV_METADATA_LENGTH],
+  ["priority", "Priority", MAX_TASK_CSV_METADATA_LENGTH],
+  ["createdAt", "Created At", MAX_TASK_CSV_METADATA_LENGTH],
+  ["completed", "Completed", MAX_TASK_CSV_METADATA_LENGTH],
+];
 
 const SPREADSHEET_FORMULA_PREFIX = /^[=+\-@\t\r\n]/;
 
@@ -181,17 +196,25 @@ export function parseTaskCsvRows(content: string): TaskCsvRow[] {
     throw new Error("CSV header does not match the NavoPath task export format.");
   }
   if (rows.length === 1) return [];
-  return rows.slice(1).map((values) => ({
-    id: restoreSpreadsheetCell(values[0] || ""),
-    title: restoreSpreadsheetCell(values[1] || ""),
-    projectTitle: restoreSpreadsheetCell(values[2] || ""),
-    status: restoreSpreadsheetCell(values[3] || ""),
-    dueDate: restoreSpreadsheetCell(values[4] || ""),
-    estimatedHours: restoreSpreadsheetCell(values[5] || ""),
-    priority: restoreSpreadsheetCell(values[6] || ""),
-    createdAt: restoreSpreadsheetCell(values[7] || ""),
-    completed: restoreSpreadsheetCell(values[8] || ""),
-  }));
+  return rows.slice(1).map((values, index) => {
+    const row: TaskCsvRow = {
+      id: restoreSpreadsheetCell(values[0] || ""),
+      title: restoreSpreadsheetCell(values[1] || ""),
+      projectTitle: restoreSpreadsheetCell(values[2] || ""),
+      status: restoreSpreadsheetCell(values[3] || ""),
+      dueDate: restoreSpreadsheetCell(values[4] || ""),
+      estimatedHours: restoreSpreadsheetCell(values[5] || ""),
+      priority: restoreSpreadsheetCell(values[6] || ""),
+      createdAt: restoreSpreadsheetCell(values[7] || ""),
+      completed: restoreSpreadsheetCell(values[8] || ""),
+    };
+    for (const [field, label, limit] of TASK_CSV_FIELD_LIMITS) {
+      if (row[field].length > limit) {
+        throw new Error(`CSV ${label} exceeds the ${limit} character limit at task row ${index + 1}.`);
+      }
+    }
+    return row;
+  });
 }
 
 export function parseTasksCsv(content: string, projects: Project[], now = new Date().toISOString()): Task[] {

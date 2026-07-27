@@ -3,7 +3,10 @@ import {
   MAX_BACKUP_IMPORT_BYTES,
   MAX_BACKUP_STRUCTURE_NODES,
   MAX_TASK_CSV_IMPORT_BYTES,
+  MAX_TASK_CSV_ID_LENGTH,
+  MAX_TASK_CSV_METADATA_LENGTH,
   MAX_TASK_CSV_ROWS,
+  MAX_TASK_CSV_TEXT_LENGTH,
   TASK_CSV_HEADERS,
   buildPlannerBackupJson,
   buildTasksCsv,
@@ -199,6 +202,27 @@ describe("task CSV export", () => {
 
     expect(tasks).toHaveLength(1);
     expect(tasks[0].title).toBe("First task");
+  });
+
+  it("rejects task CSV fields that exceed their persisted-data limits", () => {
+    const header = TASK_CSV_HEADERS.join(",");
+    expect(() => parseTaskCsvRows([
+      header,
+      `${"i".repeat(MAX_TASK_CSV_ID_LENGTH + 1)},Task`,
+    ].join("\n"))).toThrow("ID");
+    expect(() => parseTaskCsvRows([
+      header,
+      `task-1,${"T".repeat(MAX_TASK_CSV_TEXT_LENGTH + 1)}`,
+    ].join("\n"))).toThrow("Title");
+    expect(() => parseTaskCsvRows([
+      header,
+      `task-1,Task,,${"S".repeat(MAX_TASK_CSV_METADATA_LENGTH + 1)}`,
+    ].join("\n"))).toThrow("Status");
+
+    expect(parseTaskCsvRows([
+      header,
+      `${"i".repeat(MAX_TASK_CSV_ID_LENGTH)},${"T".repeat(MAX_TASK_CSV_TEXT_LENGTH)}`,
+    ].join("\n"))).toHaveLength(1);
   });
 });
 
