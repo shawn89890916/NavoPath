@@ -71,8 +71,22 @@ test("does not expose or execute external plugin scripts", () => {
 
 test("never falls back to reversible plaintext authentication storage", () => {
   const electronMainSource = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
+  const readAuthStorageSource = electronMainSource.slice(
+    electronMainSource.indexOf("function readAuthStorage("),
+    electronMainSource.indexOf("function writeAuthStorage("),
+  );
 
   assert.doesNotMatch(electronMainSource, /stored\[key\]\s*=\s*`plain:/);
   assert.match(electronMainSource, /if \(!safeStorage\.isEncryptionAvailable\(\)\)/);
-  assert.match(electronMainSource, /stored\[key\]\s*=\s*`safe:/);
+  assert.doesNotMatch(
+    electronMainSource,
+    /if \(!safeStorage\.isEncryptionAvailable\(\)\)\s*\{\s*delete stored\[key\]/,
+  );
+  assert.match(
+    electronMainSource,
+    /if \(!safeStorage\.isEncryptionAvailable\(\)\) return false;/,
+  );
+  assert.match(electronMainSource, /encryptedValue\s*=\s*`safe:/);
+  assert.match(electronMainSource, /stored\[key\]\s*=\s*encryptedValue/);
+  assert.doesNotMatch(readAuthStorageSource, /catch\s*\{\s*delete stored\[key\]/);
 });

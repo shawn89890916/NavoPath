@@ -54,6 +54,7 @@
 - 工作区恢复活动计时器前会校验任务 ID 与已用时间；损坏或错误类型的缓存不再产生无效任务状态、负数或 `NaN` 计时显示。
 - 桌面本地资料恢复会在读取前限制文件大小、在规范化时限制子任务嵌套深度，先备份超限、语法损坏或结构无效的原文件再安全回退，并逐项过滤可读取资料中的损坏项目、任务、事件、习惯、时间轴记录和嵌套子任务；异常数据不再无备份覆盖原件、耗尽内存或阻止整个工作区启动。
 - 桌面本地资料保存与恢复现在共用 20 MiB 和顶层结构契约，并通过临时文件原子替换主资料；自动离线快照也会限制结构和文件大小、在读取前拒绝超限文件，并原子替换最新副本。异常保存或进程中断不再直接截断现有数据文件。
+- 桌面登录会话缓存现在限制为 4 MiB、校验顶层结构并原子更新；系统加密暂不可用、加解密或写入失败时会保留原会话，损坏或超限缓存也会在恢复写入前备份，不再被空缓存覆盖或导致登录存储报错。
 
 ## 2026-07-27 · Input and plugin security
 
@@ -67,6 +68,7 @@
 - The workspace now validates the task ID and elapsed time before restoring an active timer. Damaged or incorrectly typed caches no longer create invalid task state or negative/`NaN` timer displays.
 - Desktop local-data recovery now limits file size before reading and subtask nesting depth during normalization, backs up oversized, syntactically damaged, or structurally invalid source files before falling back safely, and filters damaged projects, tasks, events, habits, timeline records, and nested subtasks from readable data individually. Invalid data no longer overwrites the original without a backup, exhausts memory, or prevents the whole workspace from starting.
 - Desktop local-data saving and recovery now share the same 20 MiB and top-level structure contract, and saves replace the main data file atomically through a temporary file. Automatic offline snapshots now also enforce structure and file-size limits, reject oversized files before reading them, and atomically replace the latest copy. Rejected saves or an interrupted process no longer directly truncate existing data files.
+- Desktop login-session storage is now limited to 4 MiB, validates its top-level structure, and updates atomically. The existing session is preserved when system encryption is temporarily unavailable or encryption, decryption, or writing fails, while damaged or oversized caches are backed up before recovery writes instead of being replaced by an empty cache or causing storage errors.
 
 ## 2026-07-26 · 时间轴与数据导出修复
 

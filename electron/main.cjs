@@ -15,6 +15,11 @@ const {
   serializeSnapshot,
   writeSnapshotFile,
 } = require("./snapshot-safety.cjs");
+const {
+  isAuthStorageKey,
+  readAuthStorageFile,
+  writeAuthStorageFile,
+} = require("./auth-storage-safety.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -491,7 +496,7 @@ function writeJson(file, data) {
 }
 
 function validateAuthStorageKey(key) {
-  if (typeof key !== "string" || !/^sb-[a-z0-9-]+-(?:auth-token|code-verifier)$/i.test(key)) {
+  if (!isAuthStorageKey(key)) {
     throw new Error("Invalid authentication storage key.");
   }
 }
@@ -499,23 +504,21 @@ function validateAuthStorageKey(key) {
 function readAuthStorage(key) {
   validateAuthStorageKey(key);
   const { authSessionPath } = getPaths();
-  const stored = readJson(authSessionPath, {});
+  const state = readAuthStorageFile(authSessionPath);
+  if (!state.ok) return null;
+  const stored = state.data;
   const storedValue = stored[key];
   if (typeof storedValue !== "string" || !storedValue) return null;
+  if (storedValue.startsWith("plain:")) {
+    delete stored[key];
+    try { writeAuthStorageFile(authSessionPath, stored); } catch { /* keep the original file */ }
+    return null;
+  }
+  if (!safeStorage.isEncryptionAvailable()) return null;
   try {
-    if (storedValue.startsWith("plain:")) {
-      delete stored[key];
-      writeJson(authSessionPath, stored);
-      return null;
-    }
-    if (!safeStorage.isEncryptionAvailable()) {
-      return null;
-    }
     const encryptedValue = storedValue.startsWith("safe:") ? storedValue.slice("safe:".length) : storedValue;
     return safeStorage.decryptString(Buffer.from(encryptedValue, "base64"));
   } catch {
-    delete stored[key];
-    writeJson(authSessionPath, stored);
     return null;
   }
 }
@@ -527,19 +530,30 @@ function writeAuthStorage(key, value) {
   }
   const { dir, authSessionPath } = getPaths();
   fs.mkdirSync(dir, { recursive: true });
-  const stored = readJson(authSessionPath, {});
-  if (!safeStorage.isEncryptionAvailable()) {
-    delete stored[key];
-    writeJson(authSessionPath, stored);
+  if (!safeStorage.isEncryptionAvailable()) return false;
+  let encryptedValue;
+  try {
+    encryptedValue = `safe:${safeStorage.encryptString(value).toString("base64")}`;
+  } catch {
     return false;
   }
+  const state = readAuthStorageFile(authSessionPath);
+  const stored = state.ok ? state.data : {};
+  if (!state.ok && fs.existsSync(authSessionPath)) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupPath = path.join(dir, `auth-session.corrupt-${stamp}.json`);
+    try {
+      fs.copyFileSync(authSessionPath, backupPath);
+    } catch {
+      return false;
+    }
+    console.warn(`[auth] invalid authentication storage preserved at ${backupPath}`);
+  }
+  stored[key] = encryptedValue;
   try {
-    stored[key] = `safe:${safeStorage.encryptString(value).toString("base64")}`;
-    writeJson(authSessionPath, stored);
+    writeAuthStorageFile(authSessionPath, stored);
     return true;
   } catch {
-    delete stored[key];
-    writeJson(authSessionPath, stored);
     return false;
   }
 }
@@ -547,10 +561,12 @@ function writeAuthStorage(key, value) {
 function removeAuthStorage(key) {
   validateAuthStorageKey(key);
   const { authSessionPath } = getPaths();
-  const stored = readJson(authSessionPath, {});
+  const state = readAuthStorageFile(authSessionPath);
+  if (!state.ok) return;
+  const stored = state.data;
   if (!(key in stored)) return;
   delete stored[key];
-  writeJson(authSessionPath, stored);
+  writeAuthStorageFile(authSessionPath, stored);
 }
 
 const allowedPluginPermissions = new Set(["tasks", "settings", "ui", "events", "calendar"]);
