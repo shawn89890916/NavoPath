@@ -86,6 +86,29 @@ describe("sync deletion tombstones", () => {
     ).tasks).toEqual([]);
   });
 
+  it("ignores implausibly future tombstones during merge and restore", () => {
+    const extremeFuture = "+275760-09-13T00:00:00.000Z";
+    const poisoned = data(
+      [task("safe", "2026-07-26T09:00:00.000Z")],
+      {
+        "tasks:safe": extremeFuture,
+        "unknown:item": "2026-07-26T10:00:00.000Z",
+        "tasks:": "2026-07-26T10:00:00.000Z",
+      },
+    );
+
+    const merged = mergePlannerData(poisoned, data([]), "2026-07-26T12:00:00.000Z");
+    const restored = preparePlannerDataRestore(
+      data([task("restored", "2026-07-25T09:00:00.000Z")]),
+      poisoned,
+      "2026-07-26T12:00:00.000Z",
+    );
+
+    expect(merged.tasks.map((item) => item.id)).toEqual(["safe"]);
+    expect(merged.sync?.deleted).toEqual({});
+    expect(restored.tasks[0].updatedAt).toBe("2026-07-26T12:00:00.000Z");
+  });
+
   it("makes an explicit backup restore newer than existing tombstones", () => {
     const current = data([], { "tasks:restored": "2026-07-26T12:00:00.000Z" });
     const backup = data([task("restored", "2026-07-25T09:00:00.000Z")]);

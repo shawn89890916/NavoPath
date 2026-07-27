@@ -6,7 +6,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
-- 同步合并现在只把可解析的删除时间视为有效墓碑；缺少时间戳的旧版任务及其他记录不再因为“无墓碑”和记录时间都被折算为零，而在首次同步时被静默删除，损坏的墓碑时间也会被安全忽略。
+- 同步合并现在只把结构正确、可解析且未异常超前的删除时间视为有效墓碑，并为设备时钟保留最多 7 天偏差；缺少时间戳的旧版记录不再在首次同步时被静默删除，损坏或极端未来的墓碑也会被清除，不再永久压制正常数据或导致备份恢复崩溃。
 - 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，并去重嵌套子任务；异常超过 64 层的子任务树会被安全截断，避免重复 ID 让编辑作用于多个对象，或恶意深层数据触发递归崩溃。
 - 任务 CSV 导入现在会校验 NavoPath 表头并拒绝未闭合的引号字段；同一文件中重复出现的任务 ID 只导入第一条，避免格式错误的数据被静默错列解析，或重复 ID 导致后续编辑作用于多个任务。
 - 从云端、缓存或备份恢复设置时，现在会限制昵称、标题、模型标识、URL、背景路径和折叠状态列表的长度与数量，只接受大小受限的 JPEG/PNG/WebP Base64 头像，并统一清除旧版个人 API Key 状态；异常设置不再放大缓存、同步或渲染开销。
@@ -33,7 +33,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
-- Sync merging now treats only parseable deletion times as valid tombstones. Legacy tasks and other records without timestamps are no longer silently removed on their first sync because both a missing tombstone and the record time collapsed to zero, while damaged tombstone timestamps are safely ignored.
+- Sync merging now accepts only structurally valid, parseable deletion times that are not implausibly far ahead, while allowing up to seven days of device clock skew. Legacy records without timestamps no longer disappear on their first sync, and damaged or extreme-future tombstones are removed instead of permanently suppressing normal data or crashing backup restore.
 - Planner data restored from cloud, local cache, or backup now deduplicates tasks, projects, and other persisted collections by ID, including nested subtasks. Subtask trees deeper than 64 levels are safely truncated, preventing duplicate IDs from making edits affect multiple objects and maliciously deep data from causing recursive crashes.
 - Task CSV imports now validate the NavoPath header and reject unterminated quoted fields. When a file repeats a task ID, only its first row is imported, preventing malformed data from being silently mapped to the wrong columns or duplicate IDs from making later edits affect multiple tasks.
 - Settings restored from cloud, cache, or backup now bound the length and count of names, titles, model identifiers, URLs, background paths, and collapsed-state lists; accept only size-bounded JPEG/PNG/WebP Base64 avatars; and consistently clear retired personal API-key state. Malformed settings can no longer amplify cache, sync, or rendering costs.
