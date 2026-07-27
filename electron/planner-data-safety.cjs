@@ -29,4 +29,16 @@ function sanitizePlannerDataCollections(data) {
   };
 }
 
-module.exports = { sanitizePlannerDataCollections };
+function parsePlannerDataSource(source) {
+  try {
+    const data = JSON.parse(source);
+    if (!isRecord(data) || !Array.isArray(data.tasks)) {
+      return { ok: false, reason: "invalid-shape" };
+    }
+    return { ok: true, data };
+  } catch {
+    return { ok: false, reason: "invalid-json" };
+  }
+}
+
+module.exports = { parsePlannerDataSource, sanitizePlannerDataCollections };

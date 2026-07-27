@@ -4,7 +4,7 @@ const path = require("node:path");
 const { createWidgetWindowService } = require("./widget-window.cjs");
 const { createCompactWindowService } = require("./compact-window.cjs");
 const { createRendererPolicy, resolveDevAppUrl } = require("./renderer-security.cjs");
-const { sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
+const { parsePlannerDataSource, sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -646,7 +646,17 @@ function backupCurrentData(reason) {
 
 function readData() {
   ensureData();
-  const data = normalizePlannerData(readJson(getPaths().dataPath, seedData()));
+  const { dataPath } = getPaths();
+  const source = parsePlannerDataSource(fs.readFileSync(dataPath, "utf8"));
+  let sourceData;
+  if (source.ok) {
+    sourceData = source.data;
+  } else {
+    const backupPath = backupCurrentData("corrupt");
+    console.warn(`[data] invalid local planner data preserved at ${backupPath}; restoring defaults`);
+    sourceData = seedData();
+  }
+  const data = normalizePlannerData(sourceData);
   saveData(data);
   return data;
 }

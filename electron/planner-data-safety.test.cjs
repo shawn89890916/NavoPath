@@ -1,6 +1,16 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
+const { parsePlannerDataSource, sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
+
+test("accepts only planner JSON with a top-level task collection", () => {
+  assert.deepEqual(parsePlannerDataSource('{"tasks":[],"projects":[]}'), {
+    ok: true,
+    data: { tasks: [], projects: [] },
+  });
+  assert.deepEqual(parsePlannerDataSource("{"), { ok: false, reason: "invalid-json" });
+  assert.deepEqual(parsePlannerDataSource("null"), { ok: false, reason: "invalid-shape" });
+  assert.deepEqual(parsePlannerDataSource('{"projects":[]}'), { ok: false, reason: "invalid-shape" });
+});
 
 test("filters malformed desktop planner records without discarding valid data", () => {
   const input = {
