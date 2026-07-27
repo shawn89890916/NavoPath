@@ -532,6 +532,14 @@ handleTrusted("backup:readLatest", (event) => {
 const widgetIconPath = app.isPackaged
   ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
   : path.join(__dirname, "..", "public", "navopath-icon.png");
+let compactWindowService = null;
+function isApplicationWindowEvent(event) {
+  const win = windowFromEvent(BrowserWindow, event);
+  return Boolean(
+    win
+    && (win === primaryWindowRegistry.get() || compactWindowService?.ownsWindow(win)),
+  );
+}
 const widgetWindowService = createWidgetWindowService({
   BrowserWindow,
   app,
@@ -548,7 +556,7 @@ const widgetWindowService = createWidgetWindowService({
 });
 widgetWindowService.registerIpc();
 
-const compactWindowService = createCompactWindowService({
+compactWindowService = createCompactWindowService({
   BrowserWindow,
   app,
   ipcMain: trustedIpcMain,
@@ -560,6 +568,7 @@ const compactWindowService = createCompactWindowService({
   iconPath: widgetIconPath,
   rendererPolicy,
   openExternal: (url) => shell.openExternal(url),
+  canControl: isApplicationWindowEvent,
 });
 compactWindowService.registerIpc();
 

@@ -70,15 +70,19 @@ function createCompactWindowService(deps) {
   function registerIpc() {
     if (registered) return;
     registered = true;
-    deps.ipcMain.handle("compact-window:open", (_event, options) => {
+    const canControl = (event) => typeof deps.canControl !== "function" || deps.canControl(event);
+    deps.ipcMain.handle("compact-window:open", (event, options) => {
+      if (!canControl(event)) return false;
       open(options);
       return true;
     });
-    deps.ipcMain.handle("compact-window:close", () => {
+    deps.ipcMain.handle("compact-window:close", (event) => {
+      if (!canControl(event)) return false;
       if (compactWindow && !compactWindow.isDestroyed()) compactWindow.close();
       return true;
     });
-    deps.ipcMain.handle("compact-window:set-always-on-top", (_event, enabled) => {
+    deps.ipcMain.handle("compact-window:set-always-on-top", (event, enabled) => {
+      if (!canControl(event)) return false;
       if (compactWindow && !compactWindow.isDestroyed()) compactWindow.setAlwaysOnTop(Boolean(enabled));
       return true;
     });

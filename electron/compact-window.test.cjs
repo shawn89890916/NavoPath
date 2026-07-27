@@ -1,8 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const { compactWindowPosition, createCompactWindowService } = require("./compact-window.cjs");
 
-function makeDeps({ packaged = true } = {}) {
+function makeDeps({ packaged = true, canControl } = {}) {
   const handlers = new Map();
   const windows = [];
   class FakeWindow {
@@ -36,6 +38,7 @@ function makeDeps({ packaged = true } = {}) {
       preloadPath: "C:/app/electron/preload.cjs",
       localIndexPath: "C:/app/dist/index.html",
       iconPath: "C:/app/dist/navopath-icon.png",
+      canControl,
     },
   };
 }
@@ -76,4 +79,35 @@ test("registers open, close, and always-on-top controls", async () => {
   await handlers.get("compact-window:close")();
   assert.equal(windows[0].isDestroyed(), true);
   assert.equal(service.getWindow(), null);
+});
+
+test("rejects portrait window controls from non-application renderers", async () => {
+  const { deps, handlers, windows } = makeDeps({
+    canControl: (event) => event?.role === "application",
+  });
+  const service = createCompactWindowService(deps);
+  service.registerIpc();
+
+  assert.equal(await handlers.get("compact-window:open")({ role: "widget" }), false);
+  assert.equal(windows.length, 0);
+
+  const win = service.open({ alwaysOnTop: true });
+  assert.equal(await handlers.get("compact-window:set-always-on-top")({ role: "widget" }, false), false);
+  assert.equal(win.alwaysOnTop, undefined);
+  assert.equal(await handlers.get("compact-window:close")({ role: "widget" }), false);
+  assert.equal(win.isDestroyed(), false);
+
+  assert.equal(await handlers.get("compact-window:set-always-on-top")({ role: "application" }, false), true);
+  assert.equal(win.alwaysOnTop, false);
+  assert.equal(await handlers.get("compact-window:close")({ role: "application" }), true);
+  assert.equal(win.isDestroyed(), true);
+});
+
+test("wires portrait controls to primary or portrait application windows only", () => {
+  const source = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
+
+  assert.match(source, /function isApplicationWindowEvent\(event\)/);
+  assert.match(source, /win === primaryWindowRegistry\.get\(\)/);
+  assert.match(source, /compactWindowService\?\.ownsWindow\(win\)/);
+  assert.match(source, /canControl: isApplicationWindowEvent/);
 });
