@@ -30,6 +30,7 @@ export type SyncTickResult = {
 };
 
 type SyncDirection = "push" | "pull" | "both";
+type SyncReason = "manual" | "interval";
 
 export type SyncSchedulerOptions = {
   /** Returns true when the scheduler should defer (e.g. another save in-flight). */
@@ -121,6 +122,7 @@ export class SyncScheduler {
   private runningDirection: SyncDirection | null = null;
   private queuedPromise: Promise<SyncTickResult> | null = null;
   private queuedDirection: SyncDirection | null = null;
+  private queuedReason: SyncReason | null = null;
   private intervalMinutes = 0;
 
   constructor(private readonly options: SyncSchedulerOptions = {}) {}
@@ -133,7 +135,7 @@ export class SyncScheduler {
     this.stop();
     if (normalized <= 0) return;
     this.timer = setInterval(() => {
-      void this.runTick({ reason: "interval", direction: "both" });
+      void this.runScheduled("interval", "both").catch(() => undefined);
     }, normalized * 60 * 1000);
   }
 
@@ -157,43 +159,46 @@ export class SyncScheduler {
 
   /** Run a sync now. Compatible calls share the current tick; missing work is queued. */
   runNow(): Promise<SyncTickResult> {
-    return this.runManual("both");
+    return this.runScheduled("manual", "both");
   }
 
   /** Push local changes to the cloud only (no pull). */
   runPushOnly(): Promise<SyncTickResult> {
-    return this.runManual("push");
+    return this.runScheduled("manual", "push");
   }
 
   /** Pull the latest cloud data to local only (no push). */
   runPullOnly(): Promise<SyncTickResult> {
-    return this.runManual("pull");
+    return this.runScheduled("manual", "pull");
   }
 
-  private runManual(direction: SyncDirection): Promise<SyncTickResult> {
-    if (!this.runningPromise) return this.startManualTick(direction);
+  private runScheduled(reason: SyncReason, direction: SyncDirection): Promise<SyncTickResult> {
+    if (!this.runningPromise) return this.startTick(reason, direction);
     if (this.runningDirection === "both" || this.runningDirection === direction) {
       return this.runningPromise;
     }
 
     this.queuedDirection = this.mergeDirections(this.queuedDirection, direction);
+    if (!this.queuedReason || reason === "manual") this.queuedReason = reason;
     if (!this.queuedPromise) {
       const activeRun = this.runningPromise;
       this.queuedPromise = activeRun
         .catch(() => undefined)
         .then(() => {
           const nextDirection = this.queuedDirection || direction;
+          const nextReason = this.queuedReason || reason;
           this.queuedDirection = null;
+          this.queuedReason = null;
           this.queuedPromise = null;
-          return this.startManualTick(nextDirection);
+          return this.startTick(nextReason, nextDirection);
         });
     }
     return this.queuedPromise;
   }
 
-  private startManualTick(direction: SyncDirection): Promise<SyncTickResult> {
+  private startTick(reason: SyncReason, direction: SyncDirection): Promise<SyncTickResult> {
     let trackedPromise: Promise<SyncTickResult>;
-    trackedPromise = this.runTick({ reason: "manual", direction }).finally(() => {
+    trackedPromise = this.runTick({ reason, direction }).finally(() => {
       if (this.runningPromise === trackedPromise) {
         this.runningPromise = null;
         this.runningDirection = null;
@@ -209,7 +214,7 @@ export class SyncScheduler {
     return current === incoming ? current : "both";
   }
 
-  private async runTick({ reason, direction }: { reason: "manual" | "interval"; direction: SyncDirection }): Promise<SyncTickResult> {
+  private async runTick({ reason, direction }: { reason: SyncReason; direction: SyncDirection }): Promise<SyncTickResult> {
     const now = this.options.now?.() || new Date();
     const startedAt = now.toISOString();
     const busy = () => this.options.isBusy?.();

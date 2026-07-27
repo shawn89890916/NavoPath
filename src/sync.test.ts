@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   SYNC_INTERVAL_PRESETS,
   SyncScheduler,
@@ -247,5 +247,54 @@ describe("SyncScheduler", () => {
     await expect(pushResult).resolves.toMatchObject({ pushedLocal: true, pulledRemote: false });
     await expect(pullResult).resolves.toMatchObject({ pushedLocal: false, pulledRemote: true });
     expect(order).toEqual(["push:start", "push:end", "pull"]);
+  });
+
+  it("does not overlap an interval tick with an in-flight manual sync", async () => {
+    vi.useFakeTimers();
+    let releaseFirstPush: (() => void) | undefined;
+    let finishInterval: (() => void) | undefined;
+    const firstPushBlocked = new Promise<void>((resolve) => {
+      releaseFirstPush = resolve;
+    });
+    const intervalFinished = new Promise<void>((resolve) => {
+      finishInterval = resolve;
+    });
+    let pushCalls = 0;
+    let activeCalls = 0;
+    let maxActiveCalls = 0;
+    const scheduler = new SyncScheduler({
+      pushLocal: async () => {
+        pushCalls += 1;
+        activeCalls += 1;
+        maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
+        if (pushCalls === 1) await firstPushBlocked;
+        activeCalls -= 1;
+      },
+      pullRemote: async () => {
+        activeCalls += 1;
+        maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
+        activeCalls -= 1;
+        finishInterval?.();
+      },
+    });
+
+    try {
+      scheduler.setIntervalMinutes(1);
+      const manualResult = scheduler.runPushOnly();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(pushCalls).toBe(1);
+      expect(maxActiveCalls).toBe(1);
+
+      releaseFirstPush?.();
+      await manualResult;
+      await intervalFinished;
+      expect(pushCalls).toBe(2);
+      expect(maxActiveCalls).toBe(1);
+    } finally {
+      scheduler.stop();
+      vi.useRealTimers();
+    }
   });
 });
