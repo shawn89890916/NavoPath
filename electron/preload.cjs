@@ -14,7 +14,6 @@ contextBridge.exposeInMainWorld("desktopApi", {
     ipcRenderer.on("updater:state", handler);
     return () => ipcRenderer.removeListener("updater:state", handler);
   },
-  aiChat: (payload) => ipcRenderer.invoke("ai:chat", payload),
   getAutoLaunch: () => ipcRenderer.invoke("autolaunch:get"),
   setAutoLaunch: (enabled) => ipcRenderer.invoke("autolaunch:set", enabled),
   listExternalPlugins: () => ipcRenderer.invoke("plugins:listExternal"),

@@ -69,6 +69,26 @@ test("does not expose or execute external plugin scripts", () => {
   assert.match(electronMainSource, /not external scripts/);
 });
 
+test("does not expose retired local planner or direct AI IPC surfaces", () => {
+  const preloadSource = fs.readFileSync(path.resolve("electron", "preload.cjs"), "utf8");
+  const electronMainSource = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
+  const retiredChannels = [
+    "planner:getData",
+    "planner:saveData",
+    "planner:applyActions",
+    "planner:resetSeed",
+    "settings:get",
+    "settings:save",
+    "settings:selectBackgroundImage",
+    "ai:chat",
+  ];
+
+  for (const channel of retiredChannels) {
+    assert.doesNotMatch(preloadSource, new RegExp(channel.replace(":", "\\:")));
+    assert.doesNotMatch(electronMainSource, new RegExp(channel.replace(":", "\\:")));
+  }
+});
+
 test("never falls back to reversible plaintext authentication storage", () => {
   const electronMainSource = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
   const readAuthStorageSource = electronMainSource.slice(

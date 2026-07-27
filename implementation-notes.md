@@ -829,7 +829,7 @@ Opening the template modal and inspecting the DOM should show all five `data-reu
 - localStorage keys:
   - Preview/browser fallback: `planner-preview-data`, `planner-preview-settings` (`src/browserFallback.ts:6-7`)
   - Bootstrap cache: `navopath-bootstrap-${userId}` (`src/main.tsx:466`, `bootstrapCacheKey`)
-  - Electron desktop: `planner-data.json` file at `electron/main.cjs:424`
+  - Electron desktop: the same Supabase or browser-preview data layer; native storage is limited to encrypted auth state and bounded recovery snapshots
 - feature flags (all REAL, persisted, consumed):
   - `featureHabitsEnabled` — consumed at `src/main.tsx:2017,4928,4934,5010,6983,7270,8279` (gates habit panel)
   - `featureWidgetEnabled` — consumed at `src/main.tsx:4199,4202,7168` (gates widget button + auto-open)
