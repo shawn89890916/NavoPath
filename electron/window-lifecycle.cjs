@@ -26,6 +26,14 @@ function createPrimaryWindowRegistry() {
   };
 }
 
+function windowFromEvent(BrowserWindow, event) {
+  try {
+    return BrowserWindow.fromWebContents(event?.sender) || null;
+  } catch {
+    return null;
+  }
+}
+
 function broadcastToLiveWindows(windows, channel, payload) {
   for (const win of windows) {
     if (!win || win.isDestroyed?.()) continue;
@@ -42,4 +50,5 @@ function broadcastToLiveWindows(windows, channel, payload) {
 module.exports = {
   broadcastToLiveWindows,
   createPrimaryWindowRegistry,
+  windowFromEvent,
 };

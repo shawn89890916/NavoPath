@@ -27,6 +27,7 @@ const {
 const {
   broadcastToLiveWindows,
   createPrimaryWindowRegistry,
+  windowFromEvent,
 } = require("./window-lifecycle.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
@@ -79,6 +80,10 @@ function onTrusted(channel, listener) {
 }
 const trustedIpcMain = { handle: handleTrusted, on: onTrusted };
 const primaryWindowRegistry = createPrimaryWindowRegistry();
+function isPrimaryWindowEvent(event) {
+  const primaryWindow = primaryWindowRegistry.get();
+  return Boolean(primaryWindow && windowFromEvent(BrowserWindow, event) === primaryWindow);
+}
 
 const DEFAULT_MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
@@ -1209,7 +1214,8 @@ handleTrusted("autolaunch:set", (_event, enabled) => {
 
 // Local JSON snapshot — written on every app launch (and on demand) so users
 // always have an offline backup next to their auth session in userData.
-handleTrusted("backup:writeSnapshot", (_event, payload) => {
+handleTrusted("backup:writeSnapshot", (event, payload) => {
+  if (!isPrimaryWindowEvent(event)) return { ok: false, error: "Only the main window can write recovery snapshots." };
   try {
     const { dir } = getPaths();
     fs.mkdirSync(dir, { recursive: true });
@@ -1233,7 +1239,8 @@ handleTrusted("backup:writeSnapshot", (_event, payload) => {
   }
 });
 
-handleTrusted("backup:readLatest", () => {
+handleTrusted("backup:readLatest", (event) => {
+  if (!isPrimaryWindowEvent(event)) return { ok: false, error: "Only the main window can read recovery snapshots." };
   try {
     const { dir } = getPaths();
     const latestPath = path.join(dir, "navopath-snapshot-latest.json");

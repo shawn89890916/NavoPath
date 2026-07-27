@@ -1794,7 +1794,7 @@ function App() {
   }
 
   function scheduleSnapshotWrite() {
-    if (typeof window === "undefined" || !window.desktopApi?.writeSnapshot) return;
+    if (typeof window === "undefined" || isCompactWindowRoute || !window.desktopApi?.writeSnapshot) return;
     if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current);
     snapshotTimerRef.current = window.setTimeout(() => {
       snapshotTimerRef.current = null;
@@ -1895,14 +1895,16 @@ function App() {
     if ((shouldPushCachedData || shouldPersistHabitMigration) && nextData) void saveData(nextData);
     if (shouldPushCachedSettings && cached?.settings) void saveSettings(cached.settings);
     // Persist a local JSON snapshot so users always have an offline backup.
-    try {
-      void window.desktopApi?.writeSnapshot?.({
-        data: nextData,
-        settings: nextSettings,
-        authUser: auth.user ?? null,
-      });
-    } catch (snapshotErr) {
-      console.warn("[loadInitial] snapshot write failed:", snapshotErr);
+    if (!isCompactWindowRoute) {
+      try {
+        void window.desktopApi?.writeSnapshot?.({
+          data: nextData,
+          settings: nextSettings,
+          authUser: auth.user ?? null,
+        });
+      } catch (snapshotErr) {
+        console.warn("[loadInitial] snapshot write failed:", snapshotErr);
+      }
     }
     } catch (err) {
       if (!isCurrentWorkspaceLoad(loadVersion, workspaceLoadVersionRef.current)) return;
@@ -13642,8 +13644,10 @@ const rootKey = "__plannerRoot";
 const rootWindow = window as typeof window & { [rootKey]?: ReturnType<typeof createRoot> };
 const root = rootWindow[rootKey] ?? createRoot(rootElement);
 rootWindow[rootKey] = root;
-const isWidgetPopoverRoute = new URLSearchParams(window.location.search).get("widgetPopover") === "1";
-const isWidgetRoute = new URLSearchParams(window.location.search).get("widget") === "1";
+const routeSearchParams = new URLSearchParams(window.location.search);
+const isCompactWindowRoute = routeSearchParams.get("compactWindow") === "1";
+const isWidgetPopoverRoute = routeSearchParams.get("widgetPopover") === "1";
+const isWidgetRoute = routeSearchParams.get("widget") === "1";
 root.render(
   isWidgetPopoverRoute
     ? <Suspense fallback={null}><WidgetPopoverAppLazy /></Suspense>

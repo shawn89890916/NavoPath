@@ -5,6 +5,7 @@ const path = require("node:path");
 const {
   broadcastToLiveWindows,
   createPrimaryWindowRegistry,
+  windowFromEvent,
 } = require("./window-lifecycle.cjs");
 
 function fakeWindow(options = {}) {
@@ -39,6 +40,20 @@ test("tracks the primary window independently from BrowserWindow list order", ()
   assert.equal(registry.get(), main);
   registry.clear(main);
   assert.equal(registry.get(), null);
+});
+
+test("resolves an IPC sender to its owning window without throwing", () => {
+  const owner = fakeWindow();
+  const BrowserWindow = {
+    fromWebContents: (sender) => {
+      if (sender === "throw") throw new Error("destroyed");
+      return sender === "owned" ? owner : null;
+    },
+  };
+  assert.equal(windowFromEvent(BrowserWindow, { sender: "owned" }), owner);
+  assert.equal(windowFromEvent(BrowserWindow, { sender: "unknown" }), null);
+  assert.equal(windowFromEvent(BrowserWindow, { sender: "throw" }), null);
+  assert.equal(windowFromEvent(BrowserWindow, null), null);
 });
 
 test("drops destroyed primary references and restores the live primary window", () => {

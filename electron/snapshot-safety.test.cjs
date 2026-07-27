@@ -57,3 +57,18 @@ test("atomically replaces snapshots and rejects oversized reads before parsing",
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("allows only the primary renderer to read or write desktop recovery snapshots", () => {
+  const electronMainSource = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
+  const rendererSource = fs.readFileSync(path.resolve("src", "main.tsx"), "utf8");
+
+  assert.match(electronMainSource, /handleTrusted\("backup:writeSnapshot", \(event, payload\) => \{/);
+  assert.match(electronMainSource, /handleTrusted\("backup:readLatest", \(event\) => \{/);
+  assert.equal(
+    electronMainSource.match(/if \(!isPrimaryWindowEvent\(event\)\) return \{ ok: false,/g)?.length,
+    2,
+  );
+  assert.match(rendererSource, /const isCompactWindowRoute = routeSearchParams\.get\("compactWindow"\) === "1";/);
+  assert.match(rendererSource, /if \(typeof window === "undefined" \|\| isCompactWindowRoute \|\| !window\.desktopApi\?\.writeSnapshot\) return;/);
+  assert.match(rendererSource, /if \(!isCompactWindowRoute\) \{\s*try \{\s*void window\.desktopApi\?\.writeSnapshot\?\.\(/);
+});

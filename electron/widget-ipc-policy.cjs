@@ -1,3 +1,5 @@
+const { windowFromEvent } = require("./window-lifecycle.cjs");
+
 const MAX_WIDGET_ACTION_RECORD_BYTES = 16 * 1024;
 const TIMER_MODES = new Set(["stopwatch", "pomodoro", "countdown"]);
 const SIMPLE_ACTIONS = new Set([
@@ -112,21 +114,13 @@ function sanitizeWidgetAction(action) {
 }
 
 function createWidgetIpcPolicy({ BrowserWindow, widgetWindowService, getPrimaryWindow }) {
-  function senderWindow(event) {
-    try {
-      return BrowserWindow.fromWebContents(event?.sender) || null;
-    } catch {
-      return null;
-    }
-  }
-
   return {
     canSendAction: (event) => {
-      const win = senderWindow(event);
+      const win = windowFromEvent(BrowserWindow, event);
       return Boolean(win && widgetWindowService.ownsWindow(win));
     },
     canPushSnapshot: (event) => {
-      const win = senderWindow(event);
+      const win = windowFromEvent(BrowserWindow, event);
       return Boolean(win && win === getPrimaryWindow());
     },
   };
