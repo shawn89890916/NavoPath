@@ -6,6 +6,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
+- 修复连续触发不同方向的手动同步时，后一次推送或拉取请求可能被正在进行的同步吞掉的问题；不同方向现在会安全排队并依次完成。
 - 升级桌面运行时与构建工具链，修复 Electron、桌面打包器、开发服务器和并发启动工具中的已知依赖漏洞，并保持现有 Windows 打包、网页部署与本地开发流程兼容。
 - 收紧桌面端安全边界：主窗口、竖屏窗口与小组件只加载本地应用或回环地址的开发服务，阻止远程页面访问认证存储、备份、插件、更新等桌面能力，并拦截不受信任的页面导航与新窗口。
 - 竖屏候选页将“今日候选”和两个快捷操作下移到 Tasks 切换按钮下方的独立栏；三日/周视图改为更宽的纸面时间轴，时间标尺贴左并增大，跨天日期独占 0:00 上一行，日期栏与背景融合，全天标签左对齐。顶部日期切换控件移除偏灰底色，“回到现在”仅在当前时间离开可视区域后出现；全天任务现在也会按预计时长计入指标。
@@ -26,6 +27,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
+- Fixed consecutive manual syncs in different directions dropping the later push or pull request. Different directions are now queued safely and completed in order.
 - Upgraded the desktop runtime and build toolchain to address known dependency vulnerabilities in Electron, desktop packaging, the development server, and concurrent process startup while preserving the existing Windows packaging, web deployment, and local development workflows.
 - Hardened desktop security boundaries: the main window, portrait window, and widget now load only the local app or a loopback development server, block remote pages from desktop capabilities such as authentication storage, backups, plugins, and updates, and reject untrusted navigation and new windows.
 - Moved Today’s Candidates and its two quick actions into a dedicated row below the Tasks switch in portrait mode. Three-day/week timelines now use more of the paper width, with a larger flush-left ruler, day-boundary dates above an aligned 0:00 label, a blended date strip, and a left-aligned All Day label. The date controls no longer use a heavy gray fill, Back to now appears only when the current-time line leaves the viewport, and all-day tasks now contribute their estimated duration to Metrics.

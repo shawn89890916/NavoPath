@@ -29,6 +29,8 @@ export type SyncTickResult = {
   error?: string;
 };
 
+type SyncDirection = "push" | "pull" | "both";
+
 export type SyncSchedulerOptions = {
   /** Returns true when the scheduler should defer (e.g. another save in-flight). */
   isBusy?: () => boolean;
@@ -116,6 +118,9 @@ export function formatLastSyncedAt(value: string | undefined, lang: "en" | "zh",
 export class SyncScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
   private runningPromise: Promise<SyncTickResult> | null = null;
+  private runningDirection: SyncDirection | null = null;
+  private queuedPromise: Promise<SyncTickResult> | null = null;
+  private queuedDirection: SyncDirection | null = null;
   private intervalMinutes = 0;
 
   constructor(private readonly options: SyncSchedulerOptions = {}) {}
@@ -150,34 +155,61 @@ export class SyncScheduler {
     return this.intervalMinutes;
   }
 
-  /** Run a sync now. Concurrent calls share a single in-flight tick. */
+  /** Run a sync now. Compatible calls share the current tick; missing work is queued. */
   runNow(): Promise<SyncTickResult> {
-    if (this.runningPromise) return this.runningPromise;
-    this.runningPromise = this.runTick({ reason: "manual", direction: "both" }).finally(() => {
-      this.runningPromise = null;
-    });
-    return this.runningPromise;
+    return this.runManual("both");
   }
 
-  /** Push local changes to the cloud only (no pull). Concurrent calls share the in-flight tick. */
+  /** Push local changes to the cloud only (no pull). */
   runPushOnly(): Promise<SyncTickResult> {
-    if (this.runningPromise) return this.runningPromise;
-    this.runningPromise = this.runTick({ reason: "manual", direction: "push" }).finally(() => {
-      this.runningPromise = null;
-    });
-    return this.runningPromise;
+    return this.runManual("push");
   }
 
-  /** Pull the latest cloud data to local only (no push). Concurrent calls share the in-flight tick. */
+  /** Pull the latest cloud data to local only (no push). */
   runPullOnly(): Promise<SyncTickResult> {
-    if (this.runningPromise) return this.runningPromise;
-    this.runningPromise = this.runTick({ reason: "manual", direction: "pull" }).finally(() => {
-      this.runningPromise = null;
-    });
-    return this.runningPromise;
+    return this.runManual("pull");
   }
 
-  private async runTick({ reason, direction }: { reason: "manual" | "interval"; direction: "push" | "pull" | "both" }): Promise<SyncTickResult> {
+  private runManual(direction: SyncDirection): Promise<SyncTickResult> {
+    if (!this.runningPromise) return this.startManualTick(direction);
+    if (this.runningDirection === "both" || this.runningDirection === direction) {
+      return this.runningPromise;
+    }
+
+    this.queuedDirection = this.mergeDirections(this.queuedDirection, direction);
+    if (!this.queuedPromise) {
+      const activeRun = this.runningPromise;
+      this.queuedPromise = activeRun
+        .catch(() => undefined)
+        .then(() => {
+          const nextDirection = this.queuedDirection || direction;
+          this.queuedDirection = null;
+          this.queuedPromise = null;
+          return this.startManualTick(nextDirection);
+        });
+    }
+    return this.queuedPromise;
+  }
+
+  private startManualTick(direction: SyncDirection): Promise<SyncTickResult> {
+    let trackedPromise: Promise<SyncTickResult>;
+    trackedPromise = this.runTick({ reason: "manual", direction }).finally(() => {
+      if (this.runningPromise === trackedPromise) {
+        this.runningPromise = null;
+        this.runningDirection = null;
+      }
+    });
+    this.runningDirection = direction;
+    this.runningPromise = trackedPromise;
+    return trackedPromise;
+  }
+
+  private mergeDirections(current: SyncDirection | null, incoming: SyncDirection): SyncDirection {
+    if (!current) return incoming;
+    return current === incoming ? current : "both";
+  }
+
+  private async runTick({ reason, direction }: { reason: "manual" | "interval"; direction: SyncDirection }): Promise<SyncTickResult> {
     const now = this.options.now?.() || new Date();
     const startedAt = now.toISOString();
     const busy = () => this.options.isBusy?.();

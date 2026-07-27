@@ -220,4 +220,32 @@ describe("SyncScheduler", () => {
     expect(calls.push).toBe(1);
     expect(calls.pull).toBe(1);
   });
+
+  it("runs a different requested direction after the in-flight tick", async () => {
+    const order: string[] = [];
+    let releasePush: (() => void) | undefined;
+    const pushBlocked = new Promise<void>((resolve) => {
+      releasePush = resolve;
+    });
+    const scheduler = new SyncScheduler({
+      pushLocal: async () => {
+        order.push("push:start");
+        await pushBlocked;
+        order.push("push:end");
+      },
+      pullRemote: async () => {
+        order.push("pull");
+      },
+    });
+
+    const pushResult = scheduler.runPushOnly();
+    const pullResult = scheduler.runPullOnly();
+    await Promise.resolve();
+    expect(order).toEqual(["push:start"]);
+
+    releasePush?.();
+    await expect(pushResult).resolves.toMatchObject({ pushedLocal: true, pulledRemote: false });
+    await expect(pullResult).resolves.toMatchObject({ pushedLocal: false, pulledRemote: true });
+    expect(order).toEqual(["push:start", "push:end", "pull"]);
+  });
 });
