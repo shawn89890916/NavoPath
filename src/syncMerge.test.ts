@@ -66,8 +66,19 @@ describe("sync deletion tombstones", () => {
   it("allows an object updated after its tombstone to survive", () => {
     const remote = data([], { "tasks:restored": "2026-07-26T10:00:00.000Z" });
     const local = data([task("restored", "2026-07-26T11:00:00.000Z")]);
+    const merged = mergePlannerData(remote, local, "2026-07-26T12:00:00.000Z");
+    const tracked = withDeletionTombstones(remote, local, "2026-07-26T12:00:00.000Z");
+    const equalTime = mergePlannerData(
+      data([task("equal", "2026-07-26T10:00:00.000Z")], { "tasks:equal": "2026-07-26T10:00:00.000Z" }),
+      data([]),
+      "2026-07-26T12:00:00.000Z",
+    );
 
-    expect(mergePlannerData(remote, local).tasks.map((item) => item.id)).toEqual(["restored"]);
+    expect(merged.tasks.map((item) => item.id)).toEqual(["restored"]);
+    expect(merged.sync?.deleted).not.toHaveProperty("tasks:restored");
+    expect(tracked.sync?.deleted).not.toHaveProperty("tasks:restored");
+    expect(equalTime.tasks).toEqual([]);
+    expect(equalTime.sync?.deleted).toHaveProperty("tasks:equal");
   });
 
   it("keeps legacy objects without timestamps when no valid tombstone exists", () => {

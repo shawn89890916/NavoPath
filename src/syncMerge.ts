@@ -72,6 +72,21 @@ function mergeDeleted(
   return merged;
 }
 
+function pruneSupersededTombstones(
+  data: PlannerData,
+  deleted: Record<string, string>,
+  referenceTime: number,
+) {
+  for (const collection of SYNC_COLLECTIONS) {
+    for (const item of items(data, collection)) {
+      if (!item.id) continue;
+      const key = `${collection}:${item.id}`;
+      const deletedAt = tombstoneTime(deleted[key], referenceTime);
+      if (deletedAt !== null && deletedAt < itemTime(item)) delete deleted[key];
+    }
+  }
+}
+
 export function withDeletionTombstones(
   previous: PlannerData | null,
   next: PlannerData,
@@ -80,18 +95,19 @@ export function withDeletionTombstones(
   const deletionTime = syncReferenceTime(deletedAt);
   const effectiveDeletedAt = new Date(deletionTime).toISOString();
   const deleted = mergeDeleted(previous?.sync?.deleted, next.sync?.deleted, deletionTime);
-  if (!previous) {
-    return Object.keys(deleted).length === 0 && !next.sync ? next : { ...next, sync: { deleted } };
-  }
-  for (const collection of SYNC_COLLECTIONS) {
-    const nextIds = new Set(items(next, collection).map((item) => item.id).filter(Boolean));
-    for (const item of items(previous, collection)) {
-      if (!item.id || nextIds.has(item.id)) continue;
-      const key = `${collection}:${item.id}`;
-      const existingTime = tombstoneTime(deleted[key], deletionTime);
-      if (existingTime === null || deletionTime >= existingTime) deleted[key] = effectiveDeletedAt;
+  if (previous) {
+    for (const collection of SYNC_COLLECTIONS) {
+      const nextIds = new Set(items(next, collection).map((item) => item.id).filter(Boolean));
+      for (const item of items(previous, collection)) {
+        if (!item.id || nextIds.has(item.id)) continue;
+        const key = `${collection}:${item.id}`;
+        const existingTime = tombstoneTime(deleted[key], deletionTime);
+        if (existingTime === null || deletionTime >= existingTime) deleted[key] = effectiveDeletedAt;
+      }
     }
   }
+  pruneSupersededTombstones(next, deleted, deletionTime);
+  if (!previous && Object.keys(deleted).length === 0 && !next.sync) return next;
   return { ...next, sync: { deleted } };
 }
 
@@ -142,6 +158,7 @@ export function mergePlannerData(
       return deletedAt === null || deletedAt < itemTime(item);
     });
   }
+  pruneSupersededTombstones(merged, deleted, referenceTime);
   merged.chat = local.chat || remote.chat || [];
   merged.events = local.events || remote.events || [];
   merged.savedAt = mergedAt;
