@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_BACKUP_IMPORT_BYTES,
+  MAX_BACKUP_STRUCTURE_NODES,
   MAX_TASK_CSV_IMPORT_BYTES,
+  MAX_TASK_CSV_ROWS,
+  TASK_CSV_HEADERS,
   buildPlannerBackupJson,
   buildTasksCsv,
   isImportFileSizeAllowed,
@@ -121,6 +124,22 @@ describe("planner backup export", () => {
     expect(backup.settings.widgetTimerPreferences?.mode).toBe("stopwatch");
     expect(backup.settings.widgetTimerPreferences?.focusMinutes).toBe(25);
   });
+
+  it("rejects backups with excessive nesting before normalization", () => {
+    let nested: Record<string, unknown> = {};
+    for (let depth = 0; depth < 65; depth += 1) nested = { child: nested };
+    expect(() => parsePlannerBackupJson(JSON.stringify({
+      data: { ...plannerData([]), nested },
+      settings: {},
+    }))).toThrow("nesting depth");
+  });
+
+  it("rejects backups with excessive structural nodes before normalization", () => {
+    expect(() => parsePlannerBackupJson(JSON.stringify({
+      data: { ...plannerData([]), oversized: Array(MAX_BACKUP_STRUCTURE_NODES).fill(null) },
+      settings: {},
+    }))).toThrow("structure is too large");
+  });
 });
 
 describe("task CSV export", () => {
@@ -151,6 +170,14 @@ describe("task CSV export", () => {
 
     expect(csv).toContain('"\'=HYPERLINK(""https://example.com"")"');
     expect(parseTaskCsvRows(csv)[0].title).toBe('=HYPERLINK("https://example.com")');
+  });
+
+  it("rejects excessive task rows while parsing", () => {
+    const csv = [
+      TASK_CSV_HEADERS.map((header) => `"${header}"`).join(","),
+      ...Array.from({ length: MAX_TASK_CSV_ROWS + 1 }, (_, index) => `"${index}","Task ${index}"`),
+    ].join("\n");
+    expect(() => parseTaskCsvRows(csv)).toThrow(String(MAX_TASK_CSV_ROWS));
   });
 });
 

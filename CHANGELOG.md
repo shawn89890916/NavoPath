@@ -46,11 +46,13 @@
 
 ### 修复
 - 图片附件与头像现在会在解码前校验格式、文件大小及像素尺寸，PDF OCR 和图片增强画布也遵守统一像素与最长边预算，避免超大图片或异常页面耗尽内存。
+- CSV 任务导入现在限制最多 20,000 行，JSON 备份会在迁移前限制嵌套深度与结构节点数，避免小文件在解析后膨胀成异常规模的数据结构。
 
 ## 2026-07-27 · Image and document parsing safety
 
 ### Fixed
 - Image attachments and avatars now validate format, file size, and pixel dimensions before decoding. PDF OCR and image-enhancement canvases also share pixel and maximum-side budgets to prevent oversized images or malformed pages from exhausting memory.
+- Task CSV imports now allow at most 20,000 rows, while JSON backups limit nesting depth and structural node count before migration, preventing small files from expanding into abnormally large in-memory structures.
 
 ## 2026-07-26 · 时间轴与数据导出修复
 

@@ -4,6 +4,9 @@ import { normalizeSettings } from "./defaultSettings";
 
 export const MAX_BACKUP_IMPORT_BYTES = 20 * 1024 * 1024;
 export const MAX_TASK_CSV_IMPORT_BYTES = 10 * 1024 * 1024;
+export const MAX_TASK_CSV_ROWS = 20_000;
+export const MAX_BACKUP_STRUCTURE_DEPTH = 64;
+export const MAX_BACKUP_STRUCTURE_NODES = 500_000;
 
 export function isImportFileSizeAllowed(size: number, kind: "backup" | "tasks") {
   const limit = kind === "backup" ? MAX_BACKUP_IMPORT_BYTES : MAX_TASK_CSV_IMPORT_BYTES;
@@ -55,6 +58,34 @@ export function buildPlannerBackupJson(data: PlannerData, settings: Settings, ex
   return JSON.stringify({ exportedAt, version: data.version, data, settings }, null, 2);
 }
 
+function assertSafeBackupStructure(value: object) {
+  const stack: Array<{ value: object; depth: number }> = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current.depth > MAX_BACKUP_STRUCTURE_DEPTH) {
+      throw new Error(`Planner backup exceeds the maximum nesting depth of ${MAX_BACKUP_STRUCTURE_DEPTH}.`);
+    }
+    const queueChild = (child: unknown) => {
+      nodes += 1;
+      if (nodes > MAX_BACKUP_STRUCTURE_NODES) {
+        throw new Error("Planner backup structure is too large.");
+      }
+      if (child && typeof child === "object") {
+        stack.push({ value: child, depth: current.depth + 1 });
+      }
+    };
+    if (Array.isArray(current.value)) {
+      for (const child of current.value) queueChild(child);
+    } else {
+      const record = current.value as Record<string, unknown>;
+      for (const key in record) {
+        if (Object.prototype.hasOwnProperty.call(record, key)) queueChild(record[key]);
+      }
+    }
+  }
+}
+
 export function parsePlannerBackupJson(content: string): { data: PlannerData; settings: Settings } {
   const parsed: unknown = JSON.parse(content);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -68,6 +99,7 @@ export function parsePlannerBackupJson(content: string): { data: PlannerData; se
   if (!Array.isArray(candidate.tasks) || !Array.isArray(candidate.projects)) {
     throw new Error("Planner backup is missing required collections.");
   }
+  assertSafeBackupStructure(parsed);
   return {
     data: normalizeData(candidate as PlannerData),
     settings: normalizeSettings(settings),
@@ -94,7 +126,7 @@ export function buildTasksCsv(data: PlannerData) {
   return `\uFEFF${[TASK_CSV_HEADERS.map(csvCell).join(","), ...rows].join("\r\n")}`;
 }
 
-export function parseCsv(content: string) {
+export function parseCsv(content: string, maxRows = Number.POSITIVE_INFINITY) {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -119,7 +151,10 @@ export function parseCsv(content: string) {
     if ((char === "\n" || char === "\r") && !inQuotes) {
       if (char === "\r" && content[index + 1] === "\n") index += 1;
       row.push(cell);
-      if (row.some((value) => value.trim())) rows.push(row);
+      if (row.some((value) => value.trim())) {
+        rows.push(row);
+        if (rows.length > maxRows) throw new Error(`CSV contains more than ${maxRows - 1} task rows.`);
+      }
       row = [];
       cell = "";
       continue;
@@ -128,13 +163,16 @@ export function parseCsv(content: string) {
   }
 
   row.push(cell);
-  if (row.some((value) => value.trim())) rows.push(row);
+  if (row.some((value) => value.trim())) {
+    rows.push(row);
+    if (rows.length > maxRows) throw new Error(`CSV contains more than ${maxRows - 1} task rows.`);
+  }
   if (rows[0]?.[0]?.startsWith("\uFEFF")) rows[0][0] = rows[0][0].slice(1);
   return rows;
 }
 
 export function parseTaskCsvRows(content: string): TaskCsvRow[] {
-  const rows = parseCsv(content);
+  const rows = parseCsv(content, MAX_TASK_CSV_ROWS + 1);
   if (rows.length < 2) return [];
   return rows.slice(1).map((values) => ({
     id: restoreSpreadsheetCell(values[0] || ""),
