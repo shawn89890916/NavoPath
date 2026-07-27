@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NavoPathPluginRuntime, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
+import type { AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
 import { callAiAssistant, type AiAction, type AiStep } from "./aiAssistantApi";
 import {
   buildAiContext,
@@ -148,11 +148,7 @@ function taskBlockPriorityFor(importance: NullablePriority | undefined, urgency:
   return "normal";
 }
 
-function externalManifestToPlugin(
-  plugin: DesktopExternalPlugin,
-  loadExternalPlugin: (plugin: DesktopExternalPlugin, host: PluginHost, config: Record<string, unknown>) => void,
-  unloadExternalPlugin: (pluginId: string) => void,
-): NavoPlugin {
+function externalManifestToPlugin(plugin: DesktopExternalPlugin): NavoPlugin {
   return {
     id: plugin.id,
     name: plugin.name,
@@ -165,12 +161,6 @@ function externalManifestToPlugin(
     icon: plugin.icon,
     permissions: plugin.permissions,
     configFields: plugin.configFields,
-    onActivate: (host, config) => {
-      loadExternalPlugin(plugin, host, config);
-    },
-    onDeactivate: () => {
-      unloadExternalPlugin(plugin.id);
-    },
   };
 }
 const MCP_ENDPOINT = import.meta.env.VITE_MCP_ENDPOINT || "https://navopath-mcp.shawn89890916.workers.dev/mcp";
@@ -1642,7 +1632,6 @@ function App() {
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const pluginHostRef = useRef<PluginHost | null>(null);
   const externalPluginsLoadedRef = useRef(false);
-  const externalPluginDisposersRef = useRef(new Map<string, () => void>());
   const [externalPluginsRevision, setExternalPluginsRevision] = useState(0);
   const colsContainerRef = useRef<HTMLDivElement | null>(null);
   const timeGridRef = useRef<HTMLDivElement | null>(null);
@@ -2733,104 +2722,8 @@ function App() {
     scheduler.setIntervalMinutes(readSyncInterval(settings));
   }, [settings?.syncIntervalMinutes, authState?.user?.id]);
 
-  function unloadExternalPlugin(pluginId: string) {
-    const dispose = externalPluginDisposersRef.current.get(pluginId);
-    if (dispose) {
-      try {
-        dispose();
-      } catch (error) {
-        console.warn(`[plugins] external plugin cleanup failed for ${pluginId}:`, error);
-      }
-      externalPluginDisposersRef.current.delete(pluginId);
-    }
-    if (window.navopath?.pluginId === pluginId) {
-      delete window.navopath;
-    }
-  }
-
-  function createExternalPluginApi(plugin: DesktopExternalPlugin, host: PluginHost, config: Record<string, unknown>, cleanup: Array<() => void>): NavoPathPluginRuntime {
-    const api: NavoPathPluginRuntime = {
-      version: "1",
-      pluginId: plugin.id,
-      tasks: {
-        getData: () => dataRef.current,
-        list: () => dataRef.current?.tasks ?? [],
-        update: (taskId, patch) => {
-          const current = dataRef.current;
-          if (!current) return;
-          const nextTasks = current.tasks.map((task) => (
-            task.id === taskId ? { ...task, ...patch, id: task.id, updatedAt: new Date().toISOString() } : task
-          ));
-          void saveData({ ...current, tasks: nextTasks });
-        },
-      },
-      settings: {
-        getConfig: () => ({ ...config }),
-        saveConfig: (patch) => host.savePluginConfig(plugin.id, patch),
-      },
-      ui: {
-        toast: (message) => host.toast(String(message)),
-        registerTool: (tool) => {
-          const payload = { pluginId: plugin.id, tool };
-          host.emit("ui:register-tool", payload);
-          return () => host.emit("ui:unregister-tool", payload);
-        },
-      },
-      events: {
-        emit: (event, payload) => host.emit(event, payload),
-        on: (event, listener) => {
-          const handler = (rawEvent: Event) => {
-            const detail = (rawEvent as CustomEvent<{ event: string; payload?: unknown }>).detail;
-            if (detail?.event === event) listener(detail.payload);
-          };
-          window.addEventListener("navopath:plugin", handler);
-          const unsubscribe = () => window.removeEventListener("navopath:plugin", handler);
-          cleanup.push(unsubscribe);
-          return unsubscribe;
-        },
-      },
-      plugins: {
-        register: (runtime) => {
-          const maybeDispose = runtime.activate?.(api);
-          if (typeof maybeDispose === "function") cleanup.push(maybeDispose);
-          if (typeof runtime.deactivate === "function") cleanup.push(runtime.deactivate);
-        },
-      },
-    };
-    return api;
-  }
-
-  function loadExternalPlugin(plugin: DesktopExternalPlugin, host: PluginHost, config: Record<string, unknown>) {
-    if (!plugin.hasEntry) {
-      host.toast(`${plugin.name} has no index.js entry.`);
-      return;
-    }
-    if (externalPluginDisposersRef.current.has(plugin.id)) return;
-    void window.desktopApi?.readExternalPluginEntry?.(plugin.id)
-      .then((entry) => {
-        if (!entry || entry.missing || !entry.code.trim()) {
-          host.toast(`${plugin.name} has no index.js entry.`);
-          return;
-        }
-        const cleanup: Array<() => void> = [];
-        const api = createExternalPluginApi(plugin, host, config, cleanup);
-        window.navopath = api;
-        const execute = new Function("window", "navopath", `"use strict";\n${entry.code}\n//# sourceURL=navopath-plugin-${plugin.id}.js`);
-        execute(window, api);
-        externalPluginDisposersRef.current.set(plugin.id, () => {
-          for (const dispose of cleanup.splice(0).reverse()) dispose();
-          if (window.navopath?.pluginId === plugin.id) delete window.navopath;
-        });
-        host.toast(`${plugin.name} loaded.`);
-      })
-      .catch((error) => {
-        console.warn(`[plugins] external plugin load failed for ${plugin.id}:`, error);
-        host.toast(`${plugin.name} failed to load.`);
-      });
-  }
-
-  // Plugin system bootstrap. The host exposes saveSettings + data + toast so
-  // plugin lifecycle hooks can do useful work without reaching into internals.
+  // Built-in plugins may use lifecycle hooks. External plugins contribute only
+  // validated manifest metadata and configuration; disk scripts are never run.
   useEffect(() => {
     registerBuiltinPlugins();
     if (!externalPluginsLoadedRef.current) {
@@ -2841,7 +2734,7 @@ function App() {
           let added = 0;
           for (const plugin of result?.plugins ?? []) {
             if (existingIds.has(plugin.id)) continue;
-            registerPlugin(externalManifestToPlugin(plugin, loadExternalPlugin, unloadExternalPlugin));
+            registerPlugin(externalManifestToPlugin(plugin));
             existingIds.add(plugin.id);
             added += 1;
           }

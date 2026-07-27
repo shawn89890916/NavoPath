@@ -623,33 +623,6 @@ export interface DesktopExternalPlugin {
     default: unknown;
   }>;
   source: "external";
-  directoryName: string;
-  hasEntry: boolean;
-}
-
-export interface NavoPathPluginRuntime {
-  version: string;
-  pluginId: string;
-  tasks: {
-    getData: () => PlannerData | null;
-    list: () => Task[];
-    update: (taskId: string, patch: Partial<Task>) => void;
-  };
-  settings: {
-    getConfig: () => Record<string, unknown>;
-    saveConfig: (patch: Record<string, unknown>) => void;
-  };
-  ui: {
-    toast: (message: string) => void;
-    registerTool: (tool: { id: string; title: string; description?: string }) => () => void;
-  };
-  events: {
-    emit: (event: string, payload?: unknown) => void;
-    on: (event: string, listener: (payload?: unknown) => void) => () => void;
-  };
-  plugins: {
-    register: (plugin: { activate?: (api: NavoPathPluginRuntime) => void | (() => void); deactivate?: () => void }) => void;
-  };
 }
 
 /** 桌面小组件状态快照——由主窗口构建并推送到小组件窗口。 */
@@ -720,8 +693,7 @@ declare global {
       aiChat: (payload: { messages: Array<{ role: "user" | "assistant" | "system"; content: string }>; draftText?: string }) => Promise<{ reply: string; actions: AiAction[] }>;
       getAutoLaunch: () => Promise<boolean>;
       setAutoLaunch: (enabled: boolean) => Promise<boolean>;
-      listExternalPlugins?: () => Promise<{ dir: string; plugins: DesktopExternalPlugin[] }>;
-      readExternalPluginEntry?: (pluginId: string) => Promise<{ id: string; code: string; path: string; missing: boolean }>;
+      listExternalPlugins?: () => Promise<{ plugins: DesktopExternalPlugin[] }>;
       writeSnapshot?: (payload: { data?: PlannerData | null; settings?: Partial<Settings> | null; authUser?: { id?: string; email?: string } | null }) => Promise<{ ok: boolean; path?: string; stampedPath?: string; error?: string }>;
       readLatestSnapshot?: () => Promise<{ ok: boolean; payload?: { exportedAt?: string; appVersion?: string; data?: PlannerData | null; settings?: Settings | null; authUser?: { id?: string; email?: string } | null }; reason?: string; error?: string }>;
       compactWindow?: {
@@ -751,6 +723,5 @@ declare global {
       };
       isDesktop: () => boolean;
     };
-    navopath?: NavoPathPluginRuntime;
   }
 }

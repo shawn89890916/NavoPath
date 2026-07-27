@@ -537,7 +537,6 @@ function removeAuthStorage(key) {
 
 const allowedPluginPermissions = new Set(["tasks", "settings", "ui", "events", "calendar"]);
 const allowedPluginFieldTypes = new Set(["boolean", "number", "string", "select"]);
-const maxExternalPluginEntryBytes = 512 * 1024;
 
 function cleanText(value, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : fallback;
@@ -589,7 +588,7 @@ function cleanPluginConfigFields(fields) {
 
 function readExternalPluginManifests() {
   const { pluginsDir } = getPaths();
-  if (!fs.existsSync(pluginsDir)) return { dir: pluginsDir, plugins: [] };
+  if (!fs.existsSync(pluginsDir)) return { plugins: [] };
   const plugins = [];
   for (const entry of fs.readdirSync(pluginsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -620,42 +619,12 @@ function readExternalPluginManifests() {
           : [],
         configFields: cleanPluginConfigFields(manifest.configFields),
         source: "external",
-        directoryName: entry.name,
-        hasEntry: fs.existsSync(path.join(pluginsDir, entry.name, "index.js")),
       });
     } catch (error) {
       console.warn(`[plugins] failed to read ${manifestPath}:`, error);
     }
   }
-  return { dir: pluginsDir, plugins };
-}
-
-function readExternalPluginEntry(pluginId) {
-  const safeId = cleanText(pluginId).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
-  if (!safeId) throw new Error("Invalid plugin id.");
-  const manifests = readExternalPluginManifests();
-  const plugin = manifests.plugins.find((item) => item.id === safeId);
-  if (!plugin) throw new Error(`External plugin not found: ${safeId}`);
-  const entryPath = path.join(manifests.dir, plugin.directoryName, "index.js");
-  const resolvedPluginsDir = path.resolve(manifests.dir);
-  const resolvedEntryPath = path.resolve(entryPath);
-  if (!resolvedEntryPath.startsWith(resolvedPluginsDir + path.sep)) {
-    throw new Error("External plugin entry escaped the plugin directory.");
-  }
-  if (!fs.existsSync(resolvedEntryPath)) {
-    return { id: plugin.id, code: "", path: resolvedEntryPath, missing: true };
-  }
-  const stat = fs.statSync(resolvedEntryPath);
-  if (!stat.isFile()) throw new Error("External plugin entry is not a file.");
-  if (stat.size > maxExternalPluginEntryBytes) {
-    throw new Error(`External plugin entry is too large (${stat.size} bytes).`);
-  }
-  return {
-    id: plugin.id,
-    code: fs.readFileSync(resolvedEntryPath, "utf8"),
-    path: resolvedEntryPath,
-    missing: false,
-  };
+  return { plugins };
 }
 
 function backupCurrentData(reason) {
@@ -1146,7 +1115,6 @@ handleTrusted("auth-storage:get", (_event, key) => readAuthStorage(key));
 handleTrusted("auth-storage:set", (_event, key, value) => writeAuthStorage(key, value));
 handleTrusted("auth-storage:remove", (_event, key) => removeAuthStorage(key));
 handleTrusted("plugins:listExternal", () => readExternalPluginManifests());
-handleTrusted("plugins:readExternalEntry", (_event, pluginId) => readExternalPluginEntry(pluginId));
 handleTrusted("ai:chat", (_event, payload) => callDeepSeek(payload));
 handleTrusted("updater:getState", () => updateState);
 handleTrusted("updater:check", async () => {
