@@ -13,6 +13,7 @@ import {
   getWidgetTimerSnapshotDisplaySeconds,
   getStopwatchTaskTimerAction,
   getWidgetTimerModeChangeTaskAction,
+  normalizeStoredTaskTimer,
   normalizeWidgetTimerRuntime,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerMode,
@@ -25,6 +26,27 @@ import {
 import type { Task } from "../types";
 
 describe("widget timer preferences", () => {
+  it("normalizes a stored active task timer before restoring it", () => {
+    expect(normalizeStoredTaskTimer({ taskId: "task-1", elapsed: 12.9 })).toEqual({
+      taskId: "task-1",
+      elapsedSeconds: 12,
+    });
+    expect(normalizeStoredTaskTimer({ taskId: "task-1", elapsed: "oops" })).toEqual({
+      taskId: "task-1",
+      elapsedSeconds: 0,
+    });
+    expect(normalizeStoredTaskTimer({ taskId: "task-1", elapsed: -5 })).toEqual({
+      taskId: "task-1",
+      elapsedSeconds: 0,
+    });
+    expect(normalizeStoredTaskTimer({ taskId: "task-1", elapsed: 1e308 })).toEqual({
+      taskId: "task-1",
+      elapsedSeconds: 0,
+    });
+    expect(normalizeStoredTaskTimer({ taskId: {}, elapsed: 10 })).toBeNull();
+    expect(normalizeStoredTaskTimer({ taskId: "  ", elapsed: 10 })).toBeNull();
+  });
+
   it("advances through a deadline-aligned plan and enters overtime after its final work phase", () => {
     const runtime = createDeadlineAlignedPomodoroRuntime(0, 70 * 60_000, DEFAULT_WIDGET_TIMER_PREFERENCES);
     expect(runtime.pomodoroPlan?.at(-1)).toMatchObject({ type: "work", endAt: 70 * 60_000 });

@@ -21,6 +21,20 @@ export function advanceTaskElapsedSeconds(baseSeconds: number, startedAt: number
   return Math.max(0, Math.floor(baseSeconds + Math.max(0, now - startedAt) / 1_000));
 }
 
+export type StoredTaskTimer = {
+  taskId: string;
+  elapsedSeconds: number;
+};
+
+export function normalizeStoredTaskTimer(value: unknown): StoredTaskTimer | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const stored = value as Record<string, unknown>;
+  if (typeof stored.taskId !== "string" || !stored.taskId.trim()) return null;
+  const roundedElapsed = typeof stored.elapsed === "number" ? Math.floor(stored.elapsed) : -1;
+  const elapsedSeconds = Number.isSafeInteger(roundedElapsed) && roundedElapsed >= 0 ? roundedElapsed : 0;
+  return { taskId: stored.taskId, elapsedSeconds };
+}
+
 export type StopwatchTaskTimerAction = {
   type: "start" | "resume" | "pause";
   elapsedSeconds: number;

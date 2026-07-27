@@ -103,6 +103,7 @@ import {
   getStopwatchTaskTimerAction,
   getWidgetTimerModeChangeTaskAction,
   getWidgetTimerSnapshotDisplaySeconds,
+  normalizeStoredTaskTimer,
   normalizeWidgetTimerPreferences,
   normalizeWidgetTimerRuntime,
   resolveWidgetCountdownTarget,
@@ -1353,13 +1354,13 @@ function App() {
     try {
       const saved = localStorage.getItem("navopath-active-timer");
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.taskId) {
-          setTimerTaskId(parsed.taskId);
-          setTimerElapsed(parsed.elapsed || 0);
-          timerElapsedBaseRef.current = parsed.elapsed || 0;
+        const restored = normalizeStoredTaskTimer(JSON.parse(saved) as unknown);
+        if (restored) {
+          setTimerTaskId(restored.taskId);
+          setTimerElapsed(restored.elapsedSeconds);
+          timerElapsedBaseRef.current = restored.elapsedSeconds;
           setTimerRunning(false);
-          timerTaskRef.current = parsed.taskId;
+          timerTaskRef.current = restored.taskId;
         }
       }
     } catch { /* ignore */ }
