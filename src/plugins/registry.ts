@@ -1,8 +1,9 @@
 /**
  * NavoPath Plugin System
  * ----------------------
- * Lightweight built-in plugin registry. Each plugin declares an id, metadata,
- * a default config, and an optional lifecycle hook (onActivate / onDeactivate).
+ * Lightweight registry for built-in plugins and validated external metadata.
+ * Built-ins may declare lifecycle hooks; external entries contribute metadata
+ * and configuration fields only.
  *
  * Plugins are pure functions over the app state — they cannot run arbitrary code
  * from disk (no dynamic imports / no remote scripts) which keeps the Electron
@@ -24,7 +25,7 @@ export type PluginPermission = "tasks" | "settings" | "ui" | "events" | "calenda
 export interface PluginHost {
   /** Read the current planner data (tasks, events, ...). */
   getData: () => unknown;
-  /** Replace planner data. External plugins should call this sparingly. */
+  /** Replace planner data. Built-in plugin implementations should call this sparingly. */
   saveData?: (next: unknown) => void;
   /** Patch a single plugin's config in settings. */
   savePluginConfig: (pluginId: string, patch: Record<string, unknown>) => void;
@@ -50,6 +51,8 @@ export interface PluginConfigField {
 export interface NavoPlugin {
   /** Stable unique id, lowercase kebab-case. */
   id: string;
+  /** External entries contribute validated metadata and config only. */
+  source?: "builtin" | "external";
   name: string;
   nameI18n?: LocalizedText;
   description: string;
@@ -62,9 +65,9 @@ export interface NavoPlugin {
   permissions: PluginPermission[];
   /** Schema describing config fields shown in the Configure dialog. */
   configFields: PluginConfigField[];
-  /** Called once when the plugin is activated (install or enable). */
+  /** Called once when a built-in plugin is activated (install or enable). */
   onActivate?: (host: PluginHost, config: Record<string, unknown>) => void;
-  /** Called when the plugin is deactivated (uninstall or disable). */
+  /** Called when a built-in plugin is deactivated (uninstall or disable). */
   onDeactivate?: (host: PluginHost) => void;
 }
 

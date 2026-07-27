@@ -67,8 +67,11 @@ test("does not expose or execute external plugin scripts", () => {
   assert.doesNotMatch(preloadSource, /readExternalPluginEntry|plugins:readExternalEntry/);
   assert.doesNotMatch(electronMainSource, /readExternalPluginEntry|plugins:readExternalEntry/);
   assert.doesNotMatch(rendererSource, /new Function\("window",\s*"navopath"/);
+  assert.doesNotMatch(rendererSource, /loads its manifest\.json and index\.js/);
   assert.match(electronMainSource, /readExternalPluginManifest/);
   assert.match(pluginManifestSource, /not external scripts/);
+  assert.match(rendererSource, /directory scripts such as index\.js are not loaded or executed/);
+  assert.match(rendererSource, /Configuration enabled/);
 });
 
 test("does not expose retired local planner or direct AI IPC surfaces", () => {

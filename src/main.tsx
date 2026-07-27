@@ -153,6 +153,7 @@ function taskBlockPriorityFor(importance: NullablePriority | undefined, urgency:
 function externalManifestToPlugin(plugin: DesktopExternalPlugin): NavoPlugin {
   return {
     id: plugin.id,
+    source: "external",
     name: plugin.name,
     nameI18n: plugin.nameI18n,
     description: plugin.description,
@@ -13232,7 +13233,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "mcp" && <section className="df-settings-group" data-settings-anchor="mcp" tabIndex={-1}><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "plugins" && <section className="df-settings-group" data-settings-anchor="plugins" tabIndex={-1}>
               <h3>{lang === "zh" ? "插件" : "Plugins"}</h3>
-              <p className="df-settings-desc">{lang === "zh" ? "这里会显示内置插件，以及桌面端用户插件目录中的本地插件。启用本地插件后会加载它的 manifest.json 和 index.js。" : "This list includes built-in plugins and desktop local plugins from the user plugin directory. Enabling a local plugin loads its manifest.json and index.js."}</p>
+              <p className="df-settings-desc">{lang === "zh" ? "这里会显示随应用发布的内置插件，以及桌面端用户插件目录中经过校验的本地 manifest。本地插件可保存配置，但不会加载或执行 index.js 等目录脚本。" : "This list includes built-in plugins shipped with the app and validated local manifests from the desktop plugin directory. Local plugin configuration can be stored, but directory scripts such as index.js are not loaded or executed."}</p>
 
               <div className="df-settings-divider" />
               <div className="df-settings-subhead">{lang === "zh" ? "可用插件" : "Available plugins"}</div>
@@ -13241,6 +13242,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 {listRegisteredPlugins().map((plugin) => {
                   const enabled = Boolean(settings?.enabledPlugins?.includes(plugin.id));
                   const active = isPluginActive(plugin.id);
+                  const externalManifest = plugin.source === "external";
                   return (
                     <div key={plugin.id} className={`df-plugin-card ${enabled ? "installed" : ""}`}>
                       <div className="df-plugin-icon">{plugin.icon}</div>
@@ -13253,10 +13255,14 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                         <p className="df-plugin-enabled-summary">{localizedPluginEnabledSummary(plugin, lang)}</p>
                         <div className="df-plugin-meta">
                           <span className="df-plugin-author">{plugin.author}</span>
-                          <span>{lang === "zh" ? "权限" : "Permissions"}: {plugin.permissions.join(", ")}</span>
+                          <span>{externalManifest ? (lang === "zh" ? "声明权限" : "Declared permissions") : (lang === "zh" ? "权限" : "Permissions")}: {plugin.permissions.join(", ")}</span>
                           {enabled && (
                             <span className="df-plugin-status">
-                              {active ? (lang === "zh" ? "运行中" : "Running") : (lang === "zh" ? "已启用，等待刷新" : "Enabled, refreshing")}
+                              {externalManifest
+                                ? (lang === "zh" ? "配置已启用" : "Configuration enabled")
+                                : active
+                                  ? (lang === "zh" ? "运行中" : "Running")
+                                  : (lang === "zh" ? "已启用，等待刷新" : "Enabled, refreshing")}
                             </span>
                           )}
                         </div>
@@ -13550,8 +13556,8 @@ function PluginGuidePage() {
     tag: zh ? "官方插件 / MCP" : "OFFICIAL PLUGINS / MCP",
     title: zh ? "Plugins 和 MCP 使用说明" : "Plugins and MCP guide",
     intro: zh
-      ? "NavoPath 当前只加载随应用发布的官方内置插件。启用后，插件会在设置页下方显示可直接使用的工具；不会从本地目录或远程脚本加载任意代码。"
-      : "NavoPath currently loads only official built-in plugins shipped with the app. Once enabled, each plugin exposes a usable tool in Settings; arbitrary local folders or remote scripts are not loaded.",
+      ? "随 NavoPath 发布的官方内置插件可提供直接使用的工具；桌面设置也可展示经过校验的本地 manifest 和配置，但不会加载或执行本地目录或远程脚本。"
+      : "Official built-in plugins shipped with NavoPath can provide usable tools. Desktop settings may also display validated local manifests and configuration, but local directory scripts and remote scripts are not loaded or executed.",
     mcp: zh ? "MCP 快速配置" : "MCP quickstart",
     plugins: zh ? "官方插件作用" : "Official plugin roles",
     security: zh ? "安全边界" : "Security boundary",
@@ -13597,7 +13603,7 @@ function PluginGuidePage() {
         </section>
         <section id="security" className="df-doc-section">
           <h2>{labels.security}</h2>
-          <p>{zh ? "当前版本的插件系统是同步的内置注册表：插件定义随 NavoPath 一起发布，配置保存在普通设置中。这样可以避免任意桌面脚本、远程脚本或未审核 manifest 在 Electron/Web 版本中运行。" : "The current plugin system is a synchronous built-in registry: plugin definitions ship with NavoPath and configuration is stored in normal settings. This avoids arbitrary desktop scripts, remote scripts, or unreviewed manifests running inside Electron/Web builds."}</p>
+          <p>{zh ? "内置插件代码随 NavoPath 一起发布。桌面端本地插件只会把经过大小与结构校验的 manifest 元数据和配置登记到界面，不读取或执行目录脚本；网页版同样不会加载任意本地或远程插件代码。" : "Built-in plugin code ships with NavoPath. Desktop local plugins contribute only manifest metadata and configuration that pass size and structure validation; directory scripts are not read or executed, and the web build likewise loads no arbitrary local or remote plugin code."}</p>
         </section>
         <section id="host" className="df-doc-section">
           <h2>{labels.host}</h2>
