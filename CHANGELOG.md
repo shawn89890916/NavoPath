@@ -52,6 +52,7 @@
 - 继续升级桌面更新、打包与边缘函数开发工具链：YAML 解析器、Electron Builder、Wrangler、Axios、Sharp、PostCSS、Tar 等依赖已更新至兼容修复版，消除可在现有版本范围内修复的拒绝服务、路径遍历与请求构造漏洞。
 - 更新日志页面现在会逐条忽略损坏的本地账号缓存，仍能从其他有效缓存或预览设置恢复语言，不再因单个异常条目回退到错误语言。
 - 工作区恢复活动计时器前会校验任务 ID 与已用时间；损坏或错误类型的缓存不再产生无效任务状态、负数或 `NaN` 计时显示。
+- 桌面本地资料恢复会逐项过滤损坏的项目、任务、事件、习惯、时间轴记录和嵌套子任务；单个异常条目不再阻止整个工作区启动。
 
 ## 2026-07-27 · Input and plugin security
 
@@ -63,6 +64,7 @@
 - Continued upgrading the desktop update, packaging, and edge-function development toolchain. The YAML parser, Electron Builder, Wrangler, Axios, Sharp, PostCSS, Tar, and related dependencies now use compatible patched releases, eliminating the denial-of-service, path-traversal, and request-construction vulnerabilities fixable within current version ranges.
 - The changelog page now ignores damaged local account caches one entry at a time, so it can still restore the language from another valid account cache or preview setting instead of falling back to the wrong language.
 - The workspace now validates the task ID and elapsed time before restoring an active timer. Damaged or incorrectly typed caches no longer create invalid task state or negative/`NaN` timer displays.
+- Desktop local-data recovery now filters damaged projects, tasks, events, habits, timeline records, and nested subtasks individually, so one malformed entry no longer prevents the whole workspace from starting.
 
 ## 2026-07-26 · 时间轴与数据导出修复
 

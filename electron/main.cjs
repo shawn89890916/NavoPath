@@ -4,6 +4,7 @@ const path = require("node:path");
 const { createWidgetWindowService } = require("./widget-window.cjs");
 const { createCompactWindowService } = require("./compact-window.cjs");
 const { createRendererPolicy, resolveDevAppUrl } = require("./renderer-security.cjs");
+const { sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -272,6 +273,7 @@ function normalizeHabitsForClient(data) {
 }
 
 function normalizePlannerData(data) {
+  data = sanitizePlannerDataCollections(data);
   if (!data || !Array.isArray(data.tasks)) return data;
   const habitPatch = normalizeHabitsForClient(data);
   return {
