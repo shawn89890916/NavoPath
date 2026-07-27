@@ -10,6 +10,12 @@ import {
   parseTasksCsv,
 } from "./dataExport";
 import { assertSafeDocxArchive } from "./fileParser";
+import {
+  MAX_RASTER_PIXELS,
+  assertSafeRasterDimensions,
+  boundedCanvasScale,
+  readRasterDimensions,
+} from "./imageSafety";
 import type { PlannerData, Project, Settings, Task } from "./types";
 
 function task(id: string, title: string, projectId?: string): Task {
@@ -192,5 +198,66 @@ describe("DOCX archive limits", () => {
   it("rejects malformed archives", () => {
     expect(() => assertSafeDocxArchive(new ArrayBuffer(32))).toThrow("结构无效");
     expect(() => assertSafeDocxArchive(addZipComment(zipDirectory([1_024]), 65_536))).toThrow("结构无效");
+  });
+});
+
+function pngHeader(width: number, height: number) {
+  const buffer = new ArrayBuffer(24);
+  const bytes = new Uint8Array(buffer);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  const view = new DataView(buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return buffer;
+}
+
+function jpegHeader(width: number, height: number) {
+  const bytes = new Uint8Array([
+    0xff, 0xd8,
+    0xff, 0xe0, 0x00, 0x02,
+    0xff, 0xc0, 0x00, 0x11, 0x08,
+    height >> 8, height & 0xff,
+    width >> 8, width & 0xff,
+    0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+  ]);
+  return bytes.buffer;
+}
+
+function webpHeader(width: number, height: number) {
+  const buffer = new ArrayBuffer(30);
+  const bytes = new Uint8Array(buffer);
+  bytes.set([0x52, 0x49, 0x46, 0x46], 0);
+  new DataView(buffer).setUint32(4, 22, true);
+  bytes.set([0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x58], 8);
+  new DataView(buffer).setUint32(16, 10, true);
+  const encodedWidth = width - 1;
+  const encodedHeight = height - 1;
+  bytes.set([
+    encodedWidth & 0xff, (encodedWidth >> 8) & 0xff, (encodedWidth >> 16) & 0xff,
+    encodedHeight & 0xff, (encodedHeight >> 8) & 0xff, (encodedHeight >> 16) & 0xff,
+  ], 24);
+  return buffer;
+}
+
+describe("raster image limits", () => {
+  it("reads supported image dimensions without decoding pixels", () => {
+    expect(readRasterDimensions(pngHeader(1_200, 800))).toEqual({ width: 1_200, height: 800 });
+    expect(readRasterDimensions(jpegHeader(640, 480))).toEqual({ width: 640, height: 480 });
+    expect(readRasterDimensions(webpHeader(1_920, 1_080))).toEqual({ width: 1_920, height: 1_080 });
+  });
+
+  it("rejects malformed and excessive image dimensions", () => {
+    expect(() => readRasterDimensions(new ArrayBuffer(24))).toThrow("格式无效");
+    expect(() => assertSafeRasterDimensions(pngHeader(8_000, 3_000))).toThrow("像素尺寸过大");
+  });
+
+  it("caps OCR canvas scaling by the pixel budget", () => {
+    expect(boundedCanvasScale(1_000, 1_000, 2)).toBe(2);
+    expect(boundedCanvasScale(4_000, 4_000, 2)).toBe(1);
+    expect(4_000 * 4_000 * boundedCanvasScale(4_000, 4_000, 2) ** 2).toBeLessThanOrEqual(MAX_RASTER_PIXELS);
+    expect(100_000 * boundedCanvasScale(100_000, 10, 2)).toBeLessThanOrEqual(8_192);
+    expect(() => boundedCanvasScale(0, 100, 1)).toThrow("页面尺寸无效");
+    expect(() => boundedCanvasScale(100, 100, Number.NaN)).toThrow("页面尺寸无效");
   });
 });

@@ -1,4 +1,5 @@
 import type { Worker } from "tesseract.js";
+import { assertSafeRasterDimensions, boundedCanvasScale } from "./imageSafety";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_PDF_PAGES = 30;
@@ -80,7 +81,8 @@ function isUsefulPdfText(text: string) {
 }
 
 function enhanceCanvas(source: HTMLCanvasElement) {
-  const scale = Math.min(2, Math.max(1, 2400 / source.width));
+  const requestedScale = Math.min(2, Math.max(1, 2400 / source.width));
+  const scale = boundedCanvasScale(source.width, source.height, requestedScale);
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(source.width * scale));
   canvas.height = Math.max(1, Math.round(source.height * scale));
@@ -101,6 +103,7 @@ function enhanceCanvas(source: HTMLCanvasElement) {
 }
 
 async function blobToCanvas(source: Blob) {
+  assertSafeRasterDimensions(await source.arrayBuffer());
   const bitmap = await createImageBitmap(source);
   try {
     const canvas = document.createElement("canvas");
@@ -117,12 +120,12 @@ async function createOcrSession() {
   let worker: Worker | null = null;
   return {
     async recognize(source: Blob | HTMLCanvasElement) {
+      const canvas = source instanceof Blob ? await blobToCanvas(source) : source;
       if (!worker) {
         const { createWorker } = await import("tesseract.js");
         worker = await createWorker("eng+chi_sim");
         await worker.setParameters({ preserve_interword_spaces: "1", user_defined_dpi: "300" });
       }
-      const canvas = source instanceof Blob ? await blobToCanvas(source) : source;
       return (await worker.recognize(enhanceCanvas(canvas))).data.text;
     },
     async terminate() {
@@ -159,7 +162,10 @@ async function parsePdf(file: File, ocr: Awaited<ReturnType<typeof createOcrSess
   for (const pageNumber of scanPages) {
     const page = await doc.getPage(pageNumber);
     const baseViewport = page.getViewport({ scale: 1 });
-    const viewport = page.getViewport({ scale: Math.min(2.4, Math.max(1.6, 2200 / baseViewport.width)) });
+    const requestedScale = Math.min(2.4, Math.max(1.6, 2200 / baseViewport.width));
+    const viewport = page.getViewport({
+      scale: boundedCanvasScale(baseViewport.width, baseViewport.height, requestedScale),
+    });
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);

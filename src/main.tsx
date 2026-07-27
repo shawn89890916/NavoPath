@@ -12715,12 +12715,21 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     };
     input.click();
   };
-  const uploadAvatar = (file?: File) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const image = new Image();
-      image.onload = () => {
+  const uploadAvatar = async (file?: File) => {
+    if (!file) return;
+    try {
+      const {
+        ACCEPTED_RASTER_MIME_TYPES,
+        MAX_AVATAR_FILE_BYTES,
+        assertSafeRasterDimensions,
+      } = await import("./imageSafety");
+      if (!ACCEPTED_RASTER_MIME_TYPES.has(file.type) || file.size > MAX_AVATAR_FILE_BYTES) {
+        alert(lang === "zh" ? "请选择不超过 5 MB 的 PNG、JPEG 或 WebP 图片。" : "Choose a PNG, JPEG, or WebP image up to 5 MB.");
+        return;
+      }
+      assertSafeRasterDimensions(await file.arrayBuffer());
+      const image = await createImageBitmap(file);
+      try {
         const size = 256;
         const canvas = document.createElement("canvas");
         canvas.width = size;
@@ -12732,10 +12741,12 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
         const height = image.height * scale;
         context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
         onSave({ avatarDataUrl: canvas.toDataURL("image/jpeg", .82) });
-      };
-      image.src = String(reader.result || "");
-    };
-    reader.readAsDataURL(file);
+      } finally {
+        image.close();
+      }
+    } catch {
+      alert(lang === "zh" ? "图片无效或像素尺寸过大。" : "The image is invalid or its pixel dimensions are too large.");
+    }
   };
   return (
     <>
@@ -13423,7 +13434,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
 
             {settingsTarget.category === "account-data" && <section className="df-settings-group" data-settings-anchor="account" tabIndex={-1}><h3>{lang === "zh" ? "账户" : "Account"}</h3>
               <section className="df-settings-profile">
-                <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/*" onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
+                <label className="df-settings-avatar" title={lang === "zh" ? "上传头像" : "Upload avatar"}>{settings.avatarDataUrl ? <img src={settings.avatarDataUrl} alt="" /> : <span>N</span>}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { void uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
                 <div><input className="df-settings-name-input" value={settings.displayName || ""} placeholder={t(lang, "settings.usernamePlaceholder")} onChange={(event) => onSave({ displayName: event.target.value })} /></div>
               </section>
               <SubscriptionPanel lang={lang} />

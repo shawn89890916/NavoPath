@@ -42,6 +42,16 @@
 - Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
+## 2026-07-27 · 图片与文档解析安全
+
+### 修复
+- 图片附件与头像现在会在解码前校验格式、文件大小及像素尺寸，PDF OCR 和图片增强画布也遵守统一像素与最长边预算，避免超大图片或异常页面耗尽内存。
+
+## 2026-07-27 · Image and document parsing safety
+
+### Fixed
+- Image attachments and avatars now validate format, file size, and pixel dimensions before decoding. PDF OCR and image-enhancement canvases also share pixel and maximum-side budgets to prevent oversized images or malformed pages from exhausting memory.
+
 ## 2026-07-26 · 时间轴与数据导出修复
 
 ### 修复
