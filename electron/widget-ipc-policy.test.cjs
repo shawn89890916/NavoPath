@@ -18,14 +18,11 @@ function createPolicyFixture() {
   const policy = createWidgetIpcPolicy({
     BrowserWindow: {
       fromWebContents: (sender) => sender?.win || null,
-      getAllWindows: () => [windows.main, windows.compact, windows.widget, windows.popover],
     },
     widgetWindowService: {
       ownsWindow: (win) => win === windows.widget || win === windows.popover,
     },
-    compactWindowService: {
-      ownsWindow: (win) => win === windows.compact,
-    },
+    getPrimaryWindow: () => windows.main,
   });
   return { policy, senders };
 }
@@ -118,6 +115,6 @@ test("wires ownership checks and action sanitization into both widget relays", (
   const source = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
   assert.match(source, /if \(!widgetIpcPolicy\.canSendAction\(event\)\) return;/);
   assert.match(source, /const safeAction = sanitizeWidgetAction\(action\);/);
-  assert.match(source, /webContents\.send\("widget:action", safeAction\)/);
+  assert.match(source, /broadcastToLiveWindows\(\[main\], "widget:action", safeAction\)/);
   assert.match(source, /if \(!widgetIpcPolicy\.canPushSnapshot\(event\)\) return;/);
 });

@@ -111,21 +111,13 @@ function sanitizeWidgetAction(action) {
   return null;
 }
 
-function createWidgetIpcPolicy({ BrowserWindow, widgetWindowService, compactWindowService }) {
+function createWidgetIpcPolicy({ BrowserWindow, widgetWindowService, getPrimaryWindow }) {
   function senderWindow(event) {
     try {
       return BrowserWindow.fromWebContents(event?.sender) || null;
     } catch {
       return null;
     }
-  }
-
-  function isOwnedWindow(win) {
-    return widgetWindowService.ownsWindow(win) || compactWindowService.ownsWindow(win);
-  }
-
-  function primaryWindow() {
-    return BrowserWindow.getAllWindows().find((win) => !isOwnedWindow(win)) || null;
   }
 
   return {
@@ -135,7 +127,7 @@ function createWidgetIpcPolicy({ BrowserWindow, widgetWindowService, compactWind
     },
     canPushSnapshot: (event) => {
       const win = senderWindow(event);
-      return Boolean(win && win === primaryWindow());
+      return Boolean(win && win === getPrimaryWindow());
     },
   };
 }

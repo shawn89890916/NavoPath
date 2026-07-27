@@ -24,6 +24,10 @@ const {
   createWidgetIpcPolicy,
   sanitizeWidgetAction,
 } = require("./widget-ipc-policy.cjs");
+const {
+  broadcastToLiveWindows,
+  createPrimaryWindowRegistry,
+} = require("./window-lifecycle.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -74,6 +78,7 @@ function onTrusted(channel, listener) {
   });
 }
 const trustedIpcMain = { handle: handleTrusted, on: onTrusted };
+const primaryWindowRegistry = createPrimaryWindowRegistry();
 
 const DEFAULT_MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
@@ -89,7 +94,7 @@ let updateState = {
 
 function publishUpdateState(patch) {
   updateState = { ...updateState, ...patch, currentVersion: app.getVersion() };
-  for (const win of BrowserWindow.getAllWindows()) win.webContents.send("updater:state", updateState);
+  broadcastToLiveWindows(BrowserWindow.getAllWindows(), "updater:state", updateState);
   return updateState;
 }
 
@@ -1027,18 +1032,12 @@ let isQuitting = false;
 let tray = null;
 
 function showMainWindow() {
-  const existingWin = BrowserWindow.getAllWindows()[0];
-  if (existingWin) {
-    if (existingWin.isMinimized()) existingWin.restore();
-    existingWin.show();
-    existingWin.focus();
-    return existingWin;
-  }
-  createWindow();
-  return BrowserWindow.getAllWindows()[0] || null;
+  return primaryWindowRegistry.show() || createWindow();
 }
 
 function createWindow() {
+  const existingWin = primaryWindowRegistry.get();
+  if (existingWin) return existingWin;
   const iconPath = app.isPackaged
     ? path.join(app.getAppPath(), "dist", "navopath-icon.png")
     : path.join(__dirname, "..", "public", "navopath-icon.png");
@@ -1062,6 +1061,7 @@ function createWindow() {
       backgroundThrottling: false
     }
   });
+  primaryWindowRegistry.set(win);
 
   // Show window when content is ready for faster perceived performance
   win.once("ready-to-show", () => {
@@ -1073,6 +1073,7 @@ function createWindow() {
     event.preventDefault();
     win.hide();
   });
+  win.on("closed", () => primaryWindowRegistry.clear(win));
 
   win.webContents.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL) => {
     console.error(`[did-fail-load] code=${errorCode} desc=${errorDescription} url=${validatedURL}`);
@@ -1085,6 +1086,7 @@ function createWindow() {
   } else {
     win.loadURL(resolveDevAppUrl(process.env.VITE_DEV_SERVER_URL).toString());
   }
+  return win;
 }
 
 // Single-instance lock: focus existing window instead of launching a duplicate
@@ -1126,16 +1128,13 @@ function createTray() {
   }
   tray = new Tray(trayIcon);
   const contextMenu = Menu.buildFromTemplate([
-    { label: "显示 NavoPath", click: () => { const win = BrowserWindow.getAllWindows()[0]; if (win) { win.show(); win.focus(); } else createWindow(); } },
+    { label: "显示 NavoPath", click: () => showMainWindow() },
     { type: "separator" },
     { label: "退出", click: () => { isQuitting = true; app.quit(); } }
   ]);
   tray.setToolTip("NavoPath");
   tray.setContextMenu(contextMenu);
-  tray.on("click", () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) { win.show(); win.focus(); } else createWindow();
-  });
+  tray.on("click", () => showMainWindow());
 }
 
 app.on("before-quit", () => { isQuitting = true; });
@@ -1144,7 +1143,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     // Keep app alive in tray; only quit when user explicitly exits from tray
     if (!isQuitting) {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = primaryWindowRegistry.get();
       if (win) win.hide();
     } else {
       app.quit();
@@ -1285,7 +1284,7 @@ compactWindowService.registerIpc();
 const widgetIpcPolicy = createWidgetIpcPolicy({
   BrowserWindow,
   widgetWindowService,
-  compactWindowService,
+  getPrimaryWindow: () => primaryWindowRegistry.get(),
 });
 
 // Relay: widget renderer → main window (action requests)
@@ -1293,8 +1292,8 @@ onTrusted("widget:action", (event, action) => {
   if (!widgetIpcPolicy.canSendAction(event)) return;
   const safeAction = sanitizeWidgetAction(action);
   if (!safeAction) return;
-  const main = BrowserWindow.getAllWindows().find((w) => !widgetWindowService.ownsWindow(w) && !compactWindowService.ownsWindow(w) && !w.isDestroyed());
-  if (main) main.webContents.send("widget:action", safeAction);
+  const main = primaryWindowRegistry.get();
+  if (main) broadcastToLiveWindows([main], "widget:action", safeAction);
 });
 
 // Relay: main window → widget renderer (snapshot pushes)
