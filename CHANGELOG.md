@@ -48,6 +48,7 @@
 - 图片附件与头像现在会在解码前校验格式、文件大小及像素尺寸，PDF OCR 和图片增强画布也遵守统一像素与最长边预算，避免超大图片或异常页面耗尽内存。
 - CSV 任务导入现在限制最多 20,000 行，JSON 备份会在迁移前限制嵌套深度与结构节点数，避免小文件在解析后膨胀成异常规模的数据结构。
 - 桌面端外部插件恢复为仅加载经过校验的 manifest 与配置，不再向渲染器暴露或执行插件目录中的脚本，防止插件绕过声明权限访问认证存储和其他桌面能力。
+- 桌面认证 token 不再在系统加密不可用或失败时以可逆 Base64 明文落盘；旧的明文回退凭据会被清除，用户当前会话仍可继续，但下次启动可能需要重新登录。
 
 ## 2026-07-27 · Input and plugin security
 
@@ -55,6 +56,7 @@
 - Image attachments and avatars now validate format, file size, and pixel dimensions before decoding. PDF OCR and image-enhancement canvases also share pixel and maximum-side budgets to prevent oversized images or malformed pages from exhausting memory.
 - Task CSV imports now allow at most 20,000 rows, while JSON backups limit nesting depth and structural node count before migration, preventing small files from expanding into abnormally large in-memory structures.
 - Desktop external plugins are again limited to validated manifest metadata and configuration. Scripts from plugin directories are no longer exposed to or executed in the renderer, preventing plugins from bypassing declared permissions to access authentication storage or other desktop capabilities.
+- Desktop authentication tokens no longer fall back to reversible Base64 plaintext when system encryption is unavailable or fails. Existing plaintext fallback credentials are removed; the current session can continue, but the next launch may require signing in again.
 
 ## 2026-07-26 · 时间轴与数据导出修复
 

@@ -492,7 +492,9 @@ function readAuthStorage(key) {
   if (typeof storedValue !== "string" || !storedValue) return null;
   try {
     if (storedValue.startsWith("plain:")) {
-      return Buffer.from(storedValue.slice("plain:".length), "base64").toString("utf8");
+      delete stored[key];
+      writeJson(authSessionPath, stored);
+      return null;
     }
     if (!safeStorage.isEncryptionAvailable()) {
       return null;
@@ -514,16 +516,20 @@ function writeAuthStorage(key, value) {
   const { dir, authSessionPath } = getPaths();
   fs.mkdirSync(dir, { recursive: true });
   const stored = readJson(authSessionPath, {});
-  try {
-    if (safeStorage.isEncryptionAvailable()) {
-      stored[key] = `safe:${safeStorage.encryptString(value).toString("base64")}`;
-    } else {
-      stored[key] = `plain:${Buffer.from(value, "utf8").toString("base64")}`;
-    }
-  } catch {
-    stored[key] = `plain:${Buffer.from(value, "utf8").toString("base64")}`;
+  if (!safeStorage.isEncryptionAvailable()) {
+    delete stored[key];
+    writeJson(authSessionPath, stored);
+    return false;
   }
-  writeJson(authSessionPath, stored);
+  try {
+    stored[key] = `safe:${safeStorage.encryptString(value).toString("base64")}`;
+    writeJson(authSessionPath, stored);
+    return true;
+  } catch {
+    delete stored[key];
+    writeJson(authSessionPath, stored);
+    return false;
+  }
 }
 
 function removeAuthStorage(key) {

@@ -68,3 +68,11 @@ test("does not expose or execute external plugin scripts", () => {
   assert.doesNotMatch(rendererSource, /new Function\("window",\s*"navopath"/);
   assert.match(electronMainSource, /not external scripts/);
 });
+
+test("never falls back to reversible plaintext authentication storage", () => {
+  const electronMainSource = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
+
+  assert.doesNotMatch(electronMainSource, /stored\[key\]\s*=\s*`plain:/);
+  assert.match(electronMainSource, /if \(!safeStorage\.isEncryptionAvailable\(\)\)/);
+  assert.match(electronMainSource, /stored\[key\]\s*=\s*`safe:/);
+});
