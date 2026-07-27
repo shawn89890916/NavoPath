@@ -57,6 +57,7 @@
 - 桌面登录会话缓存现在限制为 4 MiB、校验顶层结构并原子更新；系统加密暂不可用、加解密或写入失败时会保留原会话，损坏或超限缓存也会在恢复写入前备份，不再被空缓存覆盖或导致登录存储报错。
 - 桌面组件跨窗口消息现在按窗口职责隔离并校验操作结构：只有主窗口能推送状态，只有组件及其弹层能发起操作；竖屏小窗不再每秒交替覆盖组件快照，异常或超大操作也不会传入工作区。
 - 桌面托盘唤醒、二次启动和系统激活现在始终定位明确的主窗口，不再因窗口列表顺序误显示组件或竖屏小窗；离线恢复快照也只由主窗口读写，竖屏小窗不再生成重复快照或覆盖最新恢复点。更新状态与组件操作转发还会跳过正在销毁的渲染器，避免关闭竞态中断主进程。
+- 开机自启动设置现在以 Windows 返回的实际状态为准；系统拒绝设置或桌面通信失败时不再错误显示已开启，读取失败也不会永久停留在加载状态。
 
 ## 2026-07-27 · Input and plugin security
 
@@ -73,6 +74,7 @@
 - Desktop login-session storage is now limited to 4 MiB, validates its top-level structure, and updates atomically. The existing session is preserved when system encryption is temporarily unavailable or encryption, decryption, or writing fails, while damaged or oversized caches are backed up before recovery writes instead of being replaced by an empty cache or causing storage errors.
 - Desktop widget messages are now isolated by window role and action structure is validated: only the main window can push state, while only the widget and its popover can request actions. The portrait window no longer overwrites widget snapshots every second, and malformed or oversized actions no longer reach the workspace.
 - Desktop tray wakeups, second launches, and system activation now always target the explicitly tracked main window instead of showing a widget or portrait window according to list order. Offline recovery snapshots are also restricted to the main window, so the portrait window no longer creates duplicates or overwrites the latest recovery point. Update-state and widget-action relays also skip renderers that are being destroyed, preventing close-time races from interrupting the main process.
+- Launch-at-startup settings now follow the actual state returned by Windows. The control no longer incorrectly shows enabled when the system rejects the change or desktop communication fails, and a failed read no longer leaves it loading indefinitely.
 
 ## 2026-07-26 · 时间轴与数据导出修复
 

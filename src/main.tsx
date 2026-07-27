@@ -83,6 +83,7 @@ import { SETTINGS_CATEGORIES, normalizeSettingsTarget, searchSettings, settingsD
 import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
+import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch";
 import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
 import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
@@ -12178,10 +12179,23 @@ function AutoLaunchToggle({ lang }: { lang: Language }) {
 
   useEffect(() => {
     if (!api) { setLoading(false); return; }
-    void api.getAutoLaunch().then((v) => { setEnabled(v); setLoading(false); });
+    let active = true;
+    void readAutoLaunchState(api, false).then((next) => {
+      if (!active) return;
+      setEnabled(next);
+      setLoading(false);
+    });
+    return () => { active = false; };
   }, [api]);
 
   if (!api) return null;
+
+  const toggleAutoLaunch = async () => {
+    setLoading(true);
+    const next = await toggleAutoLaunchState(api, enabled);
+    setEnabled(next);
+    setLoading(false);
+  };
 
   return <section className="df-update-card">
     <div>
@@ -12191,7 +12205,7 @@ function AutoLaunchToggle({ lang }: { lang: Language }) {
     <button
       type="button"
       disabled={loading}
-      onClick={() => { const next = !enabled; setEnabled(next); void api.setAutoLaunch(next); }}
+      onClick={() => { void toggleAutoLaunch(); }}
       aria-pressed={enabled}
     >
       {loading ? "…" : enabled ? (lang === "zh" ? "已开启" : "On") : (lang === "zh" ? "已关闭" : "Off")}
