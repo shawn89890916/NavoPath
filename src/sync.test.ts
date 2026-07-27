@@ -221,7 +221,7 @@ describe("SyncScheduler", () => {
     expect(calls.pull).toBe(1);
   });
 
-  it("runs a different requested direction after the in-flight tick", async () => {
+  it("preserves a queued manual direction when the scheduler stops", async () => {
     const order: string[] = [];
     let releasePush: (() => void) | undefined;
     const pushBlocked = new Promise<void>((resolve) => {
@@ -240,6 +240,7 @@ describe("SyncScheduler", () => {
 
     const pushResult = scheduler.runPushOnly();
     const pullResult = scheduler.runPullOnly();
+    scheduler.stop();
     await Promise.resolve();
     expect(order).toEqual(["push:start"]);
 
@@ -292,6 +293,41 @@ describe("SyncScheduler", () => {
       await intervalFinished;
       expect(pushCalls).toBe(2);
       expect(maxActiveCalls).toBe(1);
+    } finally {
+      scheduler.stop();
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels a queued interval tick when automatic sync stops", async () => {
+    vi.useFakeTimers();
+    let releaseManualPush: (() => void) | undefined;
+    const manualPushBlocked = new Promise<void>((resolve) => {
+      releaseManualPush = resolve;
+    });
+    const calls = { push: 0, pull: 0 };
+    const scheduler = new SyncScheduler({
+      pushLocal: async () => {
+        calls.push += 1;
+        if (calls.push === 1) await manualPushBlocked;
+      },
+      pullRemote: async () => {
+        calls.pull += 1;
+      },
+    });
+
+    try {
+      scheduler.setIntervalMinutes(1);
+      const manualResult = scheduler.runPushOnly();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(calls).toEqual({ push: 1, pull: 0 });
+
+      scheduler.stop();
+      releaseManualPush?.();
+      await manualResult;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(calls).toEqual({ push: 1, pull: 0 });
     } finally {
       scheduler.stop();
       vi.useRealTimers();

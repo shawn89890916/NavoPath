@@ -139,11 +139,15 @@ export class SyncScheduler {
     }, normalized * 60 * 1000);
   }
 
-  /** Stop the auto-sync timer. Idempotent. */
+  /** Stop auto-sync and cancel any interval tick that has not started. Idempotent. */
   stop() {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.queuedReason === "interval") {
+      this.queuedDirection = null;
+      this.queuedReason = null;
     }
   }
 
@@ -185,11 +189,19 @@ export class SyncScheduler {
       this.queuedPromise = activeRun
         .catch(() => undefined)
         .then(() => {
-          const nextDirection = this.queuedDirection || direction;
-          const nextReason = this.queuedReason || reason;
+          const nextDirection = this.queuedDirection;
+          const nextReason = this.queuedReason;
           this.queuedDirection = null;
           this.queuedReason = null;
           this.queuedPromise = null;
+          if (!nextDirection || !nextReason) {
+            return {
+              ok: true,
+              syncedAt: (this.options.now?.() || new Date()).toISOString(),
+              pushedLocal: false,
+              pulledRemote: false,
+            };
+          }
           return this.startTick(nextReason, nextDirection);
         });
     }
