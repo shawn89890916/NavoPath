@@ -20,6 +20,10 @@ const {
   readAuthStorageFile,
   writeAuthStorageFile,
 } = require("./auth-storage-safety.cjs");
+const {
+  createWidgetIpcPolicy,
+  sanitizeWidgetAction,
+} = require("./widget-ipc-policy.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -1278,13 +1282,23 @@ const compactWindowService = createCompactWindowService({
 });
 compactWindowService.registerIpc();
 
+const widgetIpcPolicy = createWidgetIpcPolicy({
+  BrowserWindow,
+  widgetWindowService,
+  compactWindowService,
+});
+
 // Relay: widget renderer → main window (action requests)
-onTrusted("widget:action", (_event, action) => {
+onTrusted("widget:action", (event, action) => {
+  if (!widgetIpcPolicy.canSendAction(event)) return;
+  const safeAction = sanitizeWidgetAction(action);
+  if (!safeAction) return;
   const main = BrowserWindow.getAllWindows().find((w) => !widgetWindowService.ownsWindow(w) && !compactWindowService.ownsWindow(w) && !w.isDestroyed());
-  if (main) main.webContents.send("widget:action", action);
+  if (main) main.webContents.send("widget:action", safeAction);
 });
 
 // Relay: main window → widget renderer (snapshot pushes)
-onTrusted("widget:push-snapshot", (_event, snapshot) => {
+onTrusted("widget:push-snapshot", (event, snapshot) => {
+  if (!widgetIpcPolicy.canPushSnapshot(event)) return;
   widgetWindowService.broadcastSnapshot(snapshot);
 });
