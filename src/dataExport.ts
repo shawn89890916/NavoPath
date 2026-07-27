@@ -162,6 +162,7 @@ export function parseCsv(content: string, maxRows = Number.POSITIVE_INFINITY) {
     cell += char;
   }
 
+  if (inQuotes) throw new Error("CSV contains an unterminated quoted field.");
   row.push(cell);
   if (row.some((value) => value.trim())) {
     rows.push(row);
@@ -173,7 +174,13 @@ export function parseCsv(content: string, maxRows = Number.POSITIVE_INFINITY) {
 
 export function parseTaskCsvRows(content: string): TaskCsvRow[] {
   const rows = parseCsv(content, MAX_TASK_CSV_ROWS + 1);
-  if (rows.length < 2) return [];
+  if (rows.length === 0) return [];
+  const headers = rows[0].map((header) => header.trim());
+  if (headers.length < TASK_CSV_HEADERS.length
+    || TASK_CSV_HEADERS.some((header, index) => headers[index] !== header)) {
+    throw new Error("CSV header does not match the NavoPath task export format.");
+  }
+  if (rows.length === 1) return [];
   return rows.slice(1).map((values) => ({
     id: restoreSpreadsheetCell(values[0] || ""),
     title: restoreSpreadsheetCell(values[1] || ""),
@@ -189,13 +196,18 @@ export function parseTaskCsvRows(content: string): TaskCsvRow[] {
 
 export function parseTasksCsv(content: string, projects: Project[], now = new Date().toISOString()): Task[] {
   const projectIdsByTitle = new Map(projects.map((project) => [project.title.trim().toLowerCase(), project.id]));
-  return parseTaskCsvRows(content).map((row) => {
+  const seenIds = new Set<string>();
+  const tasks: Task[] = [];
+  for (const row of parseTaskCsvRows(content)) {
     const estimatedHours = Number(row.estimatedHours);
     const priority = row.priority === "high" || row.priority === "low" ? row.priority : "medium";
     const completed = row.completed.toLowerCase() === "yes" || row.status.toLowerCase() === "completed";
     const createdAt = Number.isNaN(Date.parse(row.createdAt)) ? now : row.createdAt;
-    return {
-      id: row.id || `task_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`,
+    const id = row.id.trim() || `task_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    tasks.push({
+      id,
       title: row.title || "Untitled Task",
       projectId: projectIdsByTitle.get(row.projectTitle.trim().toLowerCase()) || "",
       category: "personal",
@@ -208,8 +220,9 @@ export function parseTasksCsv(content: string, projects: Project[], now = new Da
       subtasks: [],
       createdAt,
       updatedAt: now,
-    };
-  });
+    });
+  }
+  return tasks;
 }
 
 function downloadText(content: string, type: string, filename: string) {

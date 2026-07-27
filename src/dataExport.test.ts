@@ -179,6 +179,27 @@ describe("task CSV export", () => {
     ].join("\n");
     expect(() => parseTaskCsvRows(csv)).toThrow(String(MAX_TASK_CSV_ROWS));
   });
+
+  it("rejects malformed task CSV headers and unterminated quoted fields", () => {
+    expect(() => parseTaskCsvRows("Wrong,Columns\n1,Task")).toThrow("header");
+    expect(() => parseTaskCsvRows([
+      TASK_CSV_HEADERS.join(","),
+      'task-1,"Unterminated task',
+    ].join("\n"))).toThrow("quoted field");
+  });
+
+  it("keeps only the first task when an import repeats an explicit ID", () => {
+    const csv = [
+      TASK_CSV_HEADERS.join(","),
+      "task-1,First task",
+      "task-1,Duplicate task",
+    ].join("\n");
+
+    const tasks = parseTasksCsv(csv, [], "2026-07-26T00:00:00.000Z");
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toBe("First task");
+  });
 });
 
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
