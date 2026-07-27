@@ -10,6 +10,11 @@ const {
   sanitizePlannerDataCollections,
   writePlannerDataFile,
 } = require("./planner-data-safety.cjs");
+const {
+  readSnapshotFile,
+  serializeSnapshot,
+  writeSnapshotFile,
+} = require("./snapshot-safety.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -1192,15 +1197,9 @@ handleTrusted("backup:writeSnapshot", (_event, payload) => {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const stampedPath = path.join(dir, `navopath-snapshot-${stamp}.json`);
     const latestPath = path.join(dir, "navopath-snapshot-latest.json");
-    const body = JSON.stringify({
-      exportedAt: new Date().toISOString(),
-      appVersion: app.getVersion(),
-      data: payload?.data ?? null,
-      settings: payload?.settings ?? null,
-      authUser: payload?.authUser ?? null,
-    }, null, 2);
-    fs.writeFileSync(stampedPath, body, "utf8");
-    fs.writeFileSync(latestPath, body, "utf8");
+    const body = serializeSnapshot(payload, app.getVersion());
+    writeSnapshotFile(stampedPath, body);
+    writeSnapshotFile(latestPath, body);
     // Keep only the 10 most recent stamped snapshots (latest is preserved separately).
     const snapshots = fs.readdirSync(dir)
       .filter((name) => /^navopath-snapshot-\d{4}-\d{2}-\d{2}T.+\.json$/.test(name))
@@ -1220,8 +1219,7 @@ handleTrusted("backup:readLatest", () => {
     const { dir } = getPaths();
     const latestPath = path.join(dir, "navopath-snapshot-latest.json");
     if (!fs.existsSync(latestPath)) return { ok: false, reason: "not-found" };
-    const raw = fs.readFileSync(latestPath, "utf8");
-    return { ok: true, payload: JSON.parse(raw) };
+    return { ok: true, payload: readSnapshotFile(latestPath) };
   } catch (err) {
     return { ok: false, error: String(err && err.message || err) };
   }
