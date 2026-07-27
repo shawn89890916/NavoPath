@@ -156,4 +156,36 @@ describe("browser fallback preview mode", () => {
 
     expect(actualDepth).toBe(64);
   });
+
+  it("bounds persisted task, project, and subtask identity and text fields", () => {
+    const malformed = fallbackData() as any;
+    const taskId = malformed.tasks[0].id;
+    const projectId = malformed.projects[0].id;
+    malformed.tasks[0].title = "T".repeat(10_001);
+    malformed.tasks[0].notes = "N".repeat(60_001);
+    malformed.tasks[0].projectId = "p".repeat(201);
+    malformed.tasks[0].subtasks = [{
+      id: "s".repeat(201),
+      title: "S".repeat(10_001),
+      completed: false,
+      plannedTaskId: "p".repeat(201),
+    }];
+    malformed.tasks.push({ ...malformed.tasks[0], id: "i".repeat(201), title: "Drop oversized ID" });
+    malformed.projects[0].title = "P".repeat(10_001);
+    malformed.projects[0].notes = "D".repeat(60_001);
+
+    const normalized = normalizeData(malformed);
+    const boundedTask = normalized.tasks.find((task) => task.id === taskId);
+    const boundedProject = normalized.projects.find((project) => project.id === projectId);
+
+    expect(normalized.tasks.some((task) => task.id.length > 200)).toBe(false);
+    expect(boundedTask?.title).toHaveLength(10_000);
+    expect(boundedTask?.notes).toHaveLength(60_000);
+    expect(boundedTask?.projectId).toBeUndefined();
+    expect(boundedTask?.subtasks?.[0].id.length).toBeLessThanOrEqual(200);
+    expect(boundedTask?.subtasks?.[0].title).toHaveLength(10_000);
+    expect(boundedTask?.subtasks?.[0].plannedTaskId).toBeUndefined();
+    expect(boundedProject?.title).toHaveLength(10_000);
+    expect(boundedProject?.notes).toHaveLength(60_000);
+  });
 });

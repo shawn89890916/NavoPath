@@ -7,7 +7,7 @@
 
 ### 修复
 - 同步合并现在只把结构正确、可解析且未异常超前的删除时间视为有效墓碑，并为设备时钟保留最多 7 天偏差；缺少时间戳的旧版记录不再在首次同步时被静默删除，损坏或极端未来的墓碑会被清除，已被同 ID 更新记录取代的旧墓碑也会自动移除，不再永久压制正常数据、导致备份恢复崩溃或继续占用同步载荷。
-- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，并去重嵌套子任务；异常超过 64 层的子任务树会被安全截断，避免重复 ID 让编辑作用于多个对象，或恶意深层数据触发递归崩溃。
+- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，限制任务、项目和子任务的 ID、标题及正文长度，并去重嵌套子任务；异常超过 64 层的子任务树会被安全截断，避免重复或超长身份让编辑作用于多个对象、异常文本持续占用渲染与同步资源，或恶意深层数据触发递归崩溃。
 - 任务 CSV 导入现在会校验 NavoPath 表头，拒绝未闭合的引号字段，并限制任务 ID、标题、项目名和元数据字段的长度；同一文件中重复出现的任务 ID 只导入第一条，避免格式错误或异常超长的数据进入渲染与同步链路，或重复 ID 导致后续编辑作用于多个任务。
 - 从云端、缓存或备份恢复设置时，现在会限制昵称、标题、模型标识、URL、背景路径和折叠状态列表的长度与数量，只接受大小受限的 JPEG/PNG/WebP Base64 头像，并统一清除旧版个人 API Key 状态；异常设置不再放大缓存、同步或渲染开销。
 - 插件设置与使用教程现在准确区分可运行的官方内置插件和仅提供经校验 manifest/配置的桌面本地插件；本地项不再被描述为会加载 `index.js` 或显示“运行中”，其权限明确标记为声明信息。外部 manifest 会拒绝对象保留键与重复配置字段，并按类型、数值范围、选项和文本长度规范化配置；来自云端、缓存或备份的插件设置也会去重启用列表，并限制配置数量、嵌套深度、节点、数组及文本规模。
@@ -34,7 +34,7 @@
 
 ### Fixed
 - Sync merging now accepts only structurally valid, parseable deletion times that are not implausibly far ahead, while allowing up to seven days of device clock skew. Legacy records without timestamps no longer disappear on their first sync; damaged or extreme-future tombstones are removed; and old tombstones superseded by a newer record with the same ID are pruned instead of permanently suppressing normal data, crashing backup restore, or continuing to occupy sync payloads.
-- Planner data restored from cloud, local cache, or backup now deduplicates tasks, projects, and other persisted collections by ID, including nested subtasks. Subtask trees deeper than 64 levels are safely truncated, preventing duplicate IDs from making edits affect multiple objects and maliciously deep data from causing recursive crashes.
+- Planner data restored from cloud, local cache, or backup now deduplicates tasks, projects, and other persisted collections by ID; bounds task, project, and subtask IDs, titles, and body text; and deduplicates nested subtasks. Subtask trees deeper than 64 levels are safely truncated, preventing duplicate or oversized identities from making edits affect multiple objects, abnormal text from consuming rendering and sync resources, and maliciously deep data from causing recursive crashes.
 - Task CSV imports now validate the NavoPath header, reject unterminated quoted fields, and bound task IDs, titles, project names, and metadata fields. When a file repeats a task ID, only its first row is imported, preventing malformed or abnormally long data from entering rendering and sync paths or duplicate IDs from making later edits affect multiple tasks.
 - Settings restored from cloud, cache, or backup now bound the length and count of names, titles, model identifiers, URLs, background paths, and collapsed-state lists; accept only size-bounded JPEG/PNG/WebP Base64 avatars; and consistently clear retired personal API-key state. Malformed settings can no longer amplify cache, sync, or rendering costs.
 - Plugin settings and the usage guide now accurately distinguish executable official built-ins from desktop local plugins that contribute validated manifest metadata and configuration only. Local entries no longer claim to load `index.js` or appear as “Running,” and their permissions are clearly labeled as declarations. External manifests reject reserved object keys and duplicate config fields and normalize values by type, range, options, and text length; plugin settings restored from cloud, cache, or backup also deduplicate enabled IDs and bound config count, nesting, nodes, arrays, and text.

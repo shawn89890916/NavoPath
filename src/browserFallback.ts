@@ -9,6 +9,9 @@ const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
 const PREVIEW_MODE_KEY = "navopath-force-local-preview";
 const PREVIEW_SEED_VERSION = "browser-preview-v3";
 const MAX_PERSISTED_SUBTASK_DEPTH = 64;
+const MAX_PERSISTED_ID_LENGTH = 200;
+const MAX_PERSISTED_TITLE_LENGTH = 10_000;
+const MAX_PERSISTED_TEXT_LENGTH = 60_000;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -79,17 +82,28 @@ function uniqueRecordItems<T>(value: unknown): T[] {
   });
 }
 
+function persistedId(value: unknown) {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_PERSISTED_ID_LENGTH
+    ? value
+    : undefined;
+}
+
+function boundedPersistedString(value: unknown, maxLength: number, fallback = "") {
+  return typeof value === "string" ? value.slice(0, maxLength) : fallback;
+}
+
 function normalizeSubtasks(value: unknown, depth = 0, seenIds = new Set<string>()): Subtask[] {
   if (depth >= MAX_PERSISTED_SUBTASK_DEPTH) return [];
   const result: Subtask[] = [];
   for (const [index, subtask] of recordItems<Subtask>(value).entries()) {
-    const id = typeof subtask.id === "string" && subtask.id ? subtask.id : uid("sub");
+    const id = persistedId(subtask.id) || uid("sub");
     if (seenIds.has(id)) continue;
     seenIds.add(id);
     result.push({
       ...subtask,
       id,
-      title: subtask.title || "",
+      title: boundedPersistedString(subtask.title, MAX_PERSISTED_TITLE_LENGTH),
+      plannedTaskId: persistedId(subtask.plannedTaskId),
       completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
       done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
       order: typeof subtask.order === "number" ? subtask.order : index,
@@ -224,9 +238,9 @@ export function normalizeData(data: PlannerData): PlannerData {
     ...data,
     goals: uniqueRecordItems(data.goals),
     projects: uniqueRecordItems(recordItems<PlannerData["projects"][number]>(data.projects)
-      .filter((project) => typeof project.id === "string" && typeof project.title === "string")),
+      .filter((project) => Boolean(persistedId(project.id)) && typeof project.title === "string")),
     tasks: uniqueRecordItems(recordItems<PlannerData["tasks"][number]>(data.tasks)
-      .filter((task) => typeof task.id === "string" && typeof task.title === "string")),
+      .filter((task) => Boolean(persistedId(task.id)) && typeof task.title === "string")),
     habits: uniqueRecordItems(data.habits),
     habitDailyStates: uniqueRecordItems(data.habitDailyStates),
     timeEntries: uniqueRecordItems(data.timeEntries),
@@ -273,6 +287,8 @@ export function normalizeData(data: PlannerData): PlannerData {
     ...safeData,
     projects: safeData.projects.map((project) => ({
       ...project,
+      title: boundedPersistedString(project.title, MAX_PERSISTED_TITLE_LENGTH),
+      notes: boundedPersistedString(project.notes, MAX_PERSISTED_TEXT_LENGTH),
       color: project.color || "#584D3D",
       importance: project.importance || "high",
       urgency: project.urgency || "low",
@@ -314,11 +330,15 @@ export function normalizeData(data: PlannerData): PlannerData {
     events: [],
     tasks: [...safeData.tasks, ...migratedTasks].map((task) => ({
       ...task,
+      title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
+      projectId: persistedId(task.projectId),
+      goalId: persistedId(task.goalId) || "",
+      parentTaskId: persistedId(task.parentTaskId),
       completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
       workflowStatus: inferWorkflowStatus(task),
       timelineRecords: uniqueRecordItems(task.timelineRecords),
       subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
-      notes: task.notes || "",
+      notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
     })),
   }));
 }
