@@ -118,4 +118,42 @@ describe("browser fallback preview mode", () => {
     expect(damagedTask?.subtasks?.[0].subtasks).toEqual([]);
     expect(damagedTask?.timelineRecords).toEqual([]);
   });
+
+  it("keeps the first persisted item when collection or subtask IDs repeat", () => {
+    const malformed = fallbackData() as any;
+    const originalTask = malformed.tasks[0];
+    originalTask.subtasks = [
+      { id: "duplicate-subtask", title: "Keep", completed: false },
+      { id: "duplicate-subtask", title: "Drop", completed: false },
+    ];
+    malformed.tasks.unshift({ id: originalTask.id, title: 42 });
+    malformed.tasks.push({ ...originalTask, title: "Duplicate task" });
+
+    const normalized = normalizeData(malformed);
+    const matchingTasks = normalized.tasks.filter((task) => task.id === originalTask.id);
+
+    expect(matchingTasks).toHaveLength(1);
+    expect(matchingTasks[0].title).toBe(originalTask.title);
+    expect(matchingTasks[0].subtasks).toHaveLength(1);
+    expect(matchingTasks[0].subtasks?.[0].title).toBe("Keep");
+  });
+
+  it("bounds excessively deep persisted subtask trees", () => {
+    const malformed = fallbackData() as any;
+    let nested = { id: "subtask-99", title: "Level 99", completed: false };
+    for (let depth = 98; depth >= 0; depth -= 1) {
+      nested = { id: `subtask-${depth}`, title: `Level ${depth}`, completed: false, subtasks: [nested] } as any;
+    }
+    malformed.tasks[0].subtasks = [nested];
+
+    const normalized = normalizeData(malformed);
+    let actualDepth = 0;
+    let current = normalized.tasks[0].subtasks?.[0];
+    while (current) {
+      actualDepth += 1;
+      current = current.subtasks?.[0];
+    }
+
+    expect(actualDepth).toBe(64);
+  });
 });

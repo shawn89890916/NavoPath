@@ -6,6 +6,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
+- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，并去重嵌套子任务；异常超过 64 层的子任务树会被安全截断，避免重复 ID 让编辑作用于多个对象，或恶意深层数据触发递归崩溃。
 - 任务 CSV 导入现在会校验 NavoPath 表头并拒绝未闭合的引号字段；同一文件中重复出现的任务 ID 只导入第一条，避免格式错误的数据被静默错列解析，或重复 ID 导致后续编辑作用于多个任务。
 - 从云端、缓存或备份恢复设置时，现在会限制昵称、标题、模型标识、URL、背景路径和折叠状态列表的长度与数量，只接受大小受限的 JPEG/PNG/WebP Base64 头像，并统一清除旧版个人 API Key 状态；异常设置不再放大缓存、同步或渲染开销。
 - 插件设置与使用教程现在准确区分可运行的官方内置插件和仅提供经校验 manifest/配置的桌面本地插件；本地项不再被描述为会加载 `index.js` 或显示“运行中”，其权限明确标记为声明信息。外部 manifest 会拒绝对象保留键与重复配置字段，并按类型、数值范围、选项和文本长度规范化配置；来自云端、缓存或备份的插件设置也会去重启用列表，并限制配置数量、嵌套深度、节点、数组及文本规模。
@@ -31,6 +32,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
+- Planner data restored from cloud, local cache, or backup now deduplicates tasks, projects, and other persisted collections by ID, including nested subtasks. Subtask trees deeper than 64 levels are safely truncated, preventing duplicate IDs from making edits affect multiple objects and maliciously deep data from causing recursive crashes.
 - Task CSV imports now validate the NavoPath header and reject unterminated quoted fields. When a file repeats a task ID, only its first row is imported, preventing malformed data from being silently mapped to the wrong columns or duplicate IDs from making later edits affect multiple tasks.
 - Settings restored from cloud, cache, or backup now bound the length and count of names, titles, model identifiers, URLs, background paths, and collapsed-state lists; accept only size-bounded JPEG/PNG/WebP Base64 avatars; and consistently clear retired personal API-key state. Malformed settings can no longer amplify cache, sync, or rendering costs.
 - Plugin settings and the usage guide now accurately distinguish executable official built-ins from desktop local plugins that contribute validated manifest metadata and configuration only. Local entries no longer claim to load `index.js` or appear as “Running,” and their permissions are clearly labeled as declarations. External manifests reject reserved object keys and duplicate config fields and normalize values by type, range, options, and text length; plugin settings restored from cloud, cache, or backup also deduplicate enabled IDs and bound config count, nesting, nodes, arrays, and text.

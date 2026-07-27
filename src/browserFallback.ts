@@ -8,6 +8,7 @@ const PREVIEW_STORAGE_KEY = "planner-preview-data";
 const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
 const PREVIEW_MODE_KEY = "navopath-force-local-preview";
 const PREVIEW_SEED_VERSION = "browser-preview-v3";
+const MAX_PERSISTED_SUBTASK_DEPTH = 64;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -65,17 +66,38 @@ function recordItems<T>(value: unknown): T[] {
   return Array.isArray(value) ? value.filter(isRecord) as T[] : [];
 }
 
-function normalizeSubtasks(value: unknown): Subtask[] {
-  return recordItems<Subtask>(value).map((subtask, index) => ({
-    ...subtask,
-    id: subtask.id || uid("sub"),
-    title: subtask.title || "",
-    completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
-    done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
-    order: typeof subtask.order === "number" ? subtask.order : index,
-    createdAt: subtask.createdAt || now(),
-    subtasks: subtask.subtasks ? normalizeSubtasks(subtask.subtasks) : undefined,
-  }));
+function uniqueRecordItems<T>(value: T[] | null | undefined): T[];
+function uniqueRecordItems<T = Record<string, unknown>>(value: unknown): T[];
+function uniqueRecordItems<T>(value: unknown): T[] {
+  const seenIds = new Set<string>();
+  return recordItems<T>(value).filter((item) => {
+    const id = (item as { id?: unknown }).id;
+    if (typeof id !== "string" || !id) return true;
+    if (seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
+}
+
+function normalizeSubtasks(value: unknown, depth = 0, seenIds = new Set<string>()): Subtask[] {
+  if (depth >= MAX_PERSISTED_SUBTASK_DEPTH) return [];
+  const result: Subtask[] = [];
+  for (const [index, subtask] of recordItems<Subtask>(value).entries()) {
+    const id = typeof subtask.id === "string" && subtask.id ? subtask.id : uid("sub");
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    result.push({
+      ...subtask,
+      id,
+      title: subtask.title || "",
+      completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
+      done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
+      order: typeof subtask.order === "number" ? subtask.order : index,
+      createdAt: subtask.createdAt || now(),
+      subtasks: subtask.subtasks ? normalizeSubtasks(subtask.subtasks, depth + 1, seenIds) : undefined,
+    });
+  }
+  return result;
 }
 
 function localIso(date: Date) {
@@ -200,20 +222,23 @@ function makeRecurrence(overrides: Partial<TaskRecurrence>): TaskRecurrence {
 export function normalizeData(data: PlannerData): PlannerData {
   const safeData: PlannerData = {
     ...data,
-    goals: recordItems(data.goals),
-    projects: recordItems(data.projects).filter((project) => typeof project.id === "string" && typeof project.title === "string"),
-    tasks: recordItems(data.tasks).filter((task) => typeof task.id === "string" && typeof task.title === "string"),
-    habits: recordItems(data.habits),
-    habitDailyStates: recordItems(data.habitDailyStates),
-    timeEntries: recordItems(data.timeEntries),
-    longTasks: recordItems(data.longTasks),
-    events: recordItems(data.events).filter((event) => typeof event.id === "string" && typeof event.title === "string"),
-    notes: recordItems(data.notes),
-    drafts: recordItems(data.drafts),
-    chat: recordItems(data.chat),
-    aiConversations: recordItems(data.aiConversations),
-    aiMemories: recordItems(data.aiMemories),
-    scheduleTemplates: recordItems(data.scheduleTemplates),
+    goals: uniqueRecordItems(data.goals),
+    projects: uniqueRecordItems(recordItems<PlannerData["projects"][number]>(data.projects)
+      .filter((project) => typeof project.id === "string" && typeof project.title === "string")),
+    tasks: uniqueRecordItems(recordItems<PlannerData["tasks"][number]>(data.tasks)
+      .filter((task) => typeof task.id === "string" && typeof task.title === "string")),
+    habits: uniqueRecordItems(data.habits),
+    habitDailyStates: uniqueRecordItems(data.habitDailyStates),
+    timeEntries: uniqueRecordItems(data.timeEntries),
+    longTasks: uniqueRecordItems(data.longTasks),
+    events: uniqueRecordItems(recordItems<PlannerData["events"][number]>(data.events)
+      .filter((event) => typeof event.id === "string" && typeof event.title === "string")),
+    notes: uniqueRecordItems(data.notes),
+    drafts: uniqueRecordItems(data.drafts),
+    chat: uniqueRecordItems(data.chat),
+    aiConversations: uniqueRecordItems(data.aiConversations),
+    aiMemories: uniqueRecordItems(data.aiMemories),
+    scheduleTemplates: uniqueRecordItems(data.scheduleTemplates),
     aiProfile: isRecord(data.aiProfile) ? data.aiProfile : undefined,
     taskLayouts: isRecord(data.taskLayouts) ? data.taskLayouts as PlannerData["taskLayouts"] : {},
   };
@@ -228,7 +253,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       ...conversation,
       id: conversation.id || uid("conversation"),
       title: conversation.title || "AI 对话",
-      messages: recordItems<PlannerData["chat"][number]>(conversation.messages).map((message) => ({
+      messages: uniqueRecordItems<PlannerData["chat"][number]>(conversation.messages).map((message) => ({
         ...message,
         id: message.id || uid("chat"),
         saved: Boolean(message.saved),
@@ -243,6 +268,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       createdAt: chat[0]?.createdAt || now(),
       updatedAt: chat[chat.length - 1]?.createdAt || now(),
     }] : []);
+  const seenSubtaskIds = new Set<string>();
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
     projects: safeData.projects.map((project) => ({
@@ -260,7 +286,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       id: memory.id || uid("memory"),
       tags: Array.isArray(memory.tags) ? memory.tags.filter((tag): tag is string => typeof tag === "string") : [],
       source: memory.source || "auto",
-      sourceMessages: recordItems<PlannerData["chat"][number]>(memory.sourceMessages).map((message) => ({
+      sourceMessages: uniqueRecordItems<PlannerData["chat"][number]>(memory.sourceMessages).map((message) => ({
         ...message,
         id: message.id || uid("chat"),
         saved: true,
@@ -272,7 +298,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       ...template,
       id: template.id || uid("template"),
       title: template.title || "Template",
-      slots: recordItems<NonNullable<PlannerData["scheduleTemplates"]>[number]["slots"][number]>(template.slots).map((slot) => ({
+      slots: uniqueRecordItems<NonNullable<PlannerData["scheduleTemplates"]>[number]["slots"][number]>(template.slots).map((slot) => ({
         ...slot,
         id: slot.id || uid("slot"),
         label: slot.label || "Period",
@@ -290,8 +316,8 @@ export function normalizeData(data: PlannerData): PlannerData {
       ...task,
       completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
       workflowStatus: inferWorkflowStatus(task),
-      timelineRecords: recordItems(task.timelineRecords),
-      subtasks: normalizeSubtasks(task.subtasks),
+      timelineRecords: uniqueRecordItems(task.timelineRecords),
+      subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
       notes: task.notes || "",
     })),
   }));
