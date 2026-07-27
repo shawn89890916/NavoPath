@@ -1,11 +1,16 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const {
   MAX_PLANNER_DATA_BYTES,
   MAX_PLANNER_SUBTASK_DEPTH,
   isPlannerDataFileSizeAllowed,
   parsePlannerDataSource,
   sanitizePlannerDataCollections,
+  serializePlannerDataSource,
+  writePlannerDataFile,
 } = require("./planner-data-safety.cjs");
 
 test("accepts desktop planner files only within the backup import byte budget", () => {
@@ -14,6 +19,36 @@ test("accepts desktop planner files only within the backup import byte budget", 
   assert.equal(isPlannerDataFileSizeAllowed(MAX_PLANNER_DATA_BYTES + 1), false);
   assert.equal(isPlannerDataFileSizeAllowed(-1), false);
   assert.equal(isPlannerDataFileSizeAllowed(Number.POSITIVE_INFINITY), false);
+});
+
+test("rejects invalid or oversized planner data before serialization", () => {
+  assert.throws(() => serializePlannerDataSource(null), /top-level task collection/);
+  assert.throws(() => serializePlannerDataSource({ projects: [] }), /top-level task collection/);
+  assert.throws(
+    () => serializePlannerDataSource({ tasks: [], note: "long" }, 16),
+    /maximum local file size/,
+  );
+  assert.deepEqual(JSON.parse(serializePlannerDataSource({ tasks: [], note: "valid" })), {
+    tasks: [],
+    note: "valid",
+  });
+});
+
+test("atomically replaces a valid planner file and preserves it after rejected saves", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "navopath-planner-data-"));
+  const filePath = path.join(directory, "planner-data.json");
+  try {
+    fs.writeFileSync(filePath, '{"tasks":[],"marker":"old"}', "utf8");
+    writePlannerDataFile(filePath, { tasks: [], marker: "new" });
+    assert.deepEqual(JSON.parse(fs.readFileSync(filePath, "utf8")), { tasks: [], marker: "new" });
+    assert.equal(fs.existsSync(`${filePath}.tmp`), false);
+
+    assert.throws(() => writePlannerDataFile(filePath, { projects: [] }), /top-level task collection/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(filePath, "utf8")), { tasks: [], marker: "new" });
+    assert.equal(fs.existsSync(`${filePath}.tmp`), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("accepts only planner JSON with a top-level task collection", () => {

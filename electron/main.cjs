@@ -8,6 +8,7 @@ const {
   isPlannerDataFileSizeAllowed,
   parsePlannerDataSource,
   sanitizePlannerDataCollections,
+  writePlannerDataFile,
 } = require("./planner-data-safety.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
@@ -670,7 +671,7 @@ function readData() {
 
 function saveData(data) {
   const next = { ...data, savedAt: new Date().toISOString() };
-  writeJson(getPaths().dataPath, next);
+  writePlannerDataFile(getPaths().dataPath, next);
   return next;
 }
 
