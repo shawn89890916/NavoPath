@@ -1,3 +1,6 @@
+const MAX_PLANNER_DATA_BYTES = 20 * 1024 * 1024;
+const MAX_PLANNER_SUBTASK_DEPTH = 64;
+
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -6,10 +9,11 @@ function recordArray(value) {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
-function sanitizeSubtasks(value) {
+function sanitizeSubtasks(value, depth = 0) {
+  if (depth >= MAX_PLANNER_SUBTASK_DEPTH) return [];
   return recordArray(value).map((subtask) => ({
     ...subtask,
-    subtasks: sanitizeSubtasks(subtask.subtasks),
+    subtasks: sanitizeSubtasks(subtask.subtasks, depth + 1),
   }));
 }
 
@@ -41,4 +45,14 @@ function parsePlannerDataSource(source) {
   }
 }
 
-module.exports = { parsePlannerDataSource, sanitizePlannerDataCollections };
+function isPlannerDataFileSizeAllowed(size) {
+  return Number.isSafeInteger(size) && size >= 0 && size <= MAX_PLANNER_DATA_BYTES;
+}
+
+module.exports = {
+  MAX_PLANNER_DATA_BYTES,
+  MAX_PLANNER_SUBTASK_DEPTH,
+  isPlannerDataFileSizeAllowed,
+  parsePlannerDataSource,
+  sanitizePlannerDataCollections,
+};

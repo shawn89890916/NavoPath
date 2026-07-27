@@ -4,7 +4,11 @@ const path = require("node:path");
 const { createWidgetWindowService } = require("./widget-window.cjs");
 const { createCompactWindowService } = require("./compact-window.cjs");
 const { createRendererPolicy, resolveDevAppUrl } = require("./renderer-security.cjs");
-const { parsePlannerDataSource, sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
+const {
+  isPlannerDataFileSizeAllowed,
+  parsePlannerDataSource,
+  sanitizePlannerDataCollections,
+} = require("./planner-data-safety.cjs");
 let _crypto; // lazy: only when uid() is first called
 function getCrypto() { if (!_crypto) _crypto = require("node:crypto"); return _crypto; }
 
@@ -647,7 +651,10 @@ function backupCurrentData(reason) {
 function readData() {
   ensureData();
   const { dataPath } = getPaths();
-  const source = parsePlannerDataSource(fs.readFileSync(dataPath, "utf8"));
+  const fileSize = fs.statSync(dataPath).size;
+  const source = isPlannerDataFileSizeAllowed(fileSize)
+    ? parsePlannerDataSource(fs.readFileSync(dataPath, "utf8"))
+    : { ok: false, reason: "too-large" };
   let sourceData;
   if (source.ok) {
     sourceData = source.data;

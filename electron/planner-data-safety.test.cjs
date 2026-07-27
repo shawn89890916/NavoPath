@@ -1,6 +1,20 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parsePlannerDataSource, sanitizePlannerDataCollections } = require("./planner-data-safety.cjs");
+const {
+  MAX_PLANNER_DATA_BYTES,
+  MAX_PLANNER_SUBTASK_DEPTH,
+  isPlannerDataFileSizeAllowed,
+  parsePlannerDataSource,
+  sanitizePlannerDataCollections,
+} = require("./planner-data-safety.cjs");
+
+test("accepts desktop planner files only within the backup import byte budget", () => {
+  assert.equal(isPlannerDataFileSizeAllowed(0), true);
+  assert.equal(isPlannerDataFileSizeAllowed(MAX_PLANNER_DATA_BYTES), true);
+  assert.equal(isPlannerDataFileSizeAllowed(MAX_PLANNER_DATA_BYTES + 1), false);
+  assert.equal(isPlannerDataFileSizeAllowed(-1), false);
+  assert.equal(isPlannerDataFileSizeAllowed(Number.POSITIVE_INFINITY), false);
+});
 
 test("accepts only planner JSON with a top-level task collection", () => {
   assert.deepEqual(parsePlannerDataSource('{"tasks":[],"projects":[]}'), {
@@ -74,4 +88,21 @@ test("leaves unsupported top-level data for the caller's existing fallback", () 
   assert.equal(sanitizePlannerDataCollections("bad"), "bad");
   const missingTasks = { projects: [] };
   assert.equal(sanitizePlannerDataCollections(missingTasks), missingTasks);
+});
+
+test("truncates implausibly deep nested subtasks during desktop recovery", () => {
+  let subtask = { id: "leaf" };
+  for (let depth = 0; depth < MAX_PLANNER_SUBTASK_DEPTH + 10; depth += 1) {
+    subtask = { id: `level-${depth}`, subtasks: [subtask] };
+  }
+
+  const sanitized = sanitizePlannerDataCollections({ tasks: [{ id: "task-1", subtasks: [subtask] }] });
+  let current = sanitized.tasks[0].subtasks;
+  let depth = 0;
+  while (current.length) {
+    depth += 1;
+    current = current[0].subtasks;
+  }
+
+  assert.equal(depth, MAX_PLANNER_SUBTASK_DEPTH);
 });
