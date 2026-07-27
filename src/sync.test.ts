@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   SYNC_INTERVAL_PRESETS,
@@ -11,6 +12,17 @@ import {
   shouldApplyWorkspaceRevision,
   shouldRequeueFailedSave,
 } from "./sync";
+
+describe("sync host account isolation", () => {
+  const mainSource = readFileSync(new URL("./main.tsx", import.meta.url), "utf8");
+
+  it("reads the active account from a ref in delayed cache and snapshot work", () => {
+    expect(mainSource).toContain("const authStateRef = useRef<AuthState | null>(authState);");
+    expect(mainSource).toContain("authStateRef.current = authState;");
+    expect(mainSource).toContain("authUser: authStateRef.current?.user ?? null");
+    expect(mainSource).not.toMatch(/(?:read|write)BootstrapCache\([^\n]*authState\?\.user\?\.id/);
+  });
+});
 
 describe("sync race guards", () => {
   it("requeues only the still-current failed save", () => {

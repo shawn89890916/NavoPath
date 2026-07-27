@@ -1608,6 +1608,8 @@ function App() {
   const lastTimelineAutoScrollKeyRef = useRef("");
   const dataRef = useRef<PlannerData | null>(null);
   const settingsRef = useRef<Settings | null>(null);
+  const authStateRef = useRef<AuthState | null>(authState);
+  authStateRef.current = authState;
   const loadedWorkspaceKeyRef = useRef("");
   const workspaceLoadVersionRef = useRef(0);
   const localFallbackAppliedRef = useRef(false);
@@ -1803,7 +1805,7 @@ function App() {
         void window.desktopApi?.writeSnapshot?.({
           data: dataRef.current,
           settings: settingsRef.current,
-          authUser: authState?.user ?? null,
+          authUser: authStateRef.current?.user ?? null,
         });
       } catch (err) {
         console.warn("[snapshot] write failed:", err);
@@ -2441,7 +2443,7 @@ function App() {
           if (job.version === dataSaveVersionRef.current && !pendingDataSaveRef.current) {
             dataRef.current = saved;
             setData(saved);
-            if (settingsRef.current) writeBootstrapCache(saved, settingsRef.current, authState?.user?.id, {
+            if (settingsRef.current) writeBootstrapCache(saved, settingsRef.current, authStateRef.current?.user?.id, {
               dataDirty: false,
               remoteRevision: remoteRevisionRef.current,
             });
@@ -2490,7 +2492,7 @@ function App() {
             settingsRef.current = saved;
             setSettings(saved);
             if (saved.language) setLang(saved.language);
-            if (dataRef.current) writeBootstrapCache(dataRef.current, saved, authState?.user?.id, {
+            if (dataRef.current) writeBootstrapCache(dataRef.current, saved, authStateRef.current?.user?.id, {
               settingsDirty: false,
               remoteRevision: remoteRevisionRef.current,
             });
@@ -2527,7 +2529,7 @@ function App() {
     pendingDataSaveRef.current = { payload: optimistic, version };
     dataRef.current = optimistic;
     setData(optimistic);
-    if (settingsRef.current) writeBootstrapCache(optimistic, settingsRef.current, authState?.user?.id, {
+    if (settingsRef.current) writeBootstrapCache(optimistic, settingsRef.current, authStateRef.current?.user?.id, {
       dataDirty: true,
       pendingSavedAt: savedAt,
       remoteRevision: remoteRevisionRef.current,
@@ -2601,7 +2603,7 @@ function App() {
     settingsRef.current = optimistic;
     setSettings(optimistic);
     if (optimistic.language) setLang(optimistic.language);
-    if (dataRef.current) writeBootstrapCache(dataRef.current, optimistic, authState?.user?.id, {
+    if (dataRef.current) writeBootstrapCache(dataRef.current, optimistic, authStateRef.current?.user?.id, {
       settingsDirty: true,
       pendingSavedAt: new Date().toISOString(),
       remoteRevision: remoteRevisionRef.current,
@@ -6283,7 +6285,7 @@ function App() {
     if (!bootstrap?.data || !bootstrap.settings) return;
     const incomingRevision = Number(bootstrap.revision || 0);
     if (!shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
-    const resolved = resolveBootstrap(options.force ? null : readBootstrapCache(authState?.user?.id), bootstrap.data, bootstrap.settings, { preferRemote: options.force });
+    const resolved = resolveBootstrap(options.force ? null : readBootstrapCache(authStateRef.current?.user?.id), bootstrap.data, bootstrap.settings, { preferRemote: options.force });
     if (!resolved.data || !resolved.settings) return;
     remoteRevisionRef.current = Math.max(remoteRevisionRef.current, incomingRevision);
     dataRef.current = resolved.data;
@@ -6291,7 +6293,7 @@ function App() {
     setData(resolved.data);
     setSettings(resolved.settings);
     if (resolved.settings.language) setLang(resolved.settings.language);
-    writeBootstrapCache(resolved.data, resolved.settings, authState?.user?.id, {
+    writeBootstrapCache(resolved.data, resolved.settings, authStateRef.current?.user?.id, {
       dataDirty: false,
       settingsDirty: false,
       remoteRevision: bootstrap.revision,
