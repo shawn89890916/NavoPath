@@ -70,6 +70,22 @@ describe("sync deletion tombstones", () => {
     expect(mergePlannerData(remote, local).tasks.map((item) => item.id)).toEqual(["restored"]);
   });
 
+  it("keeps legacy objects without timestamps when no valid tombstone exists", () => {
+    const legacy = task("legacy", "2026-07-26T09:00:00.000Z") as Partial<Task>;
+    delete legacy.createdAt;
+    delete legacy.updatedAt;
+
+    expect(mergePlannerData(data([legacy as Task]), data([])).tasks.map((item) => item.id)).toEqual(["legacy"]);
+    expect(mergePlannerData(
+      data([legacy as Task], { "tasks:legacy": "damaged timestamp" }),
+      data([]),
+    ).tasks.map((item) => item.id)).toEqual(["legacy"]);
+    expect(mergePlannerData(
+      data([legacy as Task], { "tasks:legacy": "1970-01-01T00:00:00.000Z" }),
+      data([]),
+    ).tasks).toEqual([]);
+  });
+
   it("makes an explicit backup restore newer than existing tombstones", () => {
     const current = data([], { "tasks:restored": "2026-07-26T12:00:00.000Z" });
     const backup = data([task("restored", "2026-07-25T09:00:00.000Z")]);

@@ -104,8 +104,8 @@ export function mergePlannerData(
       if (!current || itemTime(item) >= itemTime(current)) byId.set(item.id, item);
     }
     merged[collection] = Array.from(byId.values()).filter((item) => {
-      const deletedAt = Date.parse(deleted[`${collection}:${item.id}`] || "") || 0;
-      return deletedAt < itemTime(item);
+      const deletedAt = Date.parse(deleted[`${collection}:${item.id}`] || "");
+      return !Number.isFinite(deletedAt) || deletedAt < itemTime(item);
     });
   }
   merged.chat = local.chat || remote.chat || [];
