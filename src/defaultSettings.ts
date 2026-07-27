@@ -113,6 +113,103 @@ function allowedValue<T extends string | number>(
   return allowed.includes(value as T) ? value as T : fallback;
 }
 
+const MAX_ENABLED_PLUGINS = 100;
+const MAX_PLUGIN_ID_SCAN = 1_000;
+const MAX_PLUGIN_CONFIGS = 100;
+const MAX_PLUGIN_CONFIG_SCAN = 500;
+const MAX_PLUGIN_CONFIG_DEPTH = 8;
+const MAX_PLUGIN_CONFIG_NODES = 50_000;
+const MAX_PLUGIN_CONFIG_OBJECT_KEYS = 5_000;
+const MAX_PLUGIN_CONFIG_ARRAY_ITEMS = 5_000;
+const MAX_PLUGIN_CONFIG_STRING_LENGTH = 10_000;
+const OMIT_PLUGIN_CONFIG_VALUE = Symbol("omit-plugin-config-value");
+const unsafeStorageKeys = new Set(["__proto__", "prototype", ...Object.getOwnPropertyNames(Object.prototype)]);
+
+function isSafePluginId(value: string): boolean {
+  return /^[a-zA-Z0-9_.-]{1,80}$/.test(value) && !unsafeStorageKeys.has(value);
+}
+
+function isSafePluginConfigKey(value: string): boolean {
+  return value.length > 0 && value.length <= 100 && !unsafeStorageKeys.has(value);
+}
+
+function normalizeEnabledPlugins(value: unknown[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  const limit = Math.min(value.length, MAX_PLUGIN_ID_SCAN);
+  for (let index = 0; index < limit && result.length < MAX_ENABLED_PLUGINS; index += 1) {
+    const id = value[index];
+    if (typeof id !== "string" || !isSafePluginId(id) || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
+}
+
+function sanitizePluginConfigValue(
+  value: unknown,
+  depth: number,
+  budget: { nodes: number },
+  ancestors: WeakSet<object>,
+): unknown {
+  if (budget.nodes >= MAX_PLUGIN_CONFIG_NODES) return OMIT_PLUGIN_CONFIG_VALUE;
+  budget.nodes += 1;
+  if (value === null || typeof value === "boolean" || typeof value === "string") {
+    return typeof value === "string" ? value.slice(0, MAX_PLUGIN_CONFIG_STRING_LENGTH) : value;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? value : OMIT_PLUGIN_CONFIG_VALUE;
+  if (depth >= MAX_PLUGIN_CONFIG_DEPTH || !value || typeof value !== "object" || ancestors.has(value)) {
+    return OMIT_PLUGIN_CONFIG_VALUE;
+  }
+
+  ancestors.add(value);
+  if (Array.isArray(value)) {
+    const result: unknown[] = [];
+    const limit = Math.min(value.length, MAX_PLUGIN_CONFIG_ARRAY_ITEMS);
+    for (let index = 0; index < limit; index += 1) {
+      const sanitized = sanitizePluginConfigValue(value[index], depth + 1, budget, ancestors);
+      if (sanitized !== OMIT_PLUGIN_CONFIG_VALUE) result.push(sanitized);
+    }
+    ancestors.delete(value);
+    return result;
+  }
+  if (!isRecord(value)) {
+    ancestors.delete(value);
+    return OMIT_PLUGIN_CONFIG_VALUE;
+  }
+
+  const result: Record<string, unknown> = {};
+  let inspected = 0;
+  for (const key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    inspected += 1;
+    if (inspected > MAX_PLUGIN_CONFIG_OBJECT_KEYS) break;
+    if (!isSafePluginConfigKey(key)) continue;
+    const sanitized = sanitizePluginConfigValue(value[key], depth + 1, budget, ancestors);
+    if (sanitized !== OMIT_PLUGIN_CONFIG_VALUE) result[key] = sanitized;
+  }
+  ancestors.delete(value);
+  return result;
+}
+
+function normalizePluginConfigs(value: Record<string, unknown>): Record<string, Record<string, unknown>> {
+  const result: Record<string, Record<string, unknown>> = {};
+  const budget = { nodes: 0 };
+  let inspected = 0;
+  let accepted = 0;
+  for (const pluginId in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, pluginId)) continue;
+    inspected += 1;
+    if (inspected > MAX_PLUGIN_CONFIG_SCAN || accepted >= MAX_PLUGIN_CONFIGS) break;
+    if (!isSafePluginId(pluginId) || !isRecord(value[pluginId])) continue;
+    const sanitized = sanitizePluginConfigValue(value[pluginId], 0, budget, new WeakSet<object>());
+    if (!isRecord(sanitized)) continue;
+    result[pluginId] = sanitized;
+    accepted += 1;
+  }
+  return result;
+}
+
 /**
  * Migrates and validates persisted or imported settings against the canonical
  * defaults. Unknown keys are preserved for forward compatibility.
@@ -172,9 +269,11 @@ export function normalizeSettings(value: unknown): Settings {
     ? stored.collapsedSections.filter((item): item is string => typeof item === "string")
     : defaults.collapsedSections;
   normalized.enabledPlugins = Array.isArray(stored.enabledPlugins)
-    ? stored.enabledPlugins.filter((item): item is string => typeof item === "string")
+    ? normalizeEnabledPlugins(stored.enabledPlugins)
     : defaults.enabledPlugins;
-  normalized.pluginConfigs = isRecord(stored.pluginConfigs) ? stored.pluginConfigs : defaults.pluginConfigs;
+  normalized.pluginConfigs = isRecord(stored.pluginConfigs)
+    ? normalizePluginConfigs(stored.pluginConfigs)
+    : defaults.pluginConfigs;
 
   const widths = isRecord(stored.panelWidths) ? stored.panelWidths : {};
   normalized.panelWidths = {
