@@ -4,6 +4,8 @@ import type { Language } from "./types";
 import "./changelog.css";
 
 type Block = { type: "h1" | "h2" | "h3" | "li" | "p"; text: string };
+type LanguageStorage = Pick<Storage, "getItem" | "key" | "length">;
+type StoredLanguage = { language: Language; savedAt: string };
 
 function parseMarkdown(source: string): Block[] {
   return source.split(/\r?\n/).flatMap((line): Block[] => {
@@ -17,22 +19,68 @@ function parseMarkdown(source: string): Block[] {
   });
 }
 
-function accountLanguage(): Language {
+function parseStoredObject(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
   try {
-    const requested = new URLSearchParams(window.location.search).get("lang");
-    if (requested === "zh" || requested === "en") return requested;
-    const cached = Object.keys(localStorage)
-      .filter((key) => key.startsWith("navopath-bootstrap:"))
-      .map((key) => JSON.parse(localStorage.getItem(key) || "null"))
-      .filter((value) => value?.settings?.language === "zh" || value?.settings?.language === "en")
-      .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")))[0];
-    if (cached) return cached.settings.language;
-    const preview = JSON.parse(localStorage.getItem("planner-preview-settings") || "null");
+    const value: unknown = JSON.parse(raw);
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveChangelogLanguage(
+  search: string,
+  storage: LanguageStorage,
+  browserLanguage: string,
+): Language {
+  const requested = new URLSearchParams(search).get("lang");
+  if (requested === "zh" || requested === "en") return requested;
+
+  const cached: StoredLanguage[] = [];
+  let storageLength = 0;
+  try {
+    storageLength = storage.length;
+  } catch {
+    // Continue to the browser-language fallback when storage is unavailable.
+  }
+  for (let index = 0; index < storageLength; index += 1) {
+    try {
+      const key = storage.key(index);
+      if (!key?.startsWith("navopath-bootstrap:")) continue;
+      const value = parseStoredObject(storage.getItem(key));
+      const settings = value?.settings;
+      if (!settings || typeof settings !== "object" || Array.isArray(settings)) continue;
+      const language = (settings as Record<string, unknown>).language;
+      if (language !== "zh" && language !== "en") continue;
+      cached.push({
+        language,
+        savedAt: typeof value.savedAt === "string" ? value.savedAt : "",
+      });
+    } catch {
+      // One unreadable cache entry must not hide the other accounts.
+    }
+  }
+  cached.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  if (cached[0]) return cached[0].language;
+
+  try {
+    const preview = parseStoredObject(storage.getItem("planner-preview-settings"));
     if (preview?.language === "zh" || preview?.language === "en") return preview.language;
   } catch {
     // Fall through to the browser language when storage is unavailable.
   }
-  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+  return browserLanguage.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+function accountLanguage(): Language {
+  try {
+    return resolveChangelogLanguage(window.location.search, localStorage, navigator.language);
+  } catch {
+    return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+  }
 }
 
 function localizedSource(language: Language) {
