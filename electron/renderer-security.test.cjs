@@ -61,12 +61,14 @@ test("blocks untrusted navigation and new windows", () => {
 test("does not expose or execute external plugin scripts", () => {
   const preloadSource = fs.readFileSync(path.resolve("electron", "preload.cjs"), "utf8");
   const electronMainSource = fs.readFileSync(path.resolve("electron", "main.cjs"), "utf8");
+  const pluginManifestSource = fs.readFileSync(path.resolve("electron", "external-plugin-manifest.cjs"), "utf8");
   const rendererSource = fs.readFileSync(path.resolve("src", "main.tsx"), "utf8");
 
   assert.doesNotMatch(preloadSource, /readExternalPluginEntry|plugins:readExternalEntry/);
   assert.doesNotMatch(electronMainSource, /readExternalPluginEntry|plugins:readExternalEntry/);
   assert.doesNotMatch(rendererSource, /new Function\("window",\s*"navopath"/);
-  assert.match(electronMainSource, /not external scripts/);
+  assert.match(electronMainSource, /readExternalPluginManifest/);
+  assert.match(pluginManifestSource, /not external scripts/);
 });
 
 test("does not expose retired local planner or direct AI IPC surfaces", () => {
