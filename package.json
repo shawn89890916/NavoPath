@@ -168,6 +168,6 @@
     "wrangler": "^4.112.0"
   },
   "overrides": {
-    "js-yaml": "5.2.1"
+    "js-yaml": "5.2.2"
   }
 }
