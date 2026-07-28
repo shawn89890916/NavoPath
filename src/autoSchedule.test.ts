@@ -52,6 +52,54 @@ describe("autoScheduleTasks", () => {
     ]);
   });
 
+  it("places project work at its learned preferred start hour", () => {
+    const result = autoScheduleTasks({
+      tasks: [task("preferred", "study", 60)],
+      scheduledEvents: [],
+      dateRange: [future],
+      settings: {
+        dayStart: "08:00",
+        dayEnd: "17:00",
+        bufferMinutes: 5,
+        preferredStartHourByProject: { study: 14.1 },
+        allowTaskSplitting: false,
+      },
+    });
+
+    expect(result.proposedEvents[0]).toMatchObject({
+      scheduledStart: "14:00",
+      scheduledEnd: "15:00",
+    });
+  });
+
+  it("preserves free time before a preferred-hour placement", () => {
+    const result = autoScheduleTasks({
+      tasks: [
+        { ...task("preferred", "study", 60), priority: "high" as const },
+        task("earlier", "study", 180),
+      ],
+      scheduledEvents: [],
+      dateRange: [future],
+      settings: {
+        dayStart: "08:00",
+        dayEnd: "17:00",
+        bufferMinutes: 15,
+        strategy: "byProject",
+        preferredStartHourByProject: { study: 14 },
+        allowTaskSplitting: false,
+      },
+    });
+
+    expect(result.proposedEvents.map(({ taskId, scheduledStart, scheduledEnd }) => ({
+      taskId,
+      scheduledStart,
+      scheduledEnd,
+    }))).toEqual([
+      { taskId: "earlier", scheduledStart: "10:45", scheduledEnd: "13:45" },
+      { taskId: "preferred", scheduledStart: "14:00", scheduledEnd: "15:00" },
+    ]);
+  });
+
   it("honors the selected ordering strategy", () => {
     const tasks = [task("p1-a", "p1"), task("p2-a", "p2"), task("p1-b", "p1")];
     const common = { tasks, scheduledEvents: [], dateRange: [future], settings: { dayStart: "08:00", dayEnd: "13:00", bufferMinutes: 0 } };

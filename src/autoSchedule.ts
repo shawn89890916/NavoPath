@@ -303,11 +303,13 @@ export function autoScheduleTasks(params: {
   let freeSlots = getFreeSlots({ dateRange, scheduledEvents: params.scheduledEvents, settings: s });
   const buf = s.bufferMinutes;
 
-  const consumeSlot = (slotToUse: FreeSlot, duration: number) => {
+  const consumeSlot = (slotToUse: FreeSlot, duration: number, startMinutes = slotToUse.startMinutes) => {
     const next: FreeSlot[] = [];
     for (const slot of freeSlots) {
       if (slot !== slotToUse) { next.push(slot); continue; }
-      const after = { date: slot.date, startMinutes: slot.startMinutes + duration + buf, endMinutes: slot.endMinutes };
+      const before = { date: slot.date, startMinutes: slot.startMinutes, endMinutes: startMinutes - buf };
+      const after = { date: slot.date, startMinutes: startMinutes + duration + buf, endMinutes: slot.endMinutes };
+      if (before.endMinutes - before.startMinutes >= 15) next.push(before);
       if (after.endMinutes - after.startMinutes >= 15) next.push(after);
     }
     freeSlots = next;
@@ -318,20 +320,35 @@ export function autoScheduleTasks(params: {
 
     // Find the smallest slot that fits the entire task (best fit first)
     let best: FreeSlot | null = null;
+    let bestStartMinutes = 0;
     let bestScore = -Infinity;
     for (const slot of freeSlots) {
       const fit = slot.endMinutes - slot.startMinutes;
       if (fit < dur) continue;
       const preferredHour = task.projectId ? s.preferredStartHourByProject[task.projectId] : undefined;
-      const preferredPenalty = preferredHour === undefined ? 0 : Math.abs(slot.startMinutes - preferredHour * 60) * 2;
+      const preferredMinutes = preferredHour === undefined
+        ? undefined
+        : Math.round((preferredHour * 60) / s.snapMinutes) * s.snapMinutes;
+      const latestStart = Math.max(
+        slot.startMinutes,
+        Math.floor((slot.endMinutes - dur) / s.snapMinutes) * s.snapMinutes,
+      );
+      const startMinutes = preferredMinutes === undefined
+        ? slot.startMinutes
+        : Math.min(latestStart, Math.max(slot.startMinutes, preferredMinutes));
+      const preferredPenalty = preferredMinutes === undefined ? 0 : Math.abs(startMinutes - preferredMinutes) * 2;
       const deadlineBonus = task.dueDate === slot.date ? 400 : task.dueDate && task.dueDate < slot.date ? -800 : 0;
       const score = 1000 - (fit - dur) - preferredPenalty + deadlineBonus;
-      if (score > bestScore) { bestScore = score; best = slot; }
+      if (score > bestScore) {
+        bestScore = score;
+        best = slot;
+        bestStartMinutes = startMinutes;
+      }
     }
 
     if (best) {
-      const st = minutesToTime(best.startMinutes);
-      const et = minutesToTime(best.startMinutes + dur);
+      const st = minutesToTime(bestStartMinutes);
+      const et = minutesToTime(bestStartMinutes + dur);
       const clonedTaskId = uid("scheduledTask");
       proposed.push({
         id: uid("preview"),
@@ -348,7 +365,7 @@ export function autoScheduleTasks(params: {
         priority: task.priority,
       });
 
-      consumeSlot(best, dur);
+      consumeSlot(best, dur, bestStartMinutes);
     } else if (s.allowTaskSplitting && dur >= 60) {
       const available = freeSlots
         .filter((slot) => slot.endMinutes - slot.startMinutes >= 30)
