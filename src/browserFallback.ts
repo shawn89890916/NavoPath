@@ -772,6 +772,70 @@ export function normalizeData(data: PlannerData): PlannerData {
     ))
     .slice(-MAX_HABIT_DAILY_STATES);
   const seenSubtaskIds = new Set<string>();
+  const normalizedTasks = tasks.map((task) => {
+    const timelineRecords = normalizeTimelineRecords(task.timelineRecords, task.id);
+    const createdAt = persistedTimestamp(task.createdAt) || now();
+    const updatedAt = persistedTimestamp(task.updatedAt) || createdAt;
+    const completed = task.completed === true;
+    const projectId = persistedId(task.projectId);
+    const goalId = persistedId(task.goalId);
+    const parentTaskId = persistedId(task.parentTaskId);
+    const plannedForDate = persistedDate(task.plannedForDate);
+    const scheduledDate = persistedDate(task.scheduledDate);
+    const scheduledStart = persistedTime(task.scheduledStart, "");
+    const hasLegacySchedule = Boolean(scheduledDate && scheduledStart);
+    const estimatedHours = typeof task.estimatedHours === "number"
+      && Number.isFinite(task.estimatedHours)
+      && task.estimatedHours > 0
+      ? Math.min(MAX_TASK_ESTIMATED_HOURS, Math.max(0.25, task.estimatedHours))
+      : undefined;
+    return {
+      ...task,
+      title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
+      category: persistedCategory(task.category),
+      dueDate: persistedDate(task.dueDate) || "",
+      completed,
+      estimatedHours,
+      projectId: projectId && projectIds.has(projectId) ? projectId : undefined,
+      goalId: goalId && goalIds.has(goalId) ? goalId : "",
+      parentTaskId: parentTaskId && parentTaskId !== task.id && taskIds.has(parentTaskId)
+        ? parentTaskId
+        : undefined,
+      completedAt: completed
+        ? persistedTimestamp(task.completedAt, updatedAt)
+        : undefined,
+      plannedForDate,
+      executionLane: task.executionLane === "candidate" || task.executionLane === "queued"
+        ? task.executionLane
+        : undefined,
+      scheduledDate: hasLegacySchedule ? scheduledDate : undefined,
+      scheduledStart: hasLegacySchedule ? scheduledStart : undefined,
+      scheduledEnd: hasLegacySchedule
+        ? persistedTime(task.scheduledEnd, "") || undefined
+        : undefined,
+      executionStatus: hasLegacySchedule
+        && ["scheduled", "completed", "returned_unfinished", "cancelled"].includes(String(task.executionStatus))
+        ? task.executionStatus
+        : hasLegacySchedule ? "scheduled" : undefined,
+      workflowStatus: inferWorkflowStatus({
+        completed,
+        workflowStatus: task.workflowStatus,
+        plannedForDate,
+        timelineRecords,
+      }),
+      timelineRecords,
+      recurrence: normalizeTaskRecurrence(task.recurrence),
+      aiInference: normalizeAiInference(
+        task.aiInference,
+        projectIds,
+        persistedTimestamp(task.updatedAt) || now(),
+      ),
+      subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds, taskIds),
+      notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
+      createdAt,
+      updatedAt,
+    };
+  });
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
     goals: safeData.goals.map((goal) => ({
@@ -836,7 +900,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       updatedAt: template.updatedAt || template.createdAt || now(),
     })),
     timeEntries: (safeData.timeEntries || [])
-      .map((entry) => normalizeTimeEntry(entry, safeData.tasks))
+      .map((entry) => normalizeTimeEntry(entry, normalizedTasks, projectIds))
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
     drafts: safeData.drafts
       .filter((draft) => typeof draft.title === "string" && draft.title)
@@ -847,73 +911,10 @@ export function normalizeData(data: PlannerData): PlannerData {
         title: boundedPersistedString(draft.title, MAX_PERSISTED_TITLE_LENGTH),
         projectId: persistedId(draft.projectId) || "",
         details: boundedPersistedString(draft.details, MAX_PERSISTED_TEXT_LENGTH),
-      })),
+    })),
     version: Math.max(safeData.version || 1, 2),
     events: [],
-    tasks: tasks.map((task) => {
-      const timelineRecords = normalizeTimelineRecords(task.timelineRecords, task.id);
-      const createdAt = persistedTimestamp(task.createdAt) || now();
-      const updatedAt = persistedTimestamp(task.updatedAt) || createdAt;
-      const completed = task.completed === true;
-      const projectId = persistedId(task.projectId);
-      const goalId = persistedId(task.goalId);
-      const parentTaskId = persistedId(task.parentTaskId);
-      const plannedForDate = persistedDate(task.plannedForDate);
-      const scheduledDate = persistedDate(task.scheduledDate);
-      const scheduledStart = persistedTime(task.scheduledStart, "");
-      const hasLegacySchedule = Boolean(scheduledDate && scheduledStart);
-      const estimatedHours = typeof task.estimatedHours === "number"
-        && Number.isFinite(task.estimatedHours)
-        && task.estimatedHours > 0
-        ? Math.min(MAX_TASK_ESTIMATED_HOURS, Math.max(0.25, task.estimatedHours))
-        : undefined;
-      return {
-        ...task,
-        title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
-        category: persistedCategory(task.category),
-        dueDate: persistedDate(task.dueDate) || "",
-        completed,
-        estimatedHours,
-        projectId: projectId && projectIds.has(projectId) ? projectId : undefined,
-        goalId: goalId && goalIds.has(goalId) ? goalId : "",
-        parentTaskId: parentTaskId && parentTaskId !== task.id && taskIds.has(parentTaskId)
-          ? parentTaskId
-          : undefined,
-        completedAt: completed
-          ? persistedTimestamp(task.completedAt, updatedAt)
-          : undefined,
-        plannedForDate,
-        executionLane: task.executionLane === "candidate" || task.executionLane === "queued"
-          ? task.executionLane
-          : undefined,
-        scheduledDate: hasLegacySchedule ? scheduledDate : undefined,
-        scheduledStart: hasLegacySchedule ? scheduledStart : undefined,
-        scheduledEnd: hasLegacySchedule
-          ? persistedTime(task.scheduledEnd, "") || undefined
-          : undefined,
-        executionStatus: hasLegacySchedule
-          && ["scheduled", "completed", "returned_unfinished", "cancelled"].includes(String(task.executionStatus))
-          ? task.executionStatus
-          : hasLegacySchedule ? "scheduled" : undefined,
-        workflowStatus: inferWorkflowStatus({
-          completed,
-          workflowStatus: task.workflowStatus,
-          plannedForDate,
-          timelineRecords,
-        }),
-        timelineRecords,
-        recurrence: normalizeTaskRecurrence(task.recurrence),
-        aiInference: normalizeAiInference(
-          task.aiInference,
-          projectIds,
-          persistedTimestamp(task.updatedAt) || now(),
-        ),
-        subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds, taskIds),
-        notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
-        createdAt,
-        updatedAt,
-      };
-    }),
+    tasks: normalizedTasks,
   }));
 }
 

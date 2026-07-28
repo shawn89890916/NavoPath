@@ -44,7 +44,11 @@ export function minutesBetween(startAt: string, endAt: string): number {
   return Math.max(1, Math.round((end - start) / 60000));
 }
 
-export function normalizeTimeEntry(entry: TimeEntry, tasks: Task[] = []): TimeEntry | null {
+export function normalizeTimeEntry(
+  entry: TimeEntry,
+  tasks?: Task[],
+  projectIds?: ReadonlySet<string>,
+): TimeEntry | null {
   const boundedId = (value: unknown) => (
     typeof value === "string" && value.length > 0 && value.length <= MAX_PERSISTED_ID_LENGTH
       ? value
@@ -57,24 +61,38 @@ export function normalizeTimeEntry(entry: TimeEntry, tasks: Task[] = []): TimeEn
   const startAt = Date.parse(entry.startAt);
   const endAt = Date.parse(entry.endAt);
   if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) return null;
-  const task = tasks.find((item) => item.id === entry.taskId);
+  const task = tasks?.find((item) => item.id === entry.taskId);
+  if (tasks && !task) return null;
   const durationMinutes = Number.isFinite(entry.durationMinutes) && entry.durationMinutes > 0
     ? Math.round(entry.durationMinutes)
     : minutesBetween(entry.startAt, entry.endAt);
   if (durationMinutes <= 0) return null;
   const now = new Date().toISOString();
-  const projectId = boundedId(entry.projectId) || boundedId(task?.projectId);
+  const entryProjectId = boundedId(entry.projectId);
+  const projectId = entryProjectId && (!projectIds || projectIds.has(entryProjectId))
+    ? entryProjectId
+    : boundedId(task?.projectId);
+  const timelineRecordId = boundedId(entry.timelineRecordId);
+  const createdAt = typeof entry.createdAt === "string" && Number.isFinite(Date.parse(entry.createdAt))
+    ? entry.createdAt
+    : now;
+  const updatedAt = typeof entry.updatedAt === "string" && Number.isFinite(Date.parse(entry.updatedAt))
+    ? entry.updatedAt
+    : createdAt;
   return {
     ...entry,
     id,
     taskId,
     projectId,
-    timelineRecordId: boundedId(entry.timelineRecordId),
+    timelineRecordId: timelineRecordId
+      && (!task || (task.timelineRecords || []).some((record) => record.id === timelineRecordId))
+      ? timelineRecordId
+      : undefined,
     durationMinutes: Math.min(durationMinutes, MAX_TIME_ENTRY_DURATION_MINUTES),
     source: ["timer", "manual", "idle_adjusted"].includes(String(entry.source)) ? entry.source : "timer",
     note: typeof entry.note === "string" ? entry.note.slice(0, MAX_TIME_ENTRY_NOTE_LENGTH) : undefined,
-    createdAt: entry.createdAt || now,
-    updatedAt: entry.updatedAt || entry.createdAt || now,
+    createdAt,
+    updatedAt,
   };
 }
 

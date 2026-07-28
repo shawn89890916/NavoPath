@@ -586,6 +586,66 @@ describe("browser fallback preview mode", () => {
     expect(entry?.note).toHaveLength(60_000);
   });
 
+  it("repairs time-entry references and removes orphaned entries", () => {
+    const malformed = fallbackData() as any;
+    const task = malformed.tasks[0];
+    const projectId = task.projectId;
+    task.timelineRecords = [{
+      id: "timeline-valid",
+      taskId: task.id,
+      scheduledDate: "2026-07-28",
+      scheduledStart: "08:00",
+      scheduledEnd: "09:00",
+      executionStatus: "completed",
+      createdAt: "2026-07-28T08:00:00.000Z",
+    }];
+    malformed.timeEntries = [
+      {
+        id: "entry-repaired",
+        taskId: task.id,
+        projectId: "missing-project",
+        timelineRecordId: "missing-record",
+        startAt: "2026-07-28T08:00:00.000Z",
+        endAt: "2026-07-28T09:00:00.000Z",
+        durationMinutes: 60,
+        source: "manual",
+        createdAt: 123,
+        updatedAt: null,
+      },
+      {
+        id: "entry-linked",
+        taskId: task.id,
+        projectId,
+        timelineRecordId: "timeline-valid",
+        startAt: "2026-07-28T08:00:00.000Z",
+        endAt: "2026-07-28T09:00:00.000Z",
+        durationMinutes: 60,
+        source: "timer",
+        createdAt: "2026-07-28T09:00:00.000Z",
+        updatedAt: "2026-07-28T09:00:00.000Z",
+      },
+      {
+        id: "entry-orphan",
+        taskId: "missing-task",
+        startAt: "2026-07-28T08:00:00.000Z",
+        endAt: "2026-07-28T09:00:00.000Z",
+        durationMinutes: 60,
+        source: "timer",
+      },
+    ];
+
+    const normalized = normalizeData(malformed);
+    const repaired = normalized.timeEntries?.find((entry) => entry.id === "entry-repaired");
+    const linked = normalized.timeEntries?.find((entry) => entry.id === "entry-linked");
+
+    expect(normalized.timeEntries).toHaveLength(2);
+    expect(repaired?.projectId).toBe(projectId);
+    expect(repaired?.timelineRecordId).toBeUndefined();
+    expect(Number.isFinite(Date.parse(repaired?.createdAt || ""))).toBe(true);
+    expect(repaired?.updatedAt).toBe(repaired?.createdAt);
+    expect(linked?.timelineRecordId).toBe("timeline-valid");
+  });
+
   it("caps legacy event migration before it can expand into millions of tasks", () => {
     const malformed = fallbackData() as any;
     malformed.events = [
