@@ -258,6 +258,98 @@ describe("browser fallback preview mode", () => {
     expect(normalized.aiMemories[0].tags).toEqual(normalizedTags);
   });
 
+  it("bounds AI memories, personalization profiles, and task inference", () => {
+    const malformed = fallbackData() as any;
+    const projectId = malformed.projects[0].id;
+    malformed.aiMemories = Array.from({ length: 5_001 }, (_, index) => ({
+      id: `memory-${index}`,
+      content: `Memory ${index}`,
+      tags: [],
+      source: index === 5_000 ? "unknown" : "auto",
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }));
+    malformed.aiProfile = {
+      version: 99,
+      updatedAt: 123,
+      historySince: "not-a-timestamp",
+      durationByProject: {
+        [projectId]: { minutes: 1_000_000, sampleCount: 1_000_000_000 },
+        "missing-project": { minutes: 90, sampleCount: 2 },
+      },
+      projectTokenWeights: {
+        [projectId]: Object.fromEntries(
+          Array.from({ length: 1_001 }, (_, index) => [`token-${index}`, 1_000_000_000]),
+        ),
+        "missing-project": { ignored: 5 },
+      },
+      preferredStartHourByProject: {
+        [projectId]: 99,
+        "missing-project": 10,
+      },
+      feedback: {
+        durationCorrections: -5,
+        projectCorrections: 1_000_000_000,
+        assignmentUndos: "invalid",
+        scheduleAccepts: Number.NaN,
+        scheduleRejects: 10,
+      },
+    };
+    malformed.tasks[0].aiInference = {
+      duration: {
+        minutes: 1_000_000,
+        confidence: 5,
+        source: "unknown",
+        inferredAt: 123,
+        modelVersion: "m".repeat(201),
+        userOverridden: 1,
+      },
+      project: {
+        projectId: "missing-project",
+        confidence: -5,
+        source: "unknown",
+        inferredAt: "2026-07-28T00:00:00.000Z",
+        modelVersion: "unknown-model",
+      },
+    };
+
+    const normalized = normalizeData(malformed);
+    const inference = normalized.tasks[0].aiInference;
+
+    expect(normalized.aiMemories).toHaveLength(5_000);
+    expect(normalized.aiMemories.some((memory) => memory.id === "memory-0")).toBe(false);
+    expect(normalized.aiMemories.at(-1)?.id).toBe("memory-5000");
+    expect(normalized.aiMemories.at(-1)?.source).toBe("auto");
+    expect(normalized.aiProfile).toMatchObject({
+      version: 1,
+      historySince: undefined,
+      durationByProject: {
+        [projectId]: { minutes: 240, sampleCount: 1_000_000 },
+      },
+      preferredStartHourByProject: { [projectId]: 23 },
+      feedback: {
+        durationCorrections: 0,
+        projectCorrections: 1_000_000,
+        assignmentUndos: 0,
+        scheduleAccepts: 0,
+        scheduleRejects: 10,
+      },
+    });
+    expect(Object.keys(normalized.aiProfile?.durationByProject || {})).toEqual([projectId]);
+    expect(Object.keys(normalized.aiProfile?.projectTokenWeights || {})).toEqual([projectId]);
+    expect(Object.keys(normalized.aiProfile?.projectTokenWeights[projectId] || {})).toHaveLength(1_000);
+    expect(normalized.aiProfile?.projectTokenWeights[projectId]["token-0"]).toBe(1_000_000);
+    expect(inference?.duration).toMatchObject({
+      minutes: 1_440,
+      confidence: 1,
+      source: "default",
+      modelVersion: "m".repeat(200),
+      userOverridden: true,
+    });
+    expect(inference?.duration?.inferredAt).toBe(normalized.tasks[0].updatedAt);
+    expect(inference?.project).toBeUndefined();
+  });
+
   it("bounds persisted goals, long-term tasks, drafts, and schedule templates", () => {
     const malformed = fallbackData() as any;
     malformed.goals = [{

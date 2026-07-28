@@ -1,4 +1,4 @@
-import type { AiAction, ChatMessage, HabitDailyState, PlannerApi, PlannerData, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
+import type { AiAction, AiPersonalizationProfile, ChatMessage, HabitDailyState, PlannerApi, PlannerData, Settings, Subtask, Task, TaskAiInference, TaskRecurrence, TimelineRecord } from "./types";
 import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
@@ -27,6 +27,7 @@ const MAX_RECURRENCE_DURATION_MINUTES = 24 * 60;
 const MAX_RECURRENCE_COUNT = 10_000;
 const MAX_AI_CONVERSATIONS = 500;
 const MAX_AI_MESSAGES = 500;
+const MAX_AI_MEMORIES = 5_000;
 const MAX_AI_STEPS = 100;
 const MAX_AI_ACTIONS = 200;
 const MAX_AI_ACTION_SCAN = 1_000;
@@ -36,6 +37,12 @@ const MAX_AI_JSON_DEPTH = 6;
 const MAX_AI_JSON_NODES = 5_000;
 const MAX_AI_JSON_KEYS = 100;
 const MAX_AI_JSON_STRING_LENGTH = 10_000;
+const MAX_AI_PROFILE_PROJECTS = 1_000;
+const MAX_AI_PROFILE_PROJECT_SCAN = 5_000;
+const MAX_AI_PROFILE_TOKENS = 1_000;
+const MAX_AI_PROFILE_TOKEN_SCAN = 5_000;
+const MAX_AI_PROFILE_COUNTER = 1_000_000;
+const MAX_AI_INFERENCE_DURATION_MINUTES = 24 * 60;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -139,6 +146,141 @@ function boundedInteger(value: unknown, minimum: number, maximum: number, fallba
 function persistedTimestampRank(value: unknown) {
   const parsed = typeof value === "string" ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function persistedTimestamp(value: unknown, fallback?: string) {
+  return typeof value === "string"
+    && value.length <= MAX_PERSISTED_ID_LENGTH
+    && Number.isFinite(Date.parse(value))
+    ? value
+    : fallback;
+}
+
+function safeRecordKey(value: unknown) {
+  const key = persistedId(value);
+  return key && key !== "__proto__" && key !== "constructor" && key !== "prototype"
+    ? key
+    : undefined;
+}
+
+function normalizeAiProfile(
+  value: unknown,
+  projectIds: Set<string>,
+): AiPersonalizationProfile | undefined {
+  if (!isRecord(value)) return undefined;
+  const allowedProjectIds = new Set([...projectIds, "__unassigned__"]);
+  const durationByProject: AiPersonalizationProfile["durationByProject"] = {};
+  let durationProjectCount = 0;
+  if (isRecord(value.durationByProject)) {
+    for (const [rawProjectId, rawStat] of Object.entries(value.durationByProject)
+      .slice(0, MAX_AI_PROFILE_PROJECT_SCAN)) {
+      if (durationProjectCount >= MAX_AI_PROFILE_PROJECTS) break;
+      const projectId = safeRecordKey(rawProjectId);
+      if (!projectId || !allowedProjectIds.has(projectId) || !isRecord(rawStat)) continue;
+      durationByProject[projectId] = {
+        minutes: boundedInteger(rawStat.minutes, 15, 240, 45),
+        sampleCount: boundedInteger(rawStat.sampleCount, 0, MAX_AI_PROFILE_COUNTER, 0),
+      };
+      durationProjectCount += 1;
+    }
+  }
+
+  const projectTokenWeights: AiPersonalizationProfile["projectTokenWeights"] = {};
+  let tokenProjectCount = 0;
+  if (isRecord(value.projectTokenWeights)) {
+    for (const [rawProjectId, rawWeights] of Object.entries(value.projectTokenWeights)
+      .slice(0, MAX_AI_PROFILE_PROJECT_SCAN)) {
+      if (tokenProjectCount >= MAX_AI_PROFILE_PROJECTS) break;
+      const projectId = safeRecordKey(rawProjectId);
+      if (!projectId || !projectIds.has(projectId) || !isRecord(rawWeights)) continue;
+      const weights: Record<string, number> = {};
+      let weightCount = 0;
+      for (const [rawToken, rawWeight] of Object.entries(rawWeights)
+        .slice(0, MAX_AI_PROFILE_TOKEN_SCAN)) {
+        if (weightCount >= MAX_AI_PROFILE_TOKENS) break;
+        const token = safeRecordKey(rawToken);
+        if (!token || typeof rawWeight !== "number" || !Number.isFinite(rawWeight) || rawWeight <= 0) continue;
+        weights[token] = boundedInteger(rawWeight, 1, MAX_AI_PROFILE_COUNTER, 1);
+        weightCount += 1;
+      }
+      projectTokenWeights[projectId] = weights;
+      tokenProjectCount += 1;
+    }
+  }
+
+  const preferredStartHourByProject: AiPersonalizationProfile["preferredStartHourByProject"] = {};
+  let preferredHourProjectCount = 0;
+  if (isRecord(value.preferredStartHourByProject)) {
+    for (const [rawProjectId, rawHour] of Object.entries(value.preferredStartHourByProject)
+      .slice(0, MAX_AI_PROFILE_PROJECT_SCAN)) {
+      if (preferredHourProjectCount >= MAX_AI_PROFILE_PROJECTS) break;
+      const projectId = safeRecordKey(rawProjectId);
+      if (!projectId || !projectIds.has(projectId)) continue;
+      preferredStartHourByProject[projectId] = boundedInteger(rawHour, 0, 23, 9);
+      preferredHourProjectCount += 1;
+    }
+  }
+
+  const feedback = isRecord(value.feedback) ? value.feedback : {};
+  const counter = (key: keyof AiPersonalizationProfile["feedback"]) =>
+    boundedInteger(feedback[key], 0, MAX_AI_PROFILE_COUNTER, 0);
+  return {
+    version: 1,
+    updatedAt: persistedTimestamp(value.updatedAt) || now(),
+    historySince: persistedTimestamp(value.historySince),
+    durationByProject,
+    projectTokenWeights,
+    preferredStartHourByProject,
+    feedback: {
+      durationCorrections: counter("durationCorrections"),
+      projectCorrections: counter("projectCorrections"),
+      assignmentUndos: counter("assignmentUndos"),
+      scheduleAccepts: counter("scheduleAccepts"),
+      scheduleRejects: counter("scheduleRejects"),
+    },
+  };
+}
+
+function normalizeAiInference(
+  value: unknown,
+  projectIds: Set<string>,
+  fallbackTimestamp: string,
+): TaskAiInference | undefined {
+  if (!isRecord(value)) return undefined;
+  const sources = ["default", "history", "ai", "user"] as const;
+  const normalizeField = (field: Record<string, unknown>) => ({
+    confidence: typeof field.confidence === "number" && Number.isFinite(field.confidence)
+      ? Math.min(1, Math.max(0, field.confidence))
+      : 0,
+    source: sources.includes(field.source as typeof sources[number])
+      ? field.source as typeof sources[number]
+      : "default" as const,
+    inferredAt: persistedTimestamp(field.inferredAt, fallbackTimestamp) || now(),
+    modelVersion: boundedPersistedString(
+      field.modelVersion,
+      MAX_PERSISTED_ID_LENGTH,
+      "local-profile-v1",
+    ),
+    ...(field.userOverridden === undefined
+      ? {}
+      : { userOverridden: Boolean(field.userOverridden) }),
+  });
+  const duration = isRecord(value.duration)
+    ? {
+        ...normalizeField(value.duration),
+        minutes: boundedInteger(
+          value.duration.minutes,
+          15,
+          MAX_AI_INFERENCE_DURATION_MINUTES,
+          45,
+        ),
+      }
+    : undefined;
+  const projectId = isRecord(value.project) ? safeRecordKey(value.project.projectId) : undefined;
+  const project = isRecord(value.project) && projectId && projectIds.has(projectId)
+    ? { ...normalizeField(value.project), projectId }
+    : undefined;
+  return duration || project ? { duration, project } : undefined;
 }
 
 function normalizeTaskRecurrence(value: unknown): TaskRecurrence | undefined {
@@ -509,12 +651,13 @@ export function normalizeData(data: PlannerData): PlannerData {
     drafts: uniqueRecordItems(data.drafts),
     chat: uniqueRecordItems(data.chat),
     aiConversations: uniqueRecordItems(data.aiConversations).slice(0, MAX_AI_CONVERSATIONS),
-    aiMemories: uniqueRecordItems(data.aiMemories),
+    aiMemories: uniqueRecordItems(data.aiMemories).slice(-MAX_AI_MEMORIES),
     scheduleTemplates: uniqueRecordItems(data.scheduleTemplates),
     aiProfile: isRecord(data.aiProfile) ? data.aiProfile : undefined,
     taskLayouts: isRecord(data.taskLayouts) ? data.taskLayouts as PlannerData["taskLayouts"] : {},
   };
   const migratedTasks = migrateEventsToTasks(safeData);
+  const projectIds = new Set(safeData.projects.map((project) => project.id));
   const notes = safeData.notes.map((note) => ({
     ...note,
     id: persistedId(note.id) || uid("note"),
@@ -644,11 +787,18 @@ export function normalizeData(data: PlannerData): PlannerData {
       id: persistedId(memory.id) || uid("memory"),
       content: boundedPersistedString(memory.content, MAX_PERSISTED_TEXT_LENGTH),
       tags: normalizePersistedTags(memory.tags),
-      source: memory.source || "auto",
+      source: ["auto", "manual", "conversation"].includes(String(memory.source))
+        ? memory.source
+        : "auto",
       sourceMessages: normalizeChatMessages(memory.sourceMessages, true),
       pinned: Boolean(memory.pinned),
       archived: Boolean(memory.archived),
+      createdAt: persistedTimestamp(memory.createdAt) || now(),
+      updatedAt: persistedTimestamp(memory.updatedAt)
+        || persistedTimestamp(memory.createdAt)
+        || now(),
     })),
+    aiProfile: normalizeAiProfile(safeData.aiProfile, projectIds),
     scheduleTemplates: (safeData.scheduleTemplates || []).map((template) => ({
       ...template,
       id: persistedId(template.id) || uid("template"),
@@ -692,6 +842,11 @@ export function normalizeData(data: PlannerData): PlannerData {
         workflowStatus: inferWorkflowStatus({ ...task, timelineRecords }),
         timelineRecords,
         recurrence: normalizeTaskRecurrence(task.recurrence),
+        aiInference: normalizeAiInference(
+          task.aiInference,
+          projectIds,
+          persistedTimestamp(task.updatedAt) || now(),
+        ),
         subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
         notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
       };
