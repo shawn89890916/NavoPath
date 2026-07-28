@@ -1,4 +1,4 @@
-import type { AiAction, ChatMessage, PlannerApi, PlannerData, Settings, Subtask, Task, TaskRecurrence } from "./types";
+import type { AiAction, ChatMessage, HabitDailyState, PlannerApi, PlannerData, Settings, Subtask, Task, TaskRecurrence, TimelineRecord } from "./types";
 import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
@@ -20,6 +20,9 @@ const MAX_LEGACY_EVENT_ID_LENGTH = 160;
 const MAX_MIGRATED_EVENT_TASKS = 5_000;
 const MAX_HABIT_DURATION_MINUTES = 480;
 const MAX_HABIT_TARGET = 1_000;
+const MAX_HABIT_DAILY_STATES = 50_000;
+const MAX_PERSISTED_TIMELINE_RECORDS = 1_000;
+const MAX_PERSISTED_TIMELINE_RECORD_SCAN = 10_000;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -120,6 +123,11 @@ function boundedInteger(value: unknown, minimum: number, maximum: number, fallba
     : fallback;
 }
 
+function persistedTimestampRank(value: unknown) {
+  const parsed = typeof value === "string" ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function normalizePersistedTags(value: unknown) {
   if (!Array.isArray(value)) return [];
   const tags: string[] = [];
@@ -142,6 +150,36 @@ function normalizeChatMessages(value: unknown, forceSaved = false): ChatMessage[
     content: boundedPersistedString(message.content, MAX_PERSISTED_TEXT_LENGTH),
     saved: forceSaved || Boolean(message.saved),
   }));
+}
+
+function normalizeTimelineRecords(value: unknown, taskId: string): TimelineRecord[] {
+  const records: TimelineRecord[] = [];
+  const seenIds = new Set<string>();
+  for (const record of recordItems<TimelineRecord>(value).slice(0, MAX_PERSISTED_TIMELINE_RECORD_SCAN)) {
+    if (records.length >= MAX_PERSISTED_TIMELINE_RECORDS) break;
+    const scheduledDate = persistedDate(record.scheduledDate);
+    const scheduledStart = persistedTime(record.scheduledStart, "");
+    const scheduledEnd = persistedTime(record.scheduledEnd, "");
+    if (!scheduledDate || !scheduledStart || !scheduledEnd) continue;
+    const id = persistedId(record.id) || uid("timeline");
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    const candidateEndDate = persistedDate(record.scheduledEndDate) || scheduledDate;
+    records.push({
+      ...record,
+      id,
+      taskId,
+      scheduledDate,
+      scheduledStart,
+      scheduledEndDate: candidateEndDate < scheduledDate ? scheduledDate : candidateEndDate,
+      scheduledEnd,
+      executionStatus: ["scheduled", "completed", "returned_unfinished", "cancelled"].includes(String(record.executionStatus))
+        ? record.executionStatus
+        : "scheduled",
+      createdAt: typeof record.createdAt === "string" && record.createdAt ? record.createdAt : now(),
+    });
+  }
+  return records;
 }
 
 function normalizeSubtasks(value: unknown, depth = 0, seenIds = new Set<string>()): Subtask[] {
@@ -385,18 +423,38 @@ export function normalizeData(data: PlannerData): PlannerData {
     };
   });
   const habitIds = new Set(habits.map((habit) => habit.id));
-  const habitDailyStates = (safeData.habitDailyStates || [])
-    .filter((state) => habitIds.has(String(state.habitId)) && Boolean(persistedDate(state.date)))
-    .map((state) => ({
+  const habitStateByDate = new Map<string, HabitDailyState>();
+  for (const state of safeData.habitDailyStates || []) {
+    const habitId = String(state.habitId);
+    const date = persistedDate(state.date);
+    if (!habitIds.has(habitId) || !date) continue;
+    const normalizedState: HabitDailyState = {
       ...state,
       id: persistedId(state.id) || uid("habit-state"),
-      habitId: String(state.habitId),
-      date: persistedDate(state.date)!,
+      habitId,
+      date,
       completed: Boolean(state.completed),
       timelineRecordId: persistedId(state.timelineRecordId),
       createdAt: state.createdAt || now(),
       updatedAt: state.updatedAt || state.createdAt || now(),
-    }));
+    };
+    const key = `${habitId}\u0000${date}`;
+    const current = habitStateByDate.get(key);
+    const normalizedRank = Math.max(
+      persistedTimestampRank(normalizedState.updatedAt),
+      persistedTimestampRank(normalizedState.createdAt),
+    );
+    const currentRank = current
+      ? Math.max(persistedTimestampRank(current.updatedAt), persistedTimestampRank(current.createdAt))
+      : -1;
+    if (!current || normalizedRank >= currentRank) habitStateByDate.set(key, normalizedState);
+  }
+  const habitDailyStates = Array.from(habitStateByDate.values())
+    .sort((left, right) => (
+      left.date.localeCompare(right.date)
+      || persistedTimestampRank(left.updatedAt) - persistedTimestampRank(right.updatedAt)
+    ))
+    .slice(-MAX_HABIT_DAILY_STATES);
   const seenSubtaskIds = new Set<string>();
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
@@ -469,18 +527,21 @@ export function normalizeData(data: PlannerData): PlannerData {
       })),
     version: Math.max(safeData.version || 1, 2),
     events: [],
-    tasks: [...safeData.tasks, ...migratedTasks].map((task) => ({
-      ...task,
-      title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
-      projectId: persistedId(task.projectId),
-      goalId: persistedId(task.goalId) || "",
-      parentTaskId: persistedId(task.parentTaskId),
-      completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
-      workflowStatus: inferWorkflowStatus(task),
-      timelineRecords: uniqueRecordItems(task.timelineRecords),
-      subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
-      notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
-    })),
+    tasks: [...safeData.tasks, ...migratedTasks].map((task) => {
+      const timelineRecords = normalizeTimelineRecords(task.timelineRecords, task.id);
+      return {
+        ...task,
+        title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
+        projectId: persistedId(task.projectId),
+        goalId: persistedId(task.goalId) || "",
+        parentTaskId: persistedId(task.parentTaskId),
+        completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
+        workflowStatus: inferWorkflowStatus({ ...task, timelineRecords }),
+        timelineRecords,
+        subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
+        notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
+      };
+    }),
   }));
 }
 

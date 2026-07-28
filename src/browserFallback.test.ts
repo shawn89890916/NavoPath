@@ -360,6 +360,14 @@ describe("browser fallback preview mode", () => {
         date: "2026-99-99",
         completed: true,
       },
+      {
+        id: "state-newer",
+        habitId: "habit-valid",
+        date: "2026-07-28",
+        completed: false,
+        createdAt: "2026-07-28T00:00:00.000Z",
+        updatedAt: "2026-07-28T01:00:00.000Z",
+      },
     ];
     malformed.timeEntries = [
       {
@@ -396,7 +404,7 @@ describe("browser fallback preview mode", () => {
     expect(habit?.activeWeekdays).toEqual([1, 3]);
     expect(habit?.reminder).toEqual({ enabled: true });
     expect(normalized.habitDailyStates).toHaveLength(1);
-    expect(normalized.habitDailyStates?.[0].completed).toBe(true);
+    expect(normalized.habitDailyStates?.[0].completed).toBe(false);
     expect(normalized.habitDailyStates?.[0].timelineRecordId).toBeUndefined();
     expect(normalized.timeEntries).toHaveLength(1);
     expect(entry?.durationMinutes).toBe(10_080);
@@ -437,5 +445,67 @@ describe("browser fallback preview mode", () => {
     expect(migrated).toHaveLength(5_000);
     expect(migrated.some((task) => task.title === "Drop oversized event ID")).toBe(false);
     expect(migrated.every((task) => task.id.length <= 200)).toBe(true);
+  });
+
+  it("bounds and repairs persisted timeline records", () => {
+    const malformed = fallbackData() as any;
+    const taskId = malformed.tasks[0].id;
+    malformed.tasks.push({
+      ...malformed.tasks[0],
+      id: "task-invalid-timeline",
+      plannedForDate: undefined,
+      workflowStatus: undefined,
+      timelineRecords: [{
+        id: "invalid-only-record",
+        taskId: "task-invalid-timeline",
+        scheduledDate: "2026-07-28",
+        scheduledStart: "25:00",
+        scheduledEnd: "10:00",
+        executionStatus: "scheduled",
+      }],
+    });
+    malformed.tasks[0].timelineRecords = [
+      ...Array.from({ length: 1_001 }, (_, index) => ({
+        id: index === 0 ? "r".repeat(201) : `record-${index}`,
+        taskId: "wrong-task",
+        scheduledDate: "2026-07-28",
+        scheduledStart: "09:00",
+        scheduledEndDate: index === 0 ? "2026-07-27" : "2026-07-28",
+        scheduledEnd: "10:00",
+        executionStatus: index === 0 ? "invalid" : "scheduled",
+        createdAt: "2026-07-28T00:00:00.000Z",
+      })),
+      {
+        id: "invalid-date",
+        taskId,
+        scheduledDate: "2026-99-99",
+        scheduledStart: "09:00",
+        scheduledEnd: "10:00",
+        executionStatus: "scheduled",
+      },
+      {
+        id: "invalid-time",
+        taskId,
+        scheduledDate: "2026-07-28",
+        scheduledStart: "25:00",
+        scheduledEnd: "10:00",
+        executionStatus: "scheduled",
+      },
+    ];
+
+    const normalized = normalizeData(malformed);
+    const records = normalized.tasks.find((task) => task.id === taskId)?.timelineRecords || [];
+
+    expect(records).toHaveLength(1_000);
+    expect(records[0].id.length).toBeLessThanOrEqual(200);
+    expect(records[0].taskId).toBe(taskId);
+    expect(records[0].scheduledEndDate).toBe("2026-07-28");
+    expect(records[0].executionStatus).toBe("scheduled");
+    expect(records.some((record) => record.id === "invalid-date")).toBe(false);
+    expect(records.some((record) => record.id === "invalid-time")).toBe(false);
+    expect(normalized.tasks.find((task) => task.id === "task-invalid-timeline")).toMatchObject({
+      workflowStatus: "backlog",
+      timelineRecords: [],
+    });
   });
 });
