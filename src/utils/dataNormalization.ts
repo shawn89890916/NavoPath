@@ -1,5 +1,5 @@
 import type { PlannerData, Task } from "../types";
-import { normalizeHabits } from "./habits";
+import { normalizeHabits, normalizeLegacyHabitPluginConfigs } from "./habits";
 import { normalizeNullableLevel, normalizeUrgency } from "./productivityModel";
 import { normalizeTimelineRecord } from "./timelineRecords";
 import { buildAiProfile } from "../aiPersonalization";
@@ -28,6 +28,7 @@ export function normalizePlannerDataForClient(data: PlannerData): PlannerData {
     scheduleTemplates: data.scheduleTemplates || [],
     habits: habitPatch.habits || [],
     habitDailyStates: habitPatch.habitDailyStates || [],
+    pluginConfigs: normalizeLegacyHabitPluginConfigs(data.pluginConfigs),
   };
   return {
     ...normalized,

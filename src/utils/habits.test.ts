@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData } from "../types";
-import { migrateLegacyHabitTracker, normalizeHabits, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, buildHabitMetrics, isHabitDueOnDate, updateHabit, archiveHabit, weekdayLabels } from "./habits";
+import { migrateLegacyHabitTracker, normalizeHabits, normalizeLegacyHabitPluginConfigs, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, buildHabitMetrics, isHabitDueOnDate, updateHabit, archiveHabit, weekdayLabels } from "./habits";
 
 const baseData: PlannerData = {
   version: 1,
@@ -48,6 +48,43 @@ describe("habits", () => {
     const result = normalizeHabits(baseData, "2026-07-01T00:00:00.000Z");
     expect(result.habits?.map((habit) => habit.title)).toEqual(["Read", "Stretch"]);
     expect(result.habits?.[0].activeWeekdays).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("bounds and deduplicates legacy plugin habit names", () => {
+    const legacyNames = [
+      "x".repeat(10_001),
+      " Read ",
+      "Read",
+      ...Array.from({ length: 1_000 }, (_, index) => `Habit ${index}`),
+    ].join("\n");
+    const data = {
+      ...baseData,
+      pluginConfigs: { "habit-tracker": { habits: legacyNames } },
+    };
+
+    const normalized = normalizeHabits(data, "2026-07-01T00:00:00.000Z");
+    const migrated = migrateLegacyHabitTracker(
+      { ...data, habits: undefined },
+      data.pluginConfigs,
+      "2026-07-01T00:00:00.000Z",
+    );
+
+    expect(normalized.habits).toHaveLength(1_000);
+    expect(normalized.habits?.[0].title).toHaveLength(10_000);
+    expect(normalized.habits?.filter((habit) => habit.title === "Read")).toHaveLength(1);
+    expect(new Set(normalized.habits?.map((habit) => habit.id)).size).toBe(1_000);
+    expect(normalized.habits?.every((habit) => habit.id.length <= 200)).toBe(true);
+    expect(normalizeLegacyHabitPluginConfigs({
+      ...data.pluginConfigs,
+      unrelated: { payload: "discarded" },
+    })).toEqual({
+      "habit-tracker": {
+        habits: normalized.habits?.map((habit) => habit.title).join("\n"),
+      },
+    });
+    expect(migrated.habits?.map((habit) => habit.title)).toEqual(
+      normalized.habits?.map((habit) => habit.title),
+    );
   });
 
   it("records daily completion without removing the habit", () => {

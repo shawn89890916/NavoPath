@@ -1,12 +1,44 @@
 import type { Habit, HabitDailyState, HabitFrequency, PlannerData, Task, TimelineRecord } from "../types";
 
+const MAX_LEGACY_HABITS = 1_000;
+const MAX_LEGACY_HABIT_TEXT_LENGTH = 60_000;
+const MAX_LEGACY_HABIT_TITLE_LENGTH = 10_000;
+
 function uid(prefix: string, seed: string) {
-  const slug = seed.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
-  const unicodeSlug = Array.from(seed).map((char) => char.codePointAt(0)?.toString(36)).join("-");
-  return `${prefix}-${slug || unicodeSlug}`;
+  const slug = seed.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "").slice(0, 120);
+  let hash = 2_166_136_261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return `${prefix}-${slug || "item"}-${(hash >>> 0).toString(36)}`;
+}
+
+function legacyHabitTitles(value: unknown) {
+  if (typeof value !== "string") return [];
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  for (const line of value.slice(0, MAX_LEGACY_HABIT_TEXT_LENGTH).split(/\r?\n/)) {
+    const title = line.trim().slice(0, MAX_LEGACY_HABIT_TITLE_LENGTH);
+    if (!title || seen.has(title)) continue;
+    seen.add(title);
+    titles.push(title);
+    if (titles.length >= MAX_LEGACY_HABITS) break;
+  }
+  return titles;
 }
 
 const LEGACY_DEFAULT_HABITS = ["复盘今天", "整理任务", "查看明日计划"];
+
+export function normalizeLegacyHabitPluginConfigs(value: unknown): PlannerData["pluginConfigs"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const tracker = (value as Record<string, unknown>)["habit-tracker"];
+  if (!tracker || typeof tracker !== "object" || Array.isArray(tracker)) return undefined;
+  const titles = legacyHabitTitles((tracker as Record<string, unknown>).habits);
+  return titles.length > 0
+    ? { "habit-tracker": { habits: titles.join("\n") } }
+    : undefined;
+}
 
 type LegacyHabitTrackerConfig = {
   habits?: unknown;
@@ -23,9 +55,7 @@ export function migrateLegacyHabitTracker(
   const legacy = pluginConfigs?.["habit-tracker"] as LegacyHabitTrackerConfig | undefined;
   if (!legacy || typeof legacy !== "object") return data;
 
-  const customTitles = typeof legacy.habits === "string"
-    ? legacy.habits.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-    : [];
+  const customTitles = legacyHabitTitles(legacy.habits);
   const titles = customTitles.length > 0 ? customTitles : LEGACY_DEFAULT_HABITS;
   const habits: Habit[] = titles.map((title, index) => ({
     id: uid("habit", title),
@@ -70,8 +100,7 @@ export function normalizeHabits(data: PlannerData, now = new Date().toISOString(
   if (Array.isArray(data.habits) && data.habits.length > 0) {
     return { habits: data.habits, habitDailyStates: data.habitDailyStates || [] };
   }
-  const raw = String(data.pluginConfigs?.["habit-tracker"]?.habits || "");
-  const titles = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const titles = legacyHabitTitles(data.pluginConfigs?.["habit-tracker"]?.habits);
   const habits: Habit[] = titles.map((title, index) => ({
     id: uid("habit", title),
     title,
