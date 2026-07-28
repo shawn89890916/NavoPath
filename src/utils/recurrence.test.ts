@@ -67,6 +67,42 @@ describe("recurrence date helpers", () => {
       "2026-07-26",
     ]);
   });
+
+  it("anchors monthly recurrence to the original day after a short month", () => {
+    const recurrence: TaskRecurrence = {
+      mode: "flexible",
+      frequency: "monthly",
+      startDate: "2025-01-31",
+    };
+    const visibleDates = new Set([
+      "2025-02-28",
+      "2025-03-28",
+      "2025-03-31",
+    ]);
+
+    expect(enumerateRecurrenceDates(recurrence, visibleDates)).toEqual([
+      "2025-02-28",
+      "2025-03-31",
+    ]);
+  });
+
+  it("anchors quarterly recurrence to the original day after a short month", () => {
+    const recurrence: TaskRecurrence = {
+      mode: "flexible",
+      frequency: "quarterly",
+      startDate: "2025-01-31",
+    };
+    const visibleDates = new Set([
+      "2025-04-30",
+      "2025-07-30",
+      "2025-07-31",
+    ]);
+
+    expect(enumerateRecurrenceDates(recurrence, visibleDates)).toEqual([
+      "2025-04-30",
+      "2025-07-31",
+    ]);
+  });
 });
 
 describe("recurring task identity", () => {

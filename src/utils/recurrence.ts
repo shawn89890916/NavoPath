@@ -37,12 +37,14 @@ function isWeekendIso(iso: string) {
 
 export function enumerateRecurrenceDates(recurrence: TaskRecurrence, visibleDates: Set<string>) {
   if (!recurrence.startDate || visibleDates.size === 0) return [];
+  const startDate = recurrence.startDate;
   const sortedVisibleDates = [...visibleDates].sort();
   const minDate = sortedVisibleDates[0];
   const maxDate = sortedVisibleDates[sortedVisibleDates.length - 1];
   const results: string[] = [];
-  let cursor = recurrence.startDate;
+  let cursor = startDate;
   let occurrenceCount = 0;
+  let monthOffset = 0;
 
   const advanceCursor = (date: string) => {
     switch (recurrence.frequency) {
@@ -51,9 +53,11 @@ export function enumerateRecurrenceDates(recurrence: TaskRecurrence, visibleDate
       case "biweekly":
         return addDays(date, 14);
       case "monthly":
-        return addMonths(date, 1);
+        monthOffset += 1;
+        return addMonths(startDate, monthOffset);
       case "quarterly":
-        return addMonths(date, 3);
+        monthOffset += 3;
+        return addMonths(startDate, monthOffset);
       default:
         return addDays(date, 1);
     }
