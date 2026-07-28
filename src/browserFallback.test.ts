@@ -257,4 +257,68 @@ describe("browser fallback preview mode", () => {
     expect(normalizedTags.every((tag: string) => tag.length <= 200)).toBe(true);
     expect(normalized.aiMemories[0].tags).toEqual(normalizedTags);
   });
+
+  it("bounds persisted goals, long-term tasks, drafts, and schedule templates", () => {
+    const malformed = fallbackData() as any;
+    malformed.goals = [{
+      id: "g".repeat(201),
+      title: "G".repeat(10_001),
+      description: "D".repeat(60_001),
+      targetDate: "2027-05-01",
+      status: "active",
+    }];
+    malformed.longTasks = [{
+      id: "l".repeat(201),
+      title: "L".repeat(10_001),
+      notes: "N".repeat(60_001),
+      targetDate: "2027-05-01",
+      completed: false,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+    malformed.drafts = [{
+      id: "d".repeat(201),
+      type: "task",
+      title: "T".repeat(10_001),
+      projectId: "p".repeat(201),
+      estimatedHours: 1,
+      dueDate: "2026-07-29",
+      details: "B".repeat(60_001),
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+    malformed.scheduleTemplates = [{
+      id: "t".repeat(201),
+      title: "S".repeat(10_001),
+      slots: Array.from({ length: 501 }, (_, index) => ({
+        id: index === 0 ? "s".repeat(201) : `slot-${index}`,
+        label: "P".repeat(10_001),
+        start: index === 0 ? "invalid" : "09:00",
+        end: index === 0 ? "also-invalid" : "10:00",
+      })),
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    const normalized = normalizeData(malformed);
+    const template = normalized.scheduleTemplates?.[0];
+
+    expect(normalized.goals[0].id.length).toBeLessThanOrEqual(200);
+    expect(normalized.goals[0].title).toHaveLength(10_000);
+    expect(normalized.goals[0].description).toHaveLength(60_000);
+    expect(normalized.longTasks[0].id.length).toBeLessThanOrEqual(200);
+    expect(normalized.longTasks[0].title).toHaveLength(10_000);
+    expect(normalized.longTasks[0].notes).toHaveLength(60_000);
+    expect(normalized.drafts[0].id.length).toBeLessThanOrEqual(200);
+    expect(normalized.drafts[0].title).toHaveLength(10_000);
+    expect(normalized.drafts[0].details).toHaveLength(60_000);
+    expect(normalized.drafts[0].projectId).toBe("");
+    expect(template?.id.length).toBeLessThanOrEqual(200);
+    expect(template?.title).toHaveLength(10_000);
+    expect(template?.slots).toHaveLength(500);
+    expect(template?.slots[0].id.length).toBeLessThanOrEqual(200);
+    expect(template?.slots[0].label).toHaveLength(10_000);
+    expect(template?.slots[0].start).toBe("09:00");
+    expect(template?.slots[0].end).toBe("10:00");
+  });
 });

@@ -15,6 +15,7 @@ const MAX_PERSISTED_TEXT_LENGTH = 60_000;
 const MAX_PERSISTED_TAGS = 100;
 const MAX_PERSISTED_TAG_SCAN = 1_000;
 const MAX_PERSISTED_TAG_LENGTH = 200;
+const MAX_PERSISTED_TEMPLATE_SLOTS = 500;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -93,6 +94,12 @@ function persistedId(value: unknown) {
 
 function boundedPersistedString(value: unknown, maxLength: number, fallback = "") {
   return typeof value === "string" ? value.slice(0, maxLength) : fallback;
+}
+
+function persistedTime(value: unknown, fallback: string) {
+  return typeof value === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)
+    ? value
+    : fallback;
 }
 
 function normalizePersistedTags(value: unknown) {
@@ -312,6 +319,12 @@ export function normalizeData(data: PlannerData): PlannerData {
   const seenSubtaskIds = new Set<string>();
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
+    goals: safeData.goals.map((goal) => ({
+      ...goal,
+      id: persistedId(goal.id) || uid("goal"),
+      title: boundedPersistedString(goal.title, MAX_PERSISTED_TITLE_LENGTH),
+      description: boundedPersistedString(goal.description, MAX_PERSISTED_TEXT_LENGTH),
+    })),
     projects: safeData.projects.map((project) => ({
       ...project,
       title: boundedPersistedString(project.title, MAX_PERSISTED_TITLE_LENGTH),
@@ -320,7 +333,12 @@ export function normalizeData(data: PlannerData): PlannerData {
       importance: project.importance || "high",
       urgency: project.urgency || "low",
     })),
-    longTasks: safeData.longTasks,
+    longTasks: safeData.longTasks.map((task) => ({
+      ...task,
+      id: persistedId(task.id) || uid("long"),
+      title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
+      notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
+    })),
     notes,
     chat,
     aiConversations,
@@ -339,12 +357,16 @@ export function normalizeData(data: PlannerData): PlannerData {
     })),
     scheduleTemplates: (safeData.scheduleTemplates || []).map((template) => ({
       ...template,
-      id: template.id || uid("template"),
-      title: template.title || "Template",
-      slots: uniqueRecordItems<NonNullable<PlannerData["scheduleTemplates"]>[number]["slots"][number]>(template.slots).map((slot) => ({
+      id: persistedId(template.id) || uid("template"),
+      title: boundedPersistedString(template.title, MAX_PERSISTED_TITLE_LENGTH) || "Template",
+      slots: uniqueRecordItems<NonNullable<PlannerData["scheduleTemplates"]>[number]["slots"][number]>(
+        recordItems(template.slots).slice(0, MAX_PERSISTED_TEMPLATE_SLOTS),
+      ).map((slot) => ({
         ...slot,
-        id: slot.id || uid("slot"),
-        label: slot.label || "Period",
+        id: persistedId(slot.id) || uid("slot"),
+        label: boundedPersistedString(slot.label, MAX_PERSISTED_TITLE_LENGTH) || "Period",
+        start: persistedTime(slot.start, "09:00"),
+        end: persistedTime(slot.end, "10:00"),
       })),
       createdAt: template.createdAt || now(),
       updatedAt: template.updatedAt || template.createdAt || now(),
@@ -352,7 +374,16 @@ export function normalizeData(data: PlannerData): PlannerData {
     timeEntries: (safeData.timeEntries || [])
       .map((entry) => normalizeTimeEntry(entry, safeData.tasks))
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
-    drafts: safeData.drafts.filter((draft) => draft.title).slice(-10),
+    drafts: safeData.drafts
+      .filter((draft) => typeof draft.title === "string" && draft.title)
+      .slice(-10)
+      .map((draft) => ({
+        ...draft,
+        id: persistedId(draft.id) || uid("draft"),
+        title: boundedPersistedString(draft.title, MAX_PERSISTED_TITLE_LENGTH),
+        projectId: persistedId(draft.projectId) || "",
+        details: boundedPersistedString(draft.details, MAX_PERSISTED_TEXT_LENGTH),
+      })),
     version: Math.max(safeData.version || 1, 2),
     events: [],
     tasks: [...safeData.tasks, ...migratedTasks].map((task) => ({
