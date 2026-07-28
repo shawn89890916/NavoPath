@@ -111,7 +111,7 @@ import {
   scheduleWidgetCountdown,
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
-import { calculateTimelineRecordEnd, rescheduleTimelineRecord } from "./utils/timelineRecords";
+import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, rescheduleTimelineRecord } from "./utils/timelineRecords";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
@@ -869,13 +869,20 @@ function makeAiConversation(title = "新对话"): AiConversation {
 function buildEventFromTask(task: Task, activeRecord?: TimelineRecord): CalendarEvent {
   const scheduledDate = activeRecord?.scheduledDate || task.scheduledDate || task.plannedForDate || task.dueDate || todayIso();
   const scheduledStart = activeRecord?.scheduledStart || task.scheduledStart || task.recurrence?.startTime || "";
-  const scheduledEnd = activeRecord?.scheduledEnd || task.scheduledEnd || (scheduledStart ? addMinutes(scheduledStart, taskDuration(task)) : "");
+  const activeSchedule = activeRecord
+    ? rescheduleTimelineRecord(activeRecord, activeRecord.scheduledDate, activeRecord.scheduledStart)
+    : undefined;
+  const fallbackEnd = scheduledStart
+    ? calculateTimelineRecordEnd(scheduledDate, scheduledStart, taskDuration(task))
+    : undefined;
+  const scheduledEnd = activeSchedule?.scheduledEnd || task.scheduledEnd || fallbackEnd?.scheduledEnd || "";
+  const scheduledEndDate = activeSchedule?.scheduledEndDate || fallbackEnd?.scheduledEndDate || scheduledDate;
   return {
     id: uid("event"),
     title: task.title,
     date: scheduledDate,
     startDate: scheduledDate,
-    endDate: scheduledDate,
+    endDate: scheduledEndDate,
     startTime: scheduledStart || undefined,
     endTime: scheduledEnd || undefined,
     category: task.category,
@@ -887,12 +894,33 @@ function buildEventFromTask(task: Task, activeRecord?: TimelineRecord): Calendar
 
 function buildTaskFromEvent(event: CalendarEvent): Task {
   const now = new Date().toISOString();
+  const id = uid("task");
   const date = event.startDate || event.date || todayIso();
   const start = event.startTime || undefined;
-  const end = start ? (event.endTime || addMinutes(start, event.recurrence?.durationMinutes || 60)) : undefined;
-  const durationMinutes = start && end ? Math.max(timeToMinutes(end) - timeToMinutes(start), SLOT_MINUTES) : 30;
+  let end = start ? event.endTime : undefined;
+  let endDate = event.endDate || date;
+  if (start && !end) {
+    const calculated = calculateTimelineRecordEnd(date, start, event.recurrence?.durationMinutes || 60);
+    end = calculated.scheduledEnd;
+    endDate = calculated.scheduledEndDate || date;
+  } else if (start && end && endDate === date && timeToMinutes(end) <= timeToMinutes(start)) {
+    endDate = calculateTimelineRecordEnd(date, start, spanDurationMinutes(start, end)).scheduledEndDate || date;
+  }
+  const durationMinutes = start && end
+    ? Math.max(calendarDateTimeSpanMinutes(date, start, endDate, end), SLOT_MINUTES)
+    : 30;
+  const timelineRecords: TimelineRecord[] = start && end ? [{
+    id: `${id}_rec_0`,
+    taskId: id,
+    scheduledDate: date,
+    scheduledStart: start,
+    scheduledEndDate: endDate,
+    scheduledEnd: end,
+    executionStatus: "scheduled",
+    createdAt: now,
+  }] : [];
   return {
-    id: uid("task"),
+    id,
     title: event.title,
     dueDate: date,
     category: event.category,
@@ -903,9 +931,7 @@ function buildTaskFromEvent(event: CalendarEvent): Task {
     estimatedHours: durationMinutes / 60,
     plannedForDate: start ? undefined : date,
     executionLane: start ? undefined : "candidate",
-    scheduledDate: date,
-    scheduledStart: start,
-    scheduledEnd: end,
+    timelineRecords,
     recurrence: event.recurrence,
     order: Date.now(),
     subtasks: [],
@@ -5725,6 +5751,7 @@ function App() {
         }
       : event;
     const task = buildTaskFromEvent(sourceEvent);
+    const convertedRecord = task.timelineRecords?.[0];
     void saveData({
       ...data,
       events: data.events.filter((item) => item.id !== event.id),
@@ -5739,9 +5766,9 @@ function App() {
       projectId: "",
       projectColor: DEFAULT_PROJECT_COLOR,
       dueDate: task.dueDate,
-      dueTime: task.scheduledStart || "",
-      endDate: task.dueDate,
-      endTime: task.scheduledEnd || "",
+      dueTime: convertedRecord?.scheduledStart || "",
+      endDate: convertedRecord?.scheduledEndDate || task.dueDate,
+      endTime: convertedRecord?.scheduledEnd || "",
       category: task.category,
       priority: task.priority ?? "medium",
       importance: task.importance !== undefined ? task.importance : (task.priority ?? null),

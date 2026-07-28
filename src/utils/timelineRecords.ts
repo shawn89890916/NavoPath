@@ -32,15 +32,29 @@ export function calculateTimelineRecordEnd(
   };
 }
 
+export function calendarDateTimeSpanMinutes(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+): number {
+  const startDay = Date.parse(`${startDate}T00:00:00.000Z`);
+  const endDay = Date.parse(`${endDate}T00:00:00.000Z`);
+  return Math.max(0, Math.round((endDay - startDay) / 86_400_000) * 1_440
+    + minutesOfDay(endTime)
+    - minutesOfDay(startTime));
+}
+
 function timelineRecordDurationMinutes(record: TimelineRecord): number {
   const normalized = normalizeTimelineRecord(record);
-  const startDay = Date.parse(`${normalized.scheduledDate}T00:00:00.000Z`);
-  const endDay = Date.parse(`${normalized.scheduledEndDate}T00:00:00.000Z`);
-  let duration = Math.round((endDay - startDay) / 86_400_000) * 1_440
-    + minutesOfDay(normalized.scheduledEnd)
-    - minutesOfDay(normalized.scheduledStart);
+  let duration = calendarDateTimeSpanMinutes(
+    normalized.scheduledDate,
+    normalized.scheduledStart,
+    normalized.scheduledEndDate || normalized.scheduledDate,
+    normalized.scheduledEnd,
+  );
   if (!record.scheduledEndDate && duration <= 0) duration += 1_440;
-  return Math.max(0, duration);
+  return duration;
 }
 
 export function rescheduleTimelineRecord(
