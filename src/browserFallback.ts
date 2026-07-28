@@ -3,6 +3,7 @@ import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
 import { normalizePlannerDataForClient } from "./utils/dataNormalization";
+import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, minutesOfDay } from "./utils/timelineRecords";
 
 const PREVIEW_STORAGE_KEY = "planner-preview-data";
 const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
@@ -541,8 +542,27 @@ function migrateEventsToTasks(data: PlannerData): Task[] {
   const makeTask = (event: PlannerData["events"][number], date: string, suffix: string): Task => {
     const id = `migrated_event_${event.id}_${suffix}`;
     const start = event.startTime || undefined;
-    const duration = start && event.endTime
-      ? Math.max((Number(event.endTime.slice(0, 2)) * 60 + Number(event.endTime.slice(3))) - (Number(start.slice(0, 2)) * 60 + Number(start.slice(3))), 15)
+    let end = start ? event.endTime : undefined;
+    let endDate = event.endDate && event.endDate >= date ? event.endDate : date;
+    if (start && event.recurrence) {
+      let occurrenceDuration = event.recurrence.durationMinutes;
+      if (!occurrenceDuration) {
+        occurrenceDuration = end ? minutesOfDay(end) - minutesOfDay(start) : 60;
+        if (occurrenceDuration <= 0) occurrenceDuration += 1_440;
+      }
+      const calculated = calculateTimelineRecordEnd(date, start, occurrenceDuration);
+      end = calculated.scheduledEnd;
+      endDate = calculated.scheduledEndDate || date;
+    } else if (start && !end) {
+      const calculated = calculateTimelineRecordEnd(date, start, 60);
+      end = calculated.scheduledEnd;
+      endDate = calculated.scheduledEndDate || date;
+    } else if (start && end && endDate === date && minutesOfDay(end) <= minutesOfDay(start)) {
+      const wrappedDuration = minutesOfDay(end) - minutesOfDay(start) + 1_440;
+      endDate = calculateTimelineRecordEnd(date, start, wrappedDuration).scheduledEndDate || date;
+    }
+    const duration = start && end
+      ? Math.max(calendarDateTimeSpanMinutes(date, start, endDate, end), 15)
       : 30;
     const task: Task = {
       id,
@@ -561,7 +581,16 @@ function migrateEventsToTasks(data: PlannerData): Task[] {
       createdAt: event.createdAt || now(),
       updatedAt: event.createdAt || now(),
     };
-    if (start && !event.recurrence) task.timelineRecords = [{ id: `${id}_schedule`, taskId: id, scheduledDate: date, scheduledStart: start, scheduledEnd: event.endTime || `${String(Math.min(Number(start.slice(0, 2)) + 1, 23)).padStart(2, "0")}:${start.slice(3)}`, executionStatus: "scheduled", createdAt: event.createdAt || now() }];
+    if (start && end && !event.recurrence) task.timelineRecords = [{
+      id: `${id}_schedule`,
+      taskId: id,
+      scheduledDate: date,
+      scheduledStart: start,
+      scheduledEndDate: endDate,
+      scheduledEnd: end,
+      executionStatus: "scheduled",
+      createdAt: event.createdAt || now(),
+    }];
     return task;
   };
   for (const event of data.events || []) {

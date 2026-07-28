@@ -777,6 +777,60 @@ describe("browser fallback preview mode", () => {
     expect(migrated.every((task) => task.id.length <= 200)).toBe(true);
   });
 
+  it("preserves a legacy event that crosses midnight", () => {
+    const legacy = fallbackData();
+    legacy.events = [{
+      id: "legacy-overnight",
+      title: "Overnight study",
+      date: "2026-07-28",
+      startDate: "2026-07-28",
+      endDate: "2026-07-29",
+      startTime: "23:30",
+      endTime: "00:30",
+      category: "exam",
+      details: "",
+      createdAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    const migrated = normalizeData(legacy).tasks.find((task) => task.title === "Overnight study");
+
+    expect(migrated?.estimatedHours).toBe(1);
+    expect(migrated?.timelineRecords?.[0]).toMatchObject({
+      scheduledDate: "2026-07-28",
+      scheduledStart: "23:30",
+      scheduledEndDate: "2026-07-29",
+      scheduledEnd: "00:30",
+    });
+  });
+
+  it("uses recurrence duration instead of the recurring series end date", () => {
+    const legacy = fallbackData();
+    legacy.events = [{
+      id: "legacy-recurring",
+      title: "Daily review",
+      date: "2026-07-28",
+      startDate: "2026-07-28",
+      endDate: "2026-12-31",
+      startTime: "09:00",
+      endTime: "10:00",
+      category: "exam",
+      details: "",
+      recurrence: {
+        mode: "scheduled",
+        frequency: "daily",
+        startDate: "2026-07-28",
+        startTime: "09:00",
+        durationMinutes: 60,
+        endDate: "2026-12-31",
+      },
+      createdAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    const migrated = normalizeData(legacy).tasks.find((task) => task.title === "Daily review");
+
+    expect(migrated?.estimatedHours).toBe(1);
+  });
+
   it("bounds and repairs persisted timeline records", () => {
     const malformed = fallbackData() as any;
     const taskId = malformed.tasks[0].id;
