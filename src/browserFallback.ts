@@ -1,4 +1,4 @@
-import type { AiAction, PlannerApi, PlannerData, Settings, Subtask, Task, TaskRecurrence } from "./types";
+import type { AiAction, ChatMessage, PlannerApi, PlannerData, Settings, Subtask, Task, TaskRecurrence } from "./types";
 import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
@@ -12,6 +12,9 @@ const MAX_PERSISTED_SUBTASK_DEPTH = 64;
 const MAX_PERSISTED_ID_LENGTH = 200;
 const MAX_PERSISTED_TITLE_LENGTH = 10_000;
 const MAX_PERSISTED_TEXT_LENGTH = 60_000;
+const MAX_PERSISTED_TAGS = 100;
+const MAX_PERSISTED_TAG_SCAN = 1_000;
+const MAX_PERSISTED_TAG_LENGTH = 200;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -90,6 +93,30 @@ function persistedId(value: unknown) {
 
 function boundedPersistedString(value: unknown, maxLength: number, fallback = "") {
   return typeof value === "string" ? value.slice(0, maxLength) : fallback;
+}
+
+function normalizePersistedTags(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value.slice(0, MAX_PERSISTED_TAG_SCAN)) {
+    if (typeof item !== "string") continue;
+    const tag = item.trim().slice(0, MAX_PERSISTED_TAG_LENGTH);
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    tags.push(tag);
+    if (tags.length >= MAX_PERSISTED_TAGS) break;
+  }
+  return tags;
+}
+
+function normalizeChatMessages(value: unknown, forceSaved = false): ChatMessage[] {
+  return uniqueRecordItems<ChatMessage>(value).map((message) => ({
+    ...message,
+    id: persistedId(message.id) || uid("chat"),
+    content: boundedPersistedString(message.content, MAX_PERSISTED_TEXT_LENGTH),
+    saved: forceSaved || Boolean(message.saved),
+  }));
 }
 
 function normalizeSubtasks(value: unknown, depth = 0, seenIds = new Set<string>()): Subtask[] {
@@ -257,21 +284,20 @@ export function normalizeData(data: PlannerData): PlannerData {
     taskLayouts: isRecord(data.taskLayouts) ? data.taskLayouts as PlannerData["taskLayouts"] : {},
   };
   const migratedTasks = migrateEventsToTasks(safeData);
-  const chat = safeData.chat.map((message) => ({
-    ...message,
-    id: message.id || uid("chat"),
-    saved: Boolean(message.saved),
+  const notes = safeData.notes.map((note) => ({
+    ...note,
+    id: persistedId(note.id) || uid("note"),
+    content: boundedPersistedString(note.content, MAX_PERSISTED_TEXT_LENGTH),
+    tags: normalizePersistedTags(note.tags),
+    createdAt: note.createdAt || now(),
   }));
+  const chat = normalizeChatMessages(safeData.chat);
   const aiConversations = (safeData.aiConversations && safeData.aiConversations.length > 0)
     ? safeData.aiConversations.map((conversation) => ({
       ...conversation,
-      id: conversation.id || uid("conversation"),
-      title: conversation.title || "AI 对话",
-      messages: uniqueRecordItems<PlannerData["chat"][number]>(conversation.messages).map((message) => ({
-        ...message,
-        id: message.id || uid("chat"),
-        saved: Boolean(message.saved),
-      })),
+      id: persistedId(conversation.id) || uid("conversation"),
+      title: boundedPersistedString(conversation.title, MAX_PERSISTED_TITLE_LENGTH) || "AI 对话",
+      messages: normalizeChatMessages(conversation.messages),
       createdAt: conversation.createdAt || now(),
       updatedAt: conversation.updatedAt || conversation.createdAt || now(),
     }))
@@ -282,6 +308,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       createdAt: chat[0]?.createdAt || now(),
       updatedAt: chat[chat.length - 1]?.createdAt || now(),
     }] : []);
+  const activeAiConversationId = persistedId(safeData.activeAiConversationId);
   const seenSubtaskIds = new Set<string>();
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
@@ -294,19 +321,19 @@ export function normalizeData(data: PlannerData): PlannerData {
       urgency: project.urgency || "low",
     })),
     longTasks: safeData.longTasks,
+    notes,
     chat,
     aiConversations,
-    activeAiConversationId: safeData.activeAiConversationId || aiConversations[0]?.id,
+    activeAiConversationId: aiConversations.some((conversation) => conversation.id === activeAiConversationId)
+      ? activeAiConversationId
+      : aiConversations[0]?.id,
     aiMemories: safeData.aiMemories.map((memory) => ({
       ...memory,
-      id: memory.id || uid("memory"),
-      tags: Array.isArray(memory.tags) ? memory.tags.filter((tag): tag is string => typeof tag === "string") : [],
+      id: persistedId(memory.id) || uid("memory"),
+      content: boundedPersistedString(memory.content, MAX_PERSISTED_TEXT_LENGTH),
+      tags: normalizePersistedTags(memory.tags),
       source: memory.source || "auto",
-      sourceMessages: uniqueRecordItems<PlannerData["chat"][number]>(memory.sourceMessages).map((message) => ({
-        ...message,
-        id: message.id || uid("chat"),
-        saved: true,
-      })),
+      sourceMessages: normalizeChatMessages(memory.sourceMessages, true),
       pinned: Boolean(memory.pinned),
       archived: Boolean(memory.archived),
     })),

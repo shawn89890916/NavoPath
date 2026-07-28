@@ -188,4 +188,73 @@ describe("browser fallback preview mode", () => {
     expect(boundedProject?.title).toHaveLength(10_000);
     expect(boundedProject?.notes).toHaveLength(60_000);
   });
+
+  it("bounds persisted notes, AI conversations, messages, memories, and tags", () => {
+    const malformed = fallbackData() as any;
+    const tags = [
+      " keep ",
+      "keep",
+      "x".repeat(201),
+      ...Array.from({ length: 150 }, (_, index) => `tag-${index}`),
+    ];
+    malformed.notes = [{
+      id: "n".repeat(201),
+      content: "N".repeat(60_001),
+      tags,
+      createdAt: "2026-07-28T00:00:00.000Z",
+    }];
+    malformed.chat = [{
+      id: "c".repeat(201),
+      role: "user",
+      content: "C".repeat(60_001),
+      createdAt: "2026-07-28T00:00:00.000Z",
+    }];
+    malformed.aiConversations = [{
+      id: "a".repeat(201),
+      title: "A".repeat(10_001),
+      messages: [{
+        id: "m".repeat(201),
+        role: "assistant",
+        content: "M".repeat(60_001),
+        createdAt: "2026-07-28T00:00:00.000Z",
+      }],
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+    malformed.activeAiConversationId = "missing-conversation";
+    malformed.aiMemories = [{
+      id: "r".repeat(201),
+      content: "R".repeat(60_001),
+      tags,
+      sourceMessages: [{
+        id: "s".repeat(201),
+        role: "user",
+        content: "S".repeat(60_001),
+        createdAt: "2026-07-28T00:00:00.000Z",
+      }],
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    const normalized = normalizeData(malformed);
+    const normalizedTags = normalized.notes[0].tags;
+
+    expect(normalized.notes[0].id.length).toBeLessThanOrEqual(200);
+    expect(normalized.notes[0].content).toHaveLength(60_000);
+    expect(normalized.chat[0].id?.length).toBeLessThanOrEqual(200);
+    expect(normalized.chat[0].content).toHaveLength(60_000);
+    expect(normalized.aiConversations?.[0].id.length).toBeLessThanOrEqual(200);
+    expect(normalized.aiConversations?.[0].title).toHaveLength(10_000);
+    expect(normalized.aiConversations?.[0].messages[0].content).toHaveLength(60_000);
+    expect(normalized.activeAiConversationId).toBe(normalized.aiConversations?.[0].id);
+    expect(normalized.aiMemories[0].id.length).toBeLessThanOrEqual(200);
+    expect(normalized.aiMemories[0].content).toHaveLength(60_000);
+    expect(normalized.aiMemories[0].sourceMessages?.[0].content).toHaveLength(60_000);
+    expect(normalized.aiMemories[0].sourceMessages?.[0].saved).toBe(true);
+    expect(normalizedTags).toHaveLength(100);
+    expect(normalizedTags[0]).toBe("keep");
+    expect(new Set(normalizedTags).size).toBe(normalizedTags.length);
+    expect(normalizedTags.every((tag: string) => tag.length <= 200)).toBe(true);
+    expect(normalized.aiMemories[0].tags).toEqual(normalizedTags);
+  });
 });
