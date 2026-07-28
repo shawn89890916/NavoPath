@@ -110,6 +110,12 @@ describe("formatLastSyncedAt", () => {
     expect(formatLastSyncedAt(new Date(now.getTime() - 2 * 60 * 60_000).toISOString(), "zh", now)).toBe("2 小时前");
     expect(formatLastSyncedAt(new Date(now.getTime() - 3 * 24 * 60 * 60_000).toISOString(), "en", now)).toBe("3 days ago");
   });
+  it("labels future timestamps without describing them as past", () => {
+    expect(formatLastSyncedAt(new Date(now.getTime() + 60_000).toISOString(), "en", now)).toBe("In 1 minute");
+    expect(formatLastSyncedAt(new Date(now.getTime() + 5 * 60_000).toISOString(), "zh", now)).toBe("5 分钟后");
+    expect(formatLastSyncedAt(new Date(now.getTime() + 2 * 60 * 60_000).toISOString(), "en", now)).toBe("In 2 hours");
+    expect(formatLastSyncedAt(new Date(now.getTime() + 3 * 24 * 60 * 60_000).toISOString(), "zh", now)).toBe("3 天后");
+  });
 });
 
 describe("SyncScheduler", () => {

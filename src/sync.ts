@@ -96,17 +96,31 @@ export function formatLastSyncedAt(value: string | undefined, lang: "en" | "zh",
   const future = diffMs < 0;
   const absSec = Math.round(Math.abs(diffMs) / 1000);
   if (absSec < 45) {
-    return future
-      ? lang === "zh" ? "刚刚" : "Just now"
-      : lang === "zh" ? "刚刚" : "Just now";
+    return lang === "zh" ? "刚刚" : "Just now";
   }
-  if (absSec < 90) return lang === "zh" ? "1 分钟前" : "1 minute ago";
+  if (absSec < 90) {
+    return future
+      ? lang === "zh" ? "1 分钟后" : "In 1 minute"
+      : lang === "zh" ? "1 分钟前" : "1 minute ago";
+  }
   const minutes = Math.round(absSec / 60);
-  if (minutes < 60) return lang === "zh" ? `${minutes} 分钟前` : `${minutes} minutes ago`;
+  if (minutes < 60) {
+    return future
+      ? lang === "zh" ? `${minutes} 分钟后` : `In ${minutes} minutes`
+      : lang === "zh" ? `${minutes} 分钟前` : `${minutes} minutes ago`;
+  }
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return lang === "zh" ? `${hours} 小时前` : `${hours} hours ago`;
+  if (hours < 24) {
+    return future
+      ? lang === "zh" ? `${hours} 小时后` : `In ${hours} hours`
+      : lang === "zh" ? `${hours} 小时前` : `${hours} hours ago`;
+  }
   const days = Math.round(hours / 24);
-  if (days < 7) return lang === "zh" ? `${days} 天前` : `${days} days ago`;
+  if (days < 7) {
+    return future
+      ? lang === "zh" ? `${days} 天后` : `In ${days} days`
+      : lang === "zh" ? `${days} 天前` : `${days} days ago`;
+  }
   return parsed.toLocaleString(lang === "zh" ? "zh-CN" : "en-US", {
     year: "numeric",
     month: "short",
