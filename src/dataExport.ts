@@ -1,6 +1,7 @@
 import type { PlannerData, Project, Settings, Task } from "./types";
 import { normalizeData } from "./browserFallback";
 import { normalizeSettings } from "./defaultSettings";
+import { isIsoDate } from "./utils/localDate";
 
 export const MAX_BACKUP_IMPORT_BYTES = 20 * 1024 * 1024;
 export const MAX_TASK_CSV_IMPORT_BYTES = 10 * 1024 * 1024;
@@ -10,6 +11,8 @@ export const MAX_TASK_CSV_TEXT_LENGTH = 10_000;
 export const MAX_TASK_CSV_METADATA_LENGTH = 200;
 export const MAX_BACKUP_STRUCTURE_DEPTH = 64;
 export const MAX_BACKUP_STRUCTURE_NODES = 500_000;
+const MIN_TASK_ESTIMATED_HOURS = 0.25;
+const MAX_TASK_ESTIMATED_HOURS = 24;
 
 export function isImportFileSizeAllowed(size: number, kind: "backup" | "tasks") {
   const limit = kind === "backup" ? MAX_BACKUP_IMPORT_BYTES : MAX_TASK_CSV_IMPORT_BYTES;
@@ -222,7 +225,10 @@ export function parseTasksCsv(content: string, projects: Project[], now = new Da
   const seenIds = new Set<string>();
   const tasks: Task[] = [];
   for (const row of parseTaskCsvRows(content)) {
-    const estimatedHours = Number(row.estimatedHours);
+    const parsedEstimatedHours = Number(row.estimatedHours);
+    const estimatedHours = Number.isFinite(parsedEstimatedHours) && parsedEstimatedHours > 0
+      ? Math.min(MAX_TASK_ESTIMATED_HOURS, Math.max(MIN_TASK_ESTIMATED_HOURS, parsedEstimatedHours))
+      : undefined;
     const priority = row.priority === "high" || row.priority === "low" ? row.priority : "medium";
     const completed = row.completed.toLowerCase() === "yes" || row.status.toLowerCase() === "completed";
     const createdAt = Number.isNaN(Date.parse(row.createdAt)) ? now : row.createdAt;
@@ -238,8 +244,8 @@ export function parseTasksCsv(content: string, projects: Project[], now = new Da
       notes: "",
       goalId: "",
       completed,
-      estimatedHours: Number.isFinite(estimatedHours) && estimatedHours > 0 ? estimatedHours : undefined,
-      dueDate: row.dueDate,
+      estimatedHours,
+      dueDate: isIsoDate(row.dueDate) ? row.dueDate : "",
       subtasks: [],
       createdAt,
       updatedAt: now,

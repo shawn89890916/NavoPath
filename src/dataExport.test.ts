@@ -204,6 +204,23 @@ describe("task CSV export", () => {
     expect(tasks[0].title).toBe("First task");
   });
 
+  it("normalizes imported due dates and estimated hours before saving", () => {
+    const csv = [
+      TASK_CSV_HEADERS.join(","),
+      "invalid-date,Invalid date,,,2026-02-30,999",
+      "minimum-duration,Minimum duration,,,2026-02-28,0.1",
+      "missing-duration,Missing duration,,,not-a-date,-3",
+    ].join("\n");
+
+    const tasks = parseTasksCsv(csv, [], "2026-07-26T00:00:00.000Z");
+
+    expect(tasks.map(({ dueDate, estimatedHours }) => ({ dueDate, estimatedHours }))).toEqual([
+      { dueDate: "", estimatedHours: 24 },
+      { dueDate: "2026-02-28", estimatedHours: 0.25 },
+      { dueDate: "", estimatedHours: undefined },
+    ]);
+  });
+
   it("rejects task CSV fields that exceed their persisted-data limits", () => {
     const header = TASK_CSV_HEADERS.join(",");
     expect(() => parseTaskCsvRows([
