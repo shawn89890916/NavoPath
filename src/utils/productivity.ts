@@ -1,6 +1,9 @@
 import type { Category, PlannerData, Priority, Project, Task, TimeEntry, WorkflowStatus } from "../types";
 
 export const WORKFLOW_STATUSES: WorkflowStatus[] = ["backlog", "next", "doing", "waiting", "done"];
+const MAX_PERSISTED_ID_LENGTH = 200;
+const MAX_TIME_ENTRY_NOTE_LENGTH = 60_000;
+const MAX_TIME_ENTRY_DURATION_MINUTES = 7 * 24 * 60;
 
 export const WORKFLOW_LABELS: Record<WorkflowStatus, { en: string; zh: string }> = {
   backlog: { en: "To do", zh: "代办" },
@@ -42,18 +45,34 @@ export function minutesBetween(startAt: string, endAt: string): number {
 }
 
 export function normalizeTimeEntry(entry: TimeEntry, tasks: Task[] = []): TimeEntry | null {
-  if (!entry?.id || !entry.taskId) return null;
+  const boundedId = (value: unknown) => (
+    typeof value === "string" && value.length > 0 && value.length <= MAX_PERSISTED_ID_LENGTH
+      ? value
+      : undefined
+  );
+  const id = boundedId(entry?.id);
+  const taskId = boundedId(entry?.taskId);
+  if (!id || !taskId) return null;
+  if (typeof entry.startAt !== "string" || typeof entry.endAt !== "string") return null;
+  const startAt = Date.parse(entry.startAt);
+  const endAt = Date.parse(entry.endAt);
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) return null;
   const task = tasks.find((item) => item.id === entry.taskId);
   const durationMinutes = Number.isFinite(entry.durationMinutes) && entry.durationMinutes > 0
     ? Math.round(entry.durationMinutes)
     : minutesBetween(entry.startAt, entry.endAt);
   if (durationMinutes <= 0) return null;
   const now = new Date().toISOString();
+  const projectId = boundedId(entry.projectId) || boundedId(task?.projectId);
   return {
     ...entry,
-    projectId: entry.projectId || task?.projectId,
-    durationMinutes,
-    source: entry.source || "timer",
+    id,
+    taskId,
+    projectId,
+    timelineRecordId: boundedId(entry.timelineRecordId),
+    durationMinutes: Math.min(durationMinutes, MAX_TIME_ENTRY_DURATION_MINUTES),
+    source: ["timer", "manual", "idle_adjusted"].includes(String(entry.source)) ? entry.source : "timer",
+    note: typeof entry.note === "string" ? entry.note.slice(0, MAX_TIME_ENTRY_NOTE_LENGTH) : undefined,
     createdAt: entry.createdAt || now,
     updatedAt: entry.updatedAt || entry.createdAt || now,
   };

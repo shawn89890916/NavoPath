@@ -321,4 +321,121 @@ describe("browser fallback preview mode", () => {
     expect(template?.slots[0].start).toBe("09:00");
     expect(template?.slots[0].end).toBe("10:00");
   });
+
+  it("bounds restored habits, daily states, and time entries", () => {
+    const malformed = fallbackData() as any;
+    const taskId = malformed.tasks[0].id;
+    malformed.habits = [{
+      id: "habit-valid",
+      title: "H".repeat(10_001),
+      notes: "N".repeat(60_001),
+      defaultDurationMinutes: 1_000_000,
+      frequencyRule: "invalid",
+      weeklyTarget: 1_000_000,
+      targetCount: 1_000_000,
+      activeWeekdays: [-1, 1, 1, 3, 7, 2.5],
+      reminder: { enabled: true, time: "invalid" },
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+    malformed.habitDailyStates = [
+      {
+        id: "state-valid",
+        habitId: "habit-valid",
+        date: "2026-07-28",
+        completed: 1,
+        timelineRecordId: "r".repeat(201),
+        createdAt: "2026-07-28T00:00:00.000Z",
+        updatedAt: "2026-07-28T00:00:00.000Z",
+      },
+      {
+        id: "state-orphan",
+        habitId: "missing-habit",
+        date: "2026-07-28",
+        completed: true,
+      },
+      {
+        id: "state-invalid-date",
+        habitId: "habit-valid",
+        date: "2026-99-99",
+        completed: true,
+      },
+    ];
+    malformed.timeEntries = [
+      {
+        id: "entry-valid",
+        taskId,
+        projectId: "p".repeat(201),
+        timelineRecordId: "r".repeat(201),
+        startAt: "2026-07-28T08:00:00.000Z",
+        endAt: "2026-07-28T09:00:00.000Z",
+        durationMinutes: 1_000_000,
+        source: "invalid",
+        note: "E".repeat(60_001),
+      },
+      {
+        id: "entry-invalid-time",
+        taskId,
+        startAt: "invalid",
+        endAt: "also-invalid",
+        durationMinutes: 60,
+        source: "timer",
+      },
+    ];
+
+    const normalized = normalizeData(malformed);
+    const habit = normalized.habits?.[0];
+    const entry = normalized.timeEntries?.[0];
+
+    expect(habit?.title).toHaveLength(10_000);
+    expect(habit?.notes).toHaveLength(60_000);
+    expect(habit?.defaultDurationMinutes).toBe(480);
+    expect(habit?.frequencyRule).toBe("daily");
+    expect(habit?.weeklyTarget).toBe(1_000);
+    expect(habit?.targetCount).toBe(1_000);
+    expect(habit?.activeWeekdays).toEqual([1, 3]);
+    expect(habit?.reminder).toEqual({ enabled: true });
+    expect(normalized.habitDailyStates).toHaveLength(1);
+    expect(normalized.habitDailyStates?.[0].completed).toBe(true);
+    expect(normalized.habitDailyStates?.[0].timelineRecordId).toBeUndefined();
+    expect(normalized.timeEntries).toHaveLength(1);
+    expect(entry?.durationMinutes).toBe(10_080);
+    expect(entry?.source).toBe("timer");
+    expect(entry?.projectId).toBe(normalized.tasks.find((task) => task.id === taskId)?.projectId);
+    expect(entry?.timelineRecordId).toBeUndefined();
+    expect(entry?.note).toHaveLength(60_000);
+  });
+
+  it("caps legacy event migration before it can expand into millions of tasks", () => {
+    const malformed = fallbackData() as any;
+    malformed.events = [
+      {
+        id: "e".repeat(161),
+        title: "Drop oversized event ID",
+        date: "2026-01-01",
+        category: "personal",
+        details: "",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      ...Array.from({ length: 55 }, (_, index) => ({
+        id: `legacy-event-${index}`,
+        title: `Legacy event ${index}`,
+        date: "2026-01-01",
+        startDate: "2026-01-01",
+        endDate: "2026-12-31",
+        category: "personal",
+        details: "",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      })),
+    ];
+
+    const normalized = normalizeData(malformed);
+    const migrated = normalized.tasks.filter((task) => (
+      task.title.startsWith("Legacy event ") || task.title === "Drop oversized event ID"
+    ));
+
+    expect(migrated).toHaveLength(5_000);
+    expect(migrated.some((task) => task.title === "Drop oversized event ID")).toBe(false);
+    expect(migrated.every((task) => task.id.length <= 200)).toBe(true);
+  });
 });

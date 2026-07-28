@@ -16,6 +16,10 @@ const MAX_PERSISTED_TAGS = 100;
 const MAX_PERSISTED_TAG_SCAN = 1_000;
 const MAX_PERSISTED_TAG_LENGTH = 200;
 const MAX_PERSISTED_TEMPLATE_SLOTS = 500;
+const MAX_LEGACY_EVENT_ID_LENGTH = 160;
+const MAX_MIGRATED_EVENT_TASKS = 5_000;
+const MAX_HABIT_DURATION_MINUTES = 480;
+const MAX_HABIT_TARGET = 1_000;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -102,6 +106,20 @@ function persistedTime(value: unknown, fallback: string) {
     : fallback;
 }
 
+function persistedDate(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : undefined;
+}
+
+function boundedInteger(value: unknown, minimum: number, maximum: number, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(maximum, Math.max(minimum, Math.round(value)))
+    : fallback;
+}
+
 function normalizePersistedTags(value: unknown) {
   if (!Array.isArray(value)) return [];
   const tags: string[] = [];
@@ -164,6 +182,7 @@ function addDays(iso: string, days: number) {
 function migrateEventsToTasks(data: PlannerData): Task[] {
   const existing = new Set((data.tasks || []).map((task) => task.id));
   const migrated: Task[] = [];
+  let migrationCandidates = 0;
   const makeTask = (event: PlannerData["events"][number], date: string, suffix: string): Task => {
     const id = `migrated_event_${event.id}_${suffix}`;
     const start = event.startTime || undefined;
@@ -191,14 +210,21 @@ function migrateEventsToTasks(data: PlannerData): Task[] {
     return task;
   };
   for (const event of data.events || []) {
+    if (migrationCandidates >= MAX_MIGRATED_EVENT_TASKS) break;
     const startDate = event.startDate || event.date || localIso(new Date());
     const endDate = event.endDate || startDate;
     if (event.startTime || event.recurrence) {
+      migrationCandidates += 1;
       const task = makeTask(event, startDate, "primary");
       if (!existing.has(task.id)) migrated.push(task);
       continue;
     }
-    for (let date = startDate, index = 0; date <= endDate && index < 366; date = addDays(date, 1), index += 1) {
+    for (
+      let date = startDate, index = 0;
+      date <= endDate && index < 366 && migrationCandidates < MAX_MIGRATED_EVENT_TASKS;
+      date = addDays(date, 1), index += 1
+    ) {
+      migrationCandidates += 1;
       const task = makeTask(event, date, date);
       if (!existing.has(task.id)) migrated.push(task);
     }
@@ -275,12 +301,19 @@ export function normalizeData(data: PlannerData): PlannerData {
       .filter((project) => Boolean(persistedId(project.id)) && typeof project.title === "string")),
     tasks: uniqueRecordItems(recordItems<PlannerData["tasks"][number]>(data.tasks)
       .filter((task) => Boolean(persistedId(task.id)) && typeof task.title === "string")),
-    habits: uniqueRecordItems(data.habits),
+    habits: uniqueRecordItems(recordItems<NonNullable<PlannerData["habits"]>[number]>(data.habits)
+      .filter((habit) => typeof habit.title === "string")),
     habitDailyStates: uniqueRecordItems(data.habitDailyStates),
     timeEntries: uniqueRecordItems(data.timeEntries),
     longTasks: uniqueRecordItems(data.longTasks),
     events: uniqueRecordItems(recordItems<PlannerData["events"][number]>(data.events)
-      .filter((event) => typeof event.id === "string" && typeof event.title === "string")),
+      .slice(0, MAX_MIGRATED_EVENT_TASKS)
+      .filter((event) => (
+        typeof event.id === "string"
+        && event.id.length > 0
+        && event.id.length <= MAX_LEGACY_EVENT_ID_LENGTH
+        && typeof event.title === "string"
+      ))),
     notes: uniqueRecordItems(data.notes),
     drafts: uniqueRecordItems(data.drafts),
     chat: uniqueRecordItems(data.chat),
@@ -316,6 +349,54 @@ export function normalizeData(data: PlannerData): PlannerData {
       updatedAt: chat[chat.length - 1]?.createdAt || now(),
     }] : []);
   const activeAiConversationId = persistedId(safeData.activeAiConversationId);
+  const habits = (safeData.habits || []).map((habit, index) => {
+    const reminderTime = isRecord(habit.reminder) ? persistedTime(habit.reminder.time, "") : "";
+    return {
+      ...habit,
+      id: persistedId(habit.id) || uid("habit"),
+      title: boundedPersistedString(habit.title, MAX_PERSISTED_TITLE_LENGTH),
+      notes: boundedPersistedString(habit.notes, MAX_PERSISTED_TEXT_LENGTH) || undefined,
+      defaultDurationMinutes: boundedInteger(
+        habit.defaultDurationMinutes,
+        5,
+        MAX_HABIT_DURATION_MINUTES,
+        20,
+      ),
+      frequencyRule: ["daily", "weekly", "custom"].includes(String(habit.frequencyRule))
+        ? habit.frequencyRule
+        : "daily",
+      weeklyTarget: habit.weeklyTarget === undefined
+        ? undefined
+        : boundedInteger(habit.weeklyTarget, 0, MAX_HABIT_TARGET, 0),
+      targetCount: habit.targetCount === undefined
+        ? undefined
+        : boundedInteger(habit.targetCount, 0, MAX_HABIT_TARGET, 0),
+      activeWeekdays: Array.from(new Set(
+        (Array.isArray(habit.activeWeekdays) ? habit.activeWeekdays : [])
+          .filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6),
+      )),
+      reminder: isRecord(habit.reminder)
+        ? { enabled: Boolean(habit.reminder.enabled), ...(reminderTime ? { time: reminderTime } : {}) }
+        : undefined,
+      archived: Boolean(habit.archived),
+      order: boundedInteger(habit.order, 0, Number.MAX_SAFE_INTEGER, index),
+      createdAt: habit.createdAt || now(),
+      updatedAt: habit.updatedAt || habit.createdAt || now(),
+    };
+  });
+  const habitIds = new Set(habits.map((habit) => habit.id));
+  const habitDailyStates = (safeData.habitDailyStates || [])
+    .filter((state) => habitIds.has(String(state.habitId)) && Boolean(persistedDate(state.date)))
+    .map((state) => ({
+      ...state,
+      id: persistedId(state.id) || uid("habit-state"),
+      habitId: String(state.habitId),
+      date: persistedDate(state.date)!,
+      completed: Boolean(state.completed),
+      timelineRecordId: persistedId(state.timelineRecordId),
+      createdAt: state.createdAt || now(),
+      updatedAt: state.updatedAt || state.createdAt || now(),
+    }));
   const seenSubtaskIds = new Set<string>();
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
@@ -333,6 +414,8 @@ export function normalizeData(data: PlannerData): PlannerData {
       importance: project.importance || "high",
       urgency: project.urgency || "low",
     })),
+    habits,
+    habitDailyStates,
     longTasks: safeData.longTasks.map((task) => ({
       ...task,
       id: persistedId(task.id) || uid("long"),

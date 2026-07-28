@@ -7,7 +7,7 @@
 
 ### 修复
 - 同步合并现在只把结构正确、可解析且未异常超前的删除时间视为有效墓碑，并为设备时钟保留最多 7 天偏差；缺少时间戳的旧版记录不再在首次同步时被静默删除，损坏或极端未来的墓碑会被清除，已被同 ID 更新记录取代的旧墓碑也会自动移除，不再永久压制正常数据、导致备份恢复崩溃或继续占用同步载荷。
-- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，限制任务、项目、子任务、目标、长期任务、草稿、笔记和 AI 历史的 ID、标题、正文及标签长度与数量，并规范化自定义日程模板及其时段；悬空的 AI 活动会话会安全回退，异常超过 64 层的子任务树或超过 500 段的模板会被截断，避免重复或超长身份让编辑作用于多个对象、异常文本持续占用渲染与同步资源，或恶意深层及巨型数据触发崩溃。
+- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，限制任务、项目、子任务、目标、长期任务、草稿、笔记、习惯、时间记录和 AI 历史的身份、文本、数组与数值边界，并规范化自定义日程模板及其时段；悬空引用与无效时间会被清理，异常超过 64 层的子任务树、超过 500 段的模板或超过 5,000 次候选展开的旧日历事件迁移会被截断，避免重复或超长身份让编辑作用于多个对象、异常数据污染统计，或恶意深层及巨型数据拖垮启动和渲染。
 - 任务 CSV 导入现在会校验 NavoPath 表头，拒绝未闭合的引号字段，并限制任务 ID、标题、项目名和元数据字段的长度；同一文件中重复出现的任务 ID 只导入第一条，避免格式错误或异常超长的数据进入渲染与同步链路，或重复 ID 导致后续编辑作用于多个任务。
 - 从云端、缓存或备份恢复设置时，现在会限制昵称、标题、模型标识、URL、背景路径和折叠状态列表的长度与数量，只接受大小受限的 JPEG/PNG/WebP Base64 头像，并统一清除旧版个人 API Key 状态；异常设置不再放大缓存、同步或渲染开销。
 - 插件设置与使用教程现在准确区分可运行的官方内置插件和仅提供经校验 manifest/配置的桌面本地插件；本地项不再被描述为会加载 `index.js` 或显示“运行中”，其权限明确标记为声明信息。外部 manifest 会拒绝对象保留键与重复配置字段，并按类型、数值范围、选项和文本长度规范化配置；来自云端、缓存或备份的插件设置也会去重启用列表，并限制配置数量、嵌套深度、节点、数组及文本规模。
@@ -34,7 +34,7 @@
 
 ### Fixed
 - Sync merging now accepts only structurally valid, parseable deletion times that are not implausibly far ahead, while allowing up to seven days of device clock skew. Legacy records without timestamps no longer disappear on their first sync; damaged or extreme-future tombstones are removed; and old tombstones superseded by a newer record with the same ID are pruned instead of permanently suppressing normal data, crashing backup restore, or continuing to occupy sync payloads.
-- Planner data restored from cloud, local cache, or backup now deduplicates persisted collections by ID; bounds IDs, titles, body text, and tag counts and lengths across tasks, projects, subtasks, goals, long-term tasks, drafts, notes, and AI history; and normalizes custom schedule templates and their periods. Dangling active AI conversations fall back safely, while subtask trees deeper than 64 levels and templates beyond 500 periods are truncated, preventing duplicate or oversized identities from making edits affect multiple objects, abnormal text from consuming rendering and sync resources, and maliciously deep or oversized data from causing crashes.
+- Planner data restored from cloud, local cache, or backup now deduplicates persisted collections by ID; bounds identities, text, arrays, and numeric values across tasks, projects, subtasks, goals, long-term tasks, drafts, notes, habits, time entries, and AI history; and normalizes custom schedule templates and their periods. Dangling references and invalid times are cleaned, while subtask trees deeper than 64 levels, templates beyond 500 periods, and legacy calendar migrations beyond 5,000 candidate expansions are truncated, preventing duplicate identities from making edits affect multiple objects, malformed data from polluting metrics, and maliciously deep or oversized data from stalling startup or rendering.
 - Task CSV imports now validate the NavoPath header, reject unterminated quoted fields, and bound task IDs, titles, project names, and metadata fields. When a file repeats a task ID, only its first row is imported, preventing malformed or abnormally long data from entering rendering and sync paths or duplicate IDs from making later edits affect multiple tasks.
 - Settings restored from cloud, cache, or backup now bound the length and count of names, titles, model identifiers, URLs, background paths, and collapsed-state lists; accept only size-bounded JPEG/PNG/WebP Base64 avatars; and consistently clear retired personal API-key state. Malformed settings can no longer amplify cache, sync, or rendering costs.
 - Plugin settings and the usage guide now accurately distinguish executable official built-ins from desktop local plugins that contribute validated manifest metadata and configuration only. Local entries no longer claim to load `index.js` or appear as “Running,” and their permissions are clearly labeled as declarations. External manifests reject reserved object keys and duplicate config fields and normalize values by type, range, options, and text length; plugin settings restored from cloud, cache, or backup also deduplicate enabled IDs and bound config count, nesting, nodes, arrays, and text.
@@ -59,12 +59,12 @@
 ## 2026-07-28 · 规划数据恢复加固
 
 ### 修复
-- 从云端、本地缓存或备份恢复规划数据时，现在会限制目标、长期任务、草稿、笔记和 AI 历史的 ID、标题、正文及标签长度与数量，清理无效引用与重复标签，并规范化自定义日程模板；悬空的活动会话会安全回退，损坏的模板时间会恢复为有效默认值，单个模板最多恢复 500 个时段。
+- 从云端、本地缓存或备份恢复规划数据时，现在会限制目标、长期任务、草稿、笔记、习惯、时间记录和 AI 历史的身份、文本、数组与数值边界，清理无效引用、时间及重复标签，并规范化自定义日程模板；悬空的活动会话会安全回退，单个模板最多恢复 500 个时段，旧日历事件最多展开 5,000 个迁移候选，避免损坏数据污染统计或拖慢启动。
 
 ## 2026-07-28 · Planner data recovery hardening
 
 ### Fixed
-- Planner data restored from cloud, local cache, or backup now bounds IDs, titles, body text, and tag counts and lengths across goals, long-term tasks, drafts, notes, and AI history; cleans invalid references and duplicate tags; and normalizes custom schedule templates. Dangling active conversations fall back safely, damaged template times recover to valid defaults, and each template restores at most 500 periods.
+- Planner data restored from cloud, local cache, or backup now bounds identities, text, arrays, and numeric values across goals, long-term tasks, drafts, notes, habits, time entries, and AI history; cleans invalid references, times, and duplicate tags; and normalizes custom schedule templates. Dangling active conversations fall back safely, each template restores at most 500 periods, and legacy calendar events expand into at most 5,000 migration candidates so malformed data cannot pollute metrics or stall startup.
 
 ## 2026-07-27 · 输入与插件安全
 
