@@ -7,7 +7,7 @@ import { localIsoDate } from "./utils/localDate";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { kanbanGroups, WORKFLOW_LABELS } from "./utils/productivity";
 import { normalizeTaskCheckTone, normalizeWorkflowStatus, workflowStatusForPatch, type UiWorkflowStatus, type StateFilterValue } from "./utils/productivityModel";
-import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
+import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, moveSubtaskInsideTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox, type TaskBlockVariant } from "./components/TaskBlock";
 import { TaskDragLayer } from "./unifiedDrag";
 import { buildTimeAllocationMetrics, parseDayStartMinutes, type MetricCompletionFilter, type MetricDisplayMetric, type MetricGroupBy, type MetricHabitMode, type MetricRangePreset, type TimeAllocationGroup } from "./metrics/timeAllocation";
@@ -1290,6 +1290,13 @@ export default function PlanningView(props: {
     const owner = subtaskOwner(source.id);
     const subtask = owner ? findSubtaskInTree(owner.subtasks || [], source.id) : undefined;
     if (!owner || !subtask) return;
+    if (target.kind === "subtask" && target.position === "inside" && subtaskOwner(target.id)?.id === owner.id) {
+      const sourceTree = owner.subtasks || [];
+      const moved = moveSubtaskInsideTree(sourceTree, source.id, target.id, Date.now());
+      if (moved === sourceTree) return;
+      persistTree(projects, tasks.map((task) => task.id === owner.id ? { ...task, subtasks: moved } : task));
+      return;
+    }
     if (target.kind === "subtask" && target.position !== "inside" && subtaskOwner(target.id)?.id === owner.id) {
       const sourceAtRoot = (owner.subtasks || []).some((item) => item.id === source.id);
       const targetAtRoot = (owner.subtasks || []).some((item) => item.id === target.id);

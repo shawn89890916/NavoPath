@@ -123,6 +123,29 @@ export function addSubtaskToTree(
   });
 }
 
+export function moveSubtaskInsideTree(
+  subtasks: Subtask[],
+  activeId: string,
+  targetId: string,
+  order?: number,
+): Subtask[] {
+  const active = findSubtaskInTree(subtasks, activeId);
+  const target = findSubtaskInTree(subtasks, targetId);
+  if (
+    !active ||
+    !target ||
+    activeId === targetId ||
+    findSubtaskInTree(active.subtasks || [], targetId)
+  ) {
+    return subtasks;
+  }
+  return addSubtaskToTree(
+    removeSubtaskFromTree(subtasks, activeId),
+    { ...active, order },
+    targetId,
+  );
+}
+
 export function countSubtasks(subtasks: Subtask[] | undefined): number {
   if (!subtasks?.length) return 0;
   let count = 0;
