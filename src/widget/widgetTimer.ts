@@ -163,8 +163,21 @@ export function scheduleWidgetCountdown(task: Task, now: Date, durationMinutes: 
   start.setSeconds(0, 0);
   const end = new Date(start.getTime() + duration * 60_000);
   const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+  const dateOf = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
   const time = (value: Date) => `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
-  return { record: { id: `${task.id}_widget_${start.getTime().toString(36)}`, taskId: task.id, scheduledDate: date, scheduledStart: time(start), scheduledEnd: time(end), executionStatus: "scheduled", createdAt: start.toISOString() }, countdownTargetAt: end.getTime() };
+  return {
+    record: {
+      id: `${task.id}_widget_${start.getTime().toString(36)}`,
+      taskId: task.id,
+      scheduledDate: date,
+      scheduledStart: time(start),
+      scheduledEndDate: dateOf(end),
+      scheduledEnd: time(end),
+      executionStatus: "scheduled",
+      createdAt: start.toISOString(),
+    },
+    countdownTargetAt: end.getTime(),
+  };
 }
 
 function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {

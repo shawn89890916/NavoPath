@@ -17,6 +17,21 @@ export type TimelineFocusTarget = {
   time: string;
 };
 
+export function calculateTimelineRecordEnd(
+  scheduledDate: string,
+  scheduledStart: string,
+  durationMinutes: number,
+): Pick<TimelineRecord, "scheduledEndDate" | "scheduledEnd"> {
+  const [year, month, day] = scheduledDate.split("-").map(Number);
+  const [hours, minutes] = scheduledStart.split(":").map(Number);
+  const totalMinutes = hours * 60 + minutes + Math.max(0, Math.round(durationMinutes));
+  const endDate = new Date(Date.UTC(year, month - 1, day + Math.floor(totalMinutes / 1_440)));
+  return {
+    scheduledEndDate: `${endDate.getUTCFullYear()}-${String(endDate.getUTCMonth() + 1).padStart(2, "0")}-${String(endDate.getUTCDate()).padStart(2, "0")}`,
+    scheduledEnd: `${String(Math.floor(totalMinutes / 60) % 24).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`,
+  };
+}
+
 export function normalizeTimelineRecord(record: TimelineRecord): TimelineRecord {
   return { ...record, scheduledEndDate: record.scheduledEndDate || record.scheduledDate };
 }

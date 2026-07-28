@@ -111,6 +111,7 @@ import {
   scheduleWidgetCountdown,
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
+import { calculateTimelineRecordEnd } from "./utils/timelineRecords";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
@@ -4672,19 +4673,24 @@ function App() {
       taskId: task.id,
       scheduledDate,
       scheduledStart,
-      scheduledEnd: addMinutes(scheduledStart, durationMinutes),
+      ...calculateTimelineRecordEnd(scheduledDate, scheduledStart, durationMinutes),
       executionStatus: "scheduled",
       createdAt: now,
     };
   }
 
   function createOccurrenceExceptionRecord(task: Task, scheduledDate: string, scheduledStart: string, executionStatus: TimelineRecord["executionStatus"]) {
+    const end = calculateTimelineRecordEnd(
+      scheduledDate,
+      scheduledStart,
+      task.recurrence?.durationMinutes || taskDuration(task),
+    );
     return {
       id: `${task.id}_occ_${executionStatus}_${Date.now().toString(36)}`,
       taskId: task.id,
       scheduledDate,
       scheduledStart,
-      scheduledEnd: addMinutes(scheduledStart, task.recurrence?.durationMinutes || taskDuration(task)),
+      ...end,
       executionStatus,
       createdAt: new Date().toISOString(),
     } as TimelineRecord;

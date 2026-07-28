@@ -64,8 +64,20 @@ describe("widget timer preferences", () => {
   it("uses the user-entered duration to schedule the active task from now", () => {
     const task = { id: "task-1" } as Task;
     const result = scheduleWidgetCountdown(task, new Date("2026-07-11T10:15:00"), 45);
-    expect(result.record).toMatchObject({ scheduledDate: "2026-07-11", scheduledStart: "10:15", scheduledEnd: "11:00", executionStatus: "scheduled" });
+    expect(result.record).toMatchObject({ scheduledDate: "2026-07-11", scheduledStart: "10:15", scheduledEndDate: "2026-07-11", scheduledEnd: "11:00", executionStatus: "scheduled" });
     expect(result.countdownTargetAt).toBe(new Date("2026-07-11T11:00:00").getTime());
+  });
+
+  it("keeps a schedule-now countdown across midnight", () => {
+    const task = { id: "task-1" } as Task;
+    const result = scheduleWidgetCountdown(task, new Date("2026-12-31T23:50:00"), 20);
+    expect(result.record).toMatchObject({
+      scheduledDate: "2026-12-31",
+      scheduledStart: "23:50",
+      scheduledEndDate: "2027-01-01",
+      scheduledEnd: "00:10",
+    });
+    expect(result.countdownTargetAt).toBe(new Date("2027-01-01T00:10:00").getTime());
   });
 
   it("preserves a schedule-now target when saving a no-deadline countdown", () => {

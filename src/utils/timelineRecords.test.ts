@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineRecord } from "../types";
-import { focusTargetForRecord, normalizeTimelineRecord, sliceTimelineRecord } from "./timelineRecords";
+import { calculateTimelineRecordEnd, focusTargetForRecord, normalizeTimelineRecord, sliceTimelineRecord } from "./timelineRecords";
 
 const record: TimelineRecord = {
   id: "record-1",
@@ -14,6 +14,13 @@ const record: TimelineRecord = {
 };
 
 describe("timelineRecords", () => {
+  it("advances the end date when a scheduled duration crosses midnight", () => {
+    expect(calculateTimelineRecordEnd("2026-12-31", "23:50", 20)).toEqual({
+      scheduledEndDate: "2027-01-01",
+      scheduledEnd: "00:10",
+    });
+  });
+
   it("normalizes legacy same-day records", () => {
     const legacy = { ...record, scheduledEndDate: undefined, scheduledStart: "09:00", scheduledEnd: "10:00" };
     expect(normalizeTimelineRecord(legacy).scheduledEndDate).toBe("2026-07-01");
