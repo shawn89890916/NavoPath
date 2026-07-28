@@ -3,6 +3,7 @@ import { addDays, enumerateRecurrenceDates } from "./recurrence";
 import {
   calculateTimelineRecordEnd,
   calendarDateTimeSpanMinutes,
+  clockTimeSpanMinutes,
   minutesOfDay,
   sliceTimelineRecord,
 } from "./timelineRecords";
@@ -37,9 +38,7 @@ export function calendarEventDurationMinutes(event: CalendarEvent) {
     );
     if (calendarDuration > 0) return calendarDuration;
   }
-  let duration = minutesOfDay(event.endTime) - minutesOfDay(event.startTime);
-  if (duration <= 0) duration += 1_440;
-  return duration;
+  return clockTimeSpanMinutes(event.startTime, event.endTime);
 }
 
 function occurrenceRecord(event: CalendarEvent, occurrenceDate: string): TimelineRecord {

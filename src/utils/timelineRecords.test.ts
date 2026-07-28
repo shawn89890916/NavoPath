@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineRecord } from "../types";
-import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, focusTargetForRecord, normalizeTimelineRecord, rescheduleTimelineRecord, sliceTimelineRecord } from "./timelineRecords";
+import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, clockTimeSpanMinutes, focusTargetForRecord, normalizeTimelineRecord, rescheduleTimelineRecord, sliceTimelineRecord } from "./timelineRecords";
 
 const record: TimelineRecord = {
   id: "record-1",
@@ -24,6 +24,11 @@ describe("timelineRecords", () => {
   it("measures a span across calendar dates", () => {
     expect(calendarDateTimeSpanMinutes("2026-07-01", "23:30", "2026-07-02", "00:30")).toBe(60);
     expect(calendarDateTimeSpanMinutes("2026-07-01", "23:30", "2026-07-03", "00:30")).toBe(1_500);
+  });
+
+  it("measures a clock span that crosses midnight", () => {
+    expect(clockTimeSpanMinutes("09:15", "10:00")).toBe(45);
+    expect(clockTimeSpanMinutes("23:30", "00:30")).toBe(60);
   });
 
   it("preserves duration when moving a cross-midnight record to another date", () => {

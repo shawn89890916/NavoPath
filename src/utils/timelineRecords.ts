@@ -108,6 +108,12 @@ export function minutesOfDay(value: string): number {
   return Math.max(0, Math.min(24 * 60, (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0)));
 }
 
+export function clockTimeSpanMinutes(startTime: string, endTime: string): number {
+  let duration = minutesOfDay(endTime) - minutesOfDay(startTime);
+  if (duration <= 0) duration += 1_440;
+  return duration;
+}
+
 export function sliceTimelineRecord(record: TimelineRecord, visibleDates: string[]): TimelineSlice[] {
   const normalized = normalizeTimelineRecord(record);
   const startDate = normalized.scheduledDate;

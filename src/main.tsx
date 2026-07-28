@@ -111,7 +111,7 @@ import {
   scheduleWidgetCountdown,
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
-import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, rescheduleTimelineRecord } from "./utils/timelineRecords";
+import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, clockTimeSpanMinutes, rescheduleTimelineRecord } from "./utils/timelineRecords";
 import { calendarEventDurationMinutes, expandTimedCalendarEvent } from "./utils/calendarEventSlices";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
@@ -628,24 +628,10 @@ function dateDiff(a: string, b: string) {
   return Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
 }
 
-/**
- * Duration in minutes between two HH:MM time strings, treating the end as
- * strictly later than the start. When `end` is numerically ≤ `start` the end
- * is assumed to fall on the following day (cross-midnight), so a 23:30→00:30
- * span yields 60 minutes instead of -1380. Mirrors the helper in
- * `timelineGeometry.ts` so cross-midnight blocks render and resize correctly.
- */
-function spanDurationMinutes(startTime: string, endTime: string) {
-  const start = timeToMinutes(startTime);
-  const end = timeToMinutes(endTime);
-  let diff = end - start;
-  if (diff <= 0) diff += 24 * 60;
-  return diff;
-}
-
+/** Returns the stored or estimated duration for a task. */
 function taskDuration(task: Task) {
   if (task.scheduledStart && task.scheduledEnd) {
-    return Math.max(spanDurationMinutes(task.scheduledStart, task.scheduledEnd), SLOT_MINUTES);
+    return Math.max(clockTimeSpanMinutes(task.scheduledStart, task.scheduledEnd), SLOT_MINUTES);
   }
   return Math.max(Math.round((task.estimatedHours || 0.5) * 60), SLOT_MINUTES);
 }
@@ -905,7 +891,7 @@ function buildTaskFromEvent(event: CalendarEvent): Task {
     end = calculated.scheduledEnd;
     endDate = calculated.scheduledEndDate || date;
   } else if (start && end && endDate === date && timeToMinutes(end) <= timeToMinutes(start)) {
-    endDate = calculateTimelineRecordEnd(date, start, spanDurationMinutes(start, end)).scheduledEndDate || date;
+    endDate = calculateTimelineRecordEnd(date, start, clockTimeSpanMinutes(start, end)).scheduledEndDate || date;
   }
   const durationMinutes = start && end
     ? Math.max(calendarDateTimeSpanMinutes(date, start, endDate, end), SLOT_MINUTES)
@@ -3243,7 +3229,7 @@ function App() {
     const end = timeToMinutes(settings?.dayEndTime || "22:00");
     const scheduledMinutes = scheduledTasks
       .filter((task) => task.scheduledDate === today && !task.id.startsWith("preview_"))
-      .reduce((total, task) => total + Math.max(timeToMinutes(task.scheduledEnd) - timeToMinutes(task.scheduledStart), 0), 0);
+      .reduce((total, task) => total + taskDuration(task), 0);
     const availableMinutes = Math.max(end - start - scheduledMinutes, 0);
     const demandMinutes = todayCandidates.reduce((total, task) => total + taskDuration(task), 0);
     const ratio = availableMinutes > 0 ? demandMinutes / availableMinutes : demandMinutes > 0 ? 2 : 0;
@@ -3330,9 +3316,9 @@ function App() {
     );
     const scheduledHours = scheduled.reduce((sum, task) => {
       const active = (task.timelineRecords || []).find((r) => r.scheduledDate === today && r.executionStatus === "scheduled");
-      if (active) return sum + (timeToMinutes(active.scheduledEnd) - timeToMinutes(active.scheduledStart)) / 60;
+      if (active) return sum + clockTimeSpanMinutes(active.scheduledStart, active.scheduledEnd) / 60;
       if (task.scheduledDate === today && task.scheduledStart) {
-        return sum + (timeToMinutes(task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task))) - timeToMinutes(task.scheduledStart)) / 60;
+        return sum + clockTimeSpanMinutes(task.scheduledStart, task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task))) / 60;
       }
       if (isRecurringScheduledTask(task) && task.recurrence?.startTime && task.recurrence.durationMinutes && hasRecurrenceOccurrenceOnDate(task, today)) {
         return sum + task.recurrence.durationMinutes / 60;
@@ -3657,7 +3643,7 @@ function App() {
     if (!snapshot || slots.length === 0) return;
 
     const createdTasks: Task[] = slots.map((slot) => {
-      const durationMinutes = Math.max(timeToMinutes(slot.end) - timeToMinutes(slot.start), SLOT_MINUTES);
+      const durationMinutes = Math.max(clockTimeSpanMinutes(slot.start, slot.end), SLOT_MINUTES);
       const task = makeSmartTask({
         ...defaultForm("task"),
         title: slot.title,
@@ -4415,7 +4401,7 @@ function App() {
   function saveFloatingTimeAdd(title: string, projectId: string | null) {
     if (!data || !floatingTimeAdd) return;
     const { date, startTime, endTime } = floatingTimeAdd;
-    const durationMinutes = timeToMinutes(endTime) - timeToMinutes(startTime);
+    const durationMinutes = clockTimeSpanMinutes(startTime, endTime);
     const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: durationMinutes / 60 });
     const scheduledRecord = createScheduledRecord(task, date, startTime, durationMinutes);
     void saveData({
@@ -5100,7 +5086,7 @@ function App() {
         if ((!records || records.length === 0) && task.id === recordId && task.scheduledStart) {
           // Cross-midnight spans (e.g. 23:30→00:30) must keep their 60m duration
           // instead of collapsing to a negative / wrap-broken value.
-          const duration = spanDurationMinutes(task.scheduledStart, task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)));
+          const duration = clockTimeSpanMinutes(task.scheduledStart, task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)));
           return {
             ...task,
             scheduledDate: newDate || task.scheduledDate,
@@ -5626,7 +5612,7 @@ function App() {
       const task = makeSmartTask(form);
       const durationMinutes = form.dueTime
         ? Math.max(
-            form.endTime ? timeToMinutes(form.endTime) - timeToMinutes(form.dueTime) : Math.round((form.estimatedHours || 0.5) * 60),
+            form.endTime ? clockTimeSpanMinutes(form.dueTime, form.endTime) : Math.round((form.estimatedHours || 0.5) * 60),
             SLOT_MINUTES,
           )
         : 0;
@@ -6077,7 +6063,7 @@ function App() {
           const projectId = projects.some((project) => project.id === a.projectId) ? a.projectId : undefined;
           const learnedDuration = learnedTaskDurationMinutes(action.title, nextTasks, projectId);
           const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
-          const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : learnedDuration);
+          const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? clockTimeSpanMinutes(a.startTime, a.endTime) : learnedDuration);
           const task: Task = {
             ...makeSmartTask({ ...defaultForm("task"), title: action.title, projectId: projectId || "", dueDate: a.date, estimatedHours: Math.max(duration, 15) / 60 }),
             category: validCategory(a.category), priority: validPriority(a.priority), notes: a.notes || "",
@@ -6441,7 +6427,7 @@ function App() {
       } else {
         const projectId = projects.some((project) => project.id === a.projectId) ? a.projectId : undefined;
         const recurrence = normalizeAiRecurrence(a.recurrence, a.date, a.startTime, a.durationMinutes);
-        const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? timeToMinutes(a.endTime) - timeToMinutes(a.startTime) : learnedTaskDurationMinutes(action.title, currentData.tasks, projectId));
+        const duration = Number(a.durationMinutes) || (a.startTime && a.endTime ? clockTimeSpanMinutes(a.startTime, a.endTime) : learnedTaskDurationMinutes(action.title, currentData.tasks, projectId));
         const task: Task = {
           ...makeSmartTask({ ...defaultForm("task"), title: action.title, projectId: projectId || "", dueDate: a.date, estimatedHours: Math.max(duration, 15) / 60 }),
           category: validCategory(a.category), priority: validPriority(a.priority), notes: a.notes || "",
@@ -8796,7 +8782,7 @@ function ScheduleTemplateModal({
       id: slot.id || uid("period"),
       title: slot.label || (zh ? `第 ${index + 1} 段` : `Period ${index + 1}`),
       startMinutes: timeToMinutes(slot.start || "09:00"),
-      durationMinutes: Math.max(SLOT_MINUTES, timeToMinutes(slot.end || "10:00") - timeToMinutes(slot.start || "09:00")),
+      durationMinutes: Math.max(SLOT_MINUTES, clockTimeSpanMinutes(slot.start || "09:00", slot.end || "10:00")),
     }));
   }
 
@@ -10820,9 +10806,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
   const endMinutesValue = timeToMinutes(end);
   const startMinutesValue = timeToMinutes(start);
   // Cross-midnight spans (e.g. 23:30→00:30) must read as 60m, not -1380.
-  // `spanDurationMinutes` treats end ≤ start as next-day; we only fall back to the
+  // `clockTimeSpanMinutes` treats end ≤ start as next-day; we only fall back to the
   // task's estimated duration when the stored end is missing or >24h (bad data).
-  let calculatedDurationMinutes = spanDurationMinutes(start, end);
+  let calculatedDurationMinutes = clockTimeSpanMinutes(start, end);
 
   if (calculatedDurationMinutes > 24 * 60) {
     end = addMinutes(start, computedDuration);
@@ -11272,7 +11258,7 @@ function EditDrawer(props: {
     const ss = activeRecord?.scheduledStart || occurrence?.scheduledStart || task.scheduledStart;
     const se = activeRecord?.scheduledEnd || task.scheduledEnd;
     if (sd && ss && se) {
-      const dur = (timeToMinutes(se) - timeToMinutes(ss)) / 60;
+      const dur = clockTimeSpanMinutes(ss, se) / 60;
       return `${sd} ${ss} - ${se} · ${formatDuration(dur)}`;
     }
     if (occurrence?.scheduledDate && occurrence.scheduledStart && task.recurrence) {
@@ -11309,7 +11295,7 @@ function EditDrawer(props: {
     props.onTaskUpdate(props.task.id, taskMetaPatch(kind, value));
   }
   const eventDurationMinutes = f.dueTime
-    ? Math.max(timeToMinutes(f.endTime || addMinutes(f.dueTime, f.recurrence?.durationMinutes || 60)) - timeToMinutes(f.dueTime), SLOT_MINUTES)
+    ? Math.max(clockTimeSpanMinutes(f.dueTime, f.endTime || addMinutes(f.dueTime, f.recurrence?.durationMinutes || 60)), SLOT_MINUTES)
     : 0;
   const eventRecurrence = f.recurrence || {
     mode: f.dueTime ? "scheduled" as const : "flexible" as const,
@@ -11700,7 +11686,7 @@ function EditDrawer(props: {
       {props.type === "project" && <div className="df-form-color-row"><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></div>}
       {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label><label>重复<select value={f.recurrence?.frequency || "none"} onChange={(event) => {
         const frequency = event.target.value as RecurrenceFrequency;
-        set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max((timeToMinutes(f.endTime || addMinutes(f.dueTime, 60)) - timeToMinutes(f.dueTime)), 15) : undefined, endDate: f.endDate || undefined });
+        set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max(clockTimeSpanMinutes(f.dueTime, f.endTime || addMinutes(f.dueTime, 60)), 15) : undefined, endDate: f.endDate || undefined });
       }}>{RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>}
       {props.type === "task" && <button className={`df-clarify-action${props.clarifyLoading ? " loading" : ""}`} onClick={props.onNextAction} disabled={props.clarifyLoading}><span aria-hidden="true" />{props.clarifyLoading ? (props.lang === "zh" ? "生成中…" : "Generating…") : t(props.lang, "form.clarifyNext")}</button>}
       <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? t(props.lang, "form.collapseAdvanced") : t(props.lang, "form.expandAdvanced")}</button>
@@ -11756,7 +11742,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   };
   const patchTime = (messageId: string, index: number, action: Record<string, unknown>, startTime: string) => {
     const minutes = Number(action.durationMinutes) || (typeof action.end === "string" || typeof action.endTime === "string"
-      ? Math.max(timeToMinutes((action.end || action.endTime) as string) - timeToMinutes(startTime), SLOT_MINUTES)
+      ? Math.max(clockTimeSpanMinutes(startTime, (action.end || action.endTime) as string), SLOT_MINUTES)
       : 60);
     onPatchAction(messageId, index, { start: startTime, startTime, end: addMinutes(startTime, minutes), endTime: addMinutes(startTime, minutes), durationMinutes: minutes });
     setEditMenu(null);
