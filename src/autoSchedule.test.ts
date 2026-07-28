@@ -52,6 +52,26 @@ describe("autoScheduleTasks", () => {
     ]);
   });
 
+  it("snaps the next task to the grid after a non-grid buffer", () => {
+    const result = autoScheduleTasks({
+      tasks: [task("first", "study", 60), task("second", "study", 60)],
+      scheduledEvents: [],
+      dateRange: [future],
+      settings: {
+        dayStart: "08:00",
+        dayEnd: "11:00",
+        snapMinutes: 15,
+        bufferMinutes: 5,
+        allowTaskSplitting: false,
+      },
+    });
+
+    expect(result.proposedEvents.map(({ scheduledStart, scheduledEnd }) => ({ scheduledStart, scheduledEnd }))).toEqual([
+      { scheduledStart: "08:00", scheduledEnd: "09:00" },
+      { scheduledStart: "09:15", scheduledEnd: "10:15" },
+    ]);
+  });
+
   it("places project work at its learned preferred start hour", () => {
     const result = autoScheduleTasks({
       tasks: [task("preferred", "study", 60)],

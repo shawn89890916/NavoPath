@@ -307,8 +307,10 @@ export function autoScheduleTasks(params: {
     const next: FreeSlot[] = [];
     for (const slot of freeSlots) {
       if (slot !== slotToUse) { next.push(slot); continue; }
-      const before = { date: slot.date, startMinutes: slot.startMinutes, endMinutes: startMinutes - buf };
-      const after = { date: slot.date, startMinutes: startMinutes + duration + buf, endMinutes: slot.endMinutes };
+      const beforeEnd = Math.floor((startMinutes - buf) / s.snapMinutes) * s.snapMinutes;
+      const afterStart = Math.ceil((startMinutes + duration + buf) / s.snapMinutes) * s.snapMinutes;
+      const before = { date: slot.date, startMinutes: slot.startMinutes, endMinutes: beforeEnd };
+      const after = { date: slot.date, startMinutes: afterStart, endMinutes: slot.endMinutes };
       if (before.endMinutes - before.startMinutes >= 15) next.push(before);
       if (after.endMinutes - after.startMinutes >= 15) next.push(after);
     }
