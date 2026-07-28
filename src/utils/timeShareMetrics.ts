@@ -1,4 +1,5 @@
 import type { PlannerData, Task } from "../types";
+import { localIsoDate } from "./localDate";
 import { normalizeTaskState } from "./productivityModel";
 import { minutesOfDay, normalizeTimelineRecord } from "./timelineRecords";
 
@@ -52,7 +53,11 @@ function plannedMinutes(task: Task) {
     if (normalized.executionStatus !== "scheduled") return sum;
     const start = minutesOfDay(normalized.scheduledStart || "00:00");
     const end = minutesOfDay(normalized.scheduledEnd || normalized.scheduledStart || "00:00");
-    const daySpan = Math.max(0, new Date(`${normalized.scheduledEndDate}T00:00:00`).getTime() - new Date(`${normalized.scheduledDate}T00:00:00`).getTime()) / 86400000;
+    const startDay = Date.parse(`${normalized.scheduledDate}T00:00:00.000Z`);
+    const endDay = Date.parse(`${normalized.scheduledEndDate}T00:00:00.000Z`);
+    const daySpan = Number.isFinite(startDay) && Number.isFinite(endDay)
+      ? Math.max(0, endDay - startDay) / 86400000
+      : 0;
     return sum + Math.max(0, Math.round(daySpan * 1440 + end - start));
   }, 0);
 }
@@ -64,7 +69,7 @@ function isoDate(value: string | undefined) {
 function addDays(iso: string, days: number) {
   const date = new Date(`${iso}T00:00:00`);
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return localIsoDate(date);
 }
 
 function inRange(date: string | undefined, range: TimeShareRange, todayIso: string) {
@@ -74,7 +79,7 @@ function inRange(date: string | undefined, range: TimeShareRange, todayIso: stri
   return iso >= addDays(todayIso, -Number(range) + 1) && iso <= todayIso;
 }
 
-export function buildTimeShareMetrics(data: PlannerData, options: TimeShareOptions, todayIso = new Date().toISOString().slice(0, 10)): TimeShareResult {
+export function buildTimeShareMetrics(data: PlannerData, options: TimeShareOptions, todayIso = localIsoDate()): TimeShareResult {
   const taskById = new Map((data.tasks || []).map((task) => [task.id, task]));
   const buckets = new Map<string, { minutes: number; taskIds: Set<string> }>();
   const add = (task: Task, minutes: number) => {

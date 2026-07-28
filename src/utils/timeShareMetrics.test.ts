@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PlannerData, Task } from "../types";
 import { buildTimeShareMetrics } from "./timeShareMetrics";
 
@@ -65,5 +65,82 @@ describe("time share metrics", () => {
     expect(buildTimeShareMetrics(source, { mode: "actual", dimension: "project", range: "30" }, "2026-07-02").totalMinutes).toBe(60);
     expect(buildTimeShareMetrics(source, { mode: "planned", dimension: "project", range: "30" }, "2026-07-02").totalMinutes).toBe(90);
     expect(buildTimeShareMetrics(source, { mode: "actual", dimension: "project", range: "all" }, "2026-07-02").totalMinutes).toBe(120);
+  });
+
+  it("keeps a rolling range boundary on local calendar dates", () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
+    try {
+      const source: PlannerData = {
+        ...data,
+        timeEntries: [
+          { ...data.timeEntries![0], id: "outside", startAt: "2026-06-02T09:00:00+08:00" },
+          { ...data.timeEntries![0], id: "inside", startAt: "2026-06-03T09:00:00+08:00" },
+        ],
+      };
+
+      expect(buildTimeShareMetrics(
+        source,
+        { mode: "actual", dimension: "project", range: "30" },
+        "2026-07-02",
+      ).totalMinutes).toBe(60);
+    } finally {
+      if (originalTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimeZone;
+    }
+  });
+
+  it("counts calendar-day duration across a daylight-saving transition", () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const overnightTask: Task = {
+        ...task,
+        timelineRecords: [{
+          id: "dst-record",
+          taskId: task.id,
+          scheduledDate: "2026-03-08",
+          scheduledStart: "23:00",
+          scheduledEndDate: "2026-03-09",
+          scheduledEnd: "01:00",
+          executionStatus: "scheduled",
+          createdAt: "now",
+        }],
+      };
+
+      expect(buildTimeShareMetrics(
+        { ...data, tasks: [overnightTask] },
+        { mode: "planned", dimension: "project", range: "all" },
+        "2026-03-09",
+      ).totalMinutes).toBe(120);
+    } finally {
+      if (originalTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimeZone;
+    }
+  });
+
+  it("uses the local calendar date as the default range endpoint", () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-07-28T16:30:00.000Z"));
+      const source: PlannerData = {
+        ...data,
+        timeEntries: [{
+          ...data.timeEntries![0],
+          startAt: "2026-07-29T00:15:00+08:00",
+        }],
+      };
+
+      expect(buildTimeShareMetrics(
+        source,
+        { mode: "actual", dimension: "project", range: "7" },
+      ).totalMinutes).toBe(60);
+    } finally {
+      vi.useRealTimers();
+      if (originalTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimeZone;
+    }
   });
 });
