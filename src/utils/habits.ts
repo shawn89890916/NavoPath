@@ -90,10 +90,15 @@ export function migrateLegacyHabitTracker(
   return { ...data, habits, habitDailyStates };
 }
 
-function addMinutes(time: string, minutes: number) {
+function addMinutes(date: string, time: string, minutes: number) {
   const [h, m] = time.split(":").map(Number);
   const total = Math.max(0, h * 60 + m + minutes);
-  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  const [year, month, day] = date.split("-").map(Number);
+  const endDate = new Date(Date.UTC(year, month - 1, day + Math.floor(total / 1440)));
+  return {
+    date: `${endDate.getUTCFullYear()}-${String(endDate.getUTCMonth() + 1).padStart(2, "0")}-${String(endDate.getUTCDate()).padStart(2, "0")}`,
+    time: `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`,
+  };
 }
 
 export function normalizeHabits(data: PlannerData, now = new Date().toISOString()): Pick<PlannerData, "habits" | "habitDailyStates"> {
@@ -140,6 +145,7 @@ export function scheduleHabitRecord(data: PlannerData, habitId: string, date: st
   const taskId = `habit-task-${habit.id}-${date}`;
   const recordId = `habit-record-${habit.id}-${date}-${start.replace(":", "")}`;
   const duration = Math.max(5, habit.defaultDurationMinutes || 20);
+  const end = addMinutes(date, start, duration);
   const task: Task = {
     id: taskId,
     title: habit.title,
@@ -160,8 +166,8 @@ export function scheduleHabitRecord(data: PlannerData, habitId: string, date: st
     taskId,
     scheduledDate: date,
     scheduledStart: start,
-    scheduledEndDate: date,
-    scheduledEnd: addMinutes(start, duration),
+    scheduledEndDate: end.date,
+    scheduledEnd: end.time,
     executionStatus: "scheduled",
     createdAt: now,
   };

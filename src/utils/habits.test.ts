@@ -113,6 +113,38 @@ describe("habits", () => {
     expect(habitTask?.timelineRecords?.map((record) => record.scheduledStart)).toEqual(["10:00"]);
   });
 
+  it("advances the end date when a scheduled habit crosses midnight", () => {
+    const data = { ...baseData, ...normalizeHabits(baseData, "2026-07-01T00:00:00.000Z") };
+    const result = scheduleHabitRecord(
+      data,
+      data.habits![0].id,
+      "2026-07-01",
+      "23:50",
+      "2026-07-01T08:00:00.000Z",
+    );
+    const record = result.data.tasks.find((task) =>
+      task.id === `habit-task-${data.habits![0].id}-2026-07-01`
+    )?.timelineRecords?.[0];
+
+    expect(record).toMatchObject({
+      scheduledDate: "2026-07-01",
+      scheduledStart: "23:50",
+      scheduledEndDate: "2026-07-02",
+      scheduledEnd: "00:10",
+    });
+
+    const yearEnd = scheduleHabitRecord(
+      data,
+      data.habits![0].id,
+      "2026-12-31",
+      "23:50",
+      "2026-12-31T08:00:00.000Z",
+    );
+    expect(yearEnd.data.tasks.find((task) =>
+      task.id === `habit-task-${data.habits![0].id}-2026-12-31`
+    )?.timelineRecords?.[0].scheduledEndDate).toBe("2027-01-01");
+  });
+
   it("unscheduleHabitRecord clears only the planned marker and scheduled record", () => {
     const data = { ...baseData, ...normalizeHabits(baseData, "2026-07-01T00:00:00.000Z") };
     const habitId = data.habits![0].id;
