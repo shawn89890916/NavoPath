@@ -274,4 +274,12 @@ describe("TaskBlock shared component contract", () => {
     expect(planningModeRule).toContain("--accent-active: var(--planning-primary, #584D3D);");
     expect(planningModeRule).toContain("--accent-rgb: 88, 77, 61;");
   });
+
+  it("keeps retired purple and lime defaults out of shared app styles", () => {
+    const css = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+
+    expect(css).not.toMatch(/#(?:C69CF9|CAFF72)/i);
+    expect(css).not.toMatch(/rgba\(\s*198\s*,\s*156\s*,\s*249\s*,/i);
+    expect(css).not.toMatch(/rgba\(\s*202\s*,\s*255\s*,\s*114\s*,/i);
+  });
 });
