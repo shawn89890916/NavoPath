@@ -1052,7 +1052,7 @@
   min-width: var(--planning-sidebar-width, 86px) !important;
   padding: 12px 8px !important;
   border-right: 1px solid var(--paper-rule) !important;
-  background: rgb(245, 244, 237) !important;
+  background: var(--bg-app-soft, var(--surface-main)) !important;
   gap: 8px !important;
 }
 

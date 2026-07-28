@@ -247,7 +247,7 @@ describe("TaskBlock shared component contract", () => {
     expect(planning).toContain("df-planning-sidebar-collapse");
     expect(planning).toContain("sidebarCollapsed");
     expect(planning).toContain("clearPlanningDragState");
-    expect(css).toContain("rgb(245, 244, 237)");
+    expect(css).toContain("background: var(--bg-app-soft, var(--surface-main)) !important;");
     expect(css).toContain(".df-app.mode-planning .df-planning .df-task-node-inner > .df-task-block-accent");
     expect(css).toContain(".df-app.mode-planning .df-planning .df-task-node-inner::before");
     expect(css).toContain(".df-app.mode-planning .df-planning .df-plan-subtask-node::after");
@@ -256,5 +256,22 @@ describe("TaskBlock shared component contract", () => {
     expect(css).toContain(".df-app.mode-planning .df-planning-native-drag-image");
     expect(planning).toContain("beginTreeDrag");
     expect(css).toContain("cursor: grabbing !important;");
+  });
+
+  it("keeps Planning fallbacks bound to the active theme accent", () => {
+    const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
+    const redesignCss = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
+    const legacyCss = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+    const planningModeRule = legacyCss.match(/\.df-app\.mode-planning\s*{[\s\S]*?\n}/)?.[0] || "";
+
+    expect(planning).toContain('const DEFAULT_PROJECT_COLOR = "var(--accent-active)"');
+    expect(planning).toContain("color-mix(in srgb, ${color} ${alpha * 100}%, transparent)");
+    expect(planning).not.toContain("--accent-plan");
+    expect(planning).not.toContain("#CAFF72");
+    expect(planning).not.toContain("rgba(202, 255, 114");
+    expect(redesignCss).not.toContain("--accent-plan");
+    expect(redesignCss).not.toContain("#CAFF72");
+    expect(planningModeRule).toContain("--accent-active: var(--planning-primary, #584D3D);");
+    expect(planningModeRule).toContain("--accent-rgb: 88, 77, 61;");
   });
 });

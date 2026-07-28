@@ -6910,8 +6910,8 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   border-radius: 4px;
   transition: background 0.1s;
 }
-.df-filter-flyout-item:hover { background: color-mix(in srgb, var(--accent-plan, #CAFF72) 6%, transparent); }
-.df-filter-flyout-item.checked { color: var(--accent-plan, #CAFF72); font-weight: 500; }
+.df-filter-flyout-item:hover { background: color-mix(in srgb, var(--accent-active) 6%, transparent); }
+.df-filter-flyout-item.checked { color: var(--accent-active); font-weight: 500; }
 .df-filter-flyout-item input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; margin: 0; }
 .df-planning-view-switch {
   display: flex;
@@ -6937,9 +6937,9 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   backdrop-filter: blur(4px);
 }
 .df-view-btn.active {
-  border-color: var(--accent-plan, #CAFF72);
-  color: var(--accent-plan, #CAFF72);
-  background: color-mix(in srgb, var(--accent-plan, #CAFF72) 8%, transparent);
+  border-color: var(--accent-active);
+  color: var(--accent-active);
+  background: color-mix(in srgb, var(--accent-active) 8%, transparent);
 }
 
 /* ===== Kanban ===== */
@@ -6961,7 +6961,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   transition: border-color 0.15s;
 }
 .df-kanban-column.is-drop-target {
-  border-color: var(--accent-plan, #CAFF72);
+  border-color: var(--accent-active);
   border-style: dashed;
 }
 .df-kanban-column-header {
@@ -6987,7 +6987,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
 }
 .df-kanban-card {
   border: 1px solid var(--df-hairline, rgba(0,0,0,0.08));
-  border-left: 3px solid var(--task-project-color, var(--accent-plan, #CAFF72));
+  border-left: 3px solid var(--task-project-color, var(--accent-active));
   border-radius: 4px;
   padding: 8px 10px;
   background: var(--df-surface, #fff);
@@ -7029,8 +7029,8 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   border-radius: 2px;
 }
 .df-kanban-status-btn.active {
-  border-color: var(--accent-plan, #CAFF72);
-  color: var(--accent-plan, #CAFF72);
+  border-color: var(--accent-active);
+  color: var(--accent-active);
 }
 .df-kanban-empty {
   text-align: center;
@@ -7058,7 +7058,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   transition: border-color 0.15s;
 }
 .df-eisenhower-quadrant.is-drop-target {
-  border-color: var(--accent-plan, #CAFF72);
+  border-color: var(--accent-active);
   border-style: dashed;
 }
 .df-eisenhower-quadrant-header {
@@ -7132,8 +7132,8 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   border-radius: 2px;
 }
 .df-list-status-btn.active {
-  border-color: var(--accent-plan, #CAFF72);
-  color: var(--accent-plan, #CAFF72);
+  border-color: var(--accent-active);
+  color: var(--accent-active);
 }
 .df-planning-list-empty {
   text-align: center;
@@ -7148,17 +7148,17 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   align-items: center;
   gap: 10px;
   padding: 5px 16px;
-  border: 3px solid var(--timer-project-color, var(--accent, #CAFF72));
+  border: 3px solid var(--timer-project-color, var(--accent-active));
   border-radius: 999px;
   position: relative;
   width: fit-content;
   max-width: 520px;
-  background: color-mix(in srgb, var(--timer-project-color, var(--accent, #CAFF72)) 4%, transparent);
+  background: color-mix(in srgb, var(--timer-project-color, var(--accent-active)) 4%, transparent);
   transition: box-shadow 0.15s;
 }
 .df-header-timer-task.is-running {
   border-width: 3px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--timer-project-color, var(--accent, #CAFF72)) 15%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--timer-project-color, var(--accent-active)) 15%, transparent);
 }
 .df-header-timer-label {
   display: flex;
@@ -7254,8 +7254,8 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   line-height: 1;
 }
 .df-candidate-timer-btn.active {
-  border-color: var(--accent, #CAFF72);
-  color: var(--accent, #CAFF72);
+  border-color: var(--accent-active);
+  color: var(--accent-active);
 }
 
 /* ===== Focus overlay (super-productivity style) ===== */
@@ -7291,8 +7291,8 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
 .df-focus-mode-btn:hover { color: var(--df-ink, #ccc); border-color: rgba(255,255,255,0.2); }
 .df-focus-mode-btn.active {
   border-color: var(--focus-accent, var(--accent-active));
-  color: var(--focus-accent, var(--accent, #CAFF72));
-  background: color-mix(in srgb, var(--focus-accent, var(--accent, #CAFF72)) 10%, transparent);
+  color: var(--focus-accent, var(--accent-active));
+  background: color-mix(in srgb, var(--focus-accent, var(--accent-active)) 10%, transparent);
 }
 .df-focus-close {
   position: absolute;
@@ -7333,7 +7333,7 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   align-items: baseline;
   gap: 12px;
   padding: 12px 32px;
-  border: 3px solid var(--focus-accent, var(--accent, #CAFF72));
+  border: 3px solid var(--focus-accent, var(--accent-active));
   border-radius: 10px;
   max-width: 90vw;
   width: fit-content;

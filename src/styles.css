@@ -6023,9 +6023,9 @@
 
 
 
-  --accent-active: #C69CF9;
+  --accent-active: #584D3D;
 
-  --accent-rgb: 198, 156, 249;
+  --accent-rgb: 88, 77, 61;
 
 
 
@@ -19577,9 +19577,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-app.mode-execute {
 
-  --accent-active: var(--execute-primary, #C69CF9);
+  --accent-active: var(--execute-primary, #584D3D);
 
-  --accent-rgb: 198, 156, 249;
+  --accent-rgb: 88, 77, 61;
 
 }
 
@@ -19587,9 +19587,9 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-app.mode-planning {
 
-  --accent-active: var(--planning-primary, #CAFF72);
+  --accent-active: var(--planning-primary, #584D3D);
 
-  --accent-rgb: 202, 255, 114;
+  --accent-rgb: 88, 77, 61;
 
 }
 

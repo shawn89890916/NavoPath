@@ -17,7 +17,7 @@ type TreeDragNode = { kind: TreeNodeKind; id: string };
 type TreeDropTarget = TreeDragNode & { position: "before" | "inside" | "after"; top: number; left: number; width: number };
 type PlanningDropContainer = string;
 
-const DEFAULT_PROJECT_COLOR = "var(--accent-plan, #CAFF72)";
+const DEFAULT_PROJECT_COLOR = "var(--accent-active)";
 const UNASSIGNED_COLOR = "#7B8191";
 const DRAG_START_THRESHOLD_PX = 5;
 const SUPPRESS_CLICK_AFTER_DRAG_MS = 220;
@@ -36,8 +36,8 @@ function truncate(text: string, max: number) {
 }
 
 function alphaColor(color: string, alpha: number) {
-  if (!color) return `rgba(202, 255, 114, ${alpha})`;
-  const hex = color.trim();
+  color = color.trim() || DEFAULT_PROJECT_COLOR;
+  const hex = color;
   if (/^#([0-9a-f]{3}){1,2}$/i.test(hex)) {
     const value = hex.slice(1);
     const full = value.length === 3
@@ -48,7 +48,7 @@ function alphaColor(color: string, alpha: number) {
     const b = Number.parseInt(full.slice(4, 6), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
-  return color;
+  return `color-mix(in srgb, ${color} ${alpha * 100}%, transparent)`;
 }
 
 function polarPoint(cx: number, cy: number, radius: number, angle: number) {
