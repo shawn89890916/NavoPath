@@ -60,6 +60,7 @@ import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProj
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { computeConflictLayout, computeConflictStyle, scheduledDateTimesOverlap, scheduledTaskIntervalsOnDate } from "./utils/conflictLayout";
+import { expandTaskTimelineSlices } from "./utils/taskTimelineSlices";
 import {
   addDays,
   addMonths,
@@ -111,7 +112,7 @@ import {
   scheduleWidgetCountdown,
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
-import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, clockTimeSpanMinutes, rescheduleTimelineRecord } from "./utils/timelineRecords";
+import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, clockTimeSpanMinutes, rescheduleTimelineRecord, timelineRecordDurationMinutes } from "./utils/timelineRecords";
 import { calendarEventDurationMinutes, expandTimedCalendarEvent } from "./utils/calendarEventSlices";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
@@ -2973,43 +2974,12 @@ function App() {
     return [anchorDate];
   }
 
-  // Helper: expand timelineRecords into virtual Task objects for a list of dates.
-  // Returns Task objects where id = record.id (record-level identity).
-  function expandTimelineRecords(dates: Set<string>): Task[] {
-    const result: Task[] = [];
+  // Expand modern timeline records into per-day display tasks while retaining
+  // deprecated direct schedules until their migration is complete.
+  function expandTimelineRecords(dates: Set<string>) {
+    const expansion = expandTaskTimelineSlices(tasks, [...dates]);
+    const result = [...expansion.tasks];
     for (const task of tasks) {
-      for (const record of (task.timelineRecords || [])) {
-        if (!dates.has(record.scheduledDate)) continue;
-        if (record.executionStatus === "cancelled") continue;
-        let { scheduledStart, scheduledEnd } = record;
-        if (!scheduledStart) scheduledStart = "09:00";
-        const durationMinutes = taskDuration({ ...task, scheduledStart, scheduledEnd });
-        if (!scheduledEnd || timeToMinutes(scheduledEnd) <= timeToMinutes(scheduledStart)) {
-          scheduledEnd = addMinutes(scheduledStart, durationMinutes);
-        }
-        const computedEndMinutes = timeToMinutes(scheduledEnd);
-        const computedStartMinutes = timeToMinutes(scheduledStart);
-        const actualDuration = computedEndMinutes - computedStartMinutes;
-        if (durationMinutes > 0 && actualDuration > durationMinutes * 3) {
-          console.warn("[timeline] short task rendered too tall", {
-            taskId: record.id,
-            title: task.title,
-            durationMinutes,
-            actualDuration,
-            scheduledStart,
-            scheduledEnd,
-          });
-          scheduledEnd = addMinutes(scheduledStart, durationMinutes);
-        }
-        result.push({
-          ...task,
-          id: record.id,
-          scheduledDate: record.scheduledDate,
-          scheduledStart,
-          scheduledEnd,
-          executionStatus: record.executionStatus,
-        } as Task);
-      }
       if ((!task.timelineRecords || task.timelineRecords.length === 0) && task.scheduledDate && task.scheduledStart && dates.has(task.scheduledDate)) {
         let { scheduledStart, scheduledEnd } = task;
         const durationMinutes = taskDuration(task);
@@ -3039,7 +3009,13 @@ function App() {
         } as Task);
       }
     }
-    return result.sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
+    return {
+      ...expansion,
+      tasks: result.sort((a, b) =>
+        (a.scheduledDate || "").localeCompare(b.scheduledDate || "")
+        || timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)
+      ),
+    };
   }
 
   function expandRecurrenceOccurrences(dates: Set<string>) {
@@ -3129,7 +3105,7 @@ function App() {
     return { tasks: expanded, ownerMap, resizeEdges };
   }
 
-  const explicitVisibleTimelineTasks = useMemo(
+  const explicitVisibleTimeline = useMemo(
     () => expandTimelineRecords(visibleTimelineDates),
     [tasks, visibleTimelineDates],
   );
@@ -3152,7 +3128,7 @@ function App() {
 
   const conflictTimelineTasks = useMemo(
     () => [
-      ...expandTimelineRecords(conflictTimelineDates),
+      ...expandTimelineRecords(conflictTimelineDates).tasks,
       ...expandRecurrenceOccurrences(conflictTimelineDates).tasks,
       ...expandEventOccurrences(conflictTimelineDates).tasks.filter((task) => task.scheduledStart),
       ...previewTasks.filter((task) => conflictTimelineDates.has(task.scheduledDate || "")),
@@ -3161,8 +3137,8 @@ function App() {
   );
 
   const expandedVisibleTimelineTasks = useMemo(
-    () => [...explicitVisibleTimelineTasks, ...recurrenceVisibleTimeline.tasks, ...eventVisibleTimeline.tasks.filter((item) => item.scheduledStart)].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
-    [explicitVisibleTimelineTasks, recurrenceVisibleTimeline.tasks, eventVisibleTimeline.tasks],
+    () => [...explicitVisibleTimeline.tasks, ...recurrenceVisibleTimeline.tasks, ...eventVisibleTimeline.tasks.filter((item) => item.scheduledStart)].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
+    [explicitVisibleTimeline.tasks, recurrenceVisibleTimeline.tasks, eventVisibleTimeline.tasks],
   );
 
   // Record ID → real task resolution map (for operations like project change, note save)
@@ -3173,8 +3149,9 @@ function App() {
         map.set(record.id, task);
       }
     }
+    explicitVisibleTimeline.ownerByDisplayId.forEach((task, id) => map.set(id, task));
     return map;
-  }, [tasks]);
+  }, [tasks, explicitVisibleTimeline.ownerByDisplayId]);
 
   // Record ID → record data map (for operations like uncomplete, toggleDone)
   const recordByIdMap = useMemo(() => {
@@ -3184,8 +3161,9 @@ function App() {
         map.set(record.id, record);
       }
     }
+    explicitVisibleTimeline.recordByDisplayId.forEach((record, id) => map.set(id, record));
     return map;
-  }, [tasks]);
+  }, [tasks, explicitVisibleTimeline.recordByDisplayId]);
 
   const occurrenceToTaskMap = recurrenceVisibleTimeline.ownerMap;
   const occurrenceToEventMap = eventVisibleTimeline.ownerMap;
@@ -3193,6 +3171,10 @@ function App() {
   function resolveOwningTask(taskOrId: Task | string) {
     const id = typeof taskOrId === "string" ? taskOrId : taskOrId.id;
     return occurrenceToTaskMap.get(id) || recordToTaskMap.get(id);
+  }
+
+  function resolveTimelineRecordId(displayId: string) {
+    return explicitVisibleTimeline.sourceIdByDisplayId.get(displayId) || displayId;
   }
 
   function resolveOwningEvent(taskOrId: Task | string) {
@@ -3483,12 +3465,13 @@ function App() {
   /** Update a specific TimelineRecord by recordId. Finds the owning task. */
   function updateTimelineRecord(recordId: string, patch: Partial<TimelineRecord>) {
     if (!data) return;
+    const sourceRecordId = resolveTimelineRecordId(recordId);
     void saveData({
       ...data,
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
         if (!records) return task;
-        const idx = records.findIndex((r) => r.id === recordId);
+        const idx = records.findIndex((r) => r.id === sourceRecordId);
         if (idx === -1) return task;
         const updated = [...records];
         updated[idx] = { ...updated[idx], ...patch };
@@ -3500,11 +3483,12 @@ function App() {
   /** Delete a TimelineRecord by recordId. */
   function deleteTimelineRecord(recordId: string) {
     if (!data) return;
+    const sourceRecordId = resolveTimelineRecordId(recordId);
     void saveData({
       ...data,
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
-        if ((!records || records.length === 0) && task.id === recordId && task.scheduledDate) {
+        if ((!records || records.length === 0) && task.id === sourceRecordId && task.scheduledDate) {
           return {
             ...task,
             scheduledDate: undefined,
@@ -3514,7 +3498,7 @@ function App() {
           };
         }
         if (!records) return task;
-        const filtered = records.filter((r) => r.id !== recordId);
+        const filtered = records.filter((r) => r.id !== sourceRecordId);
         if (filtered.length === records.length) return task;
         return { ...task, timelineRecords: filtered, updatedAt: new Date().toISOString() };
       }),
@@ -3625,10 +3609,11 @@ function App() {
     // Check if this is a timeline record
     const realTask = recordToTaskMap.get(taskId);
     if (realTask) {
+      const sourceRecordId = resolveTimelineRecordId(taskId);
       // Delete the record and also check if we should delete the whole task
-      deleteTimelineRecord(taskId);
+      deleteTimelineRecord(sourceRecordId);
       // If the task has no other records and is not a recurring task, delete the whole task
-      const remainingRecords = (realTask.timelineRecords || []).filter((r) => r.id !== taskId);
+      const remainingRecords = (realTask.timelineRecords || []).filter((r) => r.id !== sourceRecordId);
       if (remainingRecords.length === 0 && !hasRecurringRule(realTask) && !realTask.plannedForDate) {
         void saveData({
           ...dataRef.current!,
@@ -4363,6 +4348,7 @@ function App() {
     // If taskId is a record ID (from expanded timeline), convert the record to all-day
     const realTask = recordToTaskMap.get(taskId);
     if (realTask && data) {
+      const sourceRecordId = resolveTimelineRecordId(taskId);
       // Update the record: remove start/end times (mark as all-day)
       void saveData({
         ...data,
@@ -4373,7 +4359,7 @@ function App() {
                 plannedForDate: targetDate,
                 executionLane: undefined,
                 timelineRecords: (t.timelineRecords || []).map((r) =>
-                  r.id === taskId
+                  r.id === sourceRecordId
                     ? { ...r, scheduledDate: targetDate, scheduledStart: "", scheduledEnd: "" }
                     : r
                 ),
@@ -4436,8 +4422,13 @@ function App() {
   }
 
   function hasScheduleConflict(date: string, startTime: string, endTime: string, ignoreTaskId?: string) {
+    const ignoredRecordId = ignoreTaskId ? recordByIdMap.get(ignoreTaskId)?.id : undefined;
+    const ignoredEvent = ignoreTaskId ? resolveOwningEvent(ignoreTaskId) : undefined;
     return conflictTimelineTasks.some((task) => {
-      if (task.id === ignoreTaskId || !task.scheduledDate || !task.scheduledStart || !task.scheduledEnd) return false;
+      const sameRecord = ignoredRecordId
+        && (task.id === ignoredRecordId || task.id.startsWith(`${ignoredRecordId}__day__`));
+      const sameEvent = ignoredEvent && task.id.startsWith(`event_occ_${ignoredEvent.id}_`);
+      if (task.id === ignoreTaskId || sameRecord || sameEvent || !task.scheduledDate || !task.scheduledStart || !task.scheduledEnd) return false;
       return scheduledDateTimesOverlap(date, startTime, endTime, task.scheduledDate, task.scheduledStart, task.scheduledEnd);
     });
   }
@@ -4604,9 +4595,10 @@ function App() {
 
   function getScheduledEventsForRange(dateRange: string[]) {
     const visibleSet = new Set(dateRange);
-    const explicit = expandTimelineRecords(visibleSet).map((task) => ({
+    const explicitExpansion = expandTimelineRecords(visibleSet);
+    const explicit = explicitExpansion.tasks.map((task) => ({
       id: task.id,
-      taskId: resolveOwningTask(task.id)?.id || task.id,
+      taskId: explicitExpansion.ownerByDisplayId.get(task.id)?.id || task.id,
       title: task.title,
       scheduledDate: task.scheduledDate,
       scheduledStart: task.scheduledStart,
@@ -5010,14 +5002,15 @@ function App() {
   function habitScheduleFromTimelineTask(taskId: string): { habitId: string; date: string } | null {
     const current = dataRef.current;
     if (!current) return null;
+    const sourceRecordId = resolveTimelineRecordId(taskId);
     const owner = current.tasks.find((task) =>
-      task.id === taskId || (task.timelineRecords || []).some((record) => record.id === taskId)
+      task.id === sourceRecordId || (task.timelineRecords || []).some((record) => record.id === sourceRecordId)
     );
     if (!owner?.id.startsWith("habit-task-")) return null;
     const habit = (current.habits || []).find((item) => owner.id.startsWith(`habit-task-${item.id}-`));
     const date = owner.plannedForDate
       || owner.scheduledDate
-      || owner.timelineRecords?.find((record) => record.id === taskId)?.scheduledDate
+      || owner.timelineRecords?.find((record) => record.id === sourceRecordId)?.scheduledDate
       || owner.timelineRecords?.[0]?.scheduledDate
       || today;
     return habit ? { habitId: habit.id, date } : null;
@@ -5031,7 +5024,7 @@ function App() {
     }
     const current = dataRef.current;
     if (!current) return;
-    void saveData(returnScheduledTaskToToday(current, taskId, date).data);
+    void saveData(returnScheduledTaskToToday(current, resolveTimelineRecordId(taskId), date).data);
     showToast(t(lang, "toast.draggedBackToCandidates"));
     setDrag(null);
     setHoverSlot("");
@@ -5094,12 +5087,13 @@ function App() {
   /** Move a TimelineRecord to a new start time, preserving duration. */
   function moveTimelineRecord(recordId: string, newStart: string, newDate?: string) {
     if (!data) return;
+    const sourceRecordId = resolveTimelineRecordId(recordId);
     const now = new Date().toISOString();
     void saveData({
       ...data,
       tasks: data.tasks.map((task) => {
         const records = task.timelineRecords;
-        if ((!records || records.length === 0) && task.id === recordId && task.scheduledStart) {
+        if ((!records || records.length === 0) && task.id === sourceRecordId && task.scheduledStart) {
           // Cross-midnight spans (e.g. 23:30→00:30) must keep their 60m duration
           // instead of collapsing to a negative / wrap-broken value.
           const duration = clockTimeSpanMinutes(task.scheduledStart, task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)));
@@ -5112,7 +5106,7 @@ function App() {
           };
         }
         if (!records) return task;
-        const idx = records.findIndex((r) => r.id === recordId);
+        const idx = records.findIndex((r) => r.id === sourceRecordId);
         if (idx === -1) return task;
         const updated = [...records];
         updated[idx] = rescheduleTimelineRecord(
@@ -5211,7 +5205,8 @@ function App() {
     const startX = event.clientX;
     const startY = event.clientY;
     const pointerId = event.pointerId;
-    const duration = taskDuration(task);
+    const owningRecord = recordByIdMap.get(task.id);
+    const duration = owningRecord ? timelineRecordDurationMinutes(owningRecord) : taskDuration(task);
     const rect = event.currentTarget.getBoundingClientRect();
     const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
     const offsetMinutes = Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0);
@@ -5398,11 +5393,14 @@ function App() {
     setDragCreate(null);
     document.body.classList.add("df-resizing");
     const owningEvent = isEventDisplayTask(task) ? resolveOwningEvent(task) : undefined;
-    const taskAnchorDate = owningEvent?.startDate || owningEvent?.date || task.scheduledDate || timelineWindowAnchorDate;
-    const origStart = owningEvent?.startTime || task.scheduledStart || "09:00";
+    const owningRecord = recordByIdMap.get(task.id);
+    const taskAnchorDate = owningEvent?.startDate || owningEvent?.date || owningRecord?.scheduledDate || task.scheduledDate || timelineWindowAnchorDate;
+    const origStart = owningEvent?.startTime || owningRecord?.scheduledStart || task.scheduledStart || "09:00";
     const origDuration = owningEvent
       ? Math.max(calendarEventDurationMinutes(owningEvent), SLOT_MINUTES)
-      : taskDuration(task);
+      : owningRecord
+        ? Math.max(timelineRecordDurationMinutes(owningRecord), SLOT_MINUTES)
+        : taskDuration(task);
     const initialEnd = calculateTimelineRecordEnd(taskAnchorDate, origStart, origDuration);
     setResizePreview({
       taskId: task.id,
@@ -5465,6 +5463,7 @@ function App() {
       // crosses midnight backwards; end-edge resize keeps the start (and
       // therefore the date) fixed.
       const moveStartDate = edge === "start";
+      const sourceRecordId = resolveTimelineRecordId(task.id);
       const nextData = {
         ...data,
         tasks: data.tasks.map((t) => {
@@ -5480,7 +5479,7 @@ function App() {
             };
           }
           if (!records) return t;
-          const idx = records.findIndex((r) => r.id === task.id);
+          const idx = records.findIndex((r) => r.id === sourceRecordId);
           if (idx === -1) return t;
           const updated = [...records];
           updated[idx] = rescheduleTimelineRecord(
@@ -5549,7 +5548,7 @@ function App() {
       return;
     }
     const realTask = resolveOwningTask(task) || task;
-    const recordId = recordByIdMap.has(task.id) ? task.id : undefined;
+    const recordId = recordByIdMap.get(task.id)?.id;
     const occurrence = parseRecurrenceOccurrenceId(task.id);
     setAddType("task");
     setEditingId(realTask.id);
@@ -7100,6 +7099,7 @@ function App() {
   const hasActiveHabits = settings.featureHabitsEnabled !== false && habits.some((habit) => !habit.archived);
   const draggedTask = drag
     ? tasks.find((task) => task.id === drag.taskId)
+      || explicitVisibleTimeline.tasks.find((task) => task.id === drag.taskId)
       || recordToTaskMap.get(drag.taskId)
       || eventVisibleTimeline.tasks.find((task) => task.id === drag.taskId)
       || (drag.taskId.startsWith("habit:")
@@ -7940,7 +7940,7 @@ function App() {
                                       if (!suppressBlockClickRef.current) openTaskEdit(task);
                                     }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
-                                    }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} resizeEdges={eventVisibleTimeline.resizeEdges.get(task.id)}
+                                    }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} resizeEdges={explicitVisibleTimeline.resizeEdges.get(task.id) || eventVisibleTimeline.resizeEdges.get(task.id)}
                                       extraStyle={{ position: "absolute", left, width, top: continuousTimelineEnabled ? continuousTimedTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00") : undefined, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                                       onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
@@ -8424,7 +8424,7 @@ function App() {
                               if (!suppressBlockClickRef.current) openTaskEdit(task);
                             }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                               createProjectForTask(task.id, title);
-                            }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} resizeEdges={eventVisibleTimeline.resizeEdges.get(task.id)} extraStyle={{ ...extraStyle, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
+                            }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} resizeEdges={explicitVisibleTimeline.resizeEdges.get(task.id) || eventVisibleTimeline.resizeEdges.get(task.id)} extraStyle={{ ...extraStyle, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                               onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                               onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                               viewMode="daily"

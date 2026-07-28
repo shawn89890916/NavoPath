@@ -45,7 +45,7 @@ export function calendarDateTimeSpanMinutes(
     - minutesOfDay(startTime));
 }
 
-function timelineRecordDurationMinutes(record: TimelineRecord): number {
+export function timelineRecordDurationMinutes(record: TimelineRecord): number {
   const normalized = normalizeTimelineRecord(record);
   let duration = calendarDateTimeSpanMinutes(
     normalized.scheduledDate,
@@ -128,6 +128,8 @@ export function sliceTimelineRecord(record: TimelineRecord, visibleDates: string
     const sliceStart = isStart ? startMinutes : 0;
     const sliceEnd = isEnd ? endMinutes : 24 * 60;
     if (sliceEnd <= sliceStart) return [];
+    const endsAtNextMidnight = endMinutes === 0
+      && Date.parse(`${endDate}T00:00:00.000Z`) - Date.parse(`${date}T00:00:00.000Z`) === 86_400_000;
     return [{
       recordId: normalized.id,
       taskId: normalized.taskId,
@@ -135,7 +137,7 @@ export function sliceTimelineRecord(record: TimelineRecord, visibleDates: string
       startMinutes: sliceStart,
       endMinutes: sliceEnd,
       continuesBefore: !isStart,
-      continuesAfter: !isEnd,
+      continuesAfter: !isEnd && !endsAtNextMidnight,
     }];
   });
 }

@@ -72,6 +72,14 @@ describe("timelineRecords", () => {
     ]);
   });
 
+  it("treats the day before an exact-midnight end as the final visible slice", () => {
+    const midnightEnd = { ...record, scheduledEnd: "00:00" };
+
+    expect(sliceTimelineRecord(midnightEnd, ["2026-07-01", "2026-07-02"])).toEqual([
+      { recordId: "record-1", taskId: "task-1", date: "2026-07-01", startMinutes: 1410, endMinutes: 1440, continuesBefore: false, continuesAfter: false },
+    ]);
+  });
+
   it("creates a stable focus target", () => {
     expect(focusTargetForRecord(record)).toEqual({ date: "2026-07-01", recordId: "record-1", taskId: "task-1", time: "23:30" });
   });
