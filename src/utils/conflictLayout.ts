@@ -1,4 +1,5 @@
-import type { Task } from "../types";
+import type { Task, TimelineRecord } from "../types";
+import { clockTimeSpanMinutes, minutesOfDay, sliceTimelineRecord } from "./timelineRecords";
 
 export type ConflictLayout = Map<string, { index: number; count: number }>;
 
@@ -8,16 +9,55 @@ type ScheduledInterval = {
   endMinutes: number;
 };
 
-function timeToMinutes(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
+export function scheduledDateTimesOverlap(
+  firstDate: string,
+  firstStart: string,
+  firstEnd: string,
+  secondDate: string,
+  secondStart: string,
+  secondEnd: string,
+): boolean {
+  const firstStartMinutes = Date.parse(`${firstDate}T00:00:00.000Z`) / 60_000 + minutesOfDay(firstStart);
+  const secondStartMinutes = Date.parse(`${secondDate}T00:00:00.000Z`) / 60_000 + minutesOfDay(secondStart);
+  const firstEndMinutes = firstStartMinutes + clockTimeSpanMinutes(firstStart, firstEnd);
+  const secondEndMinutes = secondStartMinutes + clockTimeSpanMinutes(secondStart, secondEnd);
+  return firstStartMinutes < secondEndMinutes && firstEndMinutes > secondStartMinutes;
+}
+
+export function scheduledTaskIntervalsOnDate(
+  tasks: Task[],
+  date: string,
+): Array<{ start: number; end: number }> {
+  const intervals: Array<{ start: number; end: number }> = [];
+  const appendRecord = (record: TimelineRecord) => {
+    for (const slice of sliceTimelineRecord(record, [date])) {
+      intervals.push({ start: slice.startMinutes, end: slice.endMinutes });
+    }
+  };
+
+  for (const task of tasks) {
+    for (const record of task.timelineRecords || []) {
+      if (record.executionStatus === "scheduled") appendRecord(record);
+    }
+    if (task.scheduledDate && task.scheduledStart && task.scheduledEnd) {
+      appendRecord({
+        id: `legacy_${task.id}`,
+        taskId: task.id,
+        scheduledDate: task.scheduledDate,
+        scheduledStart: task.scheduledStart,
+        scheduledEnd: task.scheduledEnd,
+        executionStatus: "scheduled",
+        createdAt: task.createdAt,
+      });
+    }
+  }
+  return intervals;
 }
 
 function scheduledInterval(task: Task): ScheduledInterval | null {
   if (!task.scheduledStart || !task.scheduledEnd) return null;
-  const startMinutes = timeToMinutes(task.scheduledStart);
-  let endMinutes = timeToMinutes(task.scheduledEnd);
-  if (endMinutes <= startMinutes) endMinutes += 24 * 60;
+  const startMinutes = minutesOfDay(task.scheduledStart);
+  const endMinutes = startMinutes + clockTimeSpanMinutes(task.scheduledStart, task.scheduledEnd);
   return { taskId: task.id, startMinutes, endMinutes };
 }
 

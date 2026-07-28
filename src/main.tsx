@@ -59,7 +59,7 @@ import {
 import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProjectCompletion, workflowStatusForPatch } from "./utils/productivityModel";
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
-import { computeConflictLayout, computeConflictStyle } from "./utils/conflictLayout";
+import { computeConflictLayout, computeConflictStyle, scheduledDateTimesOverlap, scheduledTaskIntervalsOnDate } from "./utils/conflictLayout";
 import {
   addDays,
   addMonths,
@@ -3140,6 +3140,26 @@ function App() {
 
   const eventVisibleTimeline = useMemo(() => expandEventOccurrences(visibleTimelineDates), [events, visibleTimelineDates]);
 
+  const conflictTimelineDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (const date of visibleTimelineDates) {
+      dates.add(addDays(date, -1));
+      dates.add(date);
+      dates.add(addDays(date, 1));
+    }
+    return dates;
+  }, [visibleTimelineDates]);
+
+  const conflictTimelineTasks = useMemo(
+    () => [
+      ...expandTimelineRecords(conflictTimelineDates),
+      ...expandRecurrenceOccurrences(conflictTimelineDates).tasks,
+      ...expandEventOccurrences(conflictTimelineDates).tasks.filter((task) => task.scheduledStart),
+      ...previewTasks.filter((task) => conflictTimelineDates.has(task.scheduledDate || "")),
+    ],
+    [tasks, events, conflictTimelineDates, previewTasks],
+  );
+
   const expandedVisibleTimelineTasks = useMemo(
     () => [...explicitVisibleTimelineTasks, ...recurrenceVisibleTimeline.tasks, ...eventVisibleTimeline.tasks.filter((item) => item.scheduledStart)].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart)),
     [explicitVisibleTimelineTasks, recurrenceVisibleTimeline.tasks, eventVisibleTimeline.tasks],
@@ -4415,14 +4435,10 @@ function App() {
     showToast(t(lang, "toast.addedToTimeline"));
   }
 
-  function hasScheduleConflict(startTime: string, endTime: string, ignoreTaskId?: string) {
-    const start = timeToMinutes(startTime);
-    const end = timeToMinutes(endTime);
-    return scheduledTasks.some((task) => {
-      if (task.id === ignoreTaskId || !task.scheduledStart || !task.scheduledEnd) return false;
-      const otherStart = timeToMinutes(task.scheduledStart);
-      const otherEnd = timeToMinutes(task.scheduledEnd);
-      return start < otherEnd && end > otherStart;
+  function hasScheduleConflict(date: string, startTime: string, endTime: string, ignoreTaskId?: string) {
+    return conflictTimelineTasks.some((task) => {
+      if (task.id === ignoreTaskId || !task.scheduledDate || !task.scheduledStart || !task.scheduledEnd) return false;
+      return scheduledDateTimesOverlap(date, startTime, endTime, task.scheduledDate, task.scheduledStart, task.scheduledEnd);
     });
   }
 
@@ -4433,7 +4449,7 @@ function App() {
     for (let cursor = earliest; cursor <= latestStart; cursor += SLOT_MINUTES) {
       const start = minutesToTime(cursor);
       const end = minutesToTime(cursor + duration);
-      if (!hasScheduleConflict(start, end)) return start;
+      if (!hasScheduleConflict(today, start, end)) return start;
     }
     return minutesToTime(Math.max(TIMELINE_START * 60, latestStart));
   }
@@ -7943,7 +7959,7 @@ function App() {
                                   if (dayIndex === -1) return null;
                                   const gutter = timelineView === "weekly" ? 5 : 8;
                                   return (
-                                    <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
+                                    <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(tgtDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, top: continuousTimelineEnabled ? continuousTimedTop(tgtDate, hoverSlot) : undefined }}
                                       dayStartHour={dayStartHour}
                                     />
@@ -8377,7 +8393,7 @@ function App() {
                             in non-continuous mode (via NowLine's internal timeBlockTop) and
                             the continuous absolute coordinate in continuous mode. */}
                         {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
                         {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -9038,17 +9054,7 @@ function ScheduleTemplateModal({
 
   // ── Conflict detection (existing schedule on `date`) ──
   const existingIntervals = useMemo(() => {
-    const intervals: Array<{ start: number; end: number }> = [];
-    for (const task of tasks) {
-      for (const record of task.timelineRecords || []) {
-        if (record.executionStatus !== "scheduled" || record.scheduledDate !== date || !record.scheduledStart || !record.scheduledEnd) continue;
-        intervals.push({ start: timeToMinutes(record.scheduledStart), end: timeToMinutes(record.scheduledEnd) });
-      }
-      if (task.scheduledDate === date && task.scheduledStart && task.scheduledEnd) {
-        intervals.push({ start: timeToMinutes(task.scheduledStart), end: timeToMinutes(task.scheduledEnd) });
-      }
-    }
-    return intervals;
+    return scheduledTaskIntervalsOnDate(tasks, date);
   }, [date, tasks]);
 
   const validPeriods = periods.filter((p) => p.durationMinutes >= SLOT_MINUTES && p.startMinutes + p.durationMinutes <= TIMELINE_TOTAL_MINUTES);

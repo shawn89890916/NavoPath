@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
-import { computeConflictLayout, computeConflictStyle } from "./conflictLayout";
+import { computeConflictLayout, computeConflictStyle, scheduledDateTimesOverlap, scheduledTaskIntervalsOnDate } from "./conflictLayout";
 
 function scheduledTask(id: string, start: string, end: string): Task {
   return {
@@ -65,5 +65,50 @@ describe("computeConflictStyle", () => {
       width: 96,
       isNarrow: false,
     });
+  });
+});
+
+describe("scheduledDateTimesOverlap", () => {
+  it("detects overlap between clock ranges that both cross midnight", () => {
+    expect(scheduledDateTimesOverlap("2026-07-26", "23:30", "00:30", "2026-07-26", "23:45", "00:15")).toBe(true);
+  });
+
+  it("detects a next-day conflict at the end of a cross-midnight range", () => {
+    expect(scheduledDateTimesOverlap("2026-07-26", "23:30", "00:30", "2026-07-27", "00:15", "00:45")).toBe(true);
+  });
+
+  it("does not confuse matching clock times on different dates", () => {
+    expect(scheduledDateTimesOverlap("2026-07-26", "09:00", "10:00", "2026-07-27", "09:00", "10:00")).toBe(false);
+  });
+
+  it("allows adjacent ranges", () => {
+    expect(scheduledDateTimesOverlap("2026-07-26", "09:00", "10:00", "2026-07-26", "10:00", "11:00")).toBe(false);
+  });
+});
+
+describe("scheduledTaskIntervalsOnDate", () => {
+  it("includes the ending-day continuation of a cross-midnight record", () => {
+    const task = scheduledTask("overnight", "23:30", "00:30");
+    task.timelineRecords = [{
+      id: "record-1",
+      taskId: task.id,
+      scheduledDate: "2026-07-26",
+      scheduledStart: "23:30",
+      scheduledEndDate: "2026-07-27",
+      scheduledEnd: "00:30",
+      executionStatus: "scheduled",
+      createdAt: "",
+    }];
+    task.scheduledDate = undefined;
+    task.scheduledStart = undefined;
+    task.scheduledEnd = undefined;
+
+    expect(scheduledTaskIntervalsOnDate([task], "2026-07-27")).toEqual([{ start: 0, end: 30 }]);
+  });
+
+  it("infers the ending-day continuation of a legacy direct schedule", () => {
+    const task = scheduledTask("legacy", "23:30", "00:30");
+
+    expect(scheduledTaskIntervalsOnDate([task], "2026-07-27")).toEqual([{ start: 0, end: 30 }]);
   });
 });
