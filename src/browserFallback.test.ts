@@ -189,6 +189,86 @@ describe("browser fallback preview mode", () => {
     expect(boundedProject?.notes).toHaveLength(60_000);
   });
 
+  it("normalizes persisted task planning fields and references", () => {
+    const malformed = fallbackData() as any;
+    const first = malformed.tasks[0];
+    const second = malformed.tasks[1];
+    const projectId = malformed.projects[0].id;
+    const goalId = malformed.goals[0].id;
+    first.category = "unknown";
+    first.dueDate = "2026-99-99";
+    first.estimatedHours = Number.POSITIVE_INFINITY;
+    first.projectId = "missing-project";
+    first.goalId = "missing-goal";
+    first.parentTaskId = "missing-parent";
+    first.plannedForDate = "tomorrow";
+    first.executionLane = "unknown";
+    first.completed = "false";
+    first.completedAt = "not-a-timestamp";
+    first.createdAt = 123;
+    first.updatedAt = null;
+    first.scheduledDate = "2026-07-28";
+    first.scheduledStart = "25:00";
+    first.scheduledEnd = "10:00";
+    first.executionStatus = "scheduled";
+    first.subtasks = [{
+      id: "subtask-with-missing-plan",
+      title: "Dangling plan",
+      completed: false,
+      plannedTaskId: "missing-task",
+    }];
+    second.category = "exam";
+    second.dueDate = "2026-07-29";
+    second.estimatedHours = 1_000_000;
+    second.projectId = projectId;
+    second.goalId = goalId;
+    second.parentTaskId = first.id;
+    second.plannedForDate = "2026-07-28";
+    second.executionLane = "queued";
+    second.scheduledDate = "2026-07-28";
+    second.scheduledStart = "09:00";
+    second.scheduledEnd = "10:00";
+    second.executionStatus = "invalid";
+
+    const normalized = normalizeData(malformed);
+    const normalizedFirst = normalized.tasks.find((task) => task.id === first.id);
+    const normalizedSecond = normalized.tasks.find((task) => task.id === second.id);
+
+    expect(normalizedFirst).toMatchObject({
+      category: "personal",
+      dueDate: "",
+      completed: false,
+    });
+    expect(normalizedFirst?.estimatedHours).toBeUndefined();
+    expect(normalizedFirst?.projectId).toBeUndefined();
+    expect(normalizedFirst?.goalId).toBe("");
+    expect(normalizedFirst?.parentTaskId).toBeUndefined();
+    expect(normalizedFirst?.plannedForDate).toBeUndefined();
+    expect(normalizedFirst?.executionLane).toBeUndefined();
+    expect(normalizedFirst?.completedAt).toBeUndefined();
+    expect(normalizedFirst?.scheduledDate).toBeUndefined();
+    expect(normalizedFirst?.scheduledStart).toBeUndefined();
+    expect(normalizedFirst?.scheduledEnd).toBeUndefined();
+    expect(normalizedFirst?.executionStatus).toBeUndefined();
+    expect(normalizedFirst?.subtasks?.[0].plannedTaskId).toBeUndefined();
+    expect(Number.isFinite(Date.parse(normalizedFirst?.createdAt || ""))).toBe(true);
+    expect(normalizedFirst?.updatedAt).toBe(normalizedFirst?.createdAt);
+    expect(normalizedSecond).toMatchObject({
+      category: "exam",
+      dueDate: "2026-07-29",
+      estimatedHours: 24,
+      projectId,
+      goalId,
+      parentTaskId: first.id,
+      plannedForDate: "2026-07-28",
+      executionLane: "queued",
+      scheduledDate: "2026-07-28",
+      scheduledStart: "09:00",
+      scheduledEnd: "10:00",
+      executionStatus: "scheduled",
+    });
+  });
+
   it("bounds persisted notes, AI conversations, messages, memories, and tags", () => {
     const malformed = fallbackData() as any;
     const tags = [

@@ -43,6 +43,7 @@ const MAX_AI_PROFILE_TOKENS = 1_000;
 const MAX_AI_PROFILE_TOKEN_SCAN = 5_000;
 const MAX_AI_PROFILE_COUNTER = 1_000_000;
 const MAX_AI_INFERENCE_DURATION_MINUTES = 24 * 60;
+const MAX_TASK_ESTIMATED_HOURS = 24;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -135,6 +136,12 @@ function persistedDate(value: unknown) {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
     ? value
     : undefined;
+}
+
+function persistedCategory(value: unknown): Task["category"] {
+  return ["exam", "uk", "us", "essay", "materials", "project", "personal"].includes(String(value))
+    ? value as Task["category"]
+    : "personal";
 }
 
 function boundedInteger(value: unknown, minimum: number, maximum: number, fallback: number) {
@@ -477,23 +484,33 @@ function normalizeTimelineRecords(value: unknown, taskId: string): TimelineRecor
   return records;
 }
 
-function normalizeSubtasks(value: unknown, depth = 0, seenIds = new Set<string>()): Subtask[] {
+function normalizeSubtasks(
+  value: unknown,
+  depth = 0,
+  seenIds = new Set<string>(),
+  taskIds?: Set<string>,
+): Subtask[] {
   if (depth >= MAX_PERSISTED_SUBTASK_DEPTH) return [];
   const result: Subtask[] = [];
   for (const [index, subtask] of recordItems<Subtask>(value).entries()) {
     const id = persistedId(subtask.id) || uid("sub");
     if (seenIds.has(id)) continue;
     seenIds.add(id);
+    const plannedTaskId = persistedId(subtask.plannedTaskId);
     result.push({
       ...subtask,
       id,
       title: boundedPersistedString(subtask.title, MAX_PERSISTED_TITLE_LENGTH),
-      plannedTaskId: persistedId(subtask.plannedTaskId),
+      plannedTaskId: plannedTaskId && (!taskIds || taskIds.has(plannedTaskId))
+        ? plannedTaskId
+        : undefined,
       completed: typeof subtask.completed === "boolean" ? subtask.completed : Boolean(subtask.done),
       done: typeof subtask.done === "boolean" ? subtask.done : Boolean(subtask.completed),
       order: typeof subtask.order === "number" ? subtask.order : index,
       createdAt: subtask.createdAt || now(),
-      subtasks: subtask.subtasks ? normalizeSubtasks(subtask.subtasks, depth + 1, seenIds) : undefined,
+      subtasks: subtask.subtasks
+        ? normalizeSubtasks(subtask.subtasks, depth + 1, seenIds, taskIds)
+        : undefined,
     });
   }
   return result;
@@ -658,6 +675,9 @@ export function normalizeData(data: PlannerData): PlannerData {
   };
   const migratedTasks = migrateEventsToTasks(safeData);
   const projectIds = new Set(safeData.projects.map((project) => project.id));
+  const goalIds = new Set(safeData.goals.map((goal) => persistedId(goal.id)).filter(Boolean));
+  const tasks = [...safeData.tasks, ...migratedTasks];
+  const taskIds = new Set(tasks.map((task) => task.id));
   const notes = safeData.notes.map((note) => ({
     ...note,
     id: persistedId(note.id) || uid("note"),
@@ -830,16 +850,57 @@ export function normalizeData(data: PlannerData): PlannerData {
       })),
     version: Math.max(safeData.version || 1, 2),
     events: [],
-    tasks: [...safeData.tasks, ...migratedTasks].map((task) => {
+    tasks: tasks.map((task) => {
       const timelineRecords = normalizeTimelineRecords(task.timelineRecords, task.id);
+      const createdAt = persistedTimestamp(task.createdAt) || now();
+      const updatedAt = persistedTimestamp(task.updatedAt) || createdAt;
+      const completed = task.completed === true;
+      const projectId = persistedId(task.projectId);
+      const goalId = persistedId(task.goalId);
+      const parentTaskId = persistedId(task.parentTaskId);
+      const plannedForDate = persistedDate(task.plannedForDate);
+      const scheduledDate = persistedDate(task.scheduledDate);
+      const scheduledStart = persistedTime(task.scheduledStart, "");
+      const hasLegacySchedule = Boolean(scheduledDate && scheduledStart);
+      const estimatedHours = typeof task.estimatedHours === "number"
+        && Number.isFinite(task.estimatedHours)
+        && task.estimatedHours > 0
+        ? Math.min(MAX_TASK_ESTIMATED_HOURS, Math.max(0.25, task.estimatedHours))
+        : undefined;
       return {
         ...task,
         title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
-        projectId: persistedId(task.projectId),
-        goalId: persistedId(task.goalId) || "",
-        parentTaskId: persistedId(task.parentTaskId),
-        completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
-        workflowStatus: inferWorkflowStatus({ ...task, timelineRecords }),
+        category: persistedCategory(task.category),
+        dueDate: persistedDate(task.dueDate) || "",
+        completed,
+        estimatedHours,
+        projectId: projectId && projectIds.has(projectId) ? projectId : undefined,
+        goalId: goalId && goalIds.has(goalId) ? goalId : "",
+        parentTaskId: parentTaskId && parentTaskId !== task.id && taskIds.has(parentTaskId)
+          ? parentTaskId
+          : undefined,
+        completedAt: completed
+          ? persistedTimestamp(task.completedAt, updatedAt)
+          : undefined,
+        plannedForDate,
+        executionLane: task.executionLane === "candidate" || task.executionLane === "queued"
+          ? task.executionLane
+          : undefined,
+        scheduledDate: hasLegacySchedule ? scheduledDate : undefined,
+        scheduledStart: hasLegacySchedule ? scheduledStart : undefined,
+        scheduledEnd: hasLegacySchedule
+          ? persistedTime(task.scheduledEnd, "") || undefined
+          : undefined,
+        executionStatus: hasLegacySchedule
+          && ["scheduled", "completed", "returned_unfinished", "cancelled"].includes(String(task.executionStatus))
+          ? task.executionStatus
+          : hasLegacySchedule ? "scheduled" : undefined,
+        workflowStatus: inferWorkflowStatus({
+          completed,
+          workflowStatus: task.workflowStatus,
+          plannedForDate,
+          timelineRecords,
+        }),
         timelineRecords,
         recurrence: normalizeTaskRecurrence(task.recurrence),
         aiInference: normalizeAiInference(
@@ -847,8 +908,10 @@ export function normalizeData(data: PlannerData): PlannerData {
           projectIds,
           persistedTimestamp(task.updatedAt) || now(),
         ),
-        subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
+        subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds, taskIds),
         notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
+        createdAt,
+        updatedAt,
       };
     }),
   }));
