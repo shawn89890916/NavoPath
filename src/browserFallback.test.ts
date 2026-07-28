@@ -508,4 +508,131 @@ describe("browser fallback preview mode", () => {
       timelineRecords: [],
     });
   });
+
+  it("normalizes recurrence rules and bounded AI message metadata", () => {
+    const malformed = fallbackData() as any;
+    malformed.tasks[0].recurrence = {
+      mode: "scheduled",
+      frequency: "daily",
+      startDate: "2026-07-28",
+      startTime: "25:00",
+      durationMinutes: 1_000_000,
+      endDate: "2026-07-27",
+      count: 1_000_000,
+    };
+    malformed.tasks[0].subtasks = [{
+      id: "recurring-subtask",
+      title: "Recurring subtask",
+      completed: false,
+    }];
+    malformed.tasks.push({
+      ...malformed.tasks[0],
+      id: "invalid-recurrence-task",
+      recurrence: {
+        mode: "scheduled",
+        frequency: "unexpected",
+        startDate: "2026-07-28",
+        startTime: "09:00",
+      },
+      subtasks: [],
+    });
+    malformed.tasks.push({
+      ...malformed.tasks[0],
+      id: "bounded-recurrence-task",
+      recurrence: {
+        mode: "scheduled",
+        frequency: "weekly",
+        startDate: "2026-07-28",
+        startTime: "09:00",
+        durationMinutes: 1_000_000,
+        count: 1_000_000,
+      },
+      subtasks: [],
+    });
+    const complexMessage = {
+      id: "complex-message",
+      role: "assistant",
+      content: "Keep",
+      createdAt: "2026-07-28T00:00:00.000Z",
+      status: "invalid",
+      steps: Array.from({ length: 101 }, () => ({
+        label: "S".repeat(10_001),
+        status: "invalid",
+      })),
+      actions: Array.from({ length: 202 }, (_, index) => (
+        index === 0
+          ? { type: "import_schedule_item", kind: "task", title: "Invalid date", date: "2026-99-99" }
+          : index === 1
+            ? { type: "unknown-action", title: "Unknown" }
+            : {
+              type: "create_task",
+              title: "A".repeat(10_001),
+              nested: { one: { two: { three: { four: { five: { six: { seven: "too deep" } } } } } } },
+            }
+      )),
+      selectedActions: { 0: false, 2: true, 201: false, invalid: true },
+      actionState: "invalid",
+      intent: "I".repeat(1_001),
+      plan: Array.from({ length: 201 }, () => ({
+        taskId: "t".repeat(201),
+        title: "P".repeat(10_001),
+        start: "09:00",
+        end: "10:00",
+        durationMinutes: 1_000_000,
+        reason: "R".repeat(10_001),
+      })),
+      format: "html",
+    };
+    malformed.chat = [complexMessage];
+    malformed.aiConversations = [{
+      id: "conversation",
+      title: "Conversation",
+      messages: [
+        ...Array.from({ length: 500 }, (_, index) => ({
+          id: `simple-${index}`,
+          role: "user",
+          content: `Message ${index}`,
+          createdAt: "2026-07-28T00:00:00.000Z",
+        })),
+        complexMessage,
+      ],
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    const normalized = normalizeData(malformed);
+    const recurringTask = normalized.tasks.find((task) => task.id === malformed.tasks[0].id);
+    const invalidTask = normalized.tasks.find((task) => task.id === "invalid-recurrence-task");
+    const boundedTask = normalized.tasks.find((task) => task.id === "bounded-recurrence-task");
+    const message = normalized.aiConversations?.[0].messages.find((item) => item.id === "complex-message");
+
+    expect(recurringTask?.recurrence).toEqual({
+      mode: "flexible",
+      frequency: "daily",
+      startDate: "2026-07-28",
+      count: 10_000,
+    });
+    expect(invalidTask?.recurrence).toBeUndefined();
+    expect(boundedTask?.recurrence).toMatchObject({
+      mode: "scheduled",
+      frequency: "weekly",
+      durationMinutes: 1_440,
+      count: 10_000,
+    });
+    expect(normalized.aiConversations?.[0].messages).toHaveLength(500);
+    expect(message?.status).toBe("done");
+    expect(message?.steps).toHaveLength(100);
+    expect(message?.steps?.[0]).toEqual({ label: "S".repeat(10_000), status: "pending" });
+    expect(message?.actions).toHaveLength(200);
+    expect((message?.actions?.[0] as any).title).toHaveLength(10_000);
+    expect(message?.selectedActions).toEqual({ 0: true, 199: false });
+    expect(message?.actionState).toBeUndefined();
+    expect(message?.intent).toHaveLength(1_000);
+    expect(message?.plan).toHaveLength(200);
+    expect(message?.plan?.[0].taskId).toBeUndefined();
+    expect(message?.plan?.[0].title).toHaveLength(10_000);
+    expect(message?.plan?.[0].durationMinutes).toBe(1_440);
+    expect(message?.plan?.[0].reason).toHaveLength(10_000);
+    expect(message?.format).toBe("text");
+  });
 });

@@ -23,6 +23,19 @@ const MAX_HABIT_TARGET = 1_000;
 const MAX_HABIT_DAILY_STATES = 50_000;
 const MAX_PERSISTED_TIMELINE_RECORDS = 1_000;
 const MAX_PERSISTED_TIMELINE_RECORD_SCAN = 10_000;
+const MAX_RECURRENCE_DURATION_MINUTES = 24 * 60;
+const MAX_RECURRENCE_COUNT = 10_000;
+const MAX_AI_CONVERSATIONS = 500;
+const MAX_AI_MESSAGES = 500;
+const MAX_AI_STEPS = 100;
+const MAX_AI_ACTIONS = 200;
+const MAX_AI_ACTION_SCAN = 1_000;
+const MAX_AI_PLAN_BLOCKS = 200;
+const MAX_AI_INTENT_LENGTH = 1_000;
+const MAX_AI_JSON_DEPTH = 6;
+const MAX_AI_JSON_NODES = 5_000;
+const MAX_AI_JSON_KEYS = 100;
+const MAX_AI_JSON_STRING_LENGTH = 10_000;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -128,6 +141,83 @@ function persistedTimestampRank(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeTaskRecurrence(value: unknown): TaskRecurrence | undefined {
+  if (!isRecord(value)) return undefined;
+  const frequencies: TaskRecurrence["frequency"][] = [
+    "daily", "weekdays", "weekends", "weekly", "biweekly", "monthly", "quarterly",
+  ];
+  if (!frequencies.includes(value.frequency as TaskRecurrence["frequency"])) return undefined;
+  const startDate = persistedDate(value.startDate);
+  if (!startDate) return undefined;
+  const startTime = persistedTime(value.startTime, "");
+  const mode = value.mode === "scheduled" && startTime ? "scheduled" : "flexible";
+  const endDate = persistedDate(value.endDate);
+  const count = typeof value.count === "number" && Number.isFinite(value.count) && value.count > 0
+    ? boundedInteger(value.count, 1, MAX_RECURRENCE_COUNT, 1)
+    : undefined;
+  return {
+    mode,
+    frequency: value.frequency as TaskRecurrence["frequency"],
+    startDate,
+    startTime: mode === "scheduled" ? startTime : undefined,
+    durationMinutes: mode === "scheduled"
+      ? boundedInteger(value.durationMinutes, 5, MAX_RECURRENCE_DURATION_MINUTES, 60)
+      : undefined,
+    endDate: endDate && endDate >= startDate ? endDate : undefined,
+    count,
+  };
+}
+
+function normalizePersistedJson(
+  value: unknown,
+  depth: number,
+  budget: { remaining: number },
+): unknown {
+  if (budget.remaining <= 0) return undefined;
+  budget.remaining -= 1;
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "string") return value.slice(0, MAX_AI_JSON_STRING_LENGTH);
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (depth >= MAX_AI_JSON_DEPTH) return undefined;
+  if (Array.isArray(value)) {
+    return value.slice(0, MAX_AI_ACTIONS)
+      .map((item) => normalizePersistedJson(item, depth + 1, budget))
+      .filter((item) => item !== undefined);
+  }
+  if (!isRecord(value)) return undefined;
+  const normalized: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value).slice(0, MAX_AI_JSON_KEYS)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    const child = normalizePersistedJson(item, depth + 1, budget);
+    if (child !== undefined) normalized[key.slice(0, MAX_PERSISTED_ID_LENGTH)] = child;
+  }
+  return normalized;
+}
+
+function isValidPersistedAiAction(action: Record<string, unknown>) {
+  switch (action.type) {
+    case "create_subtasks":
+      return Boolean(persistedId(action.taskId)) && Array.isArray(action.subtasks);
+    case "create_task":
+    case "create_scheduled_task":
+      return typeof action.title === "string" && action.title.trim().length > 0;
+    case "schedule_task":
+      return Boolean(persistedId(action.taskId)) && Boolean(persistedDate(action.date));
+    case "import_schedule_item":
+      return action.kind === "task"
+        && typeof action.title === "string"
+        && action.title.trim().length > 0
+        && Boolean(persistedDate(action.date))
+        && (!action.startTime || Boolean(persistedTime(action.startTime, "")))
+        && (!action.endTime || Boolean(persistedTime(action.endTime, "")));
+    case "plan_day":
+    case "none":
+      return true;
+    default:
+      return false;
+  }
+}
+
 function normalizePersistedTags(value: unknown) {
   if (!Array.isArray(value)) return [];
   const tags: string[] = [];
@@ -144,12 +234,75 @@ function normalizePersistedTags(value: unknown) {
 }
 
 function normalizeChatMessages(value: unknown, forceSaved = false): ChatMessage[] {
-  return uniqueRecordItems<ChatMessage>(value).map((message) => ({
-    ...message,
-    id: persistedId(message.id) || uid("chat"),
-    content: boundedPersistedString(message.content, MAX_PERSISTED_TEXT_LENGTH),
-    saved: forceSaved || Boolean(message.saved),
-  }));
+  return uniqueRecordItems<ChatMessage>(value).slice(-MAX_AI_MESSAGES).map((message) => {
+    const role = message.role === "assistant" ? "assistant" : "user";
+    const steps = role === "assistant"
+      ? recordItems<NonNullable<ChatMessage["steps"]>[number]>(message.steps)
+        .filter((step) => typeof step.label === "string")
+        .slice(0, MAX_AI_STEPS)
+        .map((step) => ({
+          label: boundedPersistedString(step.label, MAX_PERSISTED_TITLE_LENGTH),
+          status: ["pending", "running", "done", "error"].includes(String(step.status))
+            ? step.status
+            : "pending",
+        }))
+      : [];
+    const actionEntries: Array<{ action: Record<string, unknown>; originalIndex: number }> = [];
+    const actionBudget = { remaining: MAX_AI_JSON_NODES };
+    if (role === "assistant") {
+      for (const [originalIndex, action] of recordItems<Record<string, unknown>>(message.actions)
+        .slice(0, MAX_AI_ACTION_SCAN).entries()) {
+        if (actionEntries.length >= MAX_AI_ACTIONS) break;
+        if (!isValidPersistedAiAction(action)) continue;
+        const normalized = normalizePersistedJson(action, 0, actionBudget);
+        if (isRecord(normalized)) actionEntries.push({ action: normalized, originalIndex });
+      }
+    }
+    const actions = actionEntries.map((entry) => entry.action);
+    const selectedActions: Record<number, boolean> = {};
+    if (role === "assistant" && isRecord(message.selectedActions)) {
+      actionEntries.forEach((entry, index) => {
+        const selected = message.selectedActions?.[entry.originalIndex];
+        if (typeof selected === "boolean") selectedActions[index] = selected;
+      });
+    }
+    const plan = role === "assistant"
+      ? recordItems<NonNullable<ChatMessage["plan"]>[number]>(message.plan)
+        .filter((block) => (
+          typeof block.title === "string"
+          && Boolean(persistedTime(block.start, ""))
+          && Boolean(persistedTime(block.end, ""))
+        ))
+        .slice(0, MAX_AI_PLAN_BLOCKS)
+        .map((block) => ({
+          taskId: persistedId(block.taskId),
+          title: boundedPersistedString(block.title, MAX_PERSISTED_TITLE_LENGTH),
+          start: persistedTime(block.start, ""),
+          end: persistedTime(block.end, ""),
+          durationMinutes: block.durationMinutes === undefined
+            ? undefined
+            : boundedInteger(block.durationMinutes, 1, MAX_RECURRENCE_DURATION_MINUTES, 1),
+          reason: boundedPersistedString(block.reason, MAX_PERSISTED_TITLE_LENGTH) || undefined,
+        }))
+      : [];
+    return {
+      id: persistedId(message.id) || uid("chat"),
+      role,
+      content: boundedPersistedString(message.content, MAX_PERSISTED_TEXT_LENGTH),
+      createdAt: typeof message.createdAt === "string" && message.createdAt ? message.createdAt : now(),
+      saved: forceSaved || Boolean(message.saved),
+      status: ["thinking", "done", "error"].includes(String(message.status)) ? message.status : "done",
+      steps: steps.length > 0 ? steps : undefined,
+      actions: actions.length > 0 ? actions : undefined,
+      selectedActions: Object.keys(selectedActions).length > 0 ? selectedActions : undefined,
+      actionState: ["pending", "adopted", "rejected", "undone"].includes(String(message.actionState))
+        ? message.actionState
+        : undefined,
+      intent: boundedPersistedString(message.intent, MAX_AI_INTENT_LENGTH) || undefined,
+      plan: plan.length > 0 ? plan : undefined,
+      format: message.format === "markdown" ? "markdown" : "text",
+    };
+  });
 }
 
 function normalizeTimelineRecords(value: unknown, taskId: string): TimelineRecord[] {
@@ -355,7 +508,7 @@ export function normalizeData(data: PlannerData): PlannerData {
     notes: uniqueRecordItems(data.notes),
     drafts: uniqueRecordItems(data.drafts),
     chat: uniqueRecordItems(data.chat),
-    aiConversations: uniqueRecordItems(data.aiConversations),
+    aiConversations: uniqueRecordItems(data.aiConversations).slice(0, MAX_AI_CONVERSATIONS),
     aiMemories: uniqueRecordItems(data.aiMemories),
     scheduleTemplates: uniqueRecordItems(data.scheduleTemplates),
     aiProfile: isRecord(data.aiProfile) ? data.aiProfile : undefined,
@@ -538,6 +691,7 @@ export function normalizeData(data: PlannerData): PlannerData {
         completedAt: task.completed ? task.completedAt || task.updatedAt || task.dueDate || task.createdAt : undefined,
         workflowStatus: inferWorkflowStatus({ ...task, timelineRecords }),
         timelineRecords,
+        recurrence: normalizeTaskRecurrence(task.recurrence),
         subtasks: normalizeSubtasks(task.subtasks, 0, seenSubtaskIds),
         notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
       };

@@ -7,7 +7,7 @@
 
 ### 修复
 - 同步合并现在只把结构正确、可解析且未异常超前的删除时间视为有效墓碑，并为设备时钟保留最多 7 天偏差；缺少时间戳的旧版记录不再在首次同步时被静默删除，损坏或极端未来的墓碑会被清除，已被同 ID 更新记录取代的旧墓碑也会自动移除，不再永久压制正常数据、导致备份恢复崩溃或继续占用同步载荷。
-- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，限制任务、项目、子任务、目标、长期任务、草稿、笔记、习惯、时间记录、时间轴记录和 AI 历史的身份、文本、数组与数值边界，并规范化自定义日程模板及其时段；同一习惯同一天只保留最新状态，时间轴记录会修复任务归属、状态和结束日期，悬空引用与无效时间会被清理。异常超过 64 层的子任务树、每任务超过 1,000 条的时间轴记录、超过 500 段的模板或超过 5,000 次候选展开的旧日历事件迁移会被截断，避免重复数据污染统计、异常记录错误渲染，或恶意深层及巨型数据拖垮启动。
+- 从云端、本地缓存或备份恢复规划数据时，现在会按 ID 去重任务、项目及其他持久化集合，限制任务、项目、子任务、目标、长期任务、草稿、笔记、习惯、时间记录、时间轴记录、重复规则和 AI 历史的身份、文本、数组、嵌套与数值边界，并规范化自定义日程模板；同一习惯同一天只保留最新状态，时间轴记录会修复任务归属、状态和结束日期，无效重复规则、悬空引用、未知 AI 操作和损坏时间会被清理。子任务树、时间轴记录、模板时段、旧事件迁移及 AI 会话/消息/建议均有恢复上限，避免重复数据污染统计、异常记录错误渲染，或恶意深层及巨型数据拖垮启动。
 - 任务 CSV 导入现在会校验 NavoPath 表头，拒绝未闭合的引号字段，并限制任务 ID、标题、项目名和元数据字段的长度；同一文件中重复出现的任务 ID 只导入第一条，避免格式错误或异常超长的数据进入渲染与同步链路，或重复 ID 导致后续编辑作用于多个任务。
 - 从云端、缓存或备份恢复设置时，现在会限制昵称、标题、模型标识、URL、背景路径和折叠状态列表的长度与数量，只接受大小受限的 JPEG/PNG/WebP Base64 头像，并统一清除旧版个人 API Key 状态；异常设置不再放大缓存、同步或渲染开销。
 - 插件设置与使用教程现在准确区分可运行的官方内置插件和仅提供经校验 manifest/配置的桌面本地插件；本地项不再被描述为会加载 `index.js` 或显示“运行中”，其权限明确标记为声明信息。外部 manifest 会拒绝对象保留键与重复配置字段，并按类型、数值范围、选项和文本长度规范化配置；来自云端、缓存或备份的插件设置也会去重启用列表，并限制配置数量、嵌套深度、节点、数组及文本规模。
@@ -34,7 +34,7 @@
 
 ### Fixed
 - Sync merging now accepts only structurally valid, parseable deletion times that are not implausibly far ahead, while allowing up to seven days of device clock skew. Legacy records without timestamps no longer disappear on their first sync; damaged or extreme-future tombstones are removed; and old tombstones superseded by a newer record with the same ID are pruned instead of permanently suppressing normal data, crashing backup restore, or continuing to occupy sync payloads.
-- Planner data restored from cloud, local cache, or backup now deduplicates persisted collections by ID; bounds identities, text, arrays, and numeric values across tasks, projects, subtasks, goals, long-term tasks, drafts, notes, habits, time entries, timeline records, and AI history; and normalizes custom schedule templates. Only the latest state remains for each habit and date, while timeline records repair task ownership, status, and end dates and discard invalid times or dangling references. Subtask trees deeper than 64 levels, timeline records beyond 1,000 per task, templates beyond 500 periods, and legacy calendar migrations beyond 5,000 candidate expansions are truncated, preventing duplicate data from polluting metrics, malformed records from rendering incorrectly, and maliciously oversized data from stalling startup.
+- Planner data restored from cloud, local cache, or backup now deduplicates persisted collections by ID; bounds identities, text, arrays, nesting, and numeric values across tasks, projects, subtasks, goals, long-term tasks, drafts, notes, habits, time entries, timeline records, recurrence rules, and AI history; and normalizes custom schedule templates. Only the latest state remains for each habit and date, while timeline records repair task ownership, status, and end dates and invalid recurrence rules, dangling references, unknown AI actions, and damaged times are removed. Subtask trees, timeline records, template periods, legacy-event migration, and AI conversations, messages, and suggestions all have recovery limits, preventing duplicate data from polluting metrics, malformed records from rendering incorrectly, and maliciously oversized data from stalling startup.
 - Task CSV imports now validate the NavoPath header, reject unterminated quoted fields, and bound task IDs, titles, project names, and metadata fields. When a file repeats a task ID, only its first row is imported, preventing malformed or abnormally long data from entering rendering and sync paths or duplicate IDs from making later edits affect multiple tasks.
 - Settings restored from cloud, cache, or backup now bound the length and count of names, titles, model identifiers, URLs, background paths, and collapsed-state lists; accept only size-bounded JPEG/PNG/WebP Base64 avatars; and consistently clear retired personal API-key state. Malformed settings can no longer amplify cache, sync, or rendering costs.
 - Plugin settings and the usage guide now accurately distinguish executable official built-ins from desktop local plugins that contribute validated manifest metadata and configuration only. Local entries no longer claim to load `index.js` or appear as “Running,” and their permissions are clearly labeled as declarations. External manifests reject reserved object keys and duplicate config fields and normalize values by type, range, options, and text length; plugin settings restored from cloud, cache, or backup also deduplicate enabled IDs and bound config count, nesting, nodes, arrays, and text.
@@ -59,12 +59,12 @@
 ## 2026-07-28 · 规划数据恢复加固
 
 ### 修复
-- 从云端、本地缓存或备份恢复规划数据时，现在会限制目标、长期任务、草稿、笔记、习惯、时间记录、时间轴记录和 AI 历史的身份、文本、数组与数值边界，清理无效引用、时间及重复标签，并规范化自定义日程模板；同一习惯同一天只保留最新状态，时间轴记录会修复任务归属与结束日期且每任务最多恢复 1,000 条。悬空的活动会话会安全回退，单个模板最多恢复 500 个时段，旧日历事件最多展开 5,000 个迁移候选。
+- 从云端、本地缓存或备份恢复规划数据时，现在会限制目标、长期任务、草稿、笔记、习惯、时间记录、时间轴记录、重复规则和 AI 历史的身份、文本、数组、嵌套与数值边界，清理无效引用、时间、重复标签及未知 AI 操作，并规范化自定义日程模板；重复规则最多执行 10,000 次、单次最长 24 小时，AI 历史最多恢复 500 个会话、每会话 500 条消息，并限制消息内的步骤、操作和计划数量。
 
 ## 2026-07-28 · Planner data recovery hardening
 
 ### Fixed
-- Planner data restored from cloud, local cache, or backup now bounds identities, text, arrays, and numeric values across goals, long-term tasks, drafts, notes, habits, time entries, timeline records, and AI history; cleans invalid references, times, and duplicate tags; and normalizes custom schedule templates. Only the latest state remains for each habit and date, while timeline records repair task ownership and end dates and restore at most 1,000 records per task. Dangling active conversations fall back safely, each template restores at most 500 periods, and legacy calendar events expand into at most 5,000 migration candidates.
+- Planner data restored from cloud, local cache, or backup now bounds identities, text, arrays, nesting, and numeric values across goals, long-term tasks, drafts, notes, habits, time entries, timeline records, recurrence rules, and AI history; cleans invalid references, times, duplicate tags, and unknown AI actions; and normalizes custom schedule templates. Recurrence rules allow at most 10,000 occurrences and 24 hours per occurrence, while AI history restores at most 500 conversations and 500 messages per conversation with bounded steps, actions, and plan blocks.
 
 ## 2026-07-27 · 输入与插件安全
 
