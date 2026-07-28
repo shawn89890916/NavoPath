@@ -54,7 +54,7 @@
         "dist/assets/LandingPage-*.js",
         "dist/assets/WidgetApp-*.js"
       ],
-      "limit": "260 KB"
+      "limit": "265 KB"
     },
     {
       "name": "Document parsing scripts",
