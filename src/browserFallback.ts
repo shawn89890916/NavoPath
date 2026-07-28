@@ -744,16 +744,24 @@ export function normalizeData(data: PlannerData): PlannerData {
     const habitId = String(state.habitId);
     const date = persistedDate(state.date);
     if (!habitIds.has(habitId) || !date) continue;
+    const createdAt = persistedTimestamp(state.createdAt) || now();
+    const updatedAt = persistedTimestamp(state.updatedAt) || createdAt;
+    const completed = state.completed === true;
+    const completedAt = completed ? persistedTimestamp(state.completedAt) : undefined;
+    const timelineRecordId = persistedId(state.timelineRecordId);
     const normalizedState: HabitDailyState = {
       ...state,
       id: persistedId(state.id) || uid("habit-state"),
       habitId,
       date,
-      completed: Boolean(state.completed),
-      timelineRecordId: persistedId(state.timelineRecordId),
-      createdAt: state.createdAt || now(),
-      updatedAt: state.updatedAt || state.createdAt || now(),
+      completed,
+      createdAt,
+      updatedAt,
     };
+    if (completedAt) normalizedState.completedAt = completedAt;
+    else delete normalizedState.completedAt;
+    if (timelineRecordId) normalizedState.timelineRecordId = timelineRecordId;
+    else delete normalizedState.timelineRecordId;
     const key = `${habitId}\u0000${date}`;
     const current = habitStateByDate.get(key);
     const normalizedRank = Math.max(
@@ -836,6 +844,20 @@ export function normalizeData(data: PlannerData): PlannerData {
       updatedAt,
     };
   });
+  const timelineRecordIdsByTask = new Map(
+    normalizedTasks.map((task) => [
+      task.id,
+      new Set((task.timelineRecords || []).map((record) => record.id)),
+    ]),
+  );
+  const normalizedHabitDailyStates = habitDailyStates.map((state) => {
+    const taskId = `habit-task-${state.habitId}-${state.date}`;
+    const timelineRecordId = state.timelineRecordId;
+    if (!timelineRecordId || timelineRecordIdsByTask.get(taskId)?.has(timelineRecordId)) return state;
+    const repaired = { ...state };
+    delete repaired.timelineRecordId;
+    return repaired;
+  });
   return normalizePlannerDataForClient(normalizeTreeOrder({
     ...safeData,
     goals: safeData.goals.map((goal) => ({
@@ -853,7 +875,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       urgency: project.urgency || "low",
     })),
     habits,
-    habitDailyStates,
+    habitDailyStates: normalizedHabitDailyStates,
     longTasks: safeData.longTasks.map((task) => ({
       ...task,
       id: persistedId(task.id) || uid("long"),

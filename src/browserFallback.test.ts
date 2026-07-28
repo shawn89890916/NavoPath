@@ -646,6 +646,62 @@ describe("browser fallback preview mode", () => {
     expect(linked?.timelineRecordId).toBe("timeline-valid");
   });
 
+  it("repairs habit-state completion metadata and schedule references", () => {
+    const malformed = fallbackData() as any;
+    const firstHabit = malformed.habits[0];
+    const secondHabit = malformed.habits[1];
+    const date = "2026-07-28";
+    const habitTaskId = `habit-task-${firstHabit.id}-${date}`;
+    malformed.tasks.push({
+      ...malformed.tasks[0],
+      id: habitTaskId,
+      title: firstHabit.title,
+      timelineRecords: [{
+        id: "habit-record-valid",
+        taskId: habitTaskId,
+        scheduledDate: date,
+        scheduledStart: "08:00",
+        scheduledEnd: "08:20",
+        executionStatus: "scheduled",
+        createdAt: "2026-07-28T08:00:00.000Z",
+      }],
+    });
+    malformed.habitDailyStates = [
+      {
+        id: "habit-state-valid-link",
+        habitId: firstHabit.id,
+        date,
+        completed: true,
+        completedAt: "2026-07-28T08:20:00.000Z",
+        timelineRecordId: "habit-record-valid",
+        createdAt: "2026-07-28T08:00:00.000Z",
+        updatedAt: "2026-07-28T08:20:00.000Z",
+      },
+      {
+        id: "habit-state-wrong-link",
+        habitId: secondHabit.id,
+        date,
+        completed: "false",
+        completedAt: "not-a-timestamp",
+        timelineRecordId: "habit-record-valid",
+        createdAt: 123,
+        updatedAt: null,
+      },
+    ];
+
+    const normalized = normalizeData(malformed);
+    const valid = normalized.habitDailyStates?.find((state) => state.id === "habit-state-valid-link");
+    const repaired = normalized.habitDailyStates?.find((state) => state.id === "habit-state-wrong-link");
+
+    expect(valid?.timelineRecordId).toBe("habit-record-valid");
+    expect(valid?.completedAt).toBe("2026-07-28T08:20:00.000Z");
+    expect(repaired?.completed).toBe(false);
+    expect(repaired?.completedAt).toBeUndefined();
+    expect(repaired?.timelineRecordId).toBeUndefined();
+    expect(Number.isFinite(Date.parse(repaired?.createdAt || ""))).toBe(true);
+    expect(repaired?.updatedAt).toBe(repaired?.createdAt);
+  });
+
   it("caps legacy event migration before it can expand into millions of tasks", () => {
     const malformed = fallbackData() as any;
     malformed.events = [
