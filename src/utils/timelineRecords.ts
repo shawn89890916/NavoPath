@@ -32,6 +32,31 @@ export function calculateTimelineRecordEnd(
   };
 }
 
+function timelineRecordDurationMinutes(record: TimelineRecord): number {
+  const normalized = normalizeTimelineRecord(record);
+  const startDay = Date.parse(`${normalized.scheduledDate}T00:00:00.000Z`);
+  const endDay = Date.parse(`${normalized.scheduledEndDate}T00:00:00.000Z`);
+  let duration = Math.round((endDay - startDay) / 86_400_000) * 1_440
+    + minutesOfDay(normalized.scheduledEnd)
+    - minutesOfDay(normalized.scheduledStart);
+  if (!record.scheduledEndDate && duration <= 0) duration += 1_440;
+  return Math.max(0, duration);
+}
+
+export function rescheduleTimelineRecord(
+  record: TimelineRecord,
+  scheduledDate: string,
+  scheduledStart: string,
+  durationMinutes = timelineRecordDurationMinutes(record),
+): TimelineRecord {
+  return {
+    ...record,
+    scheduledDate,
+    scheduledStart,
+    ...calculateTimelineRecordEnd(scheduledDate, scheduledStart, durationMinutes),
+  };
+}
+
 export function normalizeTimelineRecord(record: TimelineRecord): TimelineRecord {
   return { ...record, scheduledEndDate: record.scheduledEndDate || record.scheduledDate };
 }

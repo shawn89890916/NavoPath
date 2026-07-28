@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineRecord } from "../types";
-import { calculateTimelineRecordEnd, focusTargetForRecord, normalizeTimelineRecord, sliceTimelineRecord } from "./timelineRecords";
+import { calculateTimelineRecordEnd, focusTargetForRecord, normalizeTimelineRecord, rescheduleTimelineRecord, sliceTimelineRecord } from "./timelineRecords";
 
 const record: TimelineRecord = {
   id: "record-1",
@@ -18,6 +18,24 @@ describe("timelineRecords", () => {
     expect(calculateTimelineRecordEnd("2026-12-31", "23:50", 20)).toEqual({
       scheduledEndDate: "2027-01-01",
       scheduledEnd: "00:10",
+    });
+  });
+
+  it("preserves duration when moving a cross-midnight record to another date", () => {
+    expect(rescheduleTimelineRecord(record, "2026-07-10", "23:45")).toMatchObject({
+      scheduledDate: "2026-07-10",
+      scheduledStart: "23:45",
+      scheduledEndDate: "2026-07-11",
+      scheduledEnd: "07:45",
+    });
+  });
+
+  it("recalculates the end date when changing a record duration", () => {
+    expect(rescheduleTimelineRecord(record, record.scheduledDate, record.scheduledStart, 30)).toMatchObject({
+      scheduledDate: "2026-07-01",
+      scheduledStart: "23:30",
+      scheduledEndDate: "2026-07-02",
+      scheduledEnd: "00:00",
     });
   });
 

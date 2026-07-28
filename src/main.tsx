@@ -111,7 +111,7 @@ import {
   scheduleWidgetCountdown,
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
-import { calculateTimelineRecordEnd } from "./utils/timelineRecords";
+import { calculateTimelineRecordEnd, rescheduleTimelineRecord } from "./utils/timelineRecords";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
@@ -1876,7 +1876,7 @@ function App() {
           taskId: task.id,
           scheduledDate: task.scheduledDate,
           scheduledStart: task.scheduledStart,
-          scheduledEnd: task.scheduledEnd || addMinutes(task.scheduledStart, taskDuration(task)),
+          ...calculateTimelineRecordEnd(task.scheduledDate, task.scheduledStart, taskDuration(task)),
           executionStatus: task.executionStatus || "scheduled",
           createdAt: task.updatedAt || new Date().toISOString(),
         };
@@ -3478,7 +3478,7 @@ function App() {
         taskId: realTask.id,
         scheduledDate: occurrenceMeta.scheduledDate,
         scheduledStart: occurrenceMeta.scheduledStart,
-        scheduledEnd: addMinutes(occurrenceMeta.scheduledStart, duration),
+        ...calculateTimelineRecordEnd(occurrenceMeta.scheduledDate, occurrenceMeta.scheduledStart, duration),
         executionStatus: "completed",
         createdAt: new Date().toISOString(),
       };
@@ -5062,16 +5062,11 @@ function App() {
         const idx = records.findIndex((r) => r.id === recordId);
         if (idx === -1) return task;
         const updated = [...records];
-        const oldEnd = updated[idx].scheduledEnd;
-        const oldStart = updated[idx].scheduledStart;
-        const duration = spanDurationMinutes(oldStart, oldEnd);
-        const newEnd = addMinutes(newStart, duration);
-        updated[idx] = {
-          ...updated[idx],
-          scheduledStart: newStart,
-          scheduledEnd: newEnd,
-          scheduledDate: newDate || updated[idx].scheduledDate,
-        };
+        updated[idx] = rescheduleTimelineRecord(
+          updated[idx],
+          newDate || updated[idx].scheduledDate,
+          newStart,
+        );
         return { ...task, timelineRecords: updated, updatedAt: now };
       }),
     });
@@ -5423,12 +5418,12 @@ function App() {
           const idx = records.findIndex((r) => r.id === task.id);
           if (idx === -1) return t;
           const updated = [...records];
-          updated[idx] = {
-            ...updated[idx],
-            scheduledStart: nextStart,
-            scheduledEnd: nextEnd,
-            scheduledDate: moveStartDate ? nextStartDate : updated[idx].scheduledDate,
-          };
+          updated[idx] = rescheduleTimelineRecord(
+            updated[idx],
+            moveStartDate ? nextStartDate : updated[idx].scheduledDate,
+            nextStart,
+            nextDuration,
+          );
           return { ...t, timelineRecords: updated, estimatedHours: durationHours, updatedAt: now };
         }),
       };
@@ -11150,7 +11145,7 @@ function EditDrawer(props: {
     if (props.editingRecordId && props.task.timelineRecords?.length) {
       patch.timelineRecords = props.task.timelineRecords.map((record) =>
         record.id === props.editingRecordId
-          ? { ...record, scheduledEnd: addMinutes(record.scheduledStart, safeMinutes) }
+          ? rescheduleTimelineRecord(record, record.scheduledDate, record.scheduledStart, safeMinutes)
           : record,
       );
     }
