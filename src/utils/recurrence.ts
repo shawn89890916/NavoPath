@@ -114,13 +114,34 @@ export function buildRecurrenceOccurrenceId(taskId: string, date: string, startT
   return `${taskId}${RECURRENCE_OCCURRENCE_MARKER}${date}${RECURRENCE_OCCURRENCE_MARKER}${startTime}`;
 }
 
-export function parseRecurrenceOccurrenceId(taskId: string) {
-  const parts = taskId.split(RECURRENCE_OCCURRENCE_MARKER);
-  if (parts.length !== 3) return null;
+export function parseRecurrenceOccurrenceId(occurrenceId: string) {
+  const timeSeparator = occurrenceId.lastIndexOf(RECURRENCE_OCCURRENCE_MARKER);
+  const dateSeparator = occurrenceId.lastIndexOf(
+    RECURRENCE_OCCURRENCE_MARKER,
+    timeSeparator - 1,
+  );
+  if (dateSeparator <= 0 || timeSeparator <= dateSeparator) return null;
+  const taskId = occurrenceId.slice(0, dateSeparator);
+  const scheduledDate = occurrenceId.slice(
+    dateSeparator + RECURRENCE_OCCURRENCE_MARKER.length,
+    timeSeparator,
+  );
+  const scheduledStart = occurrenceId.slice(
+    timeSeparator + RECURRENCE_OCCURRENCE_MARKER.length,
+  );
+  const parsedDate = new Date(`${scheduledDate}T00:00:00.000Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate) ||
+    !Number.isFinite(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== scheduledDate ||
+    !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(scheduledStart)
+  ) {
+    return null;
+  }
   return {
-    taskId: parts[0],
-    scheduledDate: parts[1],
-    scheduledStart: parts[2],
+    taskId,
+    scheduledDate,
+    scheduledStart,
   };
 }
 

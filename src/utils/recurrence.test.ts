@@ -117,6 +117,29 @@ describe("recurring task identity", () => {
     expect(parseRecurrenceOccurrenceId("task_123")).toBeNull();
   });
 
+  it("round-trips an occurrence when the source task id contains the marker", () => {
+    const id = buildRecurrenceOccurrenceId(
+      "imported__occ__task",
+      "2026-07-26",
+      "09:30",
+    );
+
+    expect(parseRecurrenceOccurrenceId(id)).toEqual({
+      taskId: "imported__occ__task",
+      scheduledDate: "2026-07-26",
+      scheduledStart: "09:30",
+    });
+  });
+
+  it("does not classify malformed marker-shaped task ids as occurrences", () => {
+    expect(parseRecurrenceOccurrenceId(
+      "task__occ__not-a-date__occ__09:30",
+    )).toBeNull();
+    expect(parseRecurrenceOccurrenceId(
+      "task__occ__2026-07-26__occ__25:00",
+    )).toBeNull();
+  });
+
   it("recognizes only complete scheduled recurrence rules", () => {
     const scheduled = scheduledRecurringTask({
       mode: "scheduled",
