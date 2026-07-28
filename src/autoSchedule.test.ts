@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { autoScheduleTasks } from "./autoSchedule";
+import { describe, expect, it, vi } from "vitest";
+import { autoScheduleTasks, getFreeSlots } from "./autoSchedule";
 
 const future = "2099-01-05";
 
@@ -8,6 +8,77 @@ function task(id: string, projectId: string, estimatedMinutes = 45) {
 }
 
 describe("autoScheduleTasks", () => {
+  it("uses the first grid slot at least five minutes after the current time", () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date(2026, 6, 28, 12, 1);
+      vi.setSystemTime(now);
+      const date = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      expect(getFreeSlots({
+        dateRange: [date],
+        scheduledEvents: [],
+        settings: {
+          dayStart: "08:00",
+          dayEnd: "13:00",
+          snapMinutes: 15,
+          bufferMinutes: 0,
+        },
+      })[0]).toMatchObject({
+        date,
+        startMinutes: 12 * 60 + 15,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats the local calendar date as today across a UTC day boundary", () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-07-28T16:30:00.000Z"));
+
+      expect(getFreeSlots({
+        dateRange: ["2026-07-29"],
+        scheduledEvents: [],
+        settings: {
+          dayStart: "00:00",
+          dayEnd: "02:00",
+          snapMinutes: 15,
+          bufferMinutes: 0,
+        },
+      })[0]).toMatchObject({
+        date: "2026-07-29",
+        startMinutes: 45,
+      });
+
+      expect(autoScheduleTasks({
+        tasks: [task("local-today", "study", 15)],
+        scheduledEvents: [],
+        settings: {
+          dayStart: "00:00",
+          dayEnd: "02:00",
+          snapMinutes: 15,
+          bufferMinutes: 0,
+          allowTaskSplitting: false,
+        },
+      }).proposedEvents[0]).toMatchObject({
+        scheduledDate: "2026-07-29",
+        scheduledStart: "00:45",
+      });
+    } finally {
+      vi.useRealTimers();
+      if (originalTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimeZone;
+    }
+  });
+
   it("keeps fixed events as anchors and stays inside the work window", () => {
     const result = autoScheduleTasks({
       tasks: [task("prepare", "study", 60)],

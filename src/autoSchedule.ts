@@ -2,6 +2,8 @@
 // Fixed events remain anchors. Tasks are movable work blocks and may be split
 // only when the caller explicitly enables an auditable split preview.
 
+import { localIsoDate } from "./utils/localDate";
+
 export interface ScheduleTask {
   id: string;
   title: string;
@@ -91,7 +93,7 @@ function timeToMinutes(t: string): number {
 function minutesToTime(m: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
-function todayIso(): string { return new Date().toISOString().slice(0, 10); }
+function todayIso(): string { return localIsoDate(); }
 function uid(p: string) { return `${p}_${Math.random().toString(16).slice(2, 10)}_${Date.now().toString(36).slice(-4)}`; }
 
 function eventDate(e: ScheduledEvent) { return e.scheduledDate || e.date || ""; }
@@ -163,12 +165,13 @@ export function getFreeSlots(params: {
   const dayStart = settings.dayStart ? timeToMinutes(settings.dayStart) : 480;
   const dayEnd = settings.dayEnd ? timeToMinutes(settings.dayEnd) : 1320;
   const buffer = settings.bufferMinutes ?? 5;
-  const now = new Date().getHours() * 60 + new Date().getMinutes();
-  const tIso = todayIso();
+  const current = new Date();
+  const now = current.getHours() * 60 + current.getMinutes();
+  const tIso = localIsoDate(current);
 
   const slots: FreeSlot[] = [];
   for (const date of dateRange) {
-    const effectiveStart = date === tIso ? Math.max(dayStart, Math.ceil(now / snap) * snap + 5) : dayStart;
+    const effectiveStart = date === tIso ? Math.max(dayStart, Math.ceil((now + 5) / snap) * snap) : dayStart;
     let freeSegments: { start: number; end: number }[] = [{ start: effectiveStart, end: dayEnd }];
 
     for (const ev of scheduledEvents) {
