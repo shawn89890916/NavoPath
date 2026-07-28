@@ -494,6 +494,48 @@ describe("browser fallback preview mode", () => {
     expect(template?.slots[0].end).toBe("10:00");
   });
 
+  it("normalizes persisted projects, goals, and long-term planning records", () => {
+    const malformed = fallbackData() as any;
+    const project = malformed.projects[0];
+    const goal = malformed.goals[0];
+    project.category = "unknown";
+    project.completed = "false";
+    project.color = "not-a-color".repeat(20);
+    project.createdAt = 123;
+    project.updatedAt = null;
+    goal.targetDate = "2027-99-99";
+    goal.status = "unknown";
+    malformed.longTasks = [{
+      id: "long-invalid",
+      title: "Long-range plan",
+      notes: "",
+      targetDate: "tomorrow",
+      completed: "false",
+      createdAt: 123,
+      updatedAt: null,
+    }];
+
+    const normalized = normalizeData(malformed);
+    const normalizedProject = normalized.projects.find((item) => item.id === project.id);
+    const normalizedGoal = normalized.goals.find((item) => item.id === goal.id);
+    const normalizedLongTask = normalized.longTasks[0];
+
+    expect(normalizedProject).toMatchObject({
+      category: "personal",
+      completed: false,
+      color: "#584D3D",
+    });
+    expect(Number.isFinite(Date.parse(normalizedProject?.createdAt || ""))).toBe(true);
+    expect(normalizedProject?.updatedAt).toBe(normalizedProject?.createdAt);
+    expect(normalizedGoal).toMatchObject({ targetDate: "", status: "active" });
+    expect(normalizedLongTask).toMatchObject({
+      targetDate: "",
+      completed: false,
+    });
+    expect(Number.isFinite(Date.parse(normalizedLongTask.createdAt))).toBe(true);
+    expect(normalizedLongTask.updatedAt).toBe(normalizedLongTask.createdAt);
+  });
+
   it("bounds restored habits, daily states, and time entries", () => {
     const malformed = fallbackData() as any;
     const taskId = malformed.tasks[0].id;

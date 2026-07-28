@@ -144,6 +144,11 @@ function persistedCategory(value: unknown): Task["category"] {
     : "personal";
 }
 
+function persistedProjectColor(value: unknown) {
+  const color = typeof value === "string" ? value.trim() : "";
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(color) ? color : "#584D3D";
+}
+
 function boundedInteger(value: unknown, minimum: number, maximum: number, fallback: number) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(maximum, Math.max(minimum, Math.round(value)))
@@ -865,23 +870,41 @@ export function normalizeData(data: PlannerData): PlannerData {
       id: persistedId(goal.id) || uid("goal"),
       title: boundedPersistedString(goal.title, MAX_PERSISTED_TITLE_LENGTH),
       description: boundedPersistedString(goal.description, MAX_PERSISTED_TEXT_LENGTH),
+      targetDate: persistedDate(goal.targetDate) || "",
+      status: ["active", "done", "paused"].includes(String(goal.status))
+        ? goal.status
+        : "active",
     })),
-    projects: safeData.projects.map((project) => ({
-      ...project,
-      title: boundedPersistedString(project.title, MAX_PERSISTED_TITLE_LENGTH),
-      notes: boundedPersistedString(project.notes, MAX_PERSISTED_TEXT_LENGTH),
-      color: project.color || "#584D3D",
-      importance: project.importance || "high",
-      urgency: project.urgency || "low",
-    })),
+    projects: safeData.projects.map((project) => {
+      const createdAt = persistedTimestamp(project.createdAt) || now();
+      return {
+        ...project,
+        title: boundedPersistedString(project.title, MAX_PERSISTED_TITLE_LENGTH),
+        category: persistedCategory(project.category),
+        notes: boundedPersistedString(project.notes, MAX_PERSISTED_TEXT_LENGTH),
+        completed: project.completed === true,
+        color: persistedProjectColor(project.color),
+        importance: project.importance || "high",
+        urgency: project.urgency || "low",
+        createdAt,
+        updatedAt: persistedTimestamp(project.updatedAt) || createdAt,
+      };
+    }),
     habits,
     habitDailyStates: normalizedHabitDailyStates,
-    longTasks: safeData.longTasks.map((task) => ({
-      ...task,
-      id: persistedId(task.id) || uid("long"),
-      title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
-      notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
-    })),
+    longTasks: safeData.longTasks.map((task) => {
+      const createdAt = persistedTimestamp(task.createdAt) || now();
+      return {
+        ...task,
+        id: persistedId(task.id) || uid("long"),
+        title: boundedPersistedString(task.title, MAX_PERSISTED_TITLE_LENGTH),
+        targetDate: persistedDate(task.targetDate) || "",
+        notes: boundedPersistedString(task.notes, MAX_PERSISTED_TEXT_LENGTH),
+        completed: task.completed === true,
+        createdAt,
+        updatedAt: persistedTimestamp(task.updatedAt) || createdAt,
+      };
+    }),
     notes,
     chat,
     aiConversations,
