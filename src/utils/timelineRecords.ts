@@ -72,7 +72,26 @@ export function rescheduleTimelineRecord(
 }
 
 export function normalizeTimelineRecord(record: TimelineRecord): TimelineRecord {
-  return { ...record, scheduledEndDate: record.scheduledEndDate || record.scheduledDate };
+  if (record.scheduledEndDate) return record;
+  const validTime = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!validTime.test(record.scheduledStart)
+    || !validTime.test(record.scheduledEnd)
+    || !Number.isFinite(Date.parse(`${record.scheduledDate}T00:00:00.000Z`))) {
+    return { ...record, scheduledEndDate: record.scheduledDate };
+  }
+  const startMinutes = minutesOfDay(record.scheduledStart);
+  const endMinutes = minutesOfDay(record.scheduledEnd);
+  const durationMinutes = endMinutes > startMinutes
+    ? endMinutes - startMinutes
+    : endMinutes - startMinutes + 1_440;
+  return {
+    ...record,
+    scheduledEndDate: calculateTimelineRecordEnd(
+      record.scheduledDate,
+      record.scheduledStart,
+      durationMinutes,
+    ).scheduledEndDate,
+  };
 }
 
 export function recordStartDateTime(record: TimelineRecord): Date {

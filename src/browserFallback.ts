@@ -3,7 +3,7 @@ import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
 import { normalizePlannerDataForClient } from "./utils/dataNormalization";
-import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, minutesOfDay } from "./utils/timelineRecords";
+import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, minutesOfDay, normalizeTimelineRecord } from "./utils/timelineRecords";
 
 const PREVIEW_STORAGE_KEY = "planner-preview-data";
 const PREVIEW_SETTINGS_KEY = "planner-preview-settings";
@@ -472,7 +472,15 @@ function normalizeTimelineRecords(value: unknown, taskId: string): TimelineRecor
     const id = persistedId(record.id) || uid("timeline");
     if (seenIds.has(id)) continue;
     seenIds.add(id);
-    const candidateEndDate = persistedDate(record.scheduledEndDate) || scheduledDate;
+    const explicitEndDate = persistedDate(record.scheduledEndDate);
+    const inferredEndDate = normalizeTimelineRecord({
+      ...record,
+      scheduledDate,
+      scheduledStart,
+      scheduledEnd,
+      scheduledEndDate: undefined,
+    }).scheduledEndDate || scheduledDate;
+    const candidateEndDate = explicitEndDate || inferredEndDate;
     records.push({
       ...record,
       id,

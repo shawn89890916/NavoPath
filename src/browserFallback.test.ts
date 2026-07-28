@@ -893,6 +893,23 @@ describe("browser fallback preview mode", () => {
     });
   });
 
+  it("infers a missing end date for a persisted cross-midnight record", () => {
+    const persisted = fallbackData();
+    persisted.tasks[0].timelineRecords = [{
+      id: "legacy-cross-midnight",
+      taskId: persisted.tasks[0].id,
+      scheduledDate: "2026-07-28",
+      scheduledStart: "23:30",
+      scheduledEnd: "00:30",
+      executionStatus: "scheduled",
+      createdAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    const record = normalizeData(persisted).tasks[0].timelineRecords?.[0];
+
+    expect(record?.scheduledEndDate).toBe("2026-07-29");
+  });
+
   it("normalizes recurrence rules and bounded AI message metadata", () => {
     const malformed = fallbackData() as any;
     malformed.tasks[0].recurrence = {

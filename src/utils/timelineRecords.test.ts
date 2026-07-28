@@ -49,6 +49,16 @@ describe("timelineRecords", () => {
     expect(normalizeTimelineRecord(legacy).scheduledEndDate).toBe("2026-07-01");
   });
 
+  it("infers the next day for a legacy record that crosses midnight", () => {
+    const legacy = { ...record, scheduledEndDate: undefined, scheduledEnd: "00:30" };
+    expect(normalizeTimelineRecord(legacy).scheduledEndDate).toBe("2026-07-02");
+  });
+
+  it("keeps a safe start-date fallback for malformed legacy bounds", () => {
+    const legacy = { ...record, scheduledDate: "damaged", scheduledEndDate: undefined, scheduledStart: "", scheduledEnd: "" };
+    expect(normalizeTimelineRecord(legacy).scheduledEndDate).toBe("damaged");
+  });
+
   it("slices cross-day records into visible day pieces", () => {
     const slices = sliceTimelineRecord(record, ["2026-07-01", "2026-07-02"]);
     expect(slices).toEqual([
