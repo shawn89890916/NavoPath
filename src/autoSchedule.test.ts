@@ -22,6 +22,36 @@ describe("autoScheduleTasks", () => {
     expect(proposed.scheduledEnd <= "09:00" || proposed.scheduledStart >= "10:00").toBe(true);
   });
 
+  it("allows a task to end exactly at the planning boundary", () => {
+    const result = autoScheduleTasks({
+      tasks: [task("exact-fit", "study", 60)],
+      scheduledEvents: [],
+      dateRange: [future],
+      settings: { dayStart: "08:00", dayEnd: "09:00", bufferMinutes: 5, allowTaskSplitting: false },
+    });
+
+    expect(result.proposedEvents).toHaveLength(1);
+    expect(result.proposedEvents[0]).toMatchObject({
+      scheduledStart: "08:00",
+      scheduledEnd: "09:00",
+    });
+    expect(result.unscheduledTasks).toEqual([]);
+  });
+
+  it("still keeps the configured buffer between consecutive tasks", () => {
+    const result = autoScheduleTasks({
+      tasks: [task("first", "study", 55), task("second", "study", 55)],
+      scheduledEvents: [],
+      dateRange: [future],
+      settings: { dayStart: "08:00", dayEnd: "10:00", bufferMinutes: 5, allowTaskSplitting: false },
+    });
+
+    expect(result.proposedEvents.map(({ scheduledStart, scheduledEnd }) => ({ scheduledStart, scheduledEnd }))).toEqual([
+      { scheduledStart: "08:00", scheduledEnd: "08:55" },
+      { scheduledStart: "09:00", scheduledEnd: "09:55" },
+    ]);
+  });
+
   it("honors the selected ordering strategy", () => {
     const tasks = [task("p1-a", "p1"), task("p2-a", "p2"), task("p1-b", "p1")];
     const common = { tasks, scheduledEvents: [], dateRange: [future], settings: { dayStart: "08:00", dayEnd: "13:00", bufferMinutes: 0 } };

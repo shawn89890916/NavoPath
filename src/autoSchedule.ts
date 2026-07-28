@@ -315,18 +315,17 @@ export function autoScheduleTasks(params: {
 
   for (const task of orderedTasks) {
     const dur = task.estimatedMinutes || 30;
-    const need = dur + buf;
 
     // Find the smallest slot that fits the entire task (best fit first)
     let best: FreeSlot | null = null;
     let bestScore = -Infinity;
     for (const slot of freeSlots) {
       const fit = slot.endMinutes - slot.startMinutes;
-      if (fit < need) continue;
+      if (fit < dur) continue;
       const preferredHour = task.projectId ? s.preferredStartHourByProject[task.projectId] : undefined;
       const preferredPenalty = preferredHour === undefined ? 0 : Math.abs(slot.startMinutes - preferredHour * 60) * 2;
       const deadlineBonus = task.dueDate === slot.date ? 400 : task.dueDate && task.dueDate < slot.date ? -800 : 0;
-      const score = 1000 - (fit - need) - preferredPenalty + deadlineBonus;
+      const score = 1000 - (fit - dur) - preferredPenalty + deadlineBonus;
       if (score > bestScore) { bestScore = score; best = slot; }
     }
 
