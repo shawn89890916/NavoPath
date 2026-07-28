@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PlannerData, Task, TimeEntry } from "../types";
 import { applyIdlePolicy, buildProjectMetrics, heatmapBuckets, inferWorkflowStatus, kanbanGroups } from "./productivity";
 
@@ -68,6 +68,34 @@ it("generates heatmap buckets with levels", () => {
   ], 2, new Date("2026-06-30T12:00:00.000Z"));
   expect(buckets.map((bucket) => bucket.date)).toEqual(["2026-06-29", "2026-06-30"]);
   expect(buckets[0].level).toBe(3);
+});
+
+it("attributes timestamped entries to their local heatmap day and streak", () => {
+  const originalTimeZone = process.env.TZ;
+  process.env.TZ = "Asia/Shanghai";
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(new Date("2026-07-28T16:30:00.000Z"));
+    const entries: TimeEntry[] = [
+      { id: "today", taskId: "task-1", startAt: "2026-07-28T16:30:00.000Z", endAt: "2026-07-28T17:30:00.000Z", durationMinutes: 60, source: "timer", createdAt: "now", updatedAt: "now" },
+      { id: "yesterday", taskId: "task-1", startAt: "2026-07-27T16:30:00.000Z", endAt: "2026-07-27T17:30:00.000Z", durationMinutes: 60, source: "timer", createdAt: "now", updatedAt: "now" },
+    ];
+
+    expect(heatmapBuckets(entries, 1, new Date())).toEqual([{
+      date: "2026-07-29",
+      minutes: 60,
+      level: 2,
+    }]);
+    expect(buildProjectMetrics(
+      data([{ ...baseTask, projectId: "project-1" }], entries),
+      null,
+      { projectId: "all", category: "all", priority: "all", workflowStatus: "all", completion: "all", timeRange: "all", timed: "all", scheduled: "all", keyword: "" },
+    ).activeStreak).toBe(2);
+  } finally {
+    vi.useRealTimers();
+    if (originalTimeZone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTimeZone;
+  }
 });
 
 it("applies idle policies without producing negative durations", () => {

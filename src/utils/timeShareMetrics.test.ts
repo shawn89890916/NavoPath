@@ -143,4 +143,27 @@ describe("time share metrics", () => {
       else process.env.TZ = originalTimeZone;
     }
   });
+
+  it("filters timestamped entries by their local calendar date", () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
+    try {
+      const source: PlannerData = {
+        ...data,
+        timeEntries: [{
+          ...data.timeEntries![0],
+          startAt: "2026-07-22T16:30:00.000Z",
+        }],
+      };
+
+      expect(buildTimeShareMetrics(
+        source,
+        { mode: "actual", dimension: "project", range: "7" },
+        "2026-07-29",
+      ).totalMinutes).toBe(60);
+    } finally {
+      if (originalTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimeZone;
+    }
+  });
 });

@@ -146,7 +146,7 @@ export function buildProjectMetrics(data: PlannerData, project: Project | null, 
   const completed = tasks.filter((task) => task.completed);
   const estimatedMinutes = tasks.reduce((sum, task) => sum + Math.round((task.estimatedHours || 0) * 60), 0);
   const actualMinutes = totalMinutes(entries);
-  const activeDays = new Set(entries.map((entry) => entry.startAt.slice(0, 10)));
+  const activeDays = new Set(entries.map((entry) => timestampDate(entry.startAt)).filter(Boolean));
   return {
     tasks,
     entries,
@@ -168,7 +168,7 @@ export function heatmapBuckets(entries: TimeEntry[], days = 90, anchor = new Dat
     buckets.set(toIsoDate(date), 0);
   }
   for (const entry of entries) {
-    const key = entry.startAt.slice(0, 10);
+    const key = timestampDate(entry.startAt);
     if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + Math.max(0, entry.durationMinutes || 0));
   }
   return Array.from(buckets.entries()).map(([date, minutes]) => ({ date, minutes, level: heatLevel(minutes) }));
@@ -218,4 +218,9 @@ function heatLevel(minutes: number) {
 
 function toIsoDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function timestampDate(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? toIsoDate(date) : "";
 }

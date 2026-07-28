@@ -63,7 +63,10 @@ function plannedMinutes(task: Task) {
 }
 
 function isoDate(value: string | undefined) {
-  return String(value || "").slice(0, 10);
+  const text = String(value || "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const parsed = new Date(text);
+  return Number.isFinite(parsed.getTime()) ? localIsoDate(parsed) : "";
 }
 
 function addDays(iso: string, days: number) {
