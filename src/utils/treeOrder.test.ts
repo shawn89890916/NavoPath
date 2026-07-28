@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Subtask } from "../types";
-import { moveSubtaskInsideTree } from "./treeOrder";
+import {
+  insertSubtaskRelativeInTree,
+  moveSubtaskInsideTree,
+  moveSubtaskRelativeInTree,
+} from "./treeOrder";
 
 function subtask(id: string, subtasks: Subtask[] = []): Subtask {
   return {
@@ -30,6 +34,42 @@ describe("tree order", () => {
         ...subtask("source", [subtask("leaf")]),
         order: 10,
       }]),
+    ]);
+  });
+
+  it("keeps a nested subtree beside its target when moving after it", () => {
+    const tree = [subtask("parent", [subtask("source"), subtask("target")])];
+    const moved = moveSubtaskRelativeInTree(tree, "source", "target", true);
+
+    expect(moved).toEqual([
+      subtask("parent", [
+        { ...subtask("target"), order: 0 },
+        { ...subtask("source"), order: 1 },
+      ]),
+    ]);
+  });
+
+  it("does not lose an ancestor moved beside its own descendant", () => {
+    const tree = [subtask("parent", [subtask("child")])];
+    const moved = moveSubtaskRelativeInTree(tree, "parent", "child", true);
+
+    expect(moved).toBe(tree);
+  });
+
+  it("inserts a subtree beside a nested target from another tree", () => {
+    const tree = [subtask("parent", [subtask("target")])];
+    const moved = insertSubtaskRelativeInTree(
+      tree,
+      subtask("source"),
+      "target",
+      false,
+    );
+
+    expect(moved).toEqual([
+      subtask("parent", [
+        { ...subtask("source"), order: 0 },
+        { ...subtask("target"), order: 1 },
+      ]),
     ]);
   });
 });

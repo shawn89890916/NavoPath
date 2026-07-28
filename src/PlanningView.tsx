@@ -7,7 +7,7 @@ import { localIsoDate } from "./utils/localDate";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { kanbanGroups, WORKFLOW_LABELS } from "./utils/productivity";
 import { normalizeTaskCheckTone, normalizeWorkflowStatus, workflowStatusForPatch, type UiWorkflowStatus, type StateFilterValue } from "./utils/productivityModel";
-import { normalizeTreeOrder, reorderProjects, reorderSubtasks, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, moveSubtaskInsideTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
+import { normalizeTreeOrder, reorderProjects, reorderTasks, findSubtaskInTree, removeSubtaskFromTree, addSubtaskToTree, insertSubtaskRelativeInTree, moveSubtaskInsideTree, moveSubtaskRelativeInTree, countSubtasks, countDoneSubtasks } from "./utils/treeOrder";
 import { TaskActions, TaskBlock, TaskBlockContent, TaskBlockDuration, TaskBlockRow, TaskCheckbox, type TaskBlockVariant } from "./components/TaskBlock";
 import { TaskDragLayer } from "./unifiedDrag";
 import { buildTimeAllocationMetrics, parseDayStartMinutes, type MetricCompletionFilter, type MetricDisplayMetric, type MetricGroupBy, type MetricHabitMode, type MetricRangePreset, type TimeAllocationGroup } from "./metrics/timeAllocation";
@@ -1290,20 +1290,14 @@ export default function PlanningView(props: {
     const owner = subtaskOwner(source.id);
     const subtask = owner ? findSubtaskInTree(owner.subtasks || [], source.id) : undefined;
     if (!owner || !subtask) return;
-    if (target.kind === "subtask" && target.position === "inside" && subtaskOwner(target.id)?.id === owner.id) {
+    if (target.kind === "subtask" && subtaskOwner(target.id)?.id === owner.id) {
       const sourceTree = owner.subtasks || [];
-      const moved = moveSubtaskInsideTree(sourceTree, source.id, target.id, Date.now());
+      const moved = target.position === "inside"
+        ? moveSubtaskInsideTree(sourceTree, source.id, target.id, Date.now())
+        : moveSubtaskRelativeInTree(sourceTree, source.id, target.id, target.position === "after");
       if (moved === sourceTree) return;
       persistTree(projects, tasks.map((task) => task.id === owner.id ? { ...task, subtasks: moved } : task));
       return;
-    }
-    if (target.kind === "subtask" && target.position !== "inside" && subtaskOwner(target.id)?.id === owner.id) {
-      const sourceAtRoot = (owner.subtasks || []).some((item) => item.id === source.id);
-      const targetAtRoot = (owner.subtasks || []).some((item) => item.id === target.id);
-      if (sourceAtRoot && targetAtRoot) {
-        persistTree(projects, tasks.map((task) => task.id === owner.id ? { ...task, subtasks: reorderSubtasks(task.subtasks || [], source.id, target.id, target.position === "after") } : task));
-        return;
-      }
     }
     tasks = tasks.map((task) => task.id === owner.id ? { ...task, subtasks: removeSubtaskFromTree(task.subtasks || [], source.id) } : task);
     if (target.kind === "project" && target.position !== "inside") {
@@ -1321,7 +1315,12 @@ export default function PlanningView(props: {
     }
     const nextOwner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
     if (!nextOwner) return;
-    tasks = tasks.map((task) => task.id === nextOwner.id ? { ...task, subtasks: addSubtaskToTree(task.subtasks || [], { ...subtask, order: Date.now() }, target.kind === "subtask" && target.position === "inside" ? target.id : undefined) } : task);
+    const targetTree = tasks.find((task) => task.id === nextOwner.id)?.subtasks || [];
+    const nextSubtasks = target.kind === "subtask" && target.position !== "inside"
+      ? insertSubtaskRelativeInTree(targetTree, subtask, target.id, target.position === "after")
+      : addSubtaskToTree(targetTree, { ...subtask, order: Date.now() }, target.kind === "subtask" ? target.id : undefined);
+    if (target.kind === "subtask" && nextSubtasks === targetTree) return;
+    tasks = tasks.map((task) => task.id === nextOwner.id ? { ...task, subtasks: nextSubtasks } : task);
     persistTree(projects, tasks);
   }, [dialog, persistTree, projectFromItem, props.lang, safeProjects, safeTasks, subtaskOwner, taskFromSubtask]);
 

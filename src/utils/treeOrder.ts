@@ -71,21 +71,6 @@ export function reorderTasks(
   return [...untouched, ...group.map((item, index) => ({ ...item, order: index }))];
 }
 
-export function reorderSubtasks(
-  subtasks: Subtask[],
-  activeId: string,
-  targetId: string,
-  after: boolean,
-): Subtask[] {
-  const next = [...subtasks].sort(byOrder);
-  const active = next.find((item) => item.id === activeId);
-  if (!active || activeId === targetId) return next;
-  next.splice(next.findIndex((item) => item.id === activeId), 1);
-  const targetIndex = next.findIndex((item) => item.id === targetId);
-  next.splice(Math.max(0, targetIndex + (after ? 1 : 0)), 0, active);
-  return next.map((item, index) => ({ ...item, order: index }));
-}
-
 export function findSubtaskInTree(subtasks: Subtask[], id: string): Subtask | undefined {
   for (const item of subtasks) {
     if (item.id === id) return item;
@@ -123,6 +108,31 @@ export function addSubtaskToTree(
   });
 }
 
+export function insertSubtaskRelativeInTree(
+  subtasks: Subtask[],
+  newItem: Subtask,
+  targetId: string,
+  after: boolean,
+): Subtask[] {
+  const targetIndex = subtasks.findIndex((item) => item.id === targetId);
+  if (targetIndex >= 0) {
+    const next = [...subtasks];
+    next.splice(targetIndex + (after ? 1 : 0), 0, newItem);
+    return next.map((item, index) => ({ ...item, order: index }));
+  }
+  for (let index = 0; index < subtasks.length; index += 1) {
+    const children = subtasks[index].subtasks;
+    if (!children?.length) continue;
+    const moved = insertSubtaskRelativeInTree(children, newItem, targetId, after);
+    if (moved !== children) {
+      const next = [...subtasks];
+      next[index] = { ...next[index], subtasks: moved };
+      return next;
+    }
+  }
+  return subtasks;
+}
+
 export function moveSubtaskInsideTree(
   subtasks: Subtask[],
   activeId: string,
@@ -143,6 +153,30 @@ export function moveSubtaskInsideTree(
     removeSubtaskFromTree(subtasks, activeId),
     { ...active, order },
     targetId,
+  );
+}
+
+export function moveSubtaskRelativeInTree(
+  subtasks: Subtask[],
+  activeId: string,
+  targetId: string,
+  after: boolean,
+): Subtask[] {
+  const active = findSubtaskInTree(subtasks, activeId);
+  const target = findSubtaskInTree(subtasks, targetId);
+  if (
+    !active ||
+    !target ||
+    activeId === targetId ||
+    findSubtaskInTree(active.subtasks || [], targetId)
+  ) {
+    return subtasks;
+  }
+  return insertSubtaskRelativeInTree(
+    removeSubtaskFromTree(subtasks, activeId),
+    active,
+    targetId,
+    after,
   );
 }
 
