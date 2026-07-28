@@ -112,6 +112,7 @@ import {
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
 import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, rescheduleTimelineRecord } from "./utils/timelineRecords";
+import { calendarEventDurationMinutes, expandTimedCalendarEvent } from "./utils/calendarEventSlices";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
 import "./app-redesign.css";
@@ -3095,27 +3096,51 @@ function App() {
 
   function expandEventOccurrences(dates: Set<string>) {
     const ownerMap = new Map<string, CalendarEvent>();
+    const resizeEdges = new Map<string, { start: boolean; end: boolean }>();
     const expanded: Task[] = [];
     for (const event of events) {
+      if (event.startTime) {
+        for (const slice of expandTimedCalendarEvent(event, [...dates])) {
+          expanded.push({
+            id: slice.id,
+            title: event.title,
+            dueDate: slice.date,
+            category: event.category,
+            priority: "medium",
+            notes: event.details,
+            goalId: "",
+            completed: false,
+            estimatedHours: slice.durationMinutes / 60,
+            scheduledDate: slice.date,
+            scheduledStart: slice.startTime,
+            scheduledEnd: slice.endTime,
+            recurrence: event.recurrence,
+            createdAt: event.createdAt,
+            updatedAt: event.createdAt,
+          });
+          ownerMap.set(slice.id, event);
+          resizeEdges.set(slice.id, {
+            start: !slice.continuesBefore,
+            end: !slice.continuesAfter,
+          });
+        }
+        continue;
+      }
       const occurrenceDates = event.recurrence
         ? enumerateRecurrenceDates(event.recurrence, dates)
         : [...dates].filter((date) => date >= (event.startDate || event.date) && date <= (event.endDate || event.startDate || event.date));
       for (const date of occurrenceDates) {
-        const id = `event_occ_${event.id}_${date}_${event.startTime || "all"}`;
-        const start = event.startTime || undefined;
-        const duration = start
-          ? Math.max(event.recurrence?.durationMinutes || (event.endTime ? timeToMinutes(event.endTime) - timeToMinutes(start) : 60), 15)
-          : 30;
+        const id = `event_occ_${event.id}_${date}_all`;
         expanded.push({
           id, title: event.title, dueDate: date, category: event.category, priority: "medium",
-          notes: event.details, goalId: "", completed: false, estimatedHours: duration / 60,
-          scheduledDate: date, scheduledStart: start, scheduledEnd: start ? addMinutes(start, duration) : undefined,
+          notes: event.details, goalId: "", completed: false, estimatedHours: 0.5,
+          scheduledDate: date,
           recurrence: event.recurrence, createdAt: event.createdAt, updatedAt: event.createdAt,
         });
         ownerMap.set(id, event);
       }
     }
-    return { tasks: expanded, ownerMap };
+    return { tasks: expanded, ownerMap, resizeEdges };
   }
 
   const explicitVisibleTimelineTasks = useMemo(
@@ -5102,20 +5127,18 @@ function App() {
     if (!data) return;
     const event = resolveOwningEvent(occurrenceId);
     if (!event) return;
-    const sourceStart = event.startTime || "09:00";
-    const sourceEnd = event.endTime || addMinutes(sourceStart, event.recurrence?.durationMinutes || 60);
-    const duration = Math.max(timeToMinutes(sourceEnd) - timeToMinutes(sourceStart), SLOT_MINUTES);
+    const duration = Math.max(calendarEventDurationMinutes(event), SLOT_MINUTES);
     const date = newDate || event.startDate || event.date;
-    const nextEnd = addMinutes(newStart, duration);
+    const nextEnd = calculateTimelineRecordEnd(date, newStart, duration);
     void saveData({
       ...data,
       events: data.events.map((item) => item.id === event.id ? {
         ...item,
         date,
         startDate: date,
-        endDate: date,
+        endDate: nextEnd.scheduledEndDate,
         startTime: newStart,
-        endTime: nextEnd,
+        endTime: nextEnd.scheduledEnd,
         recurrence: item.recurrence ? {
           ...item.recurrence,
           mode: "scheduled",
@@ -5151,20 +5174,25 @@ function App() {
     });
   }
 
-  function resizeEventOccurrence(occurrenceId: string, nextStart: string, nextEnd: string) {
+  function resizeEventOccurrence(occurrenceId: string, nextStartDate: string, nextStart: string, durationMinutes: number) {
     if (!data) return;
     const event = resolveOwningEvent(occurrenceId);
     if (!event) return;
-    const duration = Math.max(timeToMinutes(nextEnd) - timeToMinutes(nextStart), SLOT_MINUTES);
+    const duration = Math.max(durationMinutes, SLOT_MINUTES);
+    const end = calculateTimelineRecordEnd(nextStartDate, nextStart, duration);
     void saveData({
       ...data,
       events: data.events.map((item) => item.id === event.id ? {
         ...item,
+        date: nextStartDate,
+        startDate: nextStartDate,
         startTime: nextStart,
-        endTime: nextEnd,
+        endDate: end.scheduledEndDate,
+        endTime: end.scheduledEnd,
         recurrence: item.recurrence ? {
           ...item.recurrence,
           mode: "scheduled",
+          startDate: nextStartDate,
           startTime: nextStart,
           durationMinutes: duration,
         } : item.recurrence,
@@ -5367,16 +5395,25 @@ function App() {
     suppressBlockClickRef.current = true;
     setDragCreate(null);
     document.body.classList.add("df-resizing");
-    setResizePreview({ taskId: task.id, start: task.scheduledStart || "09:00", end: task.scheduledEnd || addMinutes(task.scheduledStart || "09:00", taskDuration(task)), startDate: task.scheduledDate || timelineWindowAnchorDate });
+    const owningEvent = isEventDisplayTask(task) ? resolveOwningEvent(task) : undefined;
+    const taskAnchorDate = owningEvent?.startDate || owningEvent?.date || task.scheduledDate || timelineWindowAnchorDate;
+    const origStart = owningEvent?.startTime || task.scheduledStart || "09:00";
+    const origDuration = owningEvent
+      ? Math.max(calendarEventDurationMinutes(owningEvent), SLOT_MINUTES)
+      : taskDuration(task);
+    const initialEnd = calculateTimelineRecordEnd(taskAnchorDate, origStart, origDuration);
+    setResizePreview({
+      taskId: task.id,
+      start: origStart,
+      end: initialEnd.scheduledEnd,
+      startDate: taskAnchorDate,
+    });
 
     // Resize works in continuous absolute minutes (relative to
     // `continuousTimelineStartDate`) so that dragging the bottom handle past
     // midnight yields a 60m duration instead of clamping to the end of day.
     // The same math also works in non-continuous mode because the absolute
     // coordinate reduces to within-day minutes when the anchor == visible date.
-    const taskAnchorDate = task.scheduledDate || timelineWindowAnchorDate;
-    const origStart = task.scheduledStart || "09:00";
-    const origDuration = taskDuration(task);
     const startAbs = dateTimeToContinuousAbs(taskAnchorDate, origStart);
     const endAbs = startAbs + origDuration;
 
@@ -5412,7 +5449,7 @@ function App() {
       const durationHours = nextDuration / 60;
       const now = new Date().toISOString();
       if (isEventDisplayTask(task)) {
-        resizeEventOccurrence(task.id, nextStart, nextEnd);
+        resizeEventOccurrence(task.id, nextStartDate, nextStart, nextDuration);
         setResizePreview(null);
         document.body.classList.remove("df-resizing");
         window.removeEventListener("mousemove", move);
@@ -7901,7 +7938,7 @@ function App() {
                                       if (!suppressBlockClickRef.current) openTaskEdit(task);
                                     }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
-                                    }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)}
+                                    }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} resizeEdges={eventVisibleTimeline.resizeEdges.get(task.id)}
                                       extraStyle={{ position: "absolute", left, width, top: continuousTimelineEnabled ? continuousTimedTop(task.scheduledDate || timelineDate, task.scheduledStart || "09:00") : undefined, pointerEvents: "auto", overflow, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                                       onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                                       onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
@@ -8385,7 +8422,7 @@ function App() {
                               if (!suppressBlockClickRef.current) openTaskEdit(task);
                             }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                               createProjectForTask(task.id, title);
-                            }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} extraStyle={{ ...extraStyle, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
+                            }} onDragStart={(event) => beginBlockDrag(event, task)} onResizeStart={(event, edge) => beginBlockResize(event, task, edge)} resizeEdges={eventVisibleTimeline.resizeEdges.get(task.id)} extraStyle={{ ...extraStyle, ...(isPreview ? { ["--df-preview" as any]: "1" } as CSSProperties : {}) }}
                               onAcceptPreview={isPreview ? () => acceptOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                               onCancelPreview={isPreview ? () => cancelOnePreview(previewIdByClonedId.get(task.id)!) : undefined}
                               viewMode="daily"
@@ -10771,7 +10808,7 @@ function ReturnedToPlanIcon({ color }: { color?: string }) {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; dragState?: TaskBlockDragState }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, resizeEdges, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.MouseEvent, edge: "start" | "end") => void; resizeEdges?: { start: boolean; end: boolean }; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; dragState?: TaskBlockDragState }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
@@ -10839,7 +10876,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {canResize && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && resizeEdges?.start !== false && <button className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
       <TaskBlockRow className="df-time-card-row" align="start">
         {isEvent ? (
@@ -10870,7 +10907,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, onHover, onE
           setProjectOpen((open) => !open);
         }}># {projectName}</button>
       </span>}
-      {canResize && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && resizeEdges?.end !== false && <button className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{
