@@ -76,6 +76,26 @@ describe("autoScheduleTasks", () => {
     expect(result.proposedEvents.every((event) => event.segmentCount === result.proposedEvents.length)).toBe(true);
   });
 
+  it("uses the full end-of-day capacity when splitting across dates", () => {
+    const result = autoScheduleTasks({
+      tasks: [task("two-day", "study", 120)],
+      scheduledEvents: [],
+      dateRange: [future, "2099-01-06"],
+      settings: { dayStart: "08:00", dayEnd: "09:00", bufferMinutes: 5, allowTaskSplitting: true },
+    });
+
+    expect(result.proposedEvents.map(({ scheduledDate, scheduledStart, scheduledEnd, durationMinutes }) => ({
+      scheduledDate,
+      scheduledStart,
+      scheduledEnd,
+      durationMinutes,
+    }))).toEqual([
+      { scheduledDate: future, scheduledStart: "08:00", scheduledEnd: "09:00", durationMinutes: 60 },
+      { scheduledDate: "2099-01-06", scheduledStart: "08:00", scheduledEnd: "09:00", durationMinutes: 60 },
+    ]);
+    expect(result.unscheduledTasks).toEqual([]);
+  });
+
   it("does not mutate source tasks during preview generation", () => {
     const tasks = [task("safe", "study")];
     const before = structuredClone(tasks);

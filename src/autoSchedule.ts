@@ -351,13 +351,13 @@ export function autoScheduleTasks(params: {
       consumeSlot(best, dur);
     } else if (s.allowTaskSplitting && dur >= 60) {
       const available = freeSlots
-        .filter((slot) => slot.endMinutes - slot.startMinutes >= 30 + buf)
+        .filter((slot) => slot.endMinutes - slot.startMinutes >= 30)
         .sort((a, b) => a.date.localeCompare(b.date) || a.startMinutes - b.startMinutes);
       const parts: Array<{ slot: FreeSlot; duration: number }> = [];
       let remaining = dur;
       for (const slot of available) {
         if (remaining <= 0) break;
-        const capacity = Math.floor((slot.endMinutes - slot.startMinutes - buf) / s.snapMinutes) * s.snapMinutes;
+        const capacity = Math.floor((slot.endMinutes - slot.startMinutes) / s.snapMinutes) * s.snapMinutes;
         const partDuration = Math.min(remaining, capacity);
         if (partDuration < 30 && remaining > partDuration) continue;
         parts.push({ slot, duration: partDuration });
