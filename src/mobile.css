@@ -10,12 +10,13 @@
 
   #root .df-app {
     position: fixed !important;
-    inset: 10px !important;
+    inset: 0 !important;
     width: auto !important;
     height: auto !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    border-radius: 28px !important;
+    padding-top: env(safe-area-inset-top) !important;
+    border-radius: 0 !important;
     background: var(--surface-main) !important;
     transform: translateZ(0);
   }
