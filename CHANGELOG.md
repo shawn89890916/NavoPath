@@ -6,7 +6,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
-- 竖屏手机版网页不再套用带外边距和大圆角的模拟设备外框，工作区现在贴合整个可用视口，同时继续避让刘海与底部安全区，在窄屏上为时间轴和顶部控件释放更多空间。
+- 竖屏手机版网页不再套用带外边距、边框和大圆角的模拟设备外壳，工作区与纸面背景现在贴合整个可用视口；底栏下移并压缩为更轻薄的安全区工具栏，同时减少时间轴底部预留，在窄屏上为主页面释放更多空间。
 - 共享工作区控件的旧紫色与荧光绿默认值已改为跟随当前活动主题，覆盖规划、快速添加、AI、撤销、任务树、排程反馈、计时器和专注模式；项目颜色缺失时也不再回退为荧光绿，暗色规划页侧栏会使用暗色纸面并恢复工具文字的清晰对比度。
 - 自动排程不再要求工作窗口末尾额外预留缓冲时间；完整任务可以恰好在规划结束时间完成，跨日期拆分的长任务也会使用每个窗口的全部可用容量。根据历史学习到的项目偏好开始时间现在会决定任务在空闲窗口内的实际落点，落点前后的剩余时间仍可继续排程；应用缓冲后产生的新窗口会重新对齐排程网格，避免后续任务落在 09:05 等非吸附时间，同时保证实际间隔不小于设置值。当天判断现在使用本地日历日期，最早可排时间会先加入 5 分钟准备时间再吸附一次，跨 UTC 日期边界不会排到错误日期，也不再无故跳过一个 15 分钟网格。
 - 时间占比统计的默认当天和最近 7、30、90 天边界现在按本地日历日期计算，不再因 UTC 转换把区间下界提前一天；跨午夜计划使用日历日跨度计算分钟数，经过夏令时切换时也不会少算或多算一小时。带时区的计时记录会按时间戳对应的本地日期归入时间占比、热力图和连续活跃天数，午夜附近的记录不再落到错误的一天。
@@ -41,7 +41,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
-- Portrait mobile web views no longer use a simulated device frame with outer margins and oversized corners. The workspace now fills the available viewport while respecting notch and bottom safe areas, giving timelines and top controls more room on narrow screens.
+- Portrait mobile web views no longer use a simulated device shell with outer margins, borders, or oversized corners. The workspace and paper background now fill the available viewport; the dock sits lower as a slimmer safe-area toolbar, with less timeline space reserved beneath it so the main page gains more room on narrow screens.
 - Retired purple and fluorescent-lime defaults across shared workspace controls now follow the active theme, including Planning, quick add, AI, undo, task-tree, scheduling feedback, timer, and focus states. Missing project colors no longer revert to lime, and the Planning sidebar uses the dark paper surface in dark mode with clear tool contrast.
 - Automatic scheduling no longer requires an extra buffer at the end of the work window. A complete task can finish exactly at the planning boundary, and long tasks split across dates now use each window's full available capacity. Project start-time preferences learned from scheduling history now determine the task's actual position inside a free window, while the remaining time before and after stays available. New windows created after applying a buffer are snapped back to the scheduling grid, preventing starts such as 09:05 while keeping the actual gap at least as large as configured. Today is now determined from the local calendar date, and the earliest available time adds the five-minute preparation window before snapping once, preventing both wrong-day scheduling across a UTC date boundary and an unnecessary skipped 15-minute slot.
 - Time-share metrics now calculate the default current day and rolling 7-, 30-, and 90-day boundaries from local calendar dates instead of moving the lower bound back a day during UTC conversion. Planned time spanning midnight uses calendar-day distance, preventing daylight-saving transitions from adding or removing an hour. Timestamped time entries are assigned to their corresponding local dates across time-share metrics, heatmaps, and active streaks, so work near midnight no longer lands on the wrong day.
@@ -75,12 +75,12 @@
 ## 2026-08-11 · 竖屏移动端全幅布局
 
 ### 修复
-- 竖屏手机版网页不再套用带外边距和大圆角的模拟设备外框，工作区现在贴合整个可用视口，同时继续避让刘海与底部安全区，在窄屏上为时间轴和顶部控件释放更多空间。
+- 竖屏手机版网页不再套用带外边距、边框和大圆角的模拟设备外壳，工作区与纸面背景现在贴合整个可用视口；底栏下移并压缩为更轻薄的安全区工具栏，同时减少时间轴底部预留，在窄屏上为主页面释放更多空间。
 
 ## 2026-08-11 · Full-width portrait mobile layout
 
 ### Fixed
-- Portrait mobile web views no longer use a simulated device frame with outer margins and oversized corners. The workspace now fills the available viewport while respecting notch and bottom safe areas, giving timelines and top controls more room on narrow screens.
+- Portrait mobile web views no longer use a simulated device shell with outer margins, borders, or oversized corners. The workspace and paper background now fill the available viewport; the dock sits lower as a slimmer safe-area toolbar, with less timeline space reserved beneath it so the main page gains more room on narrow screens.
 
 ## 2026-07-28 · 规划数据恢复加固
 

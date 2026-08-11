@@ -5,7 +5,7 @@
   }
 
   #root {
-    background: var(--text-main) !important;
+    background: var(--surface-main) !important;
   }
 
   #root .df-app {
@@ -16,8 +16,11 @@
     min-height: 0 !important;
     overflow: hidden !important;
     padding-top: env(safe-area-inset-top) !important;
+    border: 0 !important;
     border-radius: 0 !important;
     background: var(--surface-main) !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
     transform: translateZ(0);
   }
 
@@ -46,10 +49,10 @@
     right: 0 !important;
     bottom: 0 !important;
     width: auto !important;
-    min-height: calc(64px + env(safe-area-inset-bottom)) !important;
-    grid-template-columns: 48px minmax(0, 1fr) 48px !important;
-    gap: 8px !important;
-    padding: 6px 12px calc(6px + env(safe-area-inset-bottom)) !important;
+    min-height: calc(56px + env(safe-area-inset-bottom)) !important;
+    grid-template-columns: 44px minmax(0, 1fr) 44px !important;
+    gap: 4px !important;
+    padding: 2px 8px calc(2px + env(safe-area-inset-bottom)) !important;
     transform: none !important;
     border: 0 !important;
     border-top: 1px solid var(--paper-rule-strong) !important;
@@ -73,10 +76,10 @@
   }
 
   #root .df-app .df-mobile-dock-action {
-    width: 48px !important;
-    min-width: 48px !important;
-    height: 48px !important;
-    min-height: 48px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
     display: grid !important;
     place-items: center !important;
     border: 0 !important;
@@ -102,13 +105,13 @@
   }
 
   #root .df-app .df-mobile-mode-switch {
-    height: 48px !important;
+    height: 44px !important;
     align-self: center !important;
     border-inline: 1px solid var(--paper-rule) !important;
   }
 
   #root .df-app .df-mobile-mode-switch button {
-    min-height: 48px !important;
+    min-height: 44px !important;
     border-bottom: 1px solid transparent !important;
     border-radius: 0 !important;
     background: transparent !important;
@@ -194,7 +197,7 @@
   #root .df-app .df-planning {
     height: 100% !important;
     min-height: 0 !important;
-    padding: 0 8px !important;
+    padding: 0 !important;
     overflow: hidden !important;
   }
 
@@ -213,8 +216,8 @@
     max-height: none !important;
     margin: 0 !important;
     overflow-y: auto !important;
-    padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important;
-    scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 
   #root .df-app .df-week-view .df-event-blocks-layer .df-time-block,
@@ -283,14 +286,14 @@
   }
 
   #root .df-app.mode-execute .df-execute {
-    border-radius: 24px 24px 0 0 !important;
+    border-radius: 0 !important;
   }
 
   #root .df-app.mode-execute .df-candidate-panel.compact-active {
     position: relative !important;
     padding: 100px 6px 0 !important;
     border: 0 !important;
-    border-radius: 24px 24px 0 0 !important;
+    border-radius: 0 !important;
     background: var(--surface-main) !important;
   }
 
@@ -956,7 +959,7 @@
   #root .df-app .df-toast {
     left: 12px !important;
     right: 12px !important;
-    bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(64px + env(safe-area-inset-bottom)) !important;
     width: auto !important;
     transform: none !important;
     z-index: 120 !important;
