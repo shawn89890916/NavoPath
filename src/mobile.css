@@ -259,10 +259,10 @@
   #root .df-app .df-task-card .df-block-check {
     position: static !important;
     inset: auto !important;
-    width: 20px !important;
-    min-width: 20px !important;
-    height: 20px !important;
-    min-height: 20px !important;
+    width: 24px !important;
+    min-width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
     transform: none !important;
   }
 
@@ -655,12 +655,12 @@
   }
 
   #root .df-app .df-compact-date-display strong {
-    font: 650 24px/1 var(--paper-serif) !important;
+    font: 650 29px/1 var(--paper-serif) !important;
   }
 
   #root .df-app .df-compact-date-display span {
     color: var(--text-muted) !important;
-    font: 650 10px/1 var(--paper-sans) !important;
+    font: 650 12px/1 var(--paper-sans) !important;
   }
 
   #root .df-app .df-timeline-daily > .df-date-title {
@@ -695,8 +695,8 @@
 
   #root .df-app .df-timeline-3day-ruler,
   #root .df-app .df-timeline-3day-ruler-spacer {
-    width: 42px !important;
-    flex: 0 0 42px !important;
+    width: 35px !important;
+    flex: 0 0 35px !important;
   }
 
   #root .df-app .df-timeline-3day-ruler .df-slot-ruler span {
@@ -708,19 +708,19 @@
   }
 
   #root .df-app .df-timeline-scroll {
-    padding-left: 46px !important;
-    padding-right: 5px !important;
+    padding-left: 35px !important;
+    padding-right: 0 !important;
   }
 
   #root .df-app .df-timeline-scroll .df-slot span {
-    left: -44px !important;
-    width: 38px !important;
+    left: -35px !important;
+    width: 34px !important;
     font-size: 10px !important;
     text-align: left !important;
   }
 
   #root .df-app .df-timeline-scroll .df-now-line span {
-    left: -44px !important;
+    left: -35px !important;
   }
 
   #root .df-app .df-timeline-3day-ruler .df-slot-ruler .df-timeline-ruler-label b {
@@ -1066,10 +1066,10 @@
   #root .df-app .df-time-block .df-block-check,
   #root .df-app .df-time-block .df-task-block-check,
   #root .df-app .drag-create-quick-add-check {
-    width: 22px !important;
-    min-width: 22px !important;
-    height: 22px !important;
-    min-height: 22px !important;
+    width: 24px !important;
+    min-width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
     border-width: 1.5px !important;
   }
 
@@ -1167,6 +1167,25 @@
 
   #root .df-app .df-time-block:not(.show-resize-hint) .df-resize-dot::after {
     display: none !important;
+  }
+
+  #root .df-app .df-task-detail.df-drawer {
+    position: fixed !important;
+    inset: 4dvh 0 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 30px 16px calc(18px + env(safe-area-inset-bottom)) !important;
+    box-sizing: border-box !important;
+    border-radius: 18px 18px 0 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #root .df-app .df-task-detail .df-detail-close {
+    position: absolute !important;
+    inset: 8px 8px auto auto !important;
+    float: none !important;
+    margin: 0 !important;
+    z-index: 4 !important;
   }
 
 }

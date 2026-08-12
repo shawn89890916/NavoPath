@@ -124,6 +124,7 @@ import "./task-block.css";
 installBrowserFallback();
 
 const ChangelogPage = lazy(() => import("./ChangelogPage"));
+const MobileTaskSummary = lazy(() => import("./MobileTaskSummary"));
 const WidgetAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetApp })));
 const WidgetPopoverAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetPopoverApp })));
 
@@ -1223,6 +1224,7 @@ function App() {
   const [hoverSlot, setHoverSlot] = useState<string>("");
   const [hoveredBlock, setHoveredBlock] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileTaskSummary, setMobileTaskSummary] = useState(false);
   const [addType, setAddType] = useState<AddType>("task");
   const [editingId, setEditingId] = useState("");
   const [editingRecordId, setEditingRecordId] = useState<string | undefined>(undefined);
@@ -4716,6 +4718,21 @@ function App() {
     };
   }
 
+  function commitDragCreatedTask(state: NonNullable<DragCreateState>, title: string, projectId: string | null) {
+    const current = dataRef.current;
+    if (!current) return;
+    const { date, startMinutes, endMinutes } = state;
+    const startTime = minutesToTime(startMinutes);
+    const durationMinutes = endMinutes - startMinutes;
+    const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: durationMinutes / 60 });
+    const scheduledRecord = createScheduledRecord(task, date, startTime, durationMinutes);
+    void saveData({ ...current, tasks: [...current.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }] });
+    requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
+    revealResizeHandles(scheduledRecord.id);
+    setDragCreate(null);
+    showToast(t(lang, "timeline.addedToTimeline"));
+  }
+
   function createOccurrenceExceptionRecord(task: Task, scheduledDate: string, scheduledStart: string, executionStatus: TimelineRecord["executionStatus"]) {
     const end = calculateTimelineRecordEnd(
       scheduledDate,
@@ -5537,6 +5554,7 @@ function App() {
     setEditingId("");
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
+    setMobileTaskSummary(false);
     setForm(defaultForm(type));
     setDrawerOpen(true);
   }
@@ -5560,6 +5578,7 @@ function App() {
       scheduledDate: occurrence.scheduledDate,
       scheduledStart: occurrence.scheduledStart,
     } : null);
+    setMobileTaskSummary(compactLayout);
     setForm({
       title: realTask.title,
       projectId: realTask.projectId || "",
@@ -5584,6 +5603,7 @@ function App() {
     setEditingId(project.id);
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
+    setMobileTaskSummary(false);
     setForm({ ...defaultForm("project"), title: project.title, category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance !== undefined ? project.importance : null, urgency: project.urgency !== undefined ? project.urgency : null });
     setDrawerOpen(true);
   }
@@ -5594,6 +5614,7 @@ function App() {
     setEditingId(event.id);
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
+    setMobileTaskSummary(false);
     setForm({ ...defaultForm("event"), title: event.title, dueDate: event.startDate || event.date, endDate: event.endDate || event.date, dueTime: event.startTime || "", endTime: event.endTime || "", category: event.category, details: event.details, recurrence: event.recurrence });
     setDrawerOpen(true);
   }
@@ -5651,6 +5672,7 @@ function App() {
       setEditingOccurrence(null);
       setForm(defaultForm("task"));
       setAddType("task");
+      setMobileTaskSummary(false);
       setDrawerOpen(false);
     });
   }
@@ -5687,6 +5709,7 @@ function App() {
       setEditingId("");
       setForm(defaultForm("task"));
       setAddType("task");
+      setMobileTaskSummary(false);
     });
   }
 
@@ -7835,7 +7858,7 @@ function App() {
                                   if (e - s < SLOT_MINUTES * 2) e = s + SLOT_MINUTES * 2;
                                   const gridRect = gridEl.getBoundingClientRect();
                                   const cw = gridRect.width / threeDates.length;
-                                  const gut = timelineView === "weekly" ? 5 : 8;
+                                  const gut = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                   const startPx = continuousTimelineEnabled ? continuousTimedTop(startTarget.date, minutesToTime(s)) : ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
                                   const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
                                   setDragCreate({
@@ -7872,7 +7895,7 @@ function App() {
                                 if (drag || resizePreview || autoScheduleState === "generating") return;
                                 if (suppressBlockClickRef.current) return;
                                 if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule,.df-all-day-block,.df-month-task")) return;
-                                if (dragCreate) { setDragCreate(null); return; }
+                                if (dragCreate) return;
                                 const gridEl = timeGridRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (!gridEl || !scrollEl) return;
@@ -7888,7 +7911,7 @@ function App() {
                                 const endMinutes = Math.min(startMinutes + 30, TIMELINE_END * 60);
                                 const gridRect = gridEl.getBoundingClientRect();
                                 const columnWidth = gridRect.width / threeDates.length;
-                                const gutter = timelineView === "weekly" ? 5 : 8;
+                                const gutter = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                 const top = continuousTimelineEnabled
                                   ? continuousTimedTop(target.date, target.startTime)
                                   : ((startMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
@@ -7937,7 +7960,7 @@ function App() {
                                   const dayOffset = continuousDateOffset(task.scheduledDate || "");
                                   const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(task.scheduledDate || "");
                                   if (dayIndex === -1) return null;
-                                  const gutter = timelineView === "weekly" ? 5 : 8;
+                                  const gutter = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                   const gap = timelineView === "weekly" ? 3 : 4;
                                   const baseLeft = dayIndex * multiColWidth + gutter;
                                   const innerW = multiColWidth - gutter * 2;
@@ -7973,7 +7996,7 @@ function App() {
                                   const dayOffset = continuousDateOffset(tgtDate);
                                   const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(tgtDate);
                                   if (dayIndex === -1) return null;
-                                  const gutter = timelineView === "weekly" ? 5 : 8;
+                                  const gutter = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                   return (
                                     <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(tgtDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, top: continuousTimelineEnabled ? continuousTimedTop(tgtDate, hoverSlot) : undefined }}
@@ -7985,7 +8008,7 @@ function App() {
                                   const dayOffset = continuousDateOffset(placementPreview.date);
                                   const dayIndex = continuousTimelineEnabled ? ((dayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(placementPreview.date);
                                   if (dayIndex === -1) return null;
-                                  const gutter = timelineView === "weekly" ? 5 : 8;
+                                  const gutter = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                   return (
                                     <PreviewBlock
                                       task={placementPreviewTask}
@@ -8028,22 +8051,7 @@ function App() {
                                 }}>
                                   {dragCreate.committed ? (
                                     <DragCreateQuickAdd state={dragCreate} projects={projects}
-                                      onSave={(title, projectId) => {
-                                        if (!data) return;
-                                        const { date, startMinutes, endMinutes } = dragCreate;
-                                        const startTime = minutesToTime(startMinutes);
-                                        const estimatedH = (endMinutes - startMinutes) / 60;
-                                        const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
-                                        const scheduledRecord = createScheduledRecord(task, date, startTime, endMinutes - startMinutes);
-                                        void saveData({
-                                          ...data,
-                                          tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
-                                        });
-                                        requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
-                                        revealResizeHandles(scheduledRecord.id);
-                                        setDragCreate(null);
-                                        showToast(t(lang, "timeline.addedToTimeline"));
-                                      }}
+                                      onSave={(title, projectId) => commitDragCreatedTask(dragCreate, title, projectId)}
                                       onCancel={() => setDragCreate(null)}
                                     />
                                   ) : (
@@ -8340,7 +8348,7 @@ function App() {
                             const gridRect = gridEl.getBoundingClientRect();
                             const startPx = continuousTimedTop(startDate, minutesToTime(s));
                             const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
-                            const gut = 8;
+                            const gut = compactLayout ? 0 : 8;
                             setDragCreate({
                               date: startDate, dayIndex: 0,
                               startMinutes: s, endMinutes: e,
@@ -8375,7 +8383,7 @@ function App() {
                           if (suppressBlockClickRef.current) return;
                           if (drag || resizePreview) return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
-                          if (dragCreate) { setDragCreate(null); return; }
+                          if (dragCreate) return;
                           const startTime = slotFromPointer(event.clientY, 0, event.clientX);
                           const target = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : { date: timelineDate };
                           const startMinutes = timeToMinutes(startTime);
@@ -8390,8 +8398,8 @@ function App() {
                               ? continuousTimedTop(target.date, startTime)
                               : timeBlockTop(startTime, dayStartHour),
                             height: ((endMinutes - startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT,
-                            left: 8,
-                            width: canvasWidth - 16,
+                            left: compactLayout ? 0 : 8,
+                            width: canvasWidth - (compactLayout ? 0 : 16),
                             committed: true,
                           });
                         }}
@@ -8426,9 +8434,10 @@ function App() {
                           const liveEl = timelineCanvasRef.current;
                           const liveW = liveEl ? liveEl.getBoundingClientRect().width : 0;
                           const avail = dailyCanvasWidth > 0 ? dailyCanvasWidth : liveW;
-                          const innerW = avail > 0 ? avail - 16 : 0;
-                          const baseLeft = 8;
-                          const gap = 4;
+                          const gutter = compactLayout ? 0 : 8;
+                          const innerW = avail > 0 ? avail - gutter * 2 : 0;
+                          const baseLeft = gutter;
+                          const gap = compactLayout ? 2 : 4;
                           const cs = innerW > 0 ? computeConflictStyle(task.id, conflictLayout, innerW, baseLeft, gap, "daily") : null;
                           const left = cs ? cs.left : baseLeft;
                           const width = cs ? cs.width : innerW;
@@ -8460,22 +8469,7 @@ function App() {
                           }}>
                             {dragCreate.committed ? (
                               <DragCreateQuickAdd state={dragCreate} projects={projects}
-                                onSave={(title, projectId) => {
-                                  if (!data) return;
-                                  const { date, startMinutes, endMinutes } = dragCreate;
-                                  const startTime = minutesToTime(startMinutes);
-                                  const estimatedH = (endMinutes - startMinutes) / 60;
-                                  const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: estimatedH });
-                                  const scheduledRecord = createScheduledRecord(task, date, startTime, endMinutes - startMinutes);
-                                  void saveData({
-                                    ...data,
-                                    tasks: [...data.tasks, { ...task, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }]
-                                  });
-                                  requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
-                                  revealResizeHandles(scheduledRecord.id);
-                                  setDragCreate(null);
-                                  showToast(t(lang, "timeline.addedToTimeline"));
-                                }}
+                                onSave={(title, projectId) => commitDragCreatedTask(dragCreate, title, projectId)}
                                 onCancel={() => setDragCreate(null)}
                               />
                             ) : (
@@ -8524,7 +8518,7 @@ function App() {
       {!settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
@@ -10622,6 +10616,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
   const [projectQuery, setProjectQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
@@ -10650,7 +10645,8 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
 
   function handleSave() {
     const cleanTitle = input.replace(/#[^\s#]+/g, "").trim();
-    if (!cleanTitle) return;
+    if (!cleanTitle || savingRef.current) return;
+    savingRef.current = true;
     onSave(cleanTitle, selectedProject?.id || null);
   }
 
@@ -11023,7 +11019,7 @@ function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties;
 
 function EditDrawer(props: {
   type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; clarifyLoading?: boolean; onCreateProject: (title: string) => string;
-  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language;
+  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language; compactSummary?: boolean; onShowMore?: () => void;
 }) {
   const dialog = useInAppDialog(props.lang);
   const [newProjectTitle, setNewProjectTitle] = useState("");
@@ -11374,6 +11370,14 @@ function EditDrawer(props: {
       startTime: activeOccurrence?.scheduledStart || props.task.scheduledStart || "09:00",
       durationMinutes: Math.max(Math.round((f.estimatedHours || 0.5) * 60), 30),
     };
+    if (props.compactSummary) {
+      return (
+        <>
+          {dialog.host}
+          <Suspense fallback={null}><MobileTaskSummary lang={props.lang} task={props.task} form={f} setForm={props.setForm} projects={props.projects} record={activeRecord} occurrence={activeOccurrence} today={props.today} onClose={props.onClose} onMore={props.onShowMore} onUpdate={props.onTaskUpdate} onDone={props.onToggleDone} onReturn={handleUncomplete} /></Suspense>
+        </>
+      );
+    }
     return (
       <>
       {dialog.host}
@@ -11418,8 +11422,8 @@ function EditDrawer(props: {
                     style={{ "--option-color": levelColors[option.value] } as React.CSSProperties}
                   >
                     {option.value === "unset"
-                      ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                      : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>}
+                      ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>}
                   </button>
                 );
               })}

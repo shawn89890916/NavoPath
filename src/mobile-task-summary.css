@@ -1,0 +1,15 @@
+@media (max-width:899.98px) and (orientation:portrait) {
+  #root .df-app .df-task-detail.df-drawer.df-mobile-task-summary{inset:auto 0 0!important;height:auto!important;min-height:0!important;max-height:none!important;display:block!important;gap:0!important;padding:14px 14px calc(14px + env(safe-area-inset-bottom))!important;overflow:visible!important}
+  #root .df-app .df-mobile-sheet-grabber{width:38px!important;height:4px!important;margin:-6px auto 10px!important;border-radius:9px!important;background:var(--paper-rule-strong)!important}
+  #root .df-app .df-mobile-summary-head{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:10px!important;padding-right:35px!important}
+  #root .df-app .df-mobile-summary-head strong{overflow:hidden!important;color:var(--text-main)!important;font:750 17px/1.25 var(--paper-sans)!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  #root .df-app .df-mobile-more{min-height:36px!important;padding:0 13px!important;border:1px solid var(--paper-rule-strong)!important;border-radius:18px!important;color:var(--accent-active)!important;background:var(--surface-raised)!important;font-weight:750!important}
+  #root .df-app .df-mobile-summary-project{display:flex!important;align-items:center!important;gap:6px!important;min-width:0!important;margin:10px 0 8px!important;color:var(--text-muted)!important;font-size:12px!important}
+  #root .df-app .df-mobile-summary-project b{overflow:hidden!important;color:var(--text-main)!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  #root .df-app .df-mobile-summary-times{display:grid!important;grid-template-columns:1fr auto 1fr!important;align-items:center!important;gap:7px!important}
+  #root .df-app .df-mobile-summary-times label{display:grid!important;grid-template-columns:auto 1fr!important;align-items:center!important;gap:8px!important;min-width:0!important;padding:5px 9px!important;border:1px solid var(--paper-rule)!important;border-radius:10px!important;background:var(--surface-raised)!important;color:var(--text-muted)!important;font-size:11px!important}
+  #root .df-app .df-mobile-summary-times input[type=time]{min-width:0!important;height:32px!important;padding:0!important;border:0!important;background:transparent!important;color:var(--text-main)!important;font:750 16px/1 var(--paper-mono)!important}
+  #root .df-app .df-mobile-summary-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;margin-top:9px!important}
+  #root .df-app .df-mobile-summary-actions button{min-width:0!important;min-height:40px!important;padding:0 6px!important;border:1px solid var(--paper-rule)!important;border-radius:10px!important;background:var(--surface-main)!important;color:var(--text-main)!important;font-size:12px!important}
+  #root .df-app .df-mobile-summary-actions button.active{border-color:var(--accent-active)!important;background:color-mix(in srgb,var(--accent-active) 12%,var(--surface-main))!important}
+}

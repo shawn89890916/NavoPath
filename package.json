@@ -32,14 +32,15 @@
         "dist/assets/supabase-vendor-*.js",
         "dist/assets/supabasePlannerApi-*.js"
       ],
-      "limit": "231 KB"
+      "limit": "232 KB"
     },
     {
       "name": "Deferred app scripts",
       "path": [
         "dist/assets/PlanningView-*.js",
         "dist/assets/LandingPage-*.js",
-        "dist/assets/WidgetApp-*.js"
+        "dist/assets/WidgetApp-*.js",
+        "dist/assets/MobileTaskSummary-*.js"
       ],
       "limit": "35 KB"
     },
@@ -52,9 +53,10 @@
         "dist/assets/supabasePlannerApi-*.js",
         "dist/assets/PlanningView-*.js",
         "dist/assets/LandingPage-*.js",
-        "dist/assets/WidgetApp-*.js"
+        "dist/assets/WidgetApp-*.js",
+        "dist/assets/MobileTaskSummary-*.js"
       ],
-      "limit": "265 KB"
+      "limit": "267 KB"
     },
     {
       "name": "Document parsing scripts",
@@ -73,7 +75,8 @@
       "name": "Deferred styles",
       "path": [
         "dist/assets/LandingPage-*.css",
-        "dist/assets/WidgetApp-*.css"
+        "dist/assets/WidgetApp-*.css",
+        "dist/assets/MobileTaskSummary-*.css"
       ],
       "limit": "12 KB"
     },
@@ -82,7 +85,8 @@
       "path": [
         "dist/assets/index-*.css",
         "dist/assets/LandingPage-*.css",
-        "dist/assets/WidgetApp-*.css"
+        "dist/assets/WidgetApp-*.css",
+        "dist/assets/MobileTaskSummary-*.css"
       ],
       "limit": "96 KB"
     }
