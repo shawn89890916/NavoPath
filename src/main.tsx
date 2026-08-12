@@ -85,7 +85,7 @@ import { getDefaultSettings } from "./defaultSettings";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch";
-import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
 import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
 import { MAX_PLUGIN_CONFIG_STRING_LENGTH, listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
@@ -1853,8 +1853,25 @@ function App() {
     let nextData = resolved.data;
     let nextSettings = resolved.settings;
     const shouldPushCachedData = resolved.replayData;
-    const shouldPushCachedSettings = resolved.replaySettings;
+    let shouldPushCachedSettings = resolved.replaySettings;
     if (!nextData || !nextSettings) return;
+    if (auth.user && window.desktopApi?.readLatestSnapshot) {
+      try {
+        const recovery = await window.desktopApi.readLatestSnapshot();
+        if (recovery.ok && recovery.payload?.settings) {
+          const accountRecovery = recoverAccountSettings(
+            nextSettings,
+            recovery.payload.settings,
+            auth.user.id,
+            recovery.payload.authUser?.id,
+          );
+          nextSettings = accountRecovery.settings;
+          shouldPushCachedSettings ||= accountRecovery.recovered;
+        }
+      } catch (snapshotErr) {
+        console.warn("[loadInitial] account recovery snapshot read failed:", snapshotErr);
+      }
+    }
     const migratedHabitData = migrateLegacyHabitTracker(nextData, nextSettings.pluginConfigs);
     const shouldPersistHabitMigration = migratedHabitData !== nextData;
     nextData = migratedHabitData;
@@ -1890,7 +1907,7 @@ function App() {
     setAdvancedOpen(Boolean(nextSettings.addAdvancedOpen));
     if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
     if ((shouldPushCachedData || shouldPersistHabitMigration) && nextData) void saveData(nextData);
-    if (shouldPushCachedSettings && cached?.settings) void saveSettings(cached.settings);
+    if (shouldPushCachedSettings) void saveSettings(nextSettings);
     // Persist a local JSON snapshot so users always have an offline backup.
     if (!isCompactWindowRoute) {
       try {

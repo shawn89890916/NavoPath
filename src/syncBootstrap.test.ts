@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData, Settings } from "./types";
-import { parseBootstrapCache, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 
 const data = (savedAt: string, title: string): PlannerData => ({
   version: 2, importedSeedVersion: "test", generatedAt: savedAt, savedAt, goals: [], projects: [], tasks: [{ id: title, title, dueDate: "2026-06-20", category: "personal", priority: "medium", notes: "", goalId: "", completed: false, createdAt: savedAt, updatedAt: savedAt }], longTasks: [], events: [], notes: [], drafts: [], chat: [], aiConversations: [], aiMemories: [], taskLayouts: {},
@@ -84,5 +84,25 @@ describe("parseBootstrapCache", () => {
     expect(parsed?.dataDirty).toBe(false);
     expect(parsed?.settingsDirty).toBe(true);
     expect(parsed?.remoteRevision).toBeUndefined();
+  });
+});
+
+describe("recoverAccountSettings", () => {
+  it("restores missing profile fields from a snapshot for the same account", () => {
+    const current = { ...settings("zh"), displayName: "NavoPath", avatarDataUrl: "" } as Settings;
+    const snapshot = { ...current, displayName: "233cxy", avatarDataUrl: "data:image/jpeg;base64,avatar" };
+    const result = recoverAccountSettings(current, snapshot, "user-1", "user-1");
+
+    expect(result.recovered).toBe(true);
+    expect(result.settings.displayName).toBe("233cxy");
+    expect(result.settings.avatarDataUrl).toBe(snapshot.avatarDataUrl);
+  });
+
+  it("does not overwrite current profile fields or cross account boundaries", () => {
+    const current = { ...settings("zh"), displayName: "Current", avatarDataUrl: "data:image/jpeg;base64,current" } as Settings;
+    const snapshot = { ...current, displayName: "Old", avatarDataUrl: "data:image/jpeg;base64,old" };
+
+    expect(recoverAccountSettings(current, snapshot, "user-1", "user-1")).toEqual({ settings: current, recovered: false });
+    expect(recoverAccountSettings({ ...current, displayName: "NavoPath", avatarDataUrl: "" }, snapshot, "user-1", "user-2").recovered).toBe(false);
   });
 });

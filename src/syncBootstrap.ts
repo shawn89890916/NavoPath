@@ -1,6 +1,6 @@
 import type { PlannerData, Settings } from "./types";
 import { normalizeData } from "./browserFallback";
-import { normalizeSettings } from "./defaultSettings";
+import { getDefaultSettings, normalizeSettings } from "./defaultSettings";
 
 export type BootstrapCache = {
   data: PlannerData;
@@ -65,5 +65,32 @@ export function resolveBootstrap(
     settings: replaySettings ? cached!.settings : remoteSettings || cached?.settings || null,
     replayData,
     replaySettings,
+  };
+}
+
+export function recoverAccountSettings(
+  current: Settings,
+  snapshotSettings: Settings | null | undefined,
+  currentUserId: string | undefined,
+  snapshotUserId: string | undefined,
+) {
+  if (!snapshotSettings || !currentUserId || currentUserId !== snapshotUserId) {
+    return { settings: current, recovered: false };
+  }
+
+  const defaults = getDefaultSettings();
+  const snapshot = normalizeSettings(snapshotSettings);
+  const displayName = current.displayName === defaults.displayName
+    && snapshot.displayName !== defaults.displayName
+    ? snapshot.displayName
+    : current.displayName;
+  const avatarDataUrl = !current.avatarDataUrl && snapshot.avatarDataUrl
+    ? snapshot.avatarDataUrl
+    : current.avatarDataUrl;
+  const recovered = displayName !== current.displayName || avatarDataUrl !== current.avatarDataUrl;
+
+  return {
+    settings: recovered ? { ...current, displayName, avatarDataUrl } : current,
+    recovered,
   };
 }
