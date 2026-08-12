@@ -964,6 +964,143 @@
     transform: none !important;
     z-index: 120 !important;
   }
+
+  html,
+  body,
+  #root {
+    width: 100% !important;
+    min-width: 0 !important;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  #root .df-app .drag-create-quick-add input,
+  #root .df-app .df-quick-add-row input,
+  #root .df-app .df-quick-add-input-box input {
+    font-size: 16px !important;
+  }
+
+  #root .df-app .drag-create-preview {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+    overflow: visible !important;
+  }
+
+  #root .df-app .drag-create-quick-add {
+    overflow: visible !important;
+  }
+
+  #root .df-app .df-quick-add-project-menu,
+  #root .df-app .drag-create-project-menu {
+    max-height: min(220px, 34dvh) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-y !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot,
+  #root .df-app .df-event-blocks-layer .df-time-block .df-resize-dot,
+  #root .df-app .df-week-view .df-time-block.df-time-block-week .df-resize-dot {
+    position: absolute !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    opacity: 0 !important;
+    z-index: 12 !important;
+    touch-action: none !important;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot.top {
+    left: -15px !important;
+    right: auto !important;
+    top: -15px !important;
+    bottom: auto !important;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot.bottom {
+    left: auto !important;
+    right: -15px !important;
+    top: auto !important;
+    bottom: -15px !important;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot::before,
+  #root .df-app .df-time-block .df-resize-dot::after {
+    content: "" !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: 9px !important;
+    height: 9px !important;
+    border-radius: 50% !important;
+    background: var(--accent-active) !important;
+    box-shadow: 0 0 0 2px var(--surface-main) !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot::after {
+    content: attr(data-resize-hint) !important;
+    width: max-content !important;
+    max-width: 132px !important;
+    height: auto !important;
+    padding: 4px 7px !important;
+    border: 1px solid var(--paper-rule-strong) !important;
+    border-radius: 4px !important;
+    background: var(--surface-raised) !important;
+    box-shadow: none !important;
+    color: var(--text-main) !important;
+    font: 650 10px/1.25 var(--paper-sans) !important;
+    white-space: nowrap !important;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot.top::after {
+    left: 19px !important;
+    top: -3px !important;
+    transform: none !important;
+  }
+
+  #root .df-app .df-time-block .df-resize-dot.bottom::after {
+    left: auto !important;
+    right: 19px !important;
+    top: auto !important;
+    bottom: -3px !important;
+    transform: none !important;
+  }
+
+  #root .df-app .df-time-block:hover .df-resize-dot,
+  #root .df-app .df-time-block:focus-within .df-resize-dot,
+  #root .df-app .df-time-block.resizing .df-resize-dot,
+  #root .df-app .df-time-block.show-resize-hint .df-resize-dot {
+    opacity: 1 !important;
+  }
+
+  #root .df-app .df-time-block:not(.show-resize-hint) .df-resize-dot::after {
+    display: none !important;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    #root .df-app .df-time-block.show-resize-hint .df-resize-dot::before {
+      animation: df-resize-hint-pulse 900ms ease-out 2;
+    }
+  }
+}
+
+@keyframes df-resize-hint-pulse {
+  0% { box-shadow: 0 0 0 2px var(--surface-main), 0 0 0 2px color-mix(in srgb, var(--accent-active) 38%, transparent); }
+  100% { box-shadow: 0 0 0 2px var(--surface-main), 0 0 0 10px transparent; }
 }
 
 @media (max-width: 1180px) and (orientation: landscape) {

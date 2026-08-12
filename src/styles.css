@@ -28377,13 +28377,15 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .drag-create-preview {
 
-  background: color-mix(in srgb, var(--accent-active) 12%, #FFFFFF);
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 4%, var(--bg-surface));
 
-  border: 1px solid color-mix(in srgb, var(--accent-active) 42%, #E5E7EB);
+  border: 1px solid var(--border-subtle);
 
-  box-shadow: 0 8px 24px rgba(17,24,39,0.10);
+  border-left: 2px solid var(--cat, var(--accent-active));
 
-  border-radius: 12px;
+  box-shadow: none;
+
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 
   z-index: 99998;
 
@@ -28419,15 +28421,17 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .drag-create-quick-add {
 
-  border-radius: 12px 12px 0 0;
-
+  position: absolute;
+  inset: 0;
   z-index: 99999;
-
-  background: #FFFFFF;
-
-  border-bottom: 1px solid #E5E7EB;
-
-  color: #111827;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  min-height: 100%;
+  padding: 6px 7px 6px 28px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--cat, var(--accent-active)) 4%, var(--bg-surface));
+  color: var(--text-main);
 
 }
 
@@ -28435,10 +28439,50 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .drag-create-quick-add input {
 
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
   background: transparent;
 
   color: inherit;
 
+  font: 650 calc(13px * var(--timeline-font-scale, 1))/1.25 var(--paper-sans);
+
+}
+
+.drag-create-quick-add-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+}
+
+.drag-create-quick-add-check {
+  position: absolute;
+  left: 7px;
+  top: 11px;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--cat, var(--accent-active));
+  border-radius: 3px;
+}
+
+.drag-create-project-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -2px;
+  right: -1px;
+  z-index: 100000;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-soft);
 }
 
 
@@ -29168,6 +29212,12 @@ body:has(:active)::-webkit-scrollbar-thumb {
   max-height: 220px;
 
   overflow-y: auto;
+
+  touch-action: pan-y;
+
+  overscroll-behavior: contain;
+
+  -webkit-overflow-scrolling: touch;
 
   border-top: 1px solid #E5E7EB;
 
