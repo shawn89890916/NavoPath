@@ -77,6 +77,7 @@
 ## 2026-08-12 · 竖屏时间轴触摸交互
 
 ### 修复
+- 网页端的登录与工作区资料请求现在通过 `navopath.com` 同域安全中转到 Supabase，规避部分移动网络或 Safari 无法稳定直连 `supabase.co` 而持续超时的问题；认证令牌与数据库行级权限仍由 Supabase 原样校验。
 - 云端资料请求的超时窗口由 5 秒提高到 15 秒，避免 Safari 在较慢的移动网络路由上反复停留在“工作区暂时不可用”。
 - 退出登录现在先清除本机会话，再完成云端认证收尾；Safari 断网或云端认证请求失败时，退出按钮不再卡住。
 - 云端工作区读取超时或网络中断时，不再把临时空数据伪装成新账户并启动新手教程，也不会允许空工作区覆盖原账户数据；无可用本机缓存时会显示可重试、可退出登录的明确错误页，有可用缓存时继续保留该账户的本机内容。
@@ -87,6 +88,7 @@
 ## 2026-08-12 · Portrait timeline touch interactions
 
 ### Fixed
+- Web authentication and workspace-profile requests now reach Supabase through a same-origin `navopath.com` relay, avoiding persistent timeouts when some mobile routes or Safari sessions cannot connect reliably to `supabase.co`; Supabase still validates the original authentication token and row-level permissions.
 - The cloud-profile request window now allows 15 seconds instead of 5, preventing Safari from repeatedly stopping at “Workspace temporarily unavailable” on slower mobile routes.
 - Sign-out now clears the device session before completing cloud authentication cleanup, so the button no longer gets stuck when Safari is offline or the authentication request fails.
 - When cloud workspace loading times out or the network drops, NavoPath no longer disguises temporary empty data as a new account or starts onboarding, and cannot overwrite the real account with an empty workspace. With no usable device cache it now shows a clear retry/sign-out page; with a usable cache it keeps that account's local content available.

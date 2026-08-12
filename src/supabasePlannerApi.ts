@@ -104,12 +104,30 @@ function clearAuthCallbackUrl() {
 export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: string): PlannerApi {
   const desktopStorage = window.desktopApi?.authStorage;
   const authStorageKey = `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
+  const upstreamOrigin = new URL(supabaseUrl).origin;
+  const pageUrl = new URL(window.location.href);
+  const useSameOriginProxy = pageUrl.protocol === "https:"
+    && (pageUrl.hostname === "navopath.com"
+      || pageUrl.hostname.endsWith(".navopath-xiaoyang.pages.dev"));
+  const nativeFetch = globalThis.fetch.bind(globalThis);
+  const cloudFetch: typeof fetch = (input, init) => {
+    const inputUrl = input instanceof Request ? input.url : input.toString();
+    const requestUrl = new URL(inputUrl);
+    if (!useSameOriginProxy || requestUrl.origin !== upstreamOrigin) return nativeFetch(input, init);
+    requestUrl.protocol = pageUrl.protocol;
+    requestUrl.host = pageUrl.host;
+    requestUrl.pathname = `/api/supabase${requestUrl.pathname}`;
+    const request = input instanceof Request ? new Request(requestUrl, input) : requestUrl;
+    return nativeFetch(request, init);
+  };
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      storageKey: authStorageKey,
       ...(desktopStorage ? { storage: desktopStorage } : {})
-    }
+    },
+    global: { fetch: cloudFetch },
   });
   let cachedUser: User | null | undefined;
   let userPromise: Promise<User | null> | null = null;

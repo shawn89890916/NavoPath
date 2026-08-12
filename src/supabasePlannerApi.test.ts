@@ -61,6 +61,29 @@ beforeEach(() => {
 });
 
 describe("createSupabasePlannerApi", () => {
+  it("routes production Supabase fetches through the NavoPath origin", async () => {
+    window.location = { origin: "https://navopath.com", href: "https://navopath.com/app" } as any;
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        onAuthStateChange: vi.fn(),
+      },
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    createSupabasePlannerApi("https://project.supabase.co", "anon");
+    const options = createClientMock.mock.calls[0][2];
+    await options.global.fetch("https://project.supabase.co/rest/v1/dayflow_profiles?select=revision");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.objectContaining({ href: "https://navopath.com/api/supabase/rest/v1/dayflow_profiles?select=revision" }),
+      undefined,
+    );
+    vi.unstubAllGlobals();
+  });
+
   it("does not treat an email-confirmation signup as an authenticated session", async () => {
     const pendingUser = { id: "user_pending", email: "pending@example.com" };
     createClientMock.mockReturnValue({
