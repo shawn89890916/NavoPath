@@ -13,6 +13,27 @@ Every agent turn that changes user-visible behavior must update `CHANGELOG.md` b
 
 Visual and interaction work must follow `NavoPathStyle.md`.
 
+## Verification policy
+
+Use proportional verification so small changes stay fast without weakening the
+release gate.
+
+- During implementation, run only the tests and checks related to the changed
+  area. Prefer targeted unit tests, TypeScript checks, and a focused browser flow
+  over the complete test suite.
+- For small visual or interaction fixes, verify the affected viewport and user
+  flow in a real browser. Do not run `npm test` locally by default.
+- Run `npm test` locally only when the change affects persistence, migrations,
+  synchronization, authentication, security, Electron IPC or updates,
+  cross-cutting core logic, dependencies or build tooling, or when the user asks
+  for a full local test run.
+- GitHub Actions remains the authoritative full-suite gate after every push.
+  Follow the workflow to completion and report any failure.
+- Run `npm run size:check` locally only when JavaScript or CSS bundle output could
+  materially change. The deployment workflow still enforces the size limits.
+- Product-code changes must pass `npm run build` before publishing. Documentation-
+  only and agent-instruction-only changes may skip the product build.
+
 ## Protected product contracts
 
 - `NavoPathStyle.md` is the visual source of truth. Do not replace its palette,
@@ -34,7 +55,8 @@ Visual and interaction work must follow `NavoPathStyle.md`.
 
 After every conversation that changes files in this repository, finish the turn by publishing the completed work to GitHub:
 
-1. Run `npm run build` and stop the publish flow if it fails.
+1. Apply the verification policy above. For product-code changes, run
+   `npm run build` and stop the publish flow if it fails.
 2. Run `git status` and inspect the diff so the commit scope is understood.
 3. Stage the completed work with `git add .` only after confirming all current changes belong to the conversation.
 4. Commit with a concise, descriptive message derived from the completed work; never use a placeholder such as `xxx`.
