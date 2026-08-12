@@ -249,16 +249,12 @@
   }
 
   #root .df-app .df-task-card.is-drag-armed {
-    border-color: color-mix(in srgb, var(--accent-active) 56%, var(--task-border)) !important;
+    opacity: .92;
   }
 
   #root .df-app .df-ios-native-select {
     position: relative !important;
     display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 2px !important;
-    cursor: pointer !important;
   }
 
   #root .df-app .df-ios-native-select select {
@@ -266,16 +262,8 @@
     inset: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    margin: 0 !important;
     opacity: 0 !important;
-    cursor: pointer !important;
     font-size: 16px !important;
-    touch-action: manipulation !important;
-  }
-
-  #root .df-app .df-ios-duration-trigger {
-    min-width: 46px !important;
-    min-height: 34px !important;
   }
 
   #root .df-app .df-task-card .df-candidate-row {
