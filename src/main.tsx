@@ -10615,7 +10615,8 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectQuery, setProjectQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLFormElement>(null);
+  const selectedProjectRef = useRef<Project | null>(null);
   const savingRef = useRef(false);
 
   useEffect(() => {
@@ -10625,7 +10626,9 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) onCancel();
+      if (!containerRef.current || containerRef.current.contains(e.target as Node)) return;
+      if (inputRef.current?.value.replace(/#[^\s#]+/g, "").trim()) handleSave();
+      else onCancel();
     };
     const timer = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
     return () => { window.clearTimeout(timer); document.removeEventListener("mousedown", handler); };
@@ -10644,13 +10647,14 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
   }
 
   function handleSave() {
-    const cleanTitle = input.replace(/#[^\s#]+/g, "").trim();
+    const cleanTitle = (inputRef.current?.value || input).replace(/#[^\s#]+/g, "").trim();
     if (!cleanTitle || savingRef.current) return;
     savingRef.current = true;
-    onSave(cleanTitle, selectedProject?.id || null);
+    onSave(cleanTitle, selectedProjectRef.current?.id || null);
   }
 
   function selectProject(project: Project) {
+    selectedProjectRef.current = project;
     setSelectedProject(project);
     const base = input.replace(/#[^\s#]*$/, "").trimEnd();
     setInput(`${base}${base ? " " : ""}#${project.title}`);
@@ -10666,7 +10670,8 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
   const compact = state.width < 110;
 
   return (
-    <div ref={containerRef} className="drag-create-quick-add"
+    <form ref={containerRef} className="drag-create-quick-add"
+      onSubmit={(event) => { event.preventDefault(); handleSave(); }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
       style={{ "--cat": selectedProject?.color || "var(--accent-active)" } as CSSProperties}>
@@ -10674,10 +10679,22 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
         <span className="drag-create-quick-add-check" aria-hidden="true" />
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
           enterKeyHint="done"
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+            if (event.key === "Escape") onCancel();
+          }}
+          onBlur={() => {
+            window.setTimeout(() => {
+              if (containerRef.current?.contains(document.activeElement)) return;
+              if (inputRef.current?.value.replace(/#[^\s#]+/g, "").trim()) handleSave();
+            }, 0);
+          }}
           placeholder={compact ? "任务名" : "输入任务名，#选择项目"}
         />
-        <button onClick={handleSave}
+        <button type="submit"
           disabled={!input.replace(/#[^\s#]+/g, "").trim()}
           className="df-quick-add-confirm" aria-label="添加任务">✓</button>
       </div>
@@ -10690,7 +10707,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
           ))}
         </div>
       )}
-    </div>
+    </form>
   );
 }
 
