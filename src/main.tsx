@@ -294,6 +294,8 @@ type CandidateDragOptions = {
 };
 
 const DRAG_START_THRESHOLD_PX = 5;
+const CANDIDATE_TOUCH_HOLD_MS = 360;
+const TOUCH_SCROLL_CANCEL_DISTANCE_PX = 8;
 const SUPPRESS_CLICK_AFTER_DRAG_MS = 220;
 
 function isEventDisplayTask(taskOrId: Task | string) {
@@ -1211,7 +1213,6 @@ function App() {
   const [mode, setModeState] = useState<Mode>("execute");
   const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 899.98px) and (orientation: portrait)").matches);
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
-  const [compactViewMenuOpen, setCompactViewMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [visibleTimelineDate, setVisibleTimelineDate] = useState(todayIso());
@@ -1335,7 +1336,6 @@ function App() {
   const [quickProjectTitle, setQuickProjectTitle] = useState("");
   const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
   const compactQuickInputRef = useRef<HTMLInputElement>(null);
-  const compactViewPickerRef = useRef<HTMLDivElement>(null);
   const [candidatePanelCollapsed, setCandidatePanelCollapsed] = useState(false);
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -1550,26 +1550,6 @@ function App() {
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
   }, []);
-
-  useEffect(() => {
-    if (!compactViewMenuOpen) return;
-    const closeMenu = (event: PointerEvent) => {
-      if (!compactViewPickerRef.current?.contains(event.target as Node)) setCompactViewMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCompactViewMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", closeMenu);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeMenu);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [compactViewMenuOpen]);
-
-  useEffect(() => {
-    if (mode !== "execute" || compactExecuteView !== "schedule") setCompactViewMenuOpen(false);
-  }, [mode, compactExecuteView]);
 
   useEffect(() => {
     if (quickAddOpen) compactQuickInputRef.current?.focus();
@@ -6185,6 +6165,17 @@ function App() {
     const startY = event.clientY;
     const duration = taskDuration(task);
     let active = false;
+    let holdCancelled = false;
+    let holdReady = !(compactLayout && source === "candidate" && event.pointerType === "touch");
+    const holdTimer = holdReady ? undefined : window.setTimeout(() => {
+      holdReady = true;
+      dragElement.classList.add("is-drag-armed");
+      window.navigator.vibrate?.(8);
+    }, CANDIDATE_TOUCH_HOLD_MS);
+    const clearHold = () => {
+      if (holdTimer !== undefined) window.clearTimeout(holdTimer);
+      dragElement.classList.remove("is-drag-armed");
+    };
     let dropTime = "";
     let candidateTarget: CandidateDropTarget = null;
     const cleanup = () => {
@@ -6204,6 +6195,7 @@ function App() {
       setCandidateDropActive(false);
       setCandidateDropTarget(null);
       dragTargetDateRef.current = "";
+      clearHold();
       if (dragElement.hasPointerCapture(pointerId)) dragElement.releasePointerCapture(pointerId);
       if (active) suppressClickAfterDrag();
     };
@@ -6276,9 +6268,18 @@ function App() {
     };
     const move = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
-      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < DRAG_START_THRESHOLD_PX) return;
+      const distance = Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY);
+      if (!holdReady) {
+        if (distance >= TOUCH_SCROLL_CANCEL_DISTANCE_PX) {
+          holdCancelled = true;
+          clearHold();
+        }
+        return;
+      }
+      if (holdCancelled || (!active && distance < DRAG_START_THRESHOLD_PX)) return;
       if (!active) {
         active = true;
+        clearHold();
         dragElement.setPointerCapture(pointerId);
         document.body.classList.add("df-timeline-pointer-drag");
         dragElement.classList.add("is-dragging-source");
@@ -7280,20 +7281,19 @@ function App() {
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg></button>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6.5 3 5 5-5 5" /></svg></button>
-                <div className="df-compact-view-picker" ref={compactViewPickerRef}>
-                  <button className="active df-compact-view-trigger" onClick={() => setCompactViewMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={compactViewMenuOpen}>
-                    {viewLabel(lang, timelineView)}
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
-                  </button>
-                  {compactViewMenuOpen && <div className="df-compact-view-menu" role="menu">
+                <label className="active df-compact-view-trigger df-ios-native-select">
+                  <span>{viewLabel(lang, timelineView)}</span>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+                  <select
+                    aria-label={t(lang, "timeline.switchView")}
+                    value={timelineView}
+                    onChange={(event) => changeTimelineView(event.target.value as TimelineView)}
+                  >
                     {(["daily", "3day", "weekly", "month"] as TimelineView[]).map((view) => (
-                      <button key={view} role="menuitemradio" aria-checked={timelineView === view} className={timelineView === view ? "active" : ""} onClick={() => {
-                        changeTimelineView(view);
-                        setCompactViewMenuOpen(false);
-                      }}>{viewLabel(lang, view)}</button>
+                      <option key={view} value={view}>{viewLabel(lang, view)}</option>
                     ))}
-                  </div>}
-                </div>
+                  </select>
+                </label>
               </nav>
               </>
             )}
@@ -10193,6 +10193,7 @@ function TaskCard({
   dragState?: TaskBlockDragState;
   lang: Language;
 }) {
+  const compact = window.matchMedia("(max-width: 899.98px) and (orientation: portrait)").matches;
   const [openPanel, setOpenPanel] = useState<"more" | null>(null);
   const [subtasksOpen, setSubtasksOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState<"duration" | "deadline" | null>(null);
@@ -10259,7 +10260,11 @@ function TaskCard({
         dataAttrs={{ "placement-card": task.id, kind: isEvent ? "event" : "task" }}
         onPointerDown={!isEvent && recurringLocked ? undefined : onPointerDragStart}
         onClick={onClick}
-        title={!isEvent && recurringLocked ? t(lang, "taskCard.recurringHint") : t(lang, "taskCard.dragHint")}
+        title={!isEvent && recurringLocked
+          ? t(lang, "taskCard.recurringHint")
+          : compact
+            ? (lang === "zh" ? "长按后拖到时间轴排程" : "Long press, then drag to schedule")
+            : t(lang, "taskCard.dragHint")}
       >
         {!isMoreOpen && <TaskBlockRow className="df-candidate-row">
           {!isEvent && <TaskCheckbox
@@ -10291,16 +10296,33 @@ function TaskCard({
             onClick={(event) => { event.stopPropagation(); onProjectChange(suggestedProject.id); }}
           >↗ {suggestedProject.title}</button>}
           {!isEvent && <TaskBlockDuration>
-            <button
-              className="df-duration-pill"
-              title={t(lang, "taskCard.adjustDuration")}
-              onClick={(event) => {
-                event.stopPropagation();
-                setPopoverOpen((current) => current === "duration" ? null : "duration");
-              }}
-            >
-              {formatDuration(task.estimatedHours || 0.5)}
-            </button>
+            {compact ? (
+              <label className="df-duration-pill df-ios-native-select df-ios-duration-trigger" title={t(lang, "taskCard.adjustDuration")}>
+                <span>{formatDuration(task.estimatedHours || 0.5)}</span>
+                <select
+                  value={Math.round((task.estimatedHours || 0.5) * 60)}
+                  onChange={(event) => onQuickDuration(Number(event.target.value))}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                  aria-label={t(lang, "taskCard.adjustDuration")}
+                >
+                  {DURATION_OPTIONS.map((minutes) => (
+                    <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <button
+                className="df-duration-pill"
+                title={t(lang, "taskCard.adjustDuration")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setPopoverOpen((current) => current === "duration" ? null : "duration");
+                }}
+              >
+                {formatDuration(task.estimatedHours || 0.5)}
+              </button>
+            )}
           </TaskBlockDuration>}
           {!isEvent && <TaskActions>
             {hasSubtasks && onToggleSubtask ? (
