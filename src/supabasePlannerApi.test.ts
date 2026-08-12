@@ -233,12 +233,32 @@ describe("createSupabasePlannerApi", () => {
     await expect(api.signIn?.("user@example.com", "password")).resolves.toEqual({ user });
     expect(maybeSingle).not.toHaveBeenCalled();
 
-    const bootstrap = await api.getBootstrap?.({ force: true });
-    expect(bootstrap?.auth.user).toEqual(user);
-    expect(bootstrap?.data?.importedSeedVersion).toBe("cloud-empty-v1");
-    expect(bootstrap?.settings?.displayName).toBe("NavoPath");
+    await expect(api.getBootstrap?.({ force: true })).rejects.toThrow("Cloud profile load failed");
     expect(maybeSingle).toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("never exposes a temporary empty workspace when an existing profile cannot load", async () => {
+    const user = { id: "user_existing", email: "existing@example.com" };
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "Cloud request timed out. Please try again." },
+    });
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
+        onAuthStateChange: vi.fn(),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })),
+      })),
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+
+    await expect(api.getBootstrap?.({ force: true })).rejects.toThrow("Cloud profile load failed");
+    await expect(api.getData()).rejects.toThrow("Cloud profile load failed");
   });
 
   it("applies newer profile revisions from realtime events and reconnect reconciliation", async () => {

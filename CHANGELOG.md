@@ -77,6 +77,7 @@
 ## 2026-08-12 · 竖屏时间轴触摸交互
 
 ### 修复
+- 云端工作区读取超时或网络中断时，不再把临时空数据伪装成新账户并启动新手教程，也不会允许空工作区覆盖原账户数据；无可用本机缓存时会显示可重试、可退出登录的明确错误页，有可用缓存时继续保留该账户的本机内容。
 - 桌面端在已登录账户的用户名或头像意外回落为默认值时，会从同一账户的最近离线快照恢复缺失的个人资料字段并重新同步到云端；任务、项目及其他设置不会被旧快照覆盖。
 - iOS 将网页添加到主屏幕时，现在使用 NavoPath Logo 作为应用图标。
 - 竖屏手机版网页固定按设备宽度显示，输入任务时不再触发页面缩放；时间轴锁定横向位置，只响应上下滚动。Tasks 列表中的任务改为长按后才进入拖拽，普通上下滑动会取消长按判定；拖拽开始后仍会自动切到 Schedule 以放入时间轴。Tasks 时长和 Schedule 视图选择改用 iOS 原生选择列表。点按或拖拽时间轴后，新增输入栏与正式任务块共用一致的纸面背景、圆角和边线，并进一步放大时间轴任务的勾选框，不再因样式割裂或键盘、页面滚动、视口变化影响操作。手机键盘的完成键可直接保存任务，输入井号后的项目列表支持独立触摸滚动。时间块移除挤在中间的横向缩放条，改为贴在边界交界处并略向内收的左上角开始点和右下角结束点；两处保留 44px 触控区域，新任务保存后会短暂显示角点及拖动提示。竖屏时间标尺向左压缩，日期进入顶栏，切换箭头变窄；候选页移除重复标题，将已完成、AI 排程和醒目的快速添加按钮集中到右上角，为列表与时间轴释放更多空间。
@@ -84,6 +85,7 @@
 ## 2026-08-12 · Portrait timeline touch interactions
 
 ### Fixed
+- When cloud workspace loading times out or the network drops, NavoPath no longer disguises temporary empty data as a new account or starts onboarding, and cannot overwrite the real account with an empty workspace. With no usable device cache it now shows a clear retry/sign-out page; with a usable cache it keeps that account's local content available.
 - When a signed-in desktop account unexpectedly falls back to the default name or loses its avatar, NavoPath now restores only the missing profile fields from that same account's latest offline snapshot and syncs them back to the cloud without replacing tasks, projects, or other settings.
 - Adding the website to an iOS Home Screen now uses the NavoPath logo as the app icon.
 - Portrait mobile web views now stay fixed to the device width without zooming when task inputs focus; the timeline is horizontally locked and responds only to vertical scrolling. Tasks in the Tasks list now require a long press before dragging, while normal vertical scrolling cancels the hold; once dragging starts, the app still switches to Schedule for timeline placement. Task duration and Schedule view controls now use native iOS selection lists. Tapping or dragging on the timeline opens an editor that shares the final block's paper background, radius, and borders, while timeline task checkboxes are enlarged again for touch; the editor no longer feels visually detached or shifts because of the keyboard, scrolling, or viewport changes. The mobile keyboard's Done key saves immediately, and project suggestions after `#` support independent touch scrolling. Timeline blocks replace the crowded centered resize bars with top-left start and bottom-right end points that sit on the block boundaries and tuck slightly inward; both retain 44px touch targets and briefly show drag hints after save. The portrait time ruler is narrower and farther left, the date now sits in the top bar, and navigation arrows use less width. The candidate view removes its repeated heading and groups Done, AI scheduling, and a prominent quick-add button at the top right to free more room for content.

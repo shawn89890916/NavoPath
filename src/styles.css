@@ -28454,6 +28454,36 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 }
 
+.df-cloud-error-card h1 {
+  margin: 0 0 12px;
+  font-family: var(--df-font-brand);
+  font-size: 25px;
+  font-weight: 650;
+}
+
+.df-cloud-error-card > p:not(.df-auth-error) {
+  margin: 0 0 18px;
+  color: #6B6258;
+  line-height: 1.65;
+}
+
+.df-cloud-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.df-cloud-error-actions button {
+  min-height: 44px;
+}
+
+.df-cloud-error-actions .quiet {
+  border: 0;
+  background: transparent;
+  color: #6B6258;
+}
+
 .drag-create-quick-add-row {
   display: flex;
   align-items: center;

@@ -1014,6 +1014,30 @@ function AuthGate(props: {
   );
 }
 
+function CloudWorkspaceError(props: {
+  lang: Language;
+  message: string;
+  busy: boolean;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  const zh = props.lang === "zh";
+  return (
+    <main className="df-auth-shell">
+      <section className="df-auth-card df-cloud-error-card" role="alert">
+        <div className="df-auth-brand"><ProductIcon compact /><div><strong>NavoPath</strong><span>{zh ? "账户数据仍安全保存在云端" : "Your account data is still safe in the cloud"}</span></div></div>
+        <h1>{zh ? "暂时无法载入工作区" : "Workspace temporarily unavailable"}</h1>
+        <p>{zh ? "网络连接中断时，NavoPath 不会再打开空白账户或启动新手教程，也不会用空数据覆盖原有内容。请恢复网络后重试。" : "When the connection drops, NavoPath will no longer open a blank account or start onboarding, and it will never replace existing content with empty data. Reconnect and try again."}</p>
+        {props.message && <p className="df-auth-error">{props.message}</p>}
+        <div className="df-cloud-error-actions">
+          <button type="button" disabled={props.busy} onClick={props.onRetry}>{props.busy ? (zh ? "正在重试…" : "Retrying…") : (zh ? "重新载入" : "Reload workspace")}</button>
+          <button type="button" className="quiet" disabled={props.busy} onClick={props.onSignOut}>{zh ? "退出登录" : "Sign out"}</button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function ResetPasswordForm({ lang, busy, error, onReset }: { lang: Language; busy: boolean; error: string; onReset: (newPassword: string) => Promise<void> }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -1849,6 +1873,7 @@ function App() {
       };
     if (!isCurrentWorkspaceLoad(loadVersion, workspaceLoadVersionRef.current)
       || loadedWorkspaceKeyRef.current !== workspaceKey) return;
+    setAuthError("");
     const resolved = resolveBootstrap(cached, bootstrap.data, bootstrap.settings);
     let nextData = resolved.data;
     let nextSettings = resolved.settings;
@@ -7131,6 +7156,22 @@ function App() {
 
   if (authState?.mode === "cloud" && authState.user && isRecoveryMode) {
     return <ResetPasswordForm lang={lang} busy={authBusy} error={authError} onReset={handleResetPassword} />;
+  }
+
+  const unusableCloudCache = !data || !settings
+    || ((settings.onboardingVersion ?? 0) < 2 && settings.onboardingStep !== "done");
+  if (authState?.mode === "cloud" && authState.user && authError && unusableCloudCache) {
+    return <CloudWorkspaceError
+      lang={lang}
+      message={authError}
+      busy={authBusy}
+      onRetry={() => {
+        setAuthBusy(true);
+        setAuthError("");
+        void loadInitial().finally(() => setAuthBusy(false));
+      }}
+      onSignOut={() => void handleSignOut()}
+    />;
   }
 
   if (!data || !settings) return <ExecuteSkeleton />;

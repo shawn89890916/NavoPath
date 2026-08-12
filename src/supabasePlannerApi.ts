@@ -204,15 +204,6 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       if (isCurrentAuth(user.id, requestAuthVersion)) profileCache = profile;
       return profile;
     };
-    const useTemporaryProfile = () => {
-      const initialData = emptyCloudData();
-      const initialSettings = {
-        ...getDefaultSettings(),
-        onboardingVersion: 0,
-        onboardingStep: "add" as const,
-      };
-      return remember({ userId: user.id, data: initialData, settings: initialSettings, revision: 0 });
-    };
     const pending = (async () => {
       const { data, error } = await retryTransientRequest(() => supabase
         .from(PROFILE_TABLE)
@@ -221,7 +212,6 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         .maybeSingle());
 
       if (error) {
-        if (isRetryableProfileError(error.message)) return useTemporaryProfile();
         throw new Error(`Cloud profile load failed: ${error.message}`);
       }
       if (data) {
@@ -251,7 +241,6 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
         }));
 
       if (insertError) {
-        if (isRetryableProfileError(insertError.message)) return useTemporaryProfile();
         throw new Error(`Cloud profile create failed: ${insertError.message}`);
       }
       return remember({ userId: user.id, data: initialData, settings: initialSettings, revision: 0 });
