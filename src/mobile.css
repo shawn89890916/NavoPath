@@ -291,7 +291,7 @@
 
   #root .df-app.mode-execute .df-candidate-panel.compact-active {
     position: relative !important;
-    padding: 100px 6px 0 !important;
+    padding: 52px 6px 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: var(--surface-main) !important;
@@ -313,8 +313,8 @@
     min-height: 44px !important;
     display: flex !important;
     align-items: center !important;
-    gap: 2px !important;
-    padding: 3px !important;
+    gap: 0 !important;
+    padding: 3px 2px !important;
     border: 1px solid var(--paper-rule) !important;
     border-radius: 7px !important;
     background: var(--surface-main) !important;
@@ -442,9 +442,9 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    min-width: 28px !important;
+    min-width: 22px !important;
     height: 28px !important;
-    padding: 0 5px !important;
+    padding: 0 2px !important;
     border: 0 !important;
     border-radius: 4px !important;
     background: transparent !important;
@@ -458,31 +458,25 @@
 
   #root .df-app.mode-execute .df-candidate-panel > .df-panel-title {
     position: absolute !important;
-    inset: 52px 0 auto !important;
-    min-height: 48px !important;
-    height: 48px !important;
+    inset: 4px 4px auto auto !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    width: auto !important;
     margin: 0 !important;
     padding: 0 4px !important;
     border: 0 !important;
-    border-bottom: 1px solid var(--paper-rule) !important;
+    border-bottom: 0 !important;
+    z-index: 14 !important;
   }
 
   #root .df-app.mode-execute .df-candidate-panel > .df-panel-title h2 {
-    position: absolute !important;
-    inset: 0 96px 0 4px !important;
-    display: grid !important;
-    place-items: center !important;
-    margin: 0 !important;
-    color: var(--text-main) !important;
-    font-size: 16px !important;
-    text-align: left !important;
-    pointer-events: none;
+    display: none !important;
   }
 
   #root .df-app.mode-execute .df-candidate-panel > .df-panel-title > div {
     position: absolute !important;
     top: 2px !important;
-    right: 4px !important;
+    right: 0 !important;
     height: 44px !important;
   }
 
@@ -546,6 +540,26 @@
     color: var(--text-main) !important;
     border-bottom-color: var(--accent-active) !important;
     background: color-mix(in srgb, var(--surface-main) 92%, var(--accent-active) 8%) !important;
+  }
+
+  #root .df-app .df-candidate-panel .df-candidate-quick-add-top {
+    display: grid !important;
+    place-items: center !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    border: 1px solid color-mix(in srgb, var(--accent-active) 48%, var(--paper-rule-strong)) !important;
+    border-radius: 50% !important;
+    color: var(--surface-main) !important;
+    background: var(--accent-active) !important;
+    box-shadow: none !important;
+  }
+
+  #root .df-app .df-candidate-panel .df-candidate-quick-add-top span {
+    font: 400 27px/1 var(--paper-sans) !important;
+    transform: translateY(-1px);
   }
 
   #root .df-app.mode-execute .df-candidate-list:has(> .df-empty),
@@ -625,6 +639,34 @@
     box-shadow: none !important;
   }
 
+  #root .df-app .df-compact-date-display {
+    position: absolute !important;
+    left: 50% !important;
+    top: 0 !important;
+    height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    transform: translateX(-50%) !important;
+    color: var(--text-main) !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+  }
+
+  #root .df-app .df-compact-date-display strong {
+    font: 650 24px/1 var(--paper-serif) !important;
+  }
+
+  #root .df-app .df-compact-date-display span {
+    color: var(--text-muted) !important;
+    font: 650 10px/1 var(--paper-sans) !important;
+  }
+
+  #root .df-app .df-timeline-daily > .df-date-title {
+    display: none !important;
+  }
+
   #root .df-app .df-timeline-3day-top {
     margin-top: 14px !important;
     background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
@@ -653,8 +695,8 @@
 
   #root .df-app .df-timeline-3day-ruler,
   #root .df-app .df-timeline-3day-ruler-spacer {
-    width: 48px !important;
-    flex: 0 0 48px !important;
+    width: 42px !important;
+    flex: 0 0 42px !important;
   }
 
   #root .df-app .df-timeline-3day-ruler .df-slot-ruler span {
@@ -663,6 +705,22 @@
     font-size: 10px !important;
     text-align: left !important;
     letter-spacing: 0 !important;
+  }
+
+  #root .df-app .df-timeline-scroll {
+    padding-left: 46px !important;
+    padding-right: 5px !important;
+  }
+
+  #root .df-app .df-timeline-scroll .df-slot span {
+    left: -44px !important;
+    width: 38px !important;
+    font-size: 10px !important;
+    text-align: left !important;
+  }
+
+  #root .df-app .df-timeline-scroll .df-now-line span {
+    left: -44px !important;
   }
 
   #root .df-app .df-timeline-3day-ruler .df-slot-ruler .df-timeline-ruler-label b {
@@ -983,10 +1041,40 @@
   #root .df-app .drag-create-preview {
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
     overflow: visible !important;
+    background: color-mix(in srgb, var(--accent-active) 4%, var(--bg-surface)) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-left: 2px solid var(--accent-active) !important;
+    box-shadow: none !important;
   }
 
   #root .df-app .drag-create-quick-add {
     overflow: visible !important;
+    background: transparent !important;
+    color: var(--text-main) !important;
+  }
+
+  #root .df-app .drag-create-quick-add input {
+    color: var(--text-main) !important;
+    caret-color: var(--accent-active) !important;
+  }
+
+  #root .df-app .drag-create-quick-add .df-quick-add-confirm {
+    display: none !important;
+  }
+
+  #root .df-app .df-time-block .df-block-check,
+  #root .df-app .df-time-block .df-task-block-check,
+  #root .df-app .drag-create-quick-add-check {
+    width: 18px !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    border-width: 1.5px !important;
+  }
+
+  #root .df-app .drag-create-quick-add-check {
+    left: 7px !important;
+    top: 9px !important;
   }
 
   #root .df-app .df-quick-add-project-menu,
@@ -1020,17 +1108,17 @@
   }
 
   #root .df-app .df-time-block .df-resize-dot.top {
-    left: -15px !important;
+    left: -10px !important;
     right: auto !important;
-    top: -15px !important;
+    top: -22px !important;
     bottom: auto !important;
   }
 
   #root .df-app .df-time-block .df-resize-dot.bottom {
     left: auto !important;
-    right: -15px !important;
+    right: -10px !important;
     top: auto !important;
-    bottom: -15px !important;
+    bottom: -22px !important;
   }
 
   #root .df-app .df-time-block .df-resize-dot::before,

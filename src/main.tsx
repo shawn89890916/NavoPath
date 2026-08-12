@@ -7243,6 +7243,20 @@ function App() {
               </button>
             </nav>
             {compactExecuteView === "schedule" && (
+              <>
+              {(() => {
+                const date = new Date(`${timelineWindowAnchorDate}T00:00:00`);
+                return <div className="df-compact-date-display" aria-label={formatDateTitle(lang, date.getFullYear(), date.getMonth() + 1, date.getDate())}>
+                {timelineView === "month" ? (
+                  <strong>{monthTitle(lang, date.getFullYear(), date.getMonth() + 1)}</strong>
+                ) : (
+                  (() => {
+                  const weekdays = lang === "zh" ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                  return <><strong>{date.getDate()}</strong><span>{weekdays[date.getDay()]}</span></>;
+                  })()
+                )}
+              </div>;
+              })()}
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg></button>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6.5 3 5 5-5 5" /></svg></button>
@@ -7261,6 +7275,7 @@ function App() {
                   </div>}
                 </div>
               </nav>
+              </>
             )}
           </div>
           <CandidatePanelShell
@@ -7394,6 +7409,13 @@ function App() {
                     </span>}
                   </span>
                 )}
+                {compactLayout && <button
+                  type="button"
+                  className="df-candidate-quick-add-top"
+                  aria-label={lang === "zh" ? "快速添加任务" : "Quick add task"}
+                  title={lang === "zh" ? "添加任务" : "Add task"}
+                  onClick={() => setQuickAddOpen(true)}
+                ><span aria-hidden="true">+</span></button>}
               </>
             }
             />
@@ -8001,7 +8023,7 @@ function App() {
                                 {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
                               </div>
                               {dragCreate && (
-                                <div className="drag-create-preview" style={{
+                                <div className="drag-create-preview df-task-block df-task-block--scheduled df-time-block-quick-add" style={{
                                   position: "absolute", zIndex: 99998, borderRadius: "12px",
                                   overflow: "visible",
                                   top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
@@ -8433,7 +8455,7 @@ function App() {
                           );
                         })}
                         {dragCreate && (
-                          <div className="drag-create-preview" style={{
+                          <div className="drag-create-preview df-task-block df-task-block--scheduled df-time-block-quick-add" style={{
                             position: "absolute", zIndex: 99998, borderRadius: "12px",
                             overflow: "visible",
                             top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
@@ -9473,6 +9495,7 @@ function AllDayQuickAddPopover({ add, projects, onSave, onCancel, absolute }: { 
         style={{ position: pos, top, left, width, height: INPUT_H, zIndex: 999999 } as React.CSSProperties}
       >
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
+          enterKeyHint="done"
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
           placeholder={placeholder} />
         <button onClick={handleSave}
@@ -10657,6 +10680,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
       <div className="drag-create-quick-add-row">
         <span className="drag-create-quick-add-check" aria-hidden="true" />
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
+          enterKeyHint="done"
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") onCancel(); }}
           placeholder={compact ? "任务名" : "输入任务名，#选择项目"}
         />
