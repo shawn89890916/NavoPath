@@ -11325,7 +11325,7 @@ function EditDrawer(props: {
     function handleUncomplete() {
       if (!props.task || !props.data || !props.saveData) return;
       if (props.editingRecordId) {
-        // Update the specific timeline record, not the task
+        const restore = recordStatus === "returned_unfinished";
         const now = new Date().toISOString();
         void props.saveData({
           ...props.data,
@@ -11335,9 +11335,9 @@ function EditDrawer(props: {
                   ...t,
                   completed: false,
                   plannedForDate: props.task!.plannedForDate || props.today,
-                  executionLane: "candidate",
+                  executionLane: restore ? undefined : "candidate",
                   timelineRecords: (t.timelineRecords || []).map((r) =>
-                    r.id === props.editingRecordId ? { ...r, executionStatus: "returned_unfinished" as const } : r
+                    r.id === props.editingRecordId ? { ...r, executionStatus: restore ? "scheduled" as const : "returned_unfinished" as const } : r
                   ),
                   updatedAt: now,
                 }
@@ -11345,14 +11345,14 @@ function EditDrawer(props: {
           ),
         });
       } else {
-        // Legacy: no specific record, update the task directly
+        const restore = props.task.executionStatus === "returned_unfinished";
         props.onTaskUpdate(props.task.id, {
           completed: false,
           plannedForDate: props.task.plannedForDate || props.today,
-          executionLane: "candidate",
+          executionLane: restore ? undefined : "candidate",
+          executionStatus: restore ? "scheduled" : "returned_unfinished",
         });
       }
-      if (props.setEditingRecordId) props.setEditingRecordId(undefined);
     }
     const statusText = props.task.completed
       ? t(props.lang, "drawer.completed")
@@ -11374,7 +11374,7 @@ function EditDrawer(props: {
       return (
         <>
           {dialog.host}
-          <Suspense fallback={null}><MobileTaskSummary lang={props.lang} task={props.task} form={f} setForm={props.setForm} projects={props.projects} record={activeRecord} occurrence={activeOccurrence} today={props.today} onClose={props.onClose} onMore={props.onShowMore} onUpdate={props.onTaskUpdate} onDone={props.onToggleDone} onReturn={handleUncomplete} /></Suspense>
+          <Suspense fallback={null}><MobileTaskSummary lang={props.lang} task={props.task} form={f} setForm={props.setForm} projects={props.projects} record={activeRecord} occurrence={activeOccurrence} today={props.today} onClose={props.onClose} onMore={props.onShowMore} onUpdate={props.onTaskUpdate} onDone={props.onToggleDone} onReturn={handleUncomplete} unfinished={recordStatus === "returned_unfinished" || props.task.executionStatus === "returned_unfinished"} /></Suspense>
         </>
       );
     }
