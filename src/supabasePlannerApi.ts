@@ -84,7 +84,10 @@ function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-const CLOUD_REQUEST_TIMEOUT_MS = 5_000;
+// Mobile Safari can take several seconds to establish a fresh cross-origin
+// connection to Supabase. Keep the request bounded, but leave enough room for
+// a real profile payload to finish on a slow mobile route.
+const CLOUD_REQUEST_TIMEOUT_MS = 15_000;
 
 function emailConfirmationRedirectUrl() {
   return new URL("/app?auth_callback=1", window.location.origin).toString();
@@ -100,6 +103,7 @@ function clearAuthCallbackUrl() {
 
 export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: string): PlannerApi {
   const desktopStorage = window.desktopApi?.authStorage;
+  const authStorageKey = `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
@@ -380,9 +384,18 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     },
 
     signOut: async () => {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) throw new Error(error.message);
+      try {
+        await supabase.auth.stopAutoRefresh();
+      } catch {
+        // Session removal below is the authoritative local sign-out step.
+      }
+      const storage = desktopStorage ?? window.localStorage;
+      await storage.removeItem(authStorageKey);
+      await storage.removeItem(`${authStorageKey}-code-verifier`);
       setCachedUser(null);
+      // With storage already cleared this normally stays local. Ignore a late
+      // network error because the user's session is already removed here.
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
     },
 
     deleteAccount: async () => {

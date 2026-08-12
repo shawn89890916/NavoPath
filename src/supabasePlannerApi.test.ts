@@ -85,22 +85,29 @@ describe("createSupabasePlannerApi", () => {
     });
   });
 
-  it("preserves the cached session when local sign-out fails", async () => {
+  it("clears the local session even when the sign-out request fails offline", async () => {
     const user = { id: "user_1", email: "user@example.com" };
+    const removeItem = vi.fn().mockResolvedValue(undefined);
     createClientMock.mockReturnValue({
       auth: {
         getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
         onAuthStateChange: vi.fn(),
+        stopAutoRefresh: vi.fn().mockResolvedValue(undefined),
         signOut: vi.fn().mockResolvedValue({ error: { message: "Offline" } }),
       },
     });
+    window.desktopApi = {
+      authStorage: { getItem: vi.fn(), setItem: vi.fn(), removeItem },
+    } as any;
 
     const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
     const api = createSupabasePlannerApi("https://supabase.test", "anon");
     await expect(api.getAuthState?.()).resolves.toEqual(expect.objectContaining({ user }));
 
-    await expect(api.signOut?.()).rejects.toThrow("Offline");
-    await expect(api.getAuthState?.()).resolves.toEqual(expect.objectContaining({ user }));
+    await expect(api.signOut?.()).resolves.toBeUndefined();
+    expect(removeItem).toHaveBeenCalledWith("sb-supabase-auth-token");
+    expect(removeItem).toHaveBeenCalledWith("sb-supabase-auth-token-code-verifier");
+    await expect(api.getAuthState?.()).resolves.toEqual(expect.objectContaining({ user: null }));
   });
 
   it("does not let the initial session lookup overwrite a completed sign-in", async () => {
