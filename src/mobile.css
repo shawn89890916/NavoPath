@@ -1039,21 +1039,22 @@
   }
 
   #root .df-app .drag-create-preview {
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
-    overflow: visible !important;
-    background: color-mix(in srgb, var(--accent-active) 4%, var(--bg-surface)) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-left: 2px solid var(--accent-active) !important;
-    box-shadow: none !important;
+    border-radius: var(--task-radius) !important;
+    background: var(--task-bg) !important;
+    border: 1px solid var(--task-border) !important;
+    border-left: var(--task-project-accent-size) solid var(--accent-active) !important;
   }
 
   #root .df-app .drag-create-quick-add {
     overflow: visible !important;
+    padding-left: 34px !important;
     background: transparent !important;
-    color: var(--text-main) !important;
   }
 
   #root .df-app .drag-create-quick-add input {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
     color: var(--text-main) !important;
     caret-color: var(--accent-active) !important;
   }
@@ -1065,10 +1066,10 @@
   #root .df-app .df-time-block .df-block-check,
   #root .df-app .df-time-block .df-task-block-check,
   #root .df-app .drag-create-quick-add-check {
-    width: 18px !important;
-    min-width: 18px !important;
-    height: 18px !important;
-    min-height: 18px !important;
+    width: 22px !important;
+    min-width: 22px !important;
+    height: 22px !important;
+    min-height: 22px !important;
     border-width: 1.5px !important;
   }
 
@@ -1087,21 +1088,10 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  #root .df-app .df-time-block .df-resize-dot,
-  #root .df-app .df-event-blocks-layer .df-time-block .df-resize-dot,
-  #root .df-app .df-week-view .df-time-block.df-time-block-week .df-resize-dot {
-    position: absolute !important;
+  #root .df-app .df-time-block .df-resize-dot {
     width: 44px !important;
-    min-width: 44px !important;
-    max-width: 44px !important;
     height: 44px !important;
-    min-height: 44px !important;
-    margin: 0 !important;
-    padding: 0 !important;
     transform: none !important;
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
     opacity: 0 !important;
     z-index: 12 !important;
     touch-action: none !important;
@@ -1179,16 +1169,6 @@
     display: none !important;
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    #root .df-app .df-time-block.show-resize-hint .df-resize-dot::before {
-      animation: df-resize-hint-pulse 900ms ease-out 2;
-    }
-  }
-}
-
-@keyframes df-resize-hint-pulse {
-  0% { box-shadow: 0 0 0 2px var(--surface-main), 0 0 0 2px color-mix(in srgb, var(--accent-active) 38%, transparent); }
-  100% { box-shadow: 0 0 0 2px var(--surface-main), 0 0 0 10px transparent; }
 }
 
 @media (max-width: 1180px) and (orientation: landscape) {

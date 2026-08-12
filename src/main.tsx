@@ -41,7 +41,7 @@ import {
   resizedBlockTop,
   type TimelineViewMode,
 } from "./timelineGeometry";
-import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, formatDateTitle, monthTitle, weekdayName } from "./i18n";
+import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, monthTitle, weekdayName } from "./i18n";
 import { migrateLegacyHabitTracker, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, updateHabit, archiveHabit, buildHabitMetrics, isHabitDueOnDate, weekdayLabels, type HabitMetrics } from "./utils/habits";
 import { shouldShowHabitCandidates } from "./utils/habitCandidateVisibility";
 import { localIsoDate } from "./utils/localDate";
@@ -7246,14 +7246,11 @@ function App() {
               <>
               {(() => {
                 const date = new Date(`${timelineWindowAnchorDate}T00:00:00`);
-                return <div className="df-compact-date-display" aria-label={formatDateTitle(lang, date.getFullYear(), date.getMonth() + 1, date.getDate())}>
+                return <div className="df-compact-date-display">
                 {timelineView === "month" ? (
                   <strong>{monthTitle(lang, date.getFullYear(), date.getMonth() + 1)}</strong>
                 ) : (
-                  (() => {
-                  const weekdays = lang === "zh" ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                  return <><strong>{date.getDate()}</strong><span>{weekdays[date.getDay()]}</span></>;
-                  })()
+                  <><strong>{date.getDate()}</strong><span>{weekdayName(lang, date.getDay()).replace(/^周/, "")}</span></>
                 )}
               </div>;
               })()}
