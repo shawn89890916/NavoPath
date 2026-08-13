@@ -25,7 +25,7 @@ export const defaultSettings: Settings = {
   metricsCompletionFilter: "all",
   aiDockOpen: false,
   appTitle: "NavoPath",
-  model: "deepseek-ai/DeepSeek-V3.2",
+  model: "deepseek-ai/DeepSeek-V4-Flash",
   reasoningMode: "instant",
   baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
   hasApiKey: false,
@@ -252,7 +252,7 @@ export function normalizeSettings(value: unknown): Settings {
   if (
     stored.model === "deepseek-v4-flash"
     || stored.model === "deepseek-chat"
-    || (typeof stored.model === "string" && /^deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(stored.model))
+    || (typeof stored.model === "string" && /^(?:deepseek-ai\/DeepSeek-(?:V3\.2|R1)|Qwen\/Qwen3\.5-|zai-org\/GLM-4\.6|moonshotai\/Kimi-K2\.7$|MiniMaxAI\/MiniMax-M3)/i.test(stored.model))
   ) {
     stored.model = defaults.model;
   }

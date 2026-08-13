@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import type { AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
-import { callAiAssistant, type AiAction, type AiStep } from "./aiAssistantApi";
+import { callAiAssistant, FALLBACK_AI_MODELS, type AiAction, type AiStep } from "./aiAssistantApi";
 import {
   buildAiContext,
   compactText,
@@ -7487,13 +7487,6 @@ function App() {
                     </span>}
                   </span>
                 )}
-                {compactLayout && <button
-                  type="button"
-                  className="df-candidate-quick-add-top"
-                  aria-label={lang === "zh" ? "快速添加任务" : "Quick add task"}
-                  title={lang === "zh" ? "添加任务" : "Add task"}
-                  onClick={() => setQuickAddOpen(true)}
-                ><span aria-hidden="true">+</span></button>}
               </>
             }
             />
@@ -8559,9 +8552,9 @@ function App() {
 
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
-          <button className="df-mobile-dock-action df-mobile-add" onClick={() => setQuickAddOpen((open) => !open)} aria-label={t(lang, "fab.add")}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
+          {!settings.hideAi ? <button className="df-mobile-dock-action df-mobile-ai" onClick={() => { setQuickAddOpen(false); setAiOpen(true); }} aria-label={t(lang, "fab.askNavo")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14v10H9l-4 3v-13Z"/><path d="M9 10.5h6"/></svg>
+          </button> : <span className="df-mobile-dock-spacer" aria-hidden="true" />}
           <div className="df-mobile-mode-switch">
             <button className={mode === "execute" ? "active" : ""} onClick={() => changeMode("execute")}>{t(lang, "header.execute")}</button>
             <button className={mode === "planning" ? "active" : ""} onClick={() => changeMode("planning")}>{t(lang, "header.planning")}</button>
@@ -8572,8 +8565,15 @@ function App() {
         </nav>
       )}
 
-      <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />
-      {!settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
+      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />}
+      {!compactLayout && !settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
+      {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && <button
+        type="button"
+        className="df-mobile-quick-add-fab"
+        aria-label={lang === "zh" ? "快速添加任务" : "Quick add task"}
+        title={lang === "zh" ? "快速添加任务" : "Quick add task"}
+        onClick={() => { if (mode !== "execute") changeMode("execute"); setQuickAddOpen(true); }}
+      ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>}
 
       {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
@@ -13264,7 +13264,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               </div>
             </SettingSection>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "ai" && <SettingSection title="Navo AI" description={lang === "zh" ? "模型由服务端网关自动路由；本地估时、分类与排程在 AI 不可用时仍可工作。" : "Models are routed by the server gateway; local estimation, classification, and scheduling still work when AI is unavailable."}>
-              <SettingRow anchor="ai-model" title={lang === "zh" ? "高级模型偏好" : "Advanced model preference"} control={<input className="df-settings-input df-utility-input" value={settings.model} aria-label={lang === "zh" ? "高级模型偏好" : "Advanced model preference"} readOnly />} />
+              <SettingRow anchor="ai-model" title={lang === "zh" ? "高级模型偏好" : "Advanced model preference"} control={<SettingSelect value={settings.model} ariaLabel={lang === "zh" ? "高级模型偏好" : "Advanced model preference"} onChange={(model) => onSave({ model, reasoningMode: "instant" })} options={FALLBACK_AI_MODELS.map((model) => ({ value: model, label: model.split("/").pop() || model }))} />} />
               <SettingRow anchor="ai-reasoning" title={lang === "zh" ? "思考模式" : "Reasoning mode"} control={<SettingSelect value={settings.reasoningMode || "instant"} ariaLabel={lang === "zh" ? "思考模式" : "Reasoning mode"} onChange={(value) => onSave({ reasoningMode: value as Settings["reasoningMode"] })} options={[
                 { value: "instant", label: lang === "zh" ? "即时" : "Instant" },
                 ...reasoningModesForModel(settings.model).filter((mode) => mode === "high" || mode === "xhigh").map((mode) => ({ value: mode, label: mode === "xhigh" ? "Xhigh" : "High" })),

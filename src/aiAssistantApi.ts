@@ -98,12 +98,35 @@ function uid(prefix: string) {
 }
 
 let cachedClient: SupabaseClient | null = null;
+
+export function aiGatewayUrl(inputUrl: string, pageUrl: string, supabaseUrl: string): string {
+  const requestUrl = new URL(inputUrl);
+  const page = new URL(pageUrl);
+  const useSameOriginProxy = page.protocol === "https:"
+    && (page.hostname === "navopath.com" || page.hostname.endsWith(".navopath-xiaoyang.pages.dev"));
+  if (!useSameOriginProxy || requestUrl.origin !== new URL(supabaseUrl).origin) return requestUrl.href;
+  requestUrl.protocol = page.protocol;
+  requestUrl.host = page.host;
+  requestUrl.pathname = `/api/supabase${requestUrl.pathname}`;
+  return requestUrl.href;
+}
+
 function getClient(): SupabaseClient | null {
   if (cachedClient) return cachedClient;
   const url = (import.meta as any).env?.VITE_SUPABASE_URL;
   const key = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  cachedClient = createClient(url, key);
+  const nativeFetch = globalThis.fetch.bind(globalThis);
+  cachedClient = createClient(url, key, {
+    global: {
+      fetch: (input, init) => {
+        const inputUrl = input instanceof Request ? input.url : input.toString();
+        const rewritten = aiGatewayUrl(inputUrl, window.location.href, url);
+        const request = input instanceof Request ? new Request(rewritten, input) : rewritten;
+        return nativeFetch(request, init);
+      },
+    },
+  });
   return cachedClient;
 }
 
@@ -211,17 +234,15 @@ export async function getAiHealth(): Promise<AiHealthResponse> {
 }
 
 export const FALLBACK_AI_MODELS = [
-  "deepseek-ai/DeepSeek-V3.2",
-  "deepseek-ai/DeepSeek-R1",
+  "deepseek-ai/DeepSeek-V4-Flash",
+  "deepseek-ai/DeepSeek-V4-Pro",
   "Qwen/Qwen3.6-35B-A3B",
   "Qwen/Qwen3.6-27B",
-  "Qwen/Qwen3.5-35B-A3B",
-  "Qwen/Qwen3.5-122B-A10B",
-  "Qwen/Qwen3.5-397B-A17B",
   "zai-org/GLM-5.2",
-  "zai-org/GLM-4.6",
-  "moonshotai/Kimi-K2.7",
-  "MiniMaxAI/MiniMax-M3",
+  "moonshotai/Kimi-K2.7-Code",
+  "meituan-longcat/LongCat-2.0",
+  "nex-agi/Nex-N2-Pro",
+  "MiniMaxAI/MiniMax-M2.5",
 ] as const;
 
 export async function listAiModels(): Promise<string[]> {

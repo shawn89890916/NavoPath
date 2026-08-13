@@ -46,4 +46,28 @@ describe("Supabase same-origin proxy", () => {
     expect(response.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("forwards only the NavoPath AI edge function", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: true, reply: "OK" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest({
+      request: new Request("https://navopath.com/api/supabase/functions/v1/ai-assistant", {
+        method: "POST",
+        headers: { Authorization: "Bearer test-token", apikey: "test-anon-key" },
+        body: JSON.stringify({ mode: "chat", message: "hello" }),
+      }),
+      params: { path: ["functions", "v1", "ai-assistant"] },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock.mock.calls[0][0].toString()).toBe("https://qplymrkgsnaaamxggwxw.supabase.co/functions/v1/ai-assistant");
+
+    const rejected = await onRequest({
+      request: new Request("https://navopath.com/api/supabase/functions/v1/other", { method: "POST" }),
+      params: { path: ["functions", "v1", "other"] },
+    });
+    expect(rejected.status).toBe(404);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

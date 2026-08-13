@@ -39,6 +39,17 @@ function providerUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/$/, "")}/chat/completions`;
 }
 
+export function reasoningParameters(provider: AiProviderConfig, reasoningMode: "instant" | "high" | "xhigh" = "instant") {
+  if (!provider.supportsReasoning) return {};
+  if (provider.name === "siliconflow") {
+    if (reasoningMode === "instant") return { enable_thinking: false };
+    return /DeepSeek-V4-Flash$/i.test(provider.model)
+      ? { enable_thinking: true, reasoning_effort: reasoningMode === "xhigh" ? "max" : "high" }
+      : { enable_thinking: true };
+  }
+  return reasoningMode === "instant" ? {} : { reasoning_effort: reasoningMode };
+}
+
 export async function callAiGateway(params: {
   providers: AiProviderConfig[];
   messages: GatewayMessage[];
@@ -72,9 +83,7 @@ export async function callAiGateway(params: {
           messages: params.messages,
           max_tokens: params.maxTokens,
           stream: false,
-          ...(provider.supportsReasoning && params.reasoningMode && params.reasoningMode !== "instant"
-            ? { reasoning_effort: params.reasoningMode }
-            : {}),
+          ...reasoningParameters(provider, params.reasoningMode),
         }),
         signal: controller.signal,
       });

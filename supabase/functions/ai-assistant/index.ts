@@ -29,31 +29,22 @@ const corsHeaders = {
   "Content-Type": "application/json; charset=utf-8",
 };
 
-const STABLE_MODEL = "deepseek-ai/DeepSeek-V3.2";
-const AI_GATEWAY_VERSION = "2026-07-13.1";
+const STABLE_MODEL = "deepseek-ai/DeepSeek-V4-Flash";
+const AI_GATEWAY_VERSION = "2026-08-13.1";
 const FALLBACK_MODELS = [
   STABLE_MODEL,
-  "deepseek-ai/DeepSeek-R1",
+  "deepseek-ai/DeepSeek-V4-Pro",
   "Qwen/Qwen3.6-35B-A3B",
   "Qwen/Qwen3.6-27B",
-  "Qwen/Qwen3.5-35B-A3B",
-  "Qwen/Qwen3.5-122B-A10B",
-  "Qwen/Qwen3.5-397B-A17B",
-  "zai-org/GLM-4.6",
   "zai-org/GLM-5.2",
-  "moonshotai/Kimi-K2.7",
   "moonshotai/Kimi-K2.7-Code",
-  "MiniMaxAI/MiniMax-M3",
+  "meituan-longcat/LongCat-2.0",
+  "nex-agi/Nex-N2-Pro",
   "MiniMaxAI/MiniMax-M2.5",
-  "stepfun-ai/Step-3.5-Flash",
-  "nexway/Nex-N2-Pro",
-  "inclusionAI/Ling-flash-2.0",
 ];
 
 function resolveModel(model: string): string {
-  // These models currently exceed the Edge Function request window on
-  // SiliconFlow. Keep accepting saved settings while routing them safely.
-  return /deepseek-ai\/DeepSeek-V4-(?:Flash|Pro)$/i.test(model) ? STABLE_MODEL : model;
+  return FALLBACK_MODELS.includes(model) ? model : STABLE_MODEL;
 }
 
 function getTomorrow(dateStr: string): string {
@@ -306,7 +297,7 @@ serve(async (req: Request) => {
     const selectedModel = typeof model === "string" && /^[A-Za-z0-9._/-]{2,160}$/.test(model)
       ? model
       : Deno.env.get("SILICONFLOW_MODEL") || STABLE_MODEL;
-    const supportedReasoning = /DeepSeek-V4-Pro|Qwen3\.5-(?:122B|397B)|GLM-5\.2|Kimi-K2\.7|MiniMax-M3/i.test(selectedModel);
+    const supportedReasoning = /DeepSeek-V4-(?:Flash|Pro)|Qwen3\.6|GLM-5\.2|Kimi-K2\.7-Code|LongCat-2\.0|Nex-N2-Pro|MiniMax-M2\.5/i.test(selectedModel);
     const selectedReasoning = supportedReasoning && (reasoningMode === "high" || reasoningMode === "xhigh") ? reasoningMode : "instant";
 
     const timezone = (context?.timezone as string) || "Asia/Shanghai";

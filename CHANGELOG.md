@@ -6,6 +6,8 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
+- 重构竖屏手机端的主要入口：底栏左侧“+”改为简约的 Navo AI 对话入口，右下角新增始终易于触达的悬浮“+”用于快速添加任务，并移除 Tasks 顶部重复的添加按钮。AI 对话和设置现在都使用与任务详情一致的非全屏底部窗口，保留顶部退出空间、拖动提示与明确关闭按钮；设置页改用搜索加分类的紧凑布局、分组列表、iOS 尺寸开关和更接近系统原生的触控按钮，同时继续跟随当前活动主题色。
+- 修复生产站 AI 请求仍直连 Supabase、在部分移动网络或 Safari 上无法使用的问题；AI 现在与登录和工作区请求一样通过 NavoPath 同域安全中转，并按供应商协议正确切换即时与深度思考模式。模型目录同步到当前可用的新一代模型，默认升级为 DeepSeek V4 Flash，旧模型偏好会自动迁移，设置中可直接选择新模型。
 - 竖屏手机版网页固定按设备宽度显示，输入任务时不再触发页面缩放；点按或拖拽时间轴后，新增输入栏与正式任务块共用一致的纸面背景、圆角和边线，并进一步放大任务勾选框，不再因样式割裂或键盘、页面滚动、视口变化影响操作。手机键盘的完成键和收起键盘产生的失焦现在都会把临时输入块完整转换为正式任务块，恢复拖动、缩放和点按编辑能力；输入井号后的项目列表支持独立触摸滚动，快速连续操作也会稳定生成任务。短按时间轴任务会先从底部展开紧凑栏；名称和归属现在可直接编辑，开始与结束时间使用原生滚轮式选择并严格限制为 15 分钟刻度，未完成状态可以再次点按取消。子任务直接显示在短栏底部并可勾选，最多完整露出三项，更多内容可独立滚动；短栏高度随内容灵活增长，点按 More 才展开铺满宽度的完整详情，关闭按钮固定在右上角。时间块移除挤在中间的横向缩放条，改为贴在边界交界处并略向内收的左上角开始点和右下角结束点；两处保留 44px 触控区域，新任务保存后会短暂显示角点及拖动提示。竖屏时间标尺进一步左移并紧贴时间文字，任务块横向铺满时间轴，顶栏日期放大，切换箭头变窄；候选页移除重复标题，将已完成、AI 排程和醒目的快速添加按钮集中到右上角，为列表与时间轴释放更多空间。
 - 竖屏手机版网页不再套用带外边距、边框和大圆角的模拟设备外壳，工作区与纸面背景现在贴合整个可用视口；底栏下移并压缩为更轻薄的安全区工具栏，同时减少时间轴底部预留，在窄屏上为主页面释放更多空间。
 - 共享工作区控件的旧紫色与荧光绿默认值已改为跟随当前活动主题，覆盖规划、快速添加、AI、撤销、任务树、排程反馈、计时器和专注模式；项目颜色缺失时也不再回退为荧光绿，暗色规划页侧栏会使用暗色纸面并恢复工具文字的清晰对比度。
@@ -42,6 +44,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
+- Fixed production AI requests still connecting directly to Supabase and failing on some mobile networks or Safari sessions. AI now uses the same secure NavoPath same-origin relay as authentication and workspace traffic, and switches instant versus deeper reasoning with the provider's supported protocol. The model catalog now contains the current generation, defaults to DeepSeek V4 Flash, automatically migrates retired preferences, and lets users select the new models in Settings.
 - Portrait mobile web views now stay fixed to the device width without zooming when task inputs focus. Tapping or dragging on the timeline opens an editor that shares the final block's paper background, radius, and borders, while task checkboxes are enlarged for touch; the editor no longer feels visually detached or shifts because of the keyboard, scrolling, or viewport changes. Both the mobile keyboard's Done key and the blur caused by dismissing the keyboard now fully convert the temporary editor into a real task block, restoring drag, resize, and tap-to-edit behavior; project suggestions after `#` support independent touch scrolling, and rapid consecutive actions reliably create the task. A short press on a timeline task first opens a compact bottom sheet. Its title and project are directly editable; start and end use native wheel-style controls restricted to exact 15-minute increments; and Unfinished can be tapped again to cancel. Subtasks appear directly at the bottom with working checkboxes, show up to three complete rows, and scroll independently when more exist; the sheet grows with its content, while More expands the full-width detail sheet and its close button stays fixed at the upper right. Timeline blocks replace the crowded centered resize bars with top-left start and bottom-right end points that sit on the block boundaries and tuck slightly inward; both retain 44px touch targets and briefly show drag hints after save. The portrait ruler now hugs the time labels, blocks fill the timeline width, the top-bar date is larger, and navigation arrows use less width. The candidate view removes its repeated heading and groups Done, AI scheduling, and a prominent quick-add button at the top right to free more room for content.
 - Portrait mobile web views no longer use a simulated device shell with outer margins, borders, or oversized corners. The workspace and paper background now fill the available viewport; the dock sits lower as a slimmer safe-area toolbar, with less timeline space reserved beneath it so the main page gains more room on narrow screens.
 - Retired purple and fluorescent-lime defaults across shared workspace controls now follow the active theme, including Planning, quick add, AI, undo, task-tree, scheduling feedback, timer, and focus states. Missing project colors no longer revert to lime, and the Planning sidebar uses the dark paper surface in dark mode with clear tool contrast.
@@ -73,6 +76,17 @@
 ### Improved
 - Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
+
+## 2026-08-13 · AI 服务与模型更新
+
+### 修复
+- AI 请求改为通过 NavoPath 同域安全中转，并按供应商协议正确切换即时与深度思考模式，修复部分移动网络或 Safari 上 AI 无法使用的问题。模型目录同步到当前新一代模型，默认升级为 DeepSeek V4 Flash，旧模型偏好自动迁移，设置中可直接选择新模型。
+
+## 2026-08-13 · AI service and model update
+
+### Fixed
+- Reworked portrait mobile entry points: the Dock's left-side plus is now a focused Navo AI chat entry, a reachable lower-right floating plus handles quick task capture, and the duplicate Tasks-header add button is gone. AI chat and Settings now use the same non-fullscreen bottom-sheet geometry as task details, with visible exit space, a grab cue, and an explicit close control. Settings use a compact search-and-category layout, grouped lists, iOS-sized switches, and more system-like touch buttons while continuing to follow the active theme accent.
+- AI requests now use the secure NavoPath same-origin relay and the provider's supported instant/deep-reasoning protocol, fixing failures on some mobile networks and Safari sessions. The catalog now contains the current model generation, defaults to DeepSeek V4 Flash, migrates retired preferences automatically, and allows direct model selection in Settings.
 
 ## 2026-08-12 · 竖屏时间轴触摸交互
 

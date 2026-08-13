@@ -1,5 +1,5 @@
 const SUPABASE_ORIGIN = "https://qplymrkgsnaaamxggwxw.supabase.co";
-const ALLOWED_ROOTS = new Set(["auth", "rest"]);
+const ALLOWED_ROOTS = new Set(["auth", "rest", "functions"]);
 const ALLOWED_AUTH_ENDPOINTS = new Set(["token", "signup", "logout", "recover", "verify", "user", "resend"]);
 
 type FunctionContext = {
@@ -11,7 +11,8 @@ export async function onRequest({ request, params }: FunctionContext) {
   const segments = Array.isArray(params.path) ? params.path : [params.path || ""];
   if (!ALLOWED_ROOTS.has(segments[0])
     || segments[1] !== "v1"
-    || (segments[0] === "auth" && !ALLOWED_AUTH_ENDPOINTS.has(segments[2]))) {
+    || (segments[0] === "auth" && !ALLOWED_AUTH_ENDPOINTS.has(segments[2]))
+    || (segments[0] === "functions" && (segments.length !== 3 || segments[2] !== "ai-assistant"))) {
     return new Response("Not found", { status: 404 });
   }
 

@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { normalizeSettings } from "./defaultSettings";
 
 describe("plugin settings normalization", () => {
+  it("migrates retired AI models to the current default", () => {
+    expect(normalizeSettings({ model: "deepseek-ai/DeepSeek-V3.2" }).model).toBe("deepseek-ai/DeepSeek-V4-Flash");
+    expect(normalizeSettings({ model: "Qwen/Qwen3.5-397B-A17B" }).model).toBe("deepseek-ai/DeepSeek-V4-Flash");
+    expect(normalizeSettings({ model: "deepseek-ai/DeepSeek-V4-Pro" }).model).toBe("deepseek-ai/DeepSeek-V4-Pro");
+  });
+
   it("deduplicates and bounds enabled plugin ids", () => {
     const enabledPlugins = [
       "pomodoro",
