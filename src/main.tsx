@@ -1339,6 +1339,7 @@ function App() {
   const [allDayDragOver, setAllDayDragOver] = useState(false);
   const [allDayDragDate, setAllDayDragDate] = useState("");
   const [candidateDropActive, setCandidateDropActive] = useState(false);
+  const [candidatePlanningReturnActive, setCandidatePlanningReturnActive] = useState(false);
   const [candidateDropTarget, setCandidateDropTarget] = useState<CandidateDropTarget>(null);
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
@@ -4931,6 +4932,8 @@ function App() {
     if (event.button !== 0 && event.pointerType === "mouse") return;
     const initial = dragCreate;
     if (!initial) return;
+    const captureTarget = event.currentTarget;
+    try { captureTarget.setPointerCapture(event.pointerId); } catch { /* Pointer may already be captured. */ }
     dragCreateSuppressClickRef.current = true;
     const nativeEvent = event.nativeEvent;
     void import("./MobileTaskSummary").then(({ beginVerticalResize }) => beginVerticalResize(
@@ -4938,6 +4941,7 @@ function App() {
       timelineSlotHeight,
       (steps) => updateDragCreateRange(edge, (edge === "start" ? initial.startMinutes : initial.endMinutes) + steps * SLOT_MINUTES),
       () => window.setTimeout(() => { dragCreateSuppressClickRef.current = false; }, 80),
+      captureTarget,
     ));
   }
 
@@ -6453,6 +6457,7 @@ function App() {
       setAllDayDragOver(false);
       setAllDayDragDate("");
       setCandidateDropActive(false);
+      setCandidatePlanningReturnActive(false);
       setCandidateDropTarget(null);
       dragTargetDateRef.current = "";
       clearHold();
@@ -6460,6 +6465,19 @@ function App() {
       if (active) suppressClickAfterDrag();
     };
     const updateTarget = (pointerEvent: PointerEvent) => {
+      const returnToPlanning = compactLayout && source === "candidate" && pointerEvent.clientX <= 58;
+      setCandidatePlanningReturnActive(returnToPlanning);
+      if (returnToPlanning) {
+        candidateTarget = null;
+        setCandidateDropTarget(null);
+        setCandidateDropActive(false);
+        setAllDayDragOver(false);
+        setAllDayDragDate("");
+        dropTime = "";
+        setHoverSlot("");
+        dragTargetDateRef.current = "";
+        return;
+      }
       const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
       const candidateRow = source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
       if (candidateRow) {
@@ -6585,6 +6603,11 @@ function App() {
     const up = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
       if (active) {
+        if (source === "candidate" && compactLayout && pointerEvent.clientX <= 58) {
+          moveCandidateToPlanning(task.id);
+          cleanup();
+          return;
+        }
         const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
         const candidateRow = source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
         if (candidateRow || candidateTarget) {
@@ -7742,6 +7765,11 @@ function App() {
                 {lang === "zh" ? "松手后移回今日候选" : "Release to return to Today's Candidates"}
               </div>
             )}
+            {candidatePlanningReturnActive && (
+              <div className="df-candidate-planning-return-hint" role="status">
+                {lang === "zh" ? "松手移回规划" : "Release to return to Planning"}
+              </div>
+            )}
             {compactLayout && compactExecuteView === "tasks" && scheduleGuideOpen && visibleCandidates.length > 0 && (
               <aside className="df-schedule-drop-guide" aria-label={lang === "zh" ? "将任务拖入时间轴的提示" : "Drag tasks into the timeline hint"}>
                 <div className="df-schedule-drop-guide-source" aria-hidden="true">
@@ -7764,7 +7792,7 @@ function App() {
             {(dailyCapacityRisk.level !== "comfortable" || schedulePreviews.length > 0 || scheduleUnscheduled.length > 0) && (
               <div className="df-ai-plan-feedback" role="status">
                 {dailyCapacityRisk.level !== "comfortable" && <span className={`df-ai-capacity-inline ${dailyCapacityRisk.level}`}>{lang === "zh" ? `容量${dailyCapacityRisk.level === "high" ? "超载" : "偏紧"}：待安排 ${formatMinutes(dailyCapacityRisk.demandMinutes)}，剩余 ${formatMinutes(dailyCapacityRisk.availableMinutes)}` : `Capacity ${dailyCapacityRisk.level === "high" ? "overloaded" : "tight"}: ${formatMinutes(dailyCapacityRisk.demandMinutes)} to place, ${formatMinutes(dailyCapacityRisk.availableMinutes)} free`}</span>}
-                {schedulePreviews.length > 0 && <span className="df-ai-plan-summary">{t(lang, "timeline.previewPlan").replace("X", String(schedulePreviews.length))}</span>}
+                {schedulePreviews.length > 0 && <><span className="df-ai-plan-summary">{t(lang, "timeline.previewPlan").replace("X", String(schedulePreviews.length))}</span>{compactLayout && <div className="df-ai-plan-mobile-preview">{schedulePreviews.slice(0, 4).map((preview) => <button key={preview.id} type="button" onClick={() => { setCompactExecuteView("schedule"); setPendingTimelineFocus({ date: preview.scheduledDate, startTime: preview.scheduledStart, source: "autoschedule" }); }}><strong>{preview.title}</strong><small>{preview.scheduledDate} · {preview.scheduledStart}–{preview.scheduledEnd}</small></button>)}</div>}</>}
                 {scheduleUnscheduled.length > 0 && <details className="df-ai-plan-unscheduled">
                   <summary>{lang === "zh" ? `${scheduleUnscheduled.length} 项暂未安排` : `${scheduleUnscheduled.length} not scheduled`}</summary>
                   {scheduleUnscheduled.map((item) => <div key={item.taskId} className="df-ai-plan-unscheduled-item">
@@ -8278,7 +8306,11 @@ function App() {
                                   }
                                   const isPreview = previewIdByClonedId.has(task.id);
                                   return (
-                                    <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} onHover={setHoveredBlock} onEdit={() => {
+                                    <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} projectInteractive={!compactLayout} onHover={setHoveredBlock} onSelect={() => {
+                                      if (suppressBlockClickRef.current) return;
+                                      if (compactLayout) revealResizeHandles(resolveTimelineRecordId(task.id));
+                                      else openTaskEdit(task);
+                                    }} onEdit={() => {
                                       if (!suppressBlockClickRef.current) openTaskEdit(task);
                                     }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
@@ -8788,7 +8820,11 @@ function App() {
 
                           const isPreview = previewIdByClonedId.has(task.id);
                           return (
-                            <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} onHover={setHoveredBlock} onEdit={() => {
+                            <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} projectInteractive={!compactLayout} onHover={setHoveredBlock} onSelect={() => {
+                              if (suppressBlockClickRef.current) return;
+                              if (compactLayout) revealResizeHandles(resolveTimelineRecordId(task.id));
+                              else openTaskEdit(task);
+                            }} onEdit={() => {
                               if (!suppressBlockClickRef.current) openTaskEdit(task);
                             }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                               createProjectForTask(task.id, title);
@@ -8885,7 +8921,7 @@ function App() {
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
@@ -8947,6 +8983,7 @@ function App() {
             projects={projects}
             hovered={false}
             onHover={() => {}}
+            onSelect={() => {}}
             onEdit={() => {}}
             onToggleDone={() => {}}
             onTaskUpdate={() => {}}
@@ -11224,7 +11261,7 @@ function ReturnedToPlanIcon({ color }: { color?: string }) {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHint = false, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, resizeEdges, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, hourHeight = HOUR_HEIGHT, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; showResizeHint?: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.PointerEvent, edge: "start" | "end") => void; resizeEdges?: { start: boolean; end: boolean }; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; hourHeight?: number; dragState?: TaskBlockDragState }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHint = false, projectInteractive = true, onHover, onSelect, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, resizeEdges, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, hourHeight = HOUR_HEIGHT, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; showResizeHint?: boolean; projectInteractive?: boolean; onHover: (id: string) => void; onSelect: () => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.PointerEvent, edge: "start" | "end") => void; resizeEdges?: { start: boolean; end: boolean }; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; hourHeight?: number; dragState?: TaskBlockDragState }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
@@ -11256,12 +11293,12 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   const isEvent = isEventDisplayTask(task);
   const [badgeWidth, setBadgeWidth] = useState(0);
   useLayoutEffect(() => {
-    if (hovered && projectBtnRef.current) {
+    if (hovered && projectInteractive && projectBtnRef.current) {
       setBadgeWidth(projectBtnRef.current.offsetWidth);
     } else if (!hovered) {
       setBadgeWidth(0);
     }
-  }, [hovered]);
+  }, [hovered, projectInteractive]);
   const isPreview = Boolean(extraStyle && (extraStyle as Record<string, unknown>)["--df-preview" as string]);
   const currentRecordStatus =
     task.executionStatus ||
@@ -11291,7 +11328,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   return (
     <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
-    }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
+    }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
       {canResize && (showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
@@ -11318,11 +11355,11 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
           <button className="df-preview-action cancel" onClick={(e) => { e.stopPropagation(); onCancelPreview?.(); }} aria-label={t(lang, "timeBlock.cancel")} title={t(lang, "timeBlock.cancel")}>✕</button>
         </span>
       )}
-      {!isEvent && hovered && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-        <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => {
+      {!isEvent && (hovered || showResizeHint) && <span className="df-block-project-wrap" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+        {projectInteractive ? <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => {
           event.stopPropagation();
           setProjectOpen((open) => !open);
-        }}># {projectName}</button>
+        }}># {projectName}</button> : <span className="df-block-project" title={projectName}># {projectName}</span>}
       </span>}
       {canResize && (showResizeHint || preview) && resizeEdges?.end !== false && <button type="button" className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onPointerDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
@@ -12135,14 +12172,27 @@ function EditDrawer(props: {
   );
 }
 
-function MobileSheetDismissHandle({ onDismiss, lang }: { onDismiss: () => void; lang: Language }) {
+function MobileSheetDismissHandle({ onDismiss, onCollapse, onExpand, collapsed = false, lang }: { onDismiss: () => void; onCollapse?: () => void; onExpand?: () => void; collapsed?: boolean; lang: Language }) {
   const gestureRef = useRef<{ pointerId: number; startY: number; startedAt: number; panel: HTMLElement } | null>(null);
   const finishGesture = (event: React.PointerEvent<HTMLButtonElement>, cancelled = false) => {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     gestureRef.current = null;
-    const distance = Math.max(0, event.clientY - gesture.startY);
+    const signedDistance = event.clientY - gesture.startY;
+    const distance = Math.max(0, signedDistance);
     const velocity = distance / Math.max(1, performance.now() - gesture.startedAt);
+    if (!cancelled && collapsed && signedDistance <= -54 && onExpand) {
+      gesture.panel.classList.remove("is-sheet-dragging");
+      gesture.panel.style.setProperty("--mobile-sheet-drag-y", "0px");
+      onExpand();
+      return;
+    }
+    if (!cancelled && (distance >= 88 || velocity >= 0.62) && onCollapse && !collapsed) {
+      gesture.panel.classList.remove("is-sheet-dragging");
+      gesture.panel.style.setProperty("--mobile-sheet-drag-y", "0px");
+      onCollapse();
+      return;
+    }
     if (!cancelled && (distance >= 88 || velocity >= 0.62)) {
       gesture.panel.classList.remove("is-sheet-dragging");
       gesture.panel.classList.add("is-sheet-dismissing");
@@ -12168,28 +12218,27 @@ function MobileSheetDismissHandle({ onDismiss, lang }: { onDismiss: () => void; 
     onPointerMove={(event) => {
       const gesture = gestureRef.current;
       if (!gesture || gesture.pointerId !== event.pointerId) return;
-      const distance = Math.max(0, event.clientY - gesture.startY);
-      gesture.panel.style.setProperty("--mobile-sheet-drag-y", `${distance}px`);
+      const distance = event.clientY - gesture.startY;
+      gesture.panel.style.setProperty("--mobile-sheet-drag-y", `${collapsed ? Math.max(-70, distance) : Math.max(0, distance)}px`);
     }}
     onPointerUp={(event) => finishGesture(event)}
     onPointerCancel={(event) => finishGesture(event, true)}
   />;
 }
 
-function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
+function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void }) {
   const projects = projectList || [];
   const tasks = taskList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
+  const [mobileCollapsed, setMobileCollapsed] = useState(false);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !followLatestRef.current) return;
     body.scrollTo({ top: body.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, attachmentStatus]);
-  const contextLabel = lang === "zh"
-    ? `${contextDate} · ${historyCount} 条历史 · ${memoryCount} 条记忆`
-    : `${contextDate} · ${historyCount} history · ${memoryCount} memories`;
   const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
   const promptSuggestions = lang === "zh"
     ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天", "从今日候选里制定计划", "查看我的下一个时间任务", "你能帮我做什么？"]
@@ -12200,8 +12249,6 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     newChat: lang === "zh" ? "新对话" : "New",
     noChats: lang === "zh" ? "暂无对话" : "No conversations",
     untitled: lang === "zh" ? "未命名对话" : "Untitled",
-    emptyTitle: lang === "zh" ? "让计划变得清晰" : "Make the plan clear",
-    emptyBody: lang === "zh" ? "我会参考当前日程、项目、最近对话和已保存偏好来回答。描述任务、询问安排，或上传文件提取任务与事件。" : "I use your schedule, projects, recent chats, and saved preferences. Describe a task, ask for a plan, or upload a file.",
     parsed: lang === "zh" ? "解析结果" : "Parsed results",
     selectAll: lang === "zh" ? "全选" : "All",
     selectNone: lang === "zh" ? "全不选" : "None",
@@ -12241,13 +12288,20 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     });
     setEditMenu(null);
   };
-  return <aside className="df-ai-panel df-ai-panel-reference">
-    <MobileSheetDismissHandle onDismiss={onClose} lang={lang} />
+  const acceptAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) onAttachment(file);
+    event.currentTarget.value = "";
+    setAttachmentMenuOpen(false);
+  };
+  return <aside className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}`}>
+    <MobileSheetDismissHandle onDismiss={onClose} onCollapse={() => setMobileCollapsed(true)} onExpand={() => setMobileCollapsed(false)} collapsed={mobileCollapsed} lang={lang} />
     <div className="df-ai-panel-head">
-      <button className="df-ai-new-chat" onClick={onNewConversation}><span aria-hidden="true">＋</span>{text.newChat}</button>
+      <label className="df-ai-mobile-model"><span className="df-visually-hidden">{lang === "zh" ? "选择模型" : "Choose model"}</span><select value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
       <div className="df-ai-head-actions">
-        <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}>↶</button>
-        <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"} />
+        <button className="df-ai-reference-tool new-chat" onClick={onNewConversation} aria-label={text.newChat} title={text.newChat}>□<i>／</i></button>
+        <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}>▤</button>
+        <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"}>⚙</button>
         <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}>×</button>
       </div>
     </div>
@@ -12377,7 +12431,13 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
       <div className="df-ai-composer-row">
         <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
-        <label className="df-ai-attach-btn" title={text.upload}>＋<input type="file" accept={ATTACHMENT_ACCEPT} onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttachment(file); event.currentTarget.value = ""; }} /></label>
+        <button type="button" className={`df-ai-attach-btn${attachmentMenuOpen ? " active" : ""}`} title={text.upload} aria-expanded={attachmentMenuOpen} onClick={() => setAttachmentMenuOpen((open) => !open)}>＋</button>
+        {attachmentMenuOpen && <div className="df-ai-attach-menu">{[
+          [lang === "zh" ? "相机" : "Camera", "image/*", "environment"],
+          [lang === "zh" ? "照片" : "Photos", "image/*", ""],
+          [lang === "zh" ? "文件" : "Files", ATTACHMENT_ACCEPT, ""],
+          [lang === "zh" ? "同步硬件" : "Sync hardware", ATTACHMENT_ACCEPT, ""],
+        ].map(([label, accept, capture]) => <label key={label}>{label}<input type="file" accept={accept} capture={capture === "environment" ? "environment" : undefined} onChange={acceptAttachment} /></label>)}</div>}
         <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")}>{busy ? "■" : "↑"}</button>
       </div>
       <small className="df-ai-reference-disclaimer">{lang === "zh" ? "AI 生成内容可能有误，请核对重要安排。" : "AI can make mistakes. Check important schedule changes."}</small>
@@ -13578,11 +13638,24 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
                 ["integrations", lang === "zh" ? "日历与集成" : "Calendar & Integrations", lang === "zh" ? "日历订阅、扩展、工具与远程连接" : "Calendar subscriptions, extensions, tools, and remote connections"],
                 ["recovery", lang === "zh" ? "恢复与重置" : "Recovery & Reset", lang === "zh" ? "恢复默认设置" : "Restore default settings"],
               ] as const).map(([detail, label, description]) => (
-                <button key={detail} type="button" className="df-settings-detail-link" onClick={() => navigateSettings({ category: "advanced", detail })}>
+                <button key={detail} type="button" className="df-settings-detail-link" data-settings-detail={detail} onClick={() => navigateSettings({ category: "advanced", detail })}>
                   <span><strong>{label}</strong><small>{description}</small></span>
                   <i aria-hidden="true">→</i>
                 </button>
               ))}
+              <div className="df-settings-mobile-advanced-tail">
+                <SettingRow
+                  title={lang === "zh" ? "重新开始新手指南" : "Restart onboarding guide"}
+                  description={lang === "zh" ? "重新触发首次使用引导流程。" : "Re-trigger the first-run onboarding flow."}
+                  control={<SettingActionButton onClick={() => onSave({ onboardingVersion: 1, onboardingStep: "add" })}>{lang === "zh" ? "重新开始" : "Restart"}</SettingActionButton>}
+                />
+                <SettingRow
+                  anchor="reset-settings-mobile"
+                  title={lang === "zh" ? "重置所有设置" : "Reset all settings"}
+                  description={lang === "zh" ? "恢复默认设置，不会删除任务和项目。" : "Restore defaults without deleting tasks or projects."}
+                  control={<SettingActionButton tone="danger" onClick={() => setConfirmResetSettings(true)}>{lang === "zh" ? "重置…" : "Reset…"}</SettingActionButton>}
+                />
+              </div>
             </SettingSection>}
 
             {settingsTarget.category === "advanced" && settingsTarget.detail === "widget" && <SettingSection

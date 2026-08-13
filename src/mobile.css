@@ -372,7 +372,7 @@
 
   #root .df-app.is-mobile-sheet-open .df-compact-execute-controls,
   #root .df-app.is-mobile-sheet-open .df-mobile-dock,
-  #root .df-app.is-mobile-sheet-open .df-mobile-quick-add-fab { filter: grayscale(.35) brightness(.72) !important; pointer-events:none!important; }
+  #root .df-app.is-mobile-sheet-open .df-mobile-quick-add-fab { filter:none!important; opacity:1!important; pointer-events:none!important; }
 
   #root .df-app.mode-execute .df-compact-date-picker-trigger {
     pointer-events: auto !important;
@@ -679,6 +679,12 @@
     color: var(--text-main);
     font: 650 11px/1 var(--paper-sans);
   }
+
+  #root .df-app .df-candidate-planning-return-hint{position:fixed!important;z-index:100004!important;left:8px!important;top:50%!important;width:112px!important;min-height:50px!important;display:grid!important;place-items:center!important;padding:8px!important;border:1px solid var(--accent-active)!important;border-radius:14px!important;background:var(--surface-raised)!important;color:var(--accent-active)!important;box-shadow:0 10px 26px color-mix(in srgb,var(--text-main) 16%,transparent)!important;font:750 11px/1.25 var(--paper-sans)!important;text-align:center!important;transform:translateY(-50%)!important}
+  #root .df-app .df-ai-plan-mobile-preview{display:grid!important;gap:4px!important;width:100%!important;margin-top:6px!important}
+  #root .df-app .df-ai-plan-mobile-preview button{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important;min-height:38px!important;padding:6px 8px!important;border:1px solid var(--paper-rule)!important;border-radius:8px!important;background:transparent!important;text-align:left!important}
+  #root .df-app .df-ai-plan-mobile-preview strong{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:11px!important}
+  #root .df-app .df-ai-plan-mobile-preview small{font:650 9px/1.2 var(--paper-mono)!important;color:var(--text-muted)!important;white-space:nowrap!important}
 
   #root .df-app .df-back-to-now {
     top: 66px !important;
@@ -1031,6 +1037,12 @@
     padding-top: 60px !important;
   }
 
+  #root .df-app.mode-planning .df-planning .df-project-tasks{padding-left:8px!important;margin-top:5px!important;gap:5px!important}
+  #root .df-app.mode-planning .df-planning .df-task-branch{margin-top:4px!important}
+  #root .df-app.mode-planning .df-planning .df-plan-task-node{width:100%!important;min-width:0!important;max-width:none!important}
+  #root .df-app.mode-planning .df-planning .df-task-node-inner{width:100%!important;min-width:0!important;padding:5px 2px 5px 6px!important;gap:4px!important}
+  #root .df-app.mode-planning .df-planning .df-task-node-actions{min-width:76px!important}
+
   #root .df-app.mode-planning .df-planning .df-planning-longrange-guide {
     display: grid !important;
     gap: 7px !important;
@@ -1292,6 +1304,21 @@
     transition: transform 180ms cubic-bezier(.22, .72, .2, 1) !important;
   }
 
+  #root .df-app .df-settings-detail-link[data-settings-detail="widget"],
+  #root .df-app .df-settings-detail-link[data-settings-detail="recovery"],
+  #root .df-app [data-settings-anchor="general-help"],
+  #root .df-app [data-settings-anchor="shortcuts"],
+  #root .df-app .df-settings-integration-tabs button:nth-child(2){display:none!important}
+  #root .df-app .df-settings-detail-link{border:0!important;border-bottom:1px solid var(--paper-rule)!important;border-radius:0!important;padding:13px 2px!important;background:transparent!important}
+  #root .df-app .df-settings-mobile-advanced-tail{display:block!important}
+
+  #root .df-app.mode-planning .df-planning .df-metrics-view{padding:54px 10px 28px!important}
+  #root .df-app.mode-planning .df-planning .df-metrics-header{position:fixed!important;z-index:30!important;top:4px!important;right:4px!important;width:44px!important;height:44px!important;padding:0!important;border:0!important}
+  #root .df-app.mode-planning .df-planning .df-metrics-toolbar{display:block!important}
+  #root .df-app.mode-planning .df-planning .df-metrics-toolbar .df-filter-trigger{width:44px!important;height:44px!important;border:0!important;background:transparent!important}
+  #root .df-app.mode-planning .df-planning .df-metrics-donut-wrap{min-height:340px!important;overflow:visible!important}
+  #root .df-app.mode-planning .df-planning .df-metrics-donut{width:min(470px,112vw)!important;max-width:none!important;transform:scale(1.08)!important;transform-origin:center!important}
+
   #root .df-app .df-mobile-sheet-dismiss-handle {
     display: block !important;
     position: absolute !important;
@@ -1336,6 +1363,13 @@
   #root .df-app .df-ai-panel-reference {
     display: flex !important;
     flex-direction: column !important;
+    inset: auto 0 0 !important;
+    height: min(82dvh, 720px) !important;
+    transition: height 220ms cubic-bezier(.22,.72,.2,1), transform 180ms cubic-bezier(.22,.72,.2,1) !important;
+  }
+
+  #root .df-app .df-ai-panel-reference.is-mobile-collapsed {
+    height: min(48dvh, 420px) !important;
   }
 
   #root .df-app .df-ai-panel-reference .df-ai-panel-head,
@@ -1359,6 +1393,25 @@
     box-shadow: none !important;
   }
 
+  #root .df-app .df-ai-panel-reference .df-ai-mobile-model {
+    min-width:0!important;
+    max-width:148px!important;
+  }
+
+  #root .df-app .df-ai-panel-reference .df-ai-mobile-model select {
+    width:100%!important;
+    min-height:38px!important;
+    padding:0 22px 0 8px!important;
+    border:0!important;
+    border-radius:10px!important;
+    background:transparent!important;
+    color:var(--text-main)!important;
+    font-weight:800!important;
+  }
+
+  #root .df-app .df-ai-panel-reference .df-ai-reference-tool{position:relative!important;font-size:22px!important;font-weight:500!important}
+  #root .df-app .df-ai-panel-reference .df-ai-reference-tool.new-chat i{position:absolute!important;right:10px!important;top:7px!important;font-style:normal!important;font-size:12px!important}
+
   #root .df-app .df-ai-panel-reference .df-ai-reference-tool:active,
   #root .df-app .df-utility-panel .df-utility-head .df-icon-action:active {
     background: var(--paper-note) !important;
@@ -1372,8 +1425,17 @@
   }
 
   #root .df-app .df-ai-panel-reference .df-ai-conversation-list {
-    flex: 0 1 auto !important;
-    max-height: 38dvh !important;
+    position:absolute!important;
+    z-index:18!important;
+    top:62px!important;
+    right:0!important;
+    bottom:0!important;
+    width:min(82vw,330px)!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    border-left:1px solid var(--paper-rule)!important;
+    background:var(--surface-raised)!important;
+    box-shadow:-14px 0 28px color-mix(in srgb,var(--text-main) 12%,transparent)!important;
   }
 
   #root .df-app .df-ai-panel-reference .df-ai-panel-foot {
@@ -1382,9 +1444,19 @@
   }
 
   #root .df-app .df-ai-panel-reference .df-ai-composer-row {
+    position:relative!important;
+    grid-template-columns:40px minmax(0,1fr) 40px!important;
     border-radius: 18px !important;
     box-shadow: 0 3px 10px color-mix(in srgb, var(--text-main) 12%, transparent) !important;
   }
+
+  #root .df-app .df-ai-panel-reference .df-ai-composer-row textarea{grid-column:1/-1!important;grid-row:1!important}
+  #root .df-app .df-ai-panel-reference .df-ai-attach-btn{grid-column:1!important;grid-row:2!important;width:34px!important;height:34px!important}
+  #root .df-app .df-ai-panel-reference .df-ai-send-btn{grid-column:3!important;grid-row:2!important;width:34px!important;height:34px!important}
+  #root .df-app .df-ai-panel-reference .df-ai-attach-menu{position:absolute!important;z-index:24!important;left:0!important;bottom:42px!important;display:grid!important;width:190px!important;padding:6px!important;border:1px solid var(--paper-rule)!important;border-radius:14px!important;background:var(--surface-raised)!important;box-shadow:0 12px 28px color-mix(in srgb,var(--text-main) 16%,transparent)!important}
+  #root .df-app .df-ai-panel-reference .df-ai-attach-menu label{display:flex!important;align-items:center!important;min-height:40px!important;padding:0 12px!important;text-align:left!important;cursor:pointer!important}
+  #root .df-app .df-ai-panel-reference .df-ai-attach-menu label:active{background:var(--paper-note)!important}
+  #root .df-app .df-ai-panel-reference .df-ai-attach-menu input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
 
   #root .df-app .df-utility-panel {
     display: flex !important;

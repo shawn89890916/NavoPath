@@ -6943,6 +6943,8 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   background: color-mix(in srgb, var(--accent-active) 8%, transparent);
 }
 
+.df-settings-mobile-advanced-tail{display:none}
+
 /* ===== Kanban ===== */
 .df-kanban-board {
   display: flex;

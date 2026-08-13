@@ -1654,7 +1654,6 @@ export default function PlanningView(props: {
    */
   const beginTreeDrag = useCallback((event: React.PointerEvent, node: TreeDragNode) => {
     if (event.button !== 0) return;
-    if (props.compact) return;
     const target = event.target as HTMLElement;
     if (target.closest("button,input,textarea,select,a,[contenteditable='true']")) return;
     const sourceNodeEl = target.closest<HTMLElement>("[data-node-type][data-node-id]");
@@ -1668,6 +1667,13 @@ export default function PlanningView(props: {
     const startX = event.clientX;
     const startY = event.clientY;
     let active = false;
+    let holdReady = !(props.compact && event.pointerType === "touch");
+    let holdCancelled = false;
+    const holdTimer = holdReady ? undefined : window.setTimeout(() => {
+      holdReady = true;
+      dragElement.classList.add("is-drag-armed");
+      window.navigator.vibrate?.(8);
+    }, 260);
 
     const cleanup = () => {
       window.removeEventListener("pointermove", move);
@@ -1675,7 +1681,8 @@ export default function PlanningView(props: {
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
       document.body.classList.remove("df-unified-dragging");
-      dragElement.classList.remove("is-dragging-source");
+      dragElement.classList.remove("is-dragging-source", "is-drag-armed");
+      if (holdTimer !== undefined) window.clearTimeout(holdTimer);
       setTreeDragNode(null);
       setTreeDropTarget(null);
       setPlanningDragTask(null);
@@ -1706,7 +1713,17 @@ export default function PlanningView(props: {
 
     const move = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) return;
-      if (!active && Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY) < DRAG_START_THRESHOLD_PX) return;
+      const distance = Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY);
+      if (!holdReady) {
+        if (distance >= 9) {
+          holdCancelled = true;
+          if (holdTimer !== undefined) window.clearTimeout(holdTimer);
+          dragElement.classList.remove("is-drag-armed");
+        }
+        return;
+      }
+      if (holdCancelled) return;
+      if (!active && distance < DRAG_START_THRESHOLD_PX) return;
       if (!active) {
         active = true;
         pointerEvent.preventDefault();
@@ -2727,7 +2744,6 @@ export default function PlanningView(props: {
             className={`df-tree${dragNode ? " is-tree-dragging" : ""}`}
             ref={treeRef}
             onPointerDown={(event) => {
-              if (props.compact) return;
               const origin = event.target as HTMLElement;
               if (origin.closest("button, input, textarea, select, [contenteditable='true']")) return;
               const node = origin.closest<HTMLElement>("[data-node-type][data-node-id]");

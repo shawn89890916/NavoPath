@@ -32,7 +32,7 @@
         "dist/assets/supabase-vendor-*.js",
         "dist/assets/supabasePlannerApi-*.js"
       ],
-      "limit": "235 KB"
+      "limit": "236 KB"
     },
     {
       "name": "Deferred app scripts",
@@ -42,7 +42,7 @@
           "dist/assets/WidgetApp-*.js",
           "dist/assets/MobileTaskSummary-*.js"
       ],
-      "limit": "37 KB"
+      "limit": "38 KB"
     },
     {
       "name": "Total app scripts",
@@ -56,7 +56,7 @@
           "dist/assets/WidgetApp-*.js",
           "dist/assets/MobileTaskSummary-*.js"
       ],
-      "limit": "272 KB"
+      "limit": "273 KB"
     },
     {
       "name": "Document parsing scripts",
@@ -69,7 +69,7 @@
     {
       "name": "Core styles",
       "path": "dist/assets/index-*.css",
-      "limit": "87 KB"
+      "limit": "88 KB"
     },
     {
       "name": "Deferred styles",

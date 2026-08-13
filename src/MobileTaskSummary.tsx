@@ -11,9 +11,11 @@ const sheetLabels = {
   en: { task: "New task", project: "New project", habit: "New habit", more: "More", close: "Close", choose: "Choose what to add" },
 } as const;
 
-export function beginVerticalResize(event: PointerEvent, stepHeight: number, onDelta: (steps: number) => void, onFinish: () => void) {
+export function beginVerticalResize(event: PointerEvent, stepHeight: number, onDelta: (steps: number) => void, onFinish: () => void, captureTarget?: Element | null) {
   const { pointerId, clientY } = event;
   document.body.classList.add("df-resizing");
+  const pointerTarget = captureTarget instanceof HTMLElement ? captureTarget : event.target instanceof HTMLElement ? event.target : null;
+  try { pointerTarget?.setPointerCapture(pointerId); } catch { /* Pointer may already be captured. */ }
   const apply = (next: PointerEvent) => {
     if (next.pointerId !== pointerId) return false;
     onDelta(Math.round((next.clientY - clientY) / stepHeight));
@@ -23,6 +25,7 @@ export function beginVerticalResize(event: PointerEvent, stepHeight: number, onD
   const finish = (next: PointerEvent) => {
     if (!apply(next)) return;
     document.body.classList.remove("df-resizing");
+    try { if (pointerTarget?.hasPointerCapture(pointerId)) pointerTarget.releasePointerCapture(pointerId); } catch { /* Pointer already released. */ }
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", finish);
     window.removeEventListener("pointercancel", finish);
@@ -209,9 +212,10 @@ export default function MobileTaskSummary(props: {
       <span aria-hidden="true">→</span>
       <label><span>{zh ? "结束" : "End"}</span><select aria-label={zh ? "结束时间" : "End time"} value={endTime} onChange={(event) => commitTime("end", event.target.value)}><option value="">--:--</option>{timeOptions.map((time) => <option key={time}>{time}</option>)}</select></label>
     </div>
-    <div className="df-mobile-summary-actions">
+    <div className="df-mobile-summary-actions df-mobile-summary-status-actions">
       <button type="button" className="df-mobile-add-subtask" onClick={() => setAddingSubtask(true)}>＋ {zh ? "添加子任务" : "Add subtask"}</button>
-      <button type="button" className={props.task.completed ? "active" : ""} onClick={() => props.onUpdate(props.task.id, { completed: !props.task.completed })}>{props.task.completed ? (zh ? "↩ 未完成" : "↩ Incomplete") : (zh ? "✓ 完成" : "✓ Complete")}</button>
+      <button type="button" aria-pressed={props.task.completed} className={props.task.completed ? "active" : ""} onClick={() => props.onUpdate(props.task.id, { completed: true })}>✓ {zh ? "完成" : "Complete"}</button>
+      <button type="button" aria-pressed={!props.task.completed} className={!props.task.completed ? "active" : ""} onClick={() => props.onUpdate(props.task.id, { completed: false })}>↩ {zh ? "未完成" : "Incomplete"}</button>
     </div>
     {addingSubtask && <form className="df-mobile-summary-subtask-add" onSubmit={(event) => { event.preventDefault(); addSubtask(); }}>
       <input autoFocus value={subtaskTitle} onChange={(event) => setSubtaskTitle(event.target.value)} placeholder={zh ? "输入子任务名称" : "Subtask title"} onKeyDown={(event) => { if (event.key === "Escape") { setAddingSubtask(false); setSubtaskTitle(""); } }} />

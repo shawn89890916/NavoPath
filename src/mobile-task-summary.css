@@ -18,6 +18,9 @@
   #root .df-app .df-mobile-summary-actions button.active{border-color:var(--accent-active)!important;background:color-mix(in srgb,var(--accent-active) 12%,var(--surface-main))!important}
   #root .df-app .df-mobile-summary-actions .df-mobile-add-subtask{color:var(--accent-active)!important;font-weight:750!important}
   #root .df-app .df-mobile-summary-actions .df-mobile-submit{border-color:var(--accent-active)!important;color:var(--accent-active)!important;font-weight:750!important}
+  #root .df-app .df-mobile-summary-status-actions{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  #root .df-app .df-mobile-summary-status-actions button{font-size:11px!important;white-space:nowrap!important}
+  #root .df-app .df-mobile-summary-status-actions button.active{box-shadow:inset 0 0 0 1px var(--accent-active)!important;color:var(--accent-active)!important;font-weight:800!important}
   #root .df-app .df-mobile-summary-subtask-add{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:7px!important;margin-top:8px!important}
   #root .df-app .df-mobile-summary-subtask-add input{min-width:0!important;height:42px!important;padding:0 11px!important;border:1px solid var(--paper-rule)!important;border-radius:10px!important;background:var(--surface-raised)!important;color:var(--text-main)!important;font-size:16px!important}
   #root .df-app .df-mobile-summary-subtask-add button{min-width:64px!important;height:42px!important;border:1px solid var(--accent-active)!important;border-radius:10px!important;background:var(--accent-active)!important;color:var(--surface-main)!important;font-weight:750!important}
