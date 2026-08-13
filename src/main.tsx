@@ -11144,6 +11144,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
       title={input}
       onTitleChange={handleInputChange}
       onClose={onCancel}
+      onSwipeDown={() => cleanTitle() ? handleSave() : onCancel()}
       onMore={() => handleSave(true)}
       onSubmit={() => handleSave()}
       projects={projects}

@@ -28487,8 +28487,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
   background: transparent;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
   touch-action: none;
   cursor: ns-resize;
   z-index: 4;
@@ -28499,18 +28504,25 @@ body:has(:active)::-webkit-scrollbar-thumb {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   transform: translate(-50%, -50%);
   border: 2px solid var(--accent-active);
   border-radius: 50%;
-  background: var(--bg-surface);
+  background: var(--surface-main);
   box-shadow:none;
   pointer-events: none;
 }
 
-.df-timeline-draft-handle.start { top: -22px; left: -4px; }
-.df-timeline-draft-handle.end { right: -4px; bottom: -22px; }
+.df-timeline-draft-handle.start { top: -22px; left: -10px; }
+.df-timeline-draft-handle.end { right: -10px; bottom: -22px; }
+
+#root .df-app .df-timeline-draft-handle:focus,
+#root .df-app .df-timeline-draft-handle:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
 
 .df-cloud-error-card h1 {
   margin: 0 0 12px;

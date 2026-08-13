@@ -38,7 +38,7 @@ export function MobileShortSheet(props: {
   title: string; titlePlaceholder?: string; titleLabel?: string; autoFocus?: boolean;
   onTitleChange: (title: string) => void; onTitleBlur?: (title: string) => void; onTitleEnter?: () => void;
   onKindChange?: (kind: MobileShortSheetKind) => void; onClose: () => void; onMore?: () => void;
-  moreDisabled?: boolean; className?: string; swipeDownToClose?: boolean; swipeUpForMore?: boolean; children?: ReactNode;
+  onSwipeDown?: () => void; moreDisabled?: boolean; className?: string; swipeDownToClose?: boolean; swipeUpForMore?: boolean; children?: ReactNode;
 }) {
   const locale = props.lang === "zh" ? sheetLabels.zh : sheetLabels.en;
   const kind = props.kind || "task";
@@ -50,14 +50,30 @@ export function MobileShortSheet(props: {
     const input = inputRef.current;
     const panel = input?.closest<HTMLElement>(".df-mobile-short-sheet");
     if (!input || !panel) return;
+    let frame = 0;
     const align = () => {
+      cancelAnimationFrame(frame);
+      panel.style.removeProperty("--mobile-keyboard-lift");
+      frame = requestAnimationFrame(() => {
       const viewport = window.visualViewport;
-      panel.style.setProperty("--mobile-keyboard-inset", `${Math.max(0, window.innerHeight - (viewport?.height || window.innerHeight) - (viewport?.offsetTop || 0))}px`);
-      input.scrollIntoView({ block: "center", behavior: "smooth" });
+        const visibleBottom = (viewport?.offsetTop || 0) + (viewport?.height || document.documentElement.clientHeight);
+        const lift = Math.max(0, input.getBoundingClientRect().bottom + 16 - visibleBottom);
+        panel.style.setProperty("--mobile-keyboard-lift", `${lift}px`);
+      });
     };
-    const frame = requestAnimationFrame(align);
+    align();
     window.visualViewport?.addEventListener("resize", align);
-    return () => { cancelAnimationFrame(frame); window.visualViewport?.removeEventListener("resize", align); };
+    window.visualViewport?.addEventListener("scroll", align);
+    window.addEventListener("resize", align);
+    input.addEventListener("focus", align);
+    return () => {
+      cancelAnimationFrame(frame);
+      panel.style.removeProperty("--mobile-keyboard-lift");
+      window.visualViewport?.removeEventListener("resize", align);
+      window.visualViewport?.removeEventListener("scroll", align);
+      window.removeEventListener("resize", align);
+      input.removeEventListener("focus", align);
+    };
   }, [props.autoFocus]);
   const finishGesture = (event: React.PointerEvent<HTMLButtonElement>) => {
     const gesture = gestureRef.current;
@@ -66,14 +82,14 @@ export function MobileShortSheet(props: {
     gesture.panel.classList.remove("is-sheet-dragging");
     gesture.panel.style.removeProperty("--mobile-sheet-drag-y");
     const distance = event.clientY - gesture.startY;
-    if (distance > 72 && props.swipeDownToClose) props.onClose();
+    if (distance > 72 && props.swipeDownToClose) (props.onSwipeDown || props.onClose)();
     else if (distance < -54 && props.swipeUpForMore && props.onMore && !props.moreDisabled) props.onMore();
   };
   return <aside className={`df-drawer df-task-detail df-mobile-task-summary df-mobile-short-sheet${props.className ? ` ${props.className}` : ""}`} onMouseDown={(event) => event.stopPropagation()}>
     <button className="df-detail-close df-icon-action i-close" type="button" aria-label={locale.close} onClick={props.onClose} />
     <button type="button" className="df-mobile-sheet-grabber" aria-label={props.lang === "zh" ? "上下滑动短栏" : "Swipe sheet"} onPointerDown={(event) => { if (event.pointerType === "mouse" && event.button !== 0) return; const panel = event.currentTarget.parentElement; if (!panel) return; event.currentTarget.setPointerCapture(event.pointerId); panel.classList.add("is-sheet-dragging"); gestureRef.current = { pointerId: event.pointerId, startY: event.clientY, panel }; }} onPointerMove={(event) => { const gesture = gestureRef.current; if (!gesture || gesture.pointerId !== event.pointerId) return; const distance = event.clientY - gesture.startY; gesture.panel.style.setProperty("--mobile-sheet-drag-y", `${Math.max(-24, distance)}px`); }} onPointerUp={finishGesture} onPointerCancel={finishGesture} />
     {props.showKind && <label className="df-mobile-short-sheet-kind-wrap"><span className="df-visually-hidden">{locale.choose}</span><select className="df-mobile-short-sheet-kind" value={kind} aria-label={locale.choose} onChange={(event) => props.onKindChange?.(event.target.value as MobileShortSheetKind)}>{kinds.map((option) => <option key={option} value={option}>{locale[option]}</option>)}</select></label>}
-    <div className="df-mobile-summary-head"><input ref={inputRef} autoFocus={props.autoFocus} value={props.title} aria-label={props.titleLabel || (props.lang === "zh" ? "名称" : "Title")} placeholder={props.titlePlaceholder} onFocus={() => requestAnimationFrame(() => inputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }))} onChange={(event) => props.onTitleChange(event.target.value)} onBlur={(event) => props.onTitleBlur?.(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onTitleEnter?.(); } }} />{props.onMore && <button type="button" className="df-mobile-more" disabled={props.moreDisabled} onClick={props.onMore}>{locale.more}</button>}</div>
+    <div className="df-mobile-summary-head"><input ref={inputRef} autoFocus={props.autoFocus} value={props.title} aria-label={props.titleLabel || (props.lang === "zh" ? "名称" : "Title")} placeholder={props.titlePlaceholder} onChange={(event) => props.onTitleChange(event.target.value)} onBlur={(event) => props.onTitleBlur?.(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onTitleEnter?.(); } }} />{props.onMore && <button type="button" className="df-mobile-more" disabled={props.moreDisabled} onClick={props.onMore}>{locale.more}</button>}</div>
     {props.children}
   </aside>;
 }
@@ -102,7 +118,7 @@ export function MobileTimelineDraftSheet(props: {
   addingSubtask: boolean; subtaskTitle: string; onTitleChange: (title: string) => void; onProjectChange: (id: string) => void;
   onRangeChange: (edge: "start" | "end", minutes: number) => void; onStartSubtask: () => void;
   onSubtaskTitleChange: (title: string) => void; onAddSubtask: () => void; onCancelSubtask: () => void;
-  onClose: () => void; onSubmit: () => void; onMore: () => void;
+  onClose: () => void; onSwipeDown: () => void; onSubmit: () => void; onMore: () => void;
 }) {
   const zh = props.lang === "zh";
   const project = props.projects.find((item) => String(item.id) === props.projectId);
@@ -111,11 +127,11 @@ export function MobileTimelineDraftSheet(props: {
   const dateLabel = new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", { month: "short", day: "numeric", weekday: "short" }).format(new Date(`${props.date}T00:00:00`));
   const duration = props.endMinutes - props.startMinutes;
   const durationLabel = zh ? `${Math.floor(duration / 60) ? `${Math.floor(duration / 60)}小时` : ""}${duration % 60 ? `${duration % 60}分钟` : ""}` : `${Math.floor(duration / 60) ? `${Math.floor(duration / 60)}h ` : ""}${duration % 60 ? `${duration % 60}m` : ""}`;
-  return <MobileShortSheet lang={props.lang} kind="task" title={props.title} titlePlaceholder={zh ? "任务名称" : "Task title"} titleLabel={zh ? "任务名称" : "Task title"} onTitleChange={props.onTitleChange} onTitleEnter={props.onSubmit} onClose={props.onClose} onMore={props.onMore} moreDisabled={!props.title.trim()} swipeDownToClose swipeUpForMore className="df-timeline-draft-sheet">
+  return <MobileShortSheet lang={props.lang} kind="task" title={props.title} titlePlaceholder={zh ? "任务名称" : "Task title"} titleLabel={zh ? "任务名称" : "Task title"} onTitleChange={props.onTitleChange} onTitleEnter={props.onSubmit} onClose={props.onClose} onSwipeDown={props.onSwipeDown} onMore={props.onMore} moreDisabled={!props.title.trim()} swipeDownToClose swipeUpForMore className="df-timeline-draft-sheet">
     <label className="df-mobile-summary-project df-timeline-draft-project"><span className="df-detail-project-dot" style={{ background: project?.color || "#888" }} /><span>{zh ? "归属" : "Project"}</span><select value={props.projectId} onChange={(event) => props.onProjectChange(event.target.value)}><option value="">{zh ? "未归属" : "Unassigned"}</option>{props.projects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
     <div className="df-mobile-summary-times df-timeline-draft-times">{(["start", "end"] as const).map((edge, index) => <Fragment key={edge}>{index > 0 && <span aria-hidden="true">→</span>}<label><span>{edge === "start" ? (zh ? "开始" : "Start") : (zh ? "结束" : "End")}</span><select aria-label={edge === "start" ? (zh ? "开始时间" : "Start time") : (zh ? "结束时间" : "End time")} value={toTime(props[`${edge}Minutes`])} onChange={(event) => { const [hours, minutes] = event.target.value.split(":").map(Number); props.onRangeChange(edge, hours * 60 + minutes); }}>{timeOptions.map((time) => <option key={time}>{time}</option>)}</select></label></Fragment>)}</div>
     <time className="df-timeline-draft-date" dateTime={props.date}>{dateLabel} · {durationLabel}</time>
-    <div className="df-mobile-summary-actions"><button type="button" className="df-mobile-add-subtask" onClick={props.onStartSubtask}>＋ {zh ? "添加子任务" : "Add subtask"}</button></div>
+    <div className="df-mobile-summary-actions"><button type="button" className="df-mobile-add-subtask" onClick={props.onStartSubtask}>＋ {zh ? "添加子任务" : "Add subtask"}</button><button type="button" className="df-mobile-submit" disabled={!props.title.trim()} onClick={props.onSubmit}>{zh ? "添加" : "Add"}</button></div>
     {props.addingSubtask && <div className="df-mobile-summary-subtask-add"><input autoFocus value={props.subtaskTitle} onChange={(event) => props.onSubtaskTitleChange(event.target.value)} placeholder={zh ? "输入子任务名称" : "Subtask title"} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onAddSubtask(); } if (event.key === "Escape") props.onCancelSubtask(); }} /><button type="button" disabled={!props.subtaskTitle.trim()} onClick={props.onAddSubtask}>{zh ? "添加" : "Add"}</button></div>}
     {props.subtasks.length > 0 && <section className="df-mobile-summary-subtasks"><header><b>{zh ? "子任务" : "Subtasks"}</b><span>{props.subtasks.length}</span></header><div className="df-mobile-summary-subtask-list">{props.subtasks.map((subtask) => <label key={subtask.id}><input type="checkbox" checked={false} readOnly /><span>{subtask.title}</span></label>)}</div></section>}
   </MobileShortSheet>;

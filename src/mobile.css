@@ -370,7 +370,7 @@
     z-index: 12 !important;
   }
 
-  #root .df-app:is(.is-mobile-sheet-open, .is-compact-quick-add-open) .df-compact-execute-controls,
+  #root .df-app.is-mobile-sheet-open .df-compact-execute-controls,
   #root .df-app.is-mobile-sheet-open .df-mobile-dock,
   #root .df-app.is-mobile-sheet-open .df-mobile-quick-add-fab { filter: grayscale(.35) brightness(.72) !important; pointer-events:none!important; }
 
@@ -1180,8 +1180,10 @@
   }
 
   #root .df-app .df-time-block .df-resize-dot {
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
     transform: none !important;
     opacity: 0 !important;
     z-index: 6 !important;
@@ -1190,17 +1192,17 @@
   }
 
   #root .df-app .df-time-block .df-resize-dot.top {
-    left: -4px !important;
+    left: -2px !important;
     right: auto !important;
-    top: -15px !important;
+    top: -14px !important;
     bottom: auto !important;
   }
 
   #root .df-app .df-time-block .df-resize-dot.bottom {
     left: auto !important;
-    right: -4px !important;
+    right: -2px !important;
     top: auto !important;
-    bottom: -15px !important;
+    bottom: -14px !important;
   }
 
   #root .df-app .df-time-block .df-resize-dot::before,
@@ -1212,10 +1214,11 @@
     right: auto !important;
     bottom: auto !important;
     transform: translate(-50%, -50%) !important;
-    width: 9px !important;
-    height: 9px !important;
+    width: 10px !important;
+    height: 10px !important;
     border-radius: 50% !important;
-    background: var(--accent-active) !important;
+    border: 2px solid var(--accent-active) !important;
+    background: var(--surface-main) !important;
     box-shadow: none !important;
     opacity: 1 !important;
     pointer-events: none !important;
@@ -1257,14 +1260,14 @@
     padding: 14px 14px calc(14px + env(safe-area-inset-bottom)) !important;
     border-radius: 18px 18px 0 0 !important;
     overflow-y: auto !important;
-    transform:translateY(var(--mobile-sheet-drag-y,0px))!important;
+    transform:translateY(calc(var(--mobile-sheet-drag-y, 0px) - var(--mobile-keyboard-lift, 0px)))!important;
     transition:transform 180ms cubic-bezier(.22,.72,.2,1)!important;
   }
 
   #root .df-app .df-task-detail.df-drawer.df-mobile-short-sheet.is-sheet-dragging{transition:none!important}
 
   #root .df-app .df-task-detail.df-drawer.df-mobile-quick-add-sheet {
-    bottom: calc(56px + env(safe-area-inset-bottom) + var(--mobile-keyboard-inset, 0px)) !important;
+    bottom: calc(56px + env(safe-area-inset-bottom)) !important;
     padding-bottom: 14px !important;
   }
 
