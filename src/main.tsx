@@ -121,12 +121,14 @@ import "./app-redesign.css";
 import "./navopath-buttons.css";
 import "./mobile.css";
 import "./task-block.css";
-import MobileShortSheet, { type MobileShortSheetKind } from "./MobileShortSheet";
+import type { MobileShortSheetKind } from "./MobileTaskSummary";
 
 installBrowserFallback();
 
 const ChangelogPage = lazy(() => import("./ChangelogPage"));
 const MobileTaskSummary = lazy(() => import("./MobileTaskSummary"));
+const MobileQuickAddSheet = lazy(() => import("./MobileTaskSummary").then((module) => ({ default: module.MobileQuickAddSheet })));
+const MobileTimelineDraftSheet = lazy(() => import("./MobileTaskSummary").then((module) => ({ default: module.MobileTimelineDraftSheet })));
 const WidgetAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetApp })));
 const WidgetPopoverAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetPopoverApp })));
 
@@ -3958,54 +3960,31 @@ function App() {
     }
   }
 
-  function submitMobileQuickAdd() {
+  function finishMobileQuickAdd(more = false) {
     if (!data || !quickTitle.trim()) return;
     const title = quickTitle.trim();
-    if (mobileQuickAddKind === "task") {
+    if (!more && mobileQuickAddKind === "task") {
       quickAddTask();
       return;
     }
-    if (mobileQuickAddKind === "project") {
-      const project = makeProject({ ...defaultForm("project"), title, projectColor: quickProjectColor });
-      void saveData({ ...data, projects: [...data.projects, project] });
-      setQuickTitle("");
-      setQuickAddOpen(false);
-      showToast(lang === "zh" ? "项目已创建" : "Project created");
-      return;
-    }
-    const now = new Date().toISOString();
-    const habit: Habit = {
-      id: uid("habit"),
-      title,
-      defaultDurationMinutes: mobileQuickHabitMinutes,
-      frequencyRule: "daily",
-      activeWeekdays: [1, 2, 3, 4, 5],
-      order: Date.now(),
-      createdAt: now,
-      updatedAt: now,
-    };
-    void saveData({ ...data, habits: [...(data.habits || []), habit] });
     setQuickTitle("");
     setQuickAddOpen(false);
-    showToast(lang === "zh" ? "习惯已创建" : "Habit created");
-  }
-
-  function openMobileQuickAddMore() {
-    if (!data || !quickTitle.trim()) return;
-    const title = quickTitle.trim();
-    setQuickAddOpen(false);
-    if (mobileQuickAddKind === "habit") {
+    if (more && mobileQuickAddKind !== "habit") {
+      openAdd(mobileQuickAddKind === "project" ? "project" : "task");
+      setForm((current) => ({ ...current, title, ...(mobileQuickAddKind === "project" ? { projectColor: quickProjectColor } : { projectId: quickProjectId }) }));
+    } else if (mobileQuickAddKind === "project") {
+      const project = makeProject({ ...defaultForm("project"), title, projectColor: quickProjectColor });
+      void saveData({ ...data, projects: [...data.projects, project] });
+      showToast(lang === "zh" ? "项目已创建" : "Project created");
+    } else if (mobileQuickAddKind === "habit") {
       const now = new Date().toISOString();
       const habit: Habit = { id: uid("habit"), title, defaultDurationMinutes: mobileQuickHabitMinutes, frequencyRule: "daily", activeWeekdays: [1, 2, 3, 4, 5], order: Date.now(), createdAt: now, updatedAt: now };
       void saveData({ ...data, habits: [...(data.habits || []), habit] });
-      setQuickTitle("");
-      setEditingHabitId(habit.id);
-      setHabitPanel("detail");
-      return;
+      if (more) {
+        setEditingHabitId(habit.id);
+        setHabitPanel("detail");
+      } else showToast(lang === "zh" ? "习惯已创建" : "Habit created");
     }
-    setQuickTitle("");
-    openAdd(mobileQuickAddKind === "project" ? "project" : "task");
-    setForm((current) => ({ ...current, title, ...(mobileQuickAddKind === "project" ? { projectColor: quickProjectColor } : { projectId: quickProjectId }) }));
   }
 
   /** Quick-add entry point used by the desktop widget (title comes from IPC). */
@@ -4953,40 +4932,16 @@ function App() {
     event.preventDefault();
     event.stopPropagation();
     if (event.button !== 0 && event.pointerType === "mouse") return;
-    const pointerId = event.pointerId;
-    const startY = event.clientY;
     const initial = dragCreate;
     if (!initial) return;
     dragCreateSuppressClickRef.current = true;
-    document.body.classList.add("df-resizing");
-    const apply = (clientY: number) => {
-      const deltaMinutes = Math.round(((clientY - startY) / timelineSlotHeight) * SLOT_MINUTES / SLOT_MINUTES) * SLOT_MINUTES;
-      updateDragCreateRange(edge, (edge === "start" ? initial.startMinutes : initial.endMinutes) + deltaMinutes);
-    };
-    const cleanup = () => {
-      document.body.classList.remove("df-resizing");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", cancel);
-      window.setTimeout(() => { dragCreateSuppressClickRef.current = false; }, 80);
-    };
-    const move = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== pointerId) return;
-      moveEvent.preventDefault();
-      apply(moveEvent.clientY);
-    };
-    const up = (upEvent: PointerEvent) => {
-      if (upEvent.pointerId !== pointerId) return;
-      apply(upEvent.clientY);
-      cleanup();
-    };
-    const cancel = (cancelEvent: PointerEvent) => {
-      if (cancelEvent.pointerId !== pointerId) return;
-      cleanup();
-    };
-    window.addEventListener("pointermove", move, { passive: false });
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", cancel);
+    const nativeEvent = event.nativeEvent;
+    void import("./MobileTaskSummary").then(({ beginVerticalResize }) => beginVerticalResize(
+      nativeEvent,
+      timelineSlotHeight,
+      (steps) => updateDragCreateRange(edge, (edge === "start" ? initial.startMinutes : initial.endMinutes) + steps * SLOT_MINUTES),
+      () => window.setTimeout(() => { dragCreateSuppressClickRef.current = false; }, 80),
+    ));
   }
 
   function createOccurrenceExceptionRecord(task: Task, scheduledDate: string, scheduledStart: string, executionStatus: TimelineRecord["executionStatus"]) {
@@ -7507,28 +7462,24 @@ function App() {
       <div className="df-header-fade" />
       {compactLayout && quickAddOpen && <div className="df-drawer-backdrop" />}
       {compactLayout && quickAddOpen && (
-        <MobileShortSheet
+        <Suspense fallback={null}><MobileQuickAddSheet
           lang={lang}
           kind={mobileQuickAddKind}
           kinds={settings.featureHabitsEnabled === false ? ["task", "project"] : ["task", "project", "habit"]}
-          showKind
           title={quickTitle}
-          titlePlaceholder={mobileQuickAddKind === "task" ? (lang === "zh" ? "任务名称" : "Task title") : mobileQuickAddKind === "project" ? (lang === "zh" ? "项目名称" : "Project title") : (lang === "zh" ? "习惯名称" : "Habit title")}
-          titleLabel={lang === "zh" ? "名称" : "Title"}
-          autoFocus
+          projects={projects}
+          projectId={quickProjectId}
+          projectColor={quickProjectColor}
+          habitMinutes={mobileQuickHabitMinutes}
           onTitleChange={setQuickTitle}
-          onTitleEnter={submitMobileQuickAdd}
           onKindChange={(kind) => { setMobileQuickAddKind(kind); setQuickProjectOpen(false); }}
+          onProjectChange={setQuickProjectId}
+          onProjectColorChange={setQuickProjectColor}
+          onHabitMinutesChange={setMobileQuickHabitMinutes}
           onClose={() => { setQuickAddOpen(false); setQuickTitle(""); }}
-          onMore={openMobileQuickAddMore}
-          moreDisabled={!quickTitle.trim()}
-          className="df-mobile-quick-add-sheet"
-        >
-          {mobileQuickAddKind === "task" && <label className="df-mobile-summary-project"><span className="df-detail-project-dot" style={{ background: projects.find((project) => String(project.id) === String(quickProjectId))?.color || "#888" }} /><span>{lang === "zh" ? "归属" : "Project"}</span><select value={quickProjectId} onChange={(event) => setQuickProjectId(event.target.value)}><option value="">{lang === "zh" ? "未归属" : "Unassigned"}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>}
-          {mobileQuickAddKind === "project" && <label className="df-mobile-short-sheet-field"><span>{lang === "zh" ? "颜色" : "Color"}</span><input type="color" value={quickProjectColor} onChange={(event) => setQuickProjectColor(event.target.value)} /></label>}
-          {mobileQuickAddKind === "habit" && <label className="df-mobile-short-sheet-field"><span>{lang === "zh" ? "默认时长" : "Default duration"}</span><input type="number" min={5} max={480} step={5} value={mobileQuickHabitMinutes} onChange={(event) => setMobileQuickHabitMinutes(Math.max(5, Math.min(480, Number(event.target.value) || 20)))} /><strong>min</strong></label>}
-          <div className="df-mobile-summary-actions"><button type="button" className="df-mobile-add-subtask" disabled={!quickTitle.trim()} onClick={submitMobileQuickAdd}>{lang === "zh" ? "添加" : "Add"}</button></div>
-        </MobileShortSheet>
+          onMore={() => finishMobileQuickAdd(true)}
+          onSubmit={() => finishMobileQuickAdd()}
+        /></Suspense>
       )}
       <div id="df-portal-target" />
       {dialog.host}
@@ -11157,39 +11108,29 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
     : [];
 
   const compact = state.width < 110;
-  const dateLabel = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date(`${state.date}T00:00:00`));
-
   if (sheet) return (
-    <MobileShortSheet
+    <Suspense fallback={null}><MobileTimelineDraftSheet
       lang={lang}
-      kind="task"
-      showKind
       title={input}
-      titlePlaceholder={lang === "zh" ? "任务名称" : "Task title"}
-      titleLabel={lang === "zh" ? "任务名称" : "Task title"}
-      autoFocus
       onTitleChange={handleInputChange}
-      onTitleEnter={() => handleSave()}
       onClose={onCancel}
       onMore={() => handleSave(true)}
-      moreDisabled={!cleanTitle()}
-      className="df-timeline-draft-sheet"
-    >
-      <label className="df-mobile-summary-project df-timeline-draft-project"><span className="df-detail-project-dot" style={{ background: selectedProject?.color || "#888" }} /><span>{lang === "zh" ? "归属" : "Project"}</span><select value={selectedProject?.id || ""} onChange={(event) => { const project = projects.find((item) => String(item.id) === event.target.value) || null; selectedProjectRef.current = project; setSelectedProject(project); }}><option value="">{lang === "zh" ? "未归属" : "Unassigned"}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
-      <div className="df-mobile-summary-times df-timeline-draft-times">
-        <label><span>{lang === "zh" ? "开始" : "Start"}</span><select aria-label={lang === "zh" ? "开始时间" : "Start time"} value={minutesToTime(state.startMinutes)} onChange={(event) => onRangeChange?.("start", timeToMinutes(event.target.value))}>{Array.from({ length: 96 }, (_, index) => minutesToTime(index * SLOT_MINUTES)).map((time) => <option key={time}>{time}</option>)}</select></label>
-        <span aria-hidden="true">→</span>
-        <label><span>{lang === "zh" ? "结束" : "End"}</span><select aria-label={lang === "zh" ? "结束时间" : "End time"} value={minutesToTime(state.endMinutes)} onChange={(event) => onRangeChange?.("end", timeToMinutes(event.target.value))}>{Array.from({ length: 96 }, (_, index) => minutesToTime(index * SLOT_MINUTES)).map((time) => <option key={time}>{time}</option>)}</select></label>
-      </div>
-      <time className="df-timeline-draft-date" dateTime={state.date}>{dateLabel} · {formatMinutes(state.endMinutes - state.startMinutes)}</time>
-      <div className="df-mobile-summary-actions"><button type="button" className="df-mobile-add-subtask" onClick={() => setAddingSubtask(true)}>＋ {lang === "zh" ? "添加子任务" : "Add subtask"}</button></div>
-      {addingSubtask && <div className="df-mobile-summary-subtask-add"><input autoFocus value={subtaskTitle} onChange={(event) => setSubtaskTitle(event.target.value)} placeholder={lang === "zh" ? "输入子任务名称" : "Subtask title"} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); addSubtask(); } if (event.key === "Escape") { setAddingSubtask(false); setSubtaskTitle(""); } }} /><button type="button" disabled={!subtaskTitle.trim()} onClick={addSubtask}>{lang === "zh" ? "添加" : "Add"}</button></div>}
-      {subtasks.length > 0 && <section className="df-mobile-summary-subtasks"><header><b>{lang === "zh" ? "子任务" : "Subtasks"}</b><span>{subtasks.length}</span></header><div className="df-mobile-summary-subtask-list">{subtasks.map((subtask) => <label key={subtask.id}><input type="checkbox" checked={false} readOnly /><span>{subtask.title}</span></label>)}</div></section>}
-    </MobileShortSheet>
+      onSubmit={() => handleSave()}
+      projects={projects}
+      projectId={selectedProject?.id || ""}
+      onProjectChange={(id) => { const project = projects.find((item) => String(item.id) === id) || null; selectedProjectRef.current = project; setSelectedProject(project); }}
+      startMinutes={state.startMinutes}
+      endMinutes={state.endMinutes}
+      onRangeChange={(edge, minutes) => onRangeChange?.(edge, minutes)}
+      date={state.date}
+      subtasks={subtasks}
+      addingSubtask={addingSubtask}
+      subtaskTitle={subtaskTitle}
+      onStartSubtask={() => setAddingSubtask(true)}
+      onSubtaskTitleChange={setSubtaskTitle}
+      onAddSubtask={addSubtask}
+      onCancelSubtask={() => { setAddingSubtask(false); setSubtaskTitle(""); }}
+    /></Suspense>
   );
 
   return (
