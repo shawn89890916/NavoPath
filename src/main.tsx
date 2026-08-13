@@ -7460,7 +7460,7 @@ function App() {
         </div>
       </header>
       <div className="df-header-fade" />
-      {compactLayout && quickAddOpen && <div className="df-drawer-backdrop" />}
+      {compactLayout && quickAddOpen && <div className="df-drawer-backdrop" onMouseDown={() => quickTitle.trim() ? finishMobileQuickAdd() : setQuickAddOpen(false)} />}
       {compactLayout && quickAddOpen && (
         <Suspense fallback={null}><MobileQuickAddSheet
           lang={lang}
@@ -8816,7 +8816,6 @@ function App() {
         </Suspense>
       )}
 
-      {compactLayout && dragCreate?.committed && mode === "execute" && <div className="df-drawer-backdrop df-timeline-draft-backdrop" />}
       {compactLayout && dragCreate?.committed && mode === "execute" && (
         <DragCreateQuickAdd
           sheet
@@ -11109,7 +11108,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
 
   const compact = state.width < 110;
   if (sheet) return (
-    <Suspense fallback={null}><MobileTimelineDraftSheet
+    <><div className="df-drawer-backdrop df-timeline-draft-backdrop" onMouseDown={() => cleanTitle() ? handleSave() : onCancel()} /><Suspense fallback={null}><MobileTimelineDraftSheet
       lang={lang}
       title={input}
       onTitleChange={handleInputChange}
@@ -11130,7 +11129,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
       onSubtaskTitleChange={setSubtaskTitle}
       onAddSubtask={addSubtask}
       onCancelSubtask={() => { setAddingSubtask(false); setSubtaskTitle(""); }}
-    /></Suspense>
+    /></Suspense></>
   );
 
   return (

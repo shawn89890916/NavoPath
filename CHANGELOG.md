@@ -6,6 +6,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
+- 修复移动端短栏新建交互：时间轴选定时段后不再立即唤起键盘，点按任务名区域才开始输入；点按短栏外可自动保存已有标题的任务；右下角新建入口的任务、项目与习惯类型菜单可正常展开。
 - 统一竖屏移动端的任务短栏：点按时间轴空白、右下角悬浮“+”和点按已有任务块现在共用同一套抓手、标题、关闭、“更多”、归属与底部动作结构。时间轴新建可直接修改 15 分钟刻度的起止时间并添加子任务；已有任务短栏移除重复的完成/未完成按钮，改为添加子任务，“More”已适配中文。右下角“+”打开相同短栏，点按“新任务”可切换新建任务、项目或习惯，并显示各自需要的归属、颜色或默认时长设置；“更多”进入对应完整详情。
 - 时间轴草稿块和已有任务块现在共用可拖动的左上开始点与右下结束点，44px 触控区横向内收且允许越过任务边框显示，拖动会实时改变并保存起止时间；点按任务块后会明确显示两处手柄。所有新建入口的重要程度与紧急程度默认均为空。
 - 优化竖屏时间轴的快速交互：点按空白时段会先显示清晰的 30 分钟时间段预览，并直接拉起底部短栏填写名称、查看起止时间和日期；日期标题可展开紧凑月历快速跳转。时间轴同时支持更流畅的双指纵向缩放，缩放以手势中心对应的时刻为锚点，条纹背景、标尺、任务块、点击与拖动坐标保持同步；“回到现在”会可靠切回当天日程并把当前时间定位到视口中央。
@@ -47,6 +48,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
+- Fixed mobile short-sheet creation: selecting a timeline range no longer summons the keyboard until the title area is tapped, tapping outside auto-saves an item with a title, and the bottom-right create entry reliably opens the task, project, and habit type menu.
 - Unified the portrait mobile short sheet across empty-timeline creation, the lower-right floating plus, and existing task editing. All three paths now share the same grabber, title, close, More, project, and bottom-action structure. Timeline drafts directly edit 15-minute start/end values and add subtasks; existing task summaries replace the duplicate Done/Unfinished controls with Add subtask, and More is localized. The floating plus opens the same sheet, where tapping New task switches among task, project, and habit creation with the relevant project, color, or default-duration settings; More opens the corresponding full editor.
 - Timeline drafts and existing task blocks now share draggable top-left start and bottom-right end handles. Their 44px touch targets tuck farther inward, remain visible outside the task border, and update persisted start/end times while dragging; tapping a task explicitly reveals both handles. Importance and urgency now default to empty across every creation path.
 - Refined portrait timeline interactions: tapping an empty slot now shows a clear 30-minute range preview and immediately opens a compact bottom sheet for the title, time range, and date; the date heading expands into a compact monthly quick picker. Two-finger vertical zoom is smoother and stays anchored to the time beneath the gesture centre, keeping the striped background, rulers, blocks, taps, and drag coordinates aligned. Back to now reliably returns to today's Schedule and centres the current time in the viewport.
