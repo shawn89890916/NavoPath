@@ -24757,11 +24757,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
       color-mix(in srgb, var(--text-main) 3%, transparent) 0,
 
-      color-mix(in srgb, var(--text-main) 3%, transparent) calc(4 * 20px),
+      color-mix(in srgb, var(--text-main) 3%, transparent) calc(4 * var(--timeline-slot-height, 20px)),
 
-      transparent calc(4 * 20px),
+      transparent calc(4 * var(--timeline-slot-height, 20px)),
 
-      transparent calc(8 * 20px)
+      transparent calc(8 * var(--timeline-slot-height, 20px))
 
     );
 
@@ -25879,11 +25879,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
       color-mix(in srgb, var(--mode-primary) 4%, transparent) 0,
 
-      color-mix(in srgb, var(--mode-primary) 4%, transparent) calc(4 * 20px),
+      color-mix(in srgb, var(--mode-primary) 4%, transparent) calc(4 * var(--timeline-slot-height, 20px)),
 
-      transparent calc(4 * 20px),
+      transparent calc(4 * var(--timeline-slot-height, 20px)),
 
-      transparent calc(8 * 20px)
+      transparent calc(8 * var(--timeline-slot-height, 20px))
 
     );
 
@@ -26733,11 +26733,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
       color-mix(in srgb, var(--mode-primary) 6%, var(--neu-bg, #e0e5ec)) 0,
 
-      color-mix(in srgb, var(--mode-primary) 6%, var(--neu-bg, #e0e5ec)) calc(4 * 20px),
+      color-mix(in srgb, var(--mode-primary) 6%, var(--neu-bg, #e0e5ec)) calc(4 * var(--timeline-slot-height, 20px)),
 
-      var(--neu-bg, #e0e5ec) calc(4 * 20px),
+      var(--neu-bg, #e0e5ec) calc(4 * var(--timeline-slot-height, 20px)),
 
-      var(--neu-bg, #e0e5ec) calc(8 * 20px)
+      var(--neu-bg, #e0e5ec) calc(8 * var(--timeline-slot-height, 20px))
 
     ) !important;
 
@@ -26833,11 +26833,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
       color-mix(in srgb, var(--mode-primary) 4%, #FFFFFF) 0,
 
-      color-mix(in srgb, var(--mode-primary) 4%, #FFFFFF) calc(4 * 20px),
+      color-mix(in srgb, var(--mode-primary) 4%, #FFFFFF) calc(4 * var(--timeline-slot-height, 20px)),
 
-      #FFFFFF calc(4 * 20px),
+      #FFFFFF calc(4 * var(--timeline-slot-height, 20px)),
 
-      #FFFFFF calc(8 * 20px)
+      #FFFFFF calc(8 * var(--timeline-slot-height, 20px))
 
     ) !important;
 
@@ -28453,6 +28453,47 @@ body:has(:active)::-webkit-scrollbar-thumb {
   font: 650 calc(13px * var(--timeline-font-scale, 1))/1.25 var(--paper-sans);
 
 }
+
+.df-date-title-button {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.df-date-title-chevron {
+  align-self: center;
+  margin-left: 1px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.df-date-title-chevron.open { transform: rotate(180deg); }
+
+.df-mobile-date-picker { display: none; }
+
+.df-timeline-draft-time {
+  position: absolute;
+  inset: 6px 10px auto;
+  color: var(--text-secondary);
+  font: 600 11px/1.2 var(--paper-sans);
+  pointer-events: none;
+}
+
+.df-timeline-draft-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-active);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  pointer-events: none;
+}
+
+.df-timeline-draft-handle.start { top: -7px; left: -7px; }
+.df-timeline-draft-handle.end { right: -7px; bottom: -7px; }
 
 .df-cloud-error-card h1 {
   margin: 0 0 12px;
@@ -33559,6 +33600,87 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 }
 
+.df-timeline-draft-sheet {
+  position: fixed;
+  inset: auto 0 calc(72px + env(safe-area-inset-bottom, 0px));
+  z-index: 100040;
+  display: block;
+  min-height: 196px;
+  padding: 10px 20px 20px;
+  border: 1px solid var(--paper-rule);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  box-shadow: 0 -10px 30px color-mix(in srgb, var(--text-main) 10%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.df-timeline-draft-sheet .drag-create-quick-add-row {
+  position: relative;
+  min-height: 50px;
+  padding-left: 28px;
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.df-timeline-draft-sheet .drag-create-quick-add-check {
+  left: 1px;
+  top: 17px;
+}
+
+.df-timeline-draft-sheet input {
+  height: 50px;
+  font-size: 21px;
+  font-weight: 650;
+}
+
+.df-timeline-draft-grabber {
+  width: 34px;
+  height: 4px;
+  margin: 0 auto 9px;
+  border-radius: 999px;
+  background: var(--paper-rule-strong);
+}
+
+.df-timeline-draft-head {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font: 600 13px/1 var(--paper-sans);
+}
+
+.df-timeline-draft-close {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-main);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.df-timeline-draft-meta {
+  display: grid;
+  grid-template-columns: 22px auto 22px auto auto;
+  align-items: center;
+  gap: 8px;
+  padding-top: 16px;
+  color: var(--text-main);
+  font-size: 16px;
+}
+
+.df-timeline-draft-meta > span:not(.df-timeline-draft-clock) { color: var(--text-muted); }
+.df-timeline-draft-meta > time {
+  grid-column: 2 / -1;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.df-timeline-draft-clock { color: var(--text-muted); font-size: 20px; }
+
 .df-ai-plan-unscheduled {
   position: relative;
   margin-left: 12px;
@@ -37540,11 +37662,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
       color-mix(in srgb, #C9A46F 10%, transparent) 0,
 
-      color-mix(in srgb, #C9A46F 10%, transparent) 80px,
+      color-mix(in srgb, #C9A46F 10%, transparent) var(--timeline-hour-height, 80px),
 
-      transparent 80px,
+      transparent var(--timeline-hour-height, 80px),
 
-      transparent 160px
+      transparent calc(2 * var(--timeline-hour-height, 80px))
 
     ) !important;
 
@@ -37564,11 +37686,11 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
       color-mix(in srgb, #B8895F 8%, transparent) 0,
 
-      color-mix(in srgb, #B8895F 8%, transparent) 80px,
+      color-mix(in srgb, #B8895F 8%, transparent) var(--timeline-hour-height, 80px),
 
-      transparent 80px,
+      transparent var(--timeline-hour-height, 80px),
 
-      transparent 160px
+      transparent calc(2 * var(--timeline-hour-height, 80px))
 
     ) !important;
 
@@ -38318,7 +38440,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
     position: absolute;
 
-    z-index: 12;
+    z-index: 100050 !important;
 
     top: 2px;
 
@@ -38439,6 +38561,30 @@ body:has(:active)::-webkit-scrollbar-thumb {
     min-width: 58px !important;
 
   }
+
+  .df-compact-date-picker-trigger {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 5px;
+    min-width: 72px;
+    min-height: 44px;
+    padding: 0 5px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-main);
+    font-family: inherit;
+    pointer-events: auto;
+  }
+
+  .df-compact-date-picker-trigger[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--accent-active) 7%, transparent);
+  }
+
+  .df-compact-date-picker-trigger strong { font-size: 22px; }
+  .df-compact-date-picker-trigger > span:not(.df-date-title-chevron) { color: var(--text-muted); font-size: 13px; }
+  .df-compact-date-picker-trigger .df-date-title-chevron { align-self: center; font-size: 15px; }
 
 
 
@@ -38658,6 +38804,106 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
     transform: translateX(-50%);
 
+  }
+
+  .df-date-title-button {
+    min-width: 112px;
+    min-height: 54px;
+    border-radius: 12px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .df-date-title-button[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--accent-active) 7%, transparent);
+  }
+
+  .df-mobile-date-picker {
+    display: block;
+    position: absolute;
+    z-index: 50;
+    top: 50px;
+    left: 0;
+    right: 0;
+    padding: 2px 12px 14px;
+    border-bottom: 1px solid var(--paper-rule);
+    background: var(--bg-surface);
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--text-main) 8%, transparent);
+  }
+
+  .df-mobile-date-picker > header {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    min-height: 42px;
+  }
+
+  .df-mobile-date-picker > header strong {
+    text-align: center;
+    color: var(--text-main);
+    font: 650 17px/1.2 var(--paper-sans);
+  }
+
+  .df-mobile-date-picker > header button,
+  .df-mobile-date-grid button {
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--text-main);
+    font: 500 15px/1 var(--paper-sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .df-mobile-date-picker > header button {
+    color: var(--text-muted);
+    font-size: 28px;
+  }
+
+  .df-mobile-date-weekdays,
+  .df-mobile-date-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    text-align: center;
+  }
+
+  .df-mobile-date-weekdays span {
+    padding: 5px 0 3px;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .df-mobile-date-grid button {
+    position: relative;
+    justify-self: center;
+    width: 42px;
+    min-width: 42px;
+    min-height: 40px;
+    border-radius: 12px;
+  }
+
+  .df-mobile-date-grid button.outside { color: color-mix(in srgb, var(--text-muted) 48%, transparent); }
+  .df-mobile-date-grid button.today::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--accent-active);
+    transform: translateX(-50%);
+  }
+
+  .df-mobile-date-grid button.selected {
+    background: color-mix(in srgb, var(--accent-active) 13%, var(--bg-surface));
+    color: var(--mode-primary-strong);
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-active) 42%, transparent);
+  }
+
+  .df-app .df-timeline-scroll,
+  .df-app .df-timeline-3day-scroll {
+    touch-action: pan-y;
   }
 
 

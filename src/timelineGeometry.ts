@@ -290,7 +290,7 @@ export function timeBlockHeight(startTime: string, endTime: string, startHour = 
   // Cross-midnight spans (e.g. 23:30→00:30) must keep their full 60m height
   // instead of collapsing to the SLOT_MINUTES fallback.
   const dur = Math.max(durationMinutes(startTime, endTime), SLOT_MINUTES);
-  return Math.max((dur / 60) * hourHeight, SLOT_HEIGHT);
+  return Math.max((dur / 60) * hourHeight, (SLOT_MINUTES / 60) * hourHeight);
 }
 
 /**

@@ -113,6 +113,7 @@ import {
 } from "./widget/widgetTimer";
 import { extendActiveTimelineRecord, nextOverrunExtensionEnd, resolveWidgetTimelineSelection, timelineRecordBounds } from "./widget/widgetSchedule";
 import { calculateTimelineRecordEnd, calendarDateTimeSpanMinutes, clockTimeSpanMinutes, rescheduleTimelineRecord, timelineRecordDurationMinutes } from "./utils/timelineRecords";
+import { anchoredTimelineScrollTop, timelineZoomFromPinch } from "./utils/timelineZoom";
 import { calendarEventDurationMinutes, expandTimedCalendarEvent } from "./utils/calendarEventSlices";
 import { MOTION, runMotionTransition, scheduleMotionCommit } from "./motion";
 import "./styles.css";
@@ -1240,6 +1241,11 @@ function App() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [visibleTimelineDate, setVisibleTimelineDate] = useState(todayIso());
+  const [mobileDatePickerOpen, setMobileDatePickerOpen] = useState(false);
+  const [mobileDatePickerMonth, setMobileDatePickerMonth] = useState(() => todayIso().slice(0, 7));
+  const [timelineZoom, setTimelineZoom] = useState(1);
+  const timelineSlotHeight = SLOT_HEIGHT * timelineZoom;
+  const timelineHourHeight = timelineSlotHeight * (60 / SLOT_MINUTES);
   const [drag, setDrag] = useState<DragState>(null);
   const [dragOverlay, setDragOverlay] = useState<UnifiedDragSnapshot | null>(null);
   const [dragOverlayTask, setDragOverlayTask] = useState<{ task: Task; variant: "candidate" | "allDay" | "scheduled" } | null>(null);
@@ -1310,14 +1316,14 @@ function App() {
     const container = timelineRef.current;
     if (!container) return;
     continuousScrollRestoreRef.current = null;
-    const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const dayHeight = (24 * 60 / SLOT_MINUTES) * timelineSlotHeight;
     const next = restore.oldScrollTop + restore.shiftBands * dayHeight;
     container.scrollTop = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, next));
     // Release the lock on the next frame so the scroll event triggered by this
     // scrollTop assignment does not re-enter the prepend/append branch.
     const frame = window.requestAnimationFrame(() => { continuousPrependLockRef.current = false; });
     return () => window.cancelAnimationFrame(frame);
-  }, [selectedDate, timelineView]);
+  }, [selectedDate, timelineView, timelineSlotHeight]);
   const [pendingTimelineFocus, setPendingTimelineFocus] = useState<TimelineFocusTarget | null>(null);
   const [placementPreview, setPlacementPreview] = useState<PlacementPreview>(null);
   const [editingOccurrence, setEditingOccurrence] = useState<EditingOccurrence>(null);
@@ -1331,6 +1337,9 @@ function App() {
   const [candidateDropTarget, setCandidateDropTarget] = useState<CandidateDropTarget>(null);
   const [dragCreate, setDragCreate] = useState<DragCreateState>(null);
   const dragCreateSuppressClickRef = useRef(false);
+  const timelineZoomRef = useRef(1);
+  const timelinePinchActiveRef = useRef(false);
+  const timelinePinchRef = useRef<{ distance: number; startZoom: number; anchorBaseY: number; anchorViewportY: number } | null>(null);
   const [resizeHintTaskId, setResizeHintTaskId] = useState("");
   const resizeHintTimerRef = useRef<number | null>(null);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
@@ -1659,6 +1668,61 @@ function App() {
   const timeGridRef = useRef<HTMLDivElement | null>(null);
   const [multiColWidth, setMultiColWidth] = useState(0);
   const [dailyCanvasWidth, setDailyCanvasWidth] = useState(0);
+  timelineZoomRef.current = timelineZoom;
+
+  useEffect(() => {
+    const scrollElement = timelineRef.current;
+    if (!scrollElement || !compactLayout || mode !== "execute" || timelineView === "month") return;
+
+    const verticalDistance = (touches: TouchList) => Math.abs(touches[0].clientY - touches[1].clientY);
+    const verticalCentre = (touches: TouchList) => (touches[0].clientY + touches[1].clientY) / 2;
+    const beginPinch = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return;
+      const rect = scrollElement.getBoundingClientRect();
+      const anchorViewportY = verticalCentre(event.touches) - rect.top;
+      const startZoom = timelineZoomRef.current;
+      timelinePinchActiveRef.current = true;
+      dragCreateSuppressClickRef.current = true;
+      setDragCreate(null);
+      timelinePinchRef.current = {
+        distance: Math.max(1, verticalDistance(event.touches)),
+        startZoom,
+        anchorBaseY: (scrollElement.scrollTop + anchorViewportY) / startZoom,
+        anchorViewportY,
+      };
+      event.preventDefault();
+    };
+    const movePinch = (event: TouchEvent) => {
+      const pinch = timelinePinchRef.current;
+      if (!pinch || event.touches.length !== 2) return;
+      const nextZoom = timelineZoomFromPinch(pinch.startZoom, pinch.distance, verticalDistance(event.touches));
+      timelineZoomRef.current = nextZoom;
+      setTimelineZoom(nextZoom);
+      window.requestAnimationFrame(() => {
+        scrollElement.scrollTop = anchoredTimelineScrollTop(pinch.anchorBaseY, nextZoom, pinch.anchorViewportY);
+      });
+      event.preventDefault();
+    };
+    const endPinch = (event: TouchEvent) => {
+      if (!timelinePinchRef.current || event.touches.length >= 2) return;
+      timelinePinchRef.current = null;
+      window.requestAnimationFrame(() => {
+        timelinePinchActiveRef.current = false;
+        window.setTimeout(() => { dragCreateSuppressClickRef.current = false; }, 80);
+      });
+    };
+
+    scrollElement.addEventListener("touchstart", beginPinch, { passive: false });
+    scrollElement.addEventListener("touchmove", movePinch, { passive: false });
+    scrollElement.addEventListener("touchend", endPinch, { passive: true });
+    scrollElement.addEventListener("touchcancel", endPinch, { passive: true });
+    return () => {
+      scrollElement.removeEventListener("touchstart", beginPinch);
+      scrollElement.removeEventListener("touchmove", movePinch);
+      scrollElement.removeEventListener("touchend", endPinch);
+      scrollElement.removeEventListener("touchcancel", endPinch);
+    };
+  }, [compactLayout, mode, timelineView, data]);
 
   // Keep column width updated for multi-day overlay positioning
   useEffect(() => {
@@ -2244,17 +2308,17 @@ function App() {
       const bandIndex = Math.floor(offset / effectColumnCount);
       let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
       if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
-      return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+      return bandIndex * ((24 * 60 / SLOT_MINUTES) * timelineSlotHeight) + (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight;
     };
     const targetTop = effectEnabled
       ? effectTop(selectedDate, minutesToTime(targetMinutes))
       : (() => {
           let diff = targetMinutes - dayStartHour * 60;
           if (diff < 0) diff += 24 * 60;
-          return (diff / SLOT_MINUTES) * SLOT_HEIGHT;
+          return (diff / SLOT_MINUTES) * timelineSlotHeight;
         })();
     container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
-  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour, settings?.continuousCrossDayScroll]);
+  }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour, settings?.continuousCrossDayScroll, timelineSlotHeight]);
 
   // Scroll timeline to day start time when the setting changes
   const prevDayStartRef = useRef<string>("");
@@ -2266,7 +2330,7 @@ function App() {
       const [h, m] = dayStart.split(":").map(Number);
       const startMinutes = (h || 0) * 60 + (m || 0);
       if (timelineRef.current) {
-        const targetTop = ((startMinutes - dayStartHour * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+        const targetTop = ((startMinutes - dayStartHour * 60) / SLOT_MINUTES) * timelineSlotHeight;
         timelineRef.current.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
       }
       if (!isInitial) {
@@ -2274,7 +2338,7 @@ function App() {
       }
     }
     prevDayStartRef.current = dayStart;
-  }, [settings?.dayStartTime, mode, lang, dayStartHour]);
+  }, [settings?.dayStartTime, mode, lang, dayStartHour, timelineSlotHeight]);
 
   useLayoutEffect(() => {
     if (mode !== "execute" || !pendingTimelineFocus) return;
@@ -2299,18 +2363,18 @@ function App() {
       const bandIndex = Math.floor(offset / effectColumnCount);
       let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
       if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
-      return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+      return bandIndex * ((24 * 60 / SLOT_MINUTES) * timelineSlotHeight) + (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight;
     };
     const targetTop = effectEnabled
       ? effectTop(targetDate, minutesToTime(targetMinutes))
-      : ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+      : ((targetMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * timelineSlotHeight;
     const nextScrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
     const frame = window.requestAnimationFrame(() => {
       container.scrollTop = nextScrollTop;
       setPendingTimelineFocus(null);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [mode, pendingTimelineFocus, selectedDate, timelineView, dayStartHour, settings?.continuousCrossDayScroll]);
+  }, [mode, pendingTimelineFocus, selectedDate, timelineView, dayStartHour, settings?.continuousCrossDayScroll, timelineSlotHeight]);
 
   useEffect(() => {
     const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
@@ -2325,7 +2389,7 @@ function App() {
     const effectDates = buildDailyContinuousDates(effectAnchorDate, true, continuousTimelineDayCount(effectColumnCount));
     const effectStartDate = effectDates[0] || selectedDate;
     const effectBandCount = Math.max(1, Math.ceil(effectDates.length / effectColumnCount));
-    const dayHeight = (24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+    const dayHeight = (24 * 60 / SLOT_MINUTES) * timelineSlotHeight;
     const bufferBands = Math.max(1, Math.floor(effectBandCount / 4));
     // Label-only update: safe to call on init (no state shift, no loop risk).
     const updateVisibleLabel = () => {
@@ -2339,7 +2403,7 @@ function App() {
     // cannot trigger a setSelectedDate feedback loop.
     const handleTimelineScroll = () => {
       updateVisibleLabel();
-      if (continuousPrependLockRef.current) return;
+      if (continuousPrependLockRef.current || timelinePinchActiveRef.current) return;
       // Guard: if the container isn't scrollable (not laid out yet or content
       // fits), skip prepend/append entirely to avoid a compensation clamp loop.
       if (scrollElement.scrollHeight <= scrollElement.clientHeight) return;
@@ -2359,7 +2423,7 @@ function App() {
     updateVisibleLabel();
     scrollElement.addEventListener("scroll", handleTimelineScroll, { passive: true });
     return () => scrollElement.removeEventListener("scroll", handleTimelineScroll);
-  }, [mode, settings?.continuousCrossDayScroll, timelineView, selectedDate]);
+  }, [mode, settings?.continuousCrossDayScroll, timelineView, selectedDate, timelineSlotHeight]);
 
   useEffect(() => {
     if (!placementPreview) return;
@@ -2952,7 +3016,7 @@ function App() {
   const continuousTimelineBandCount = Math.max(1, Math.ceil(continuousTimelineDates.length / timelineColumnCount));
   const visibleTimelineDates = useMemo(() => new Set(continuousTimelineDates), [continuousTimelineDates]);
   const dailyTimelineDates = continuousTimelineDates;
-  const dailyTimelineCanvasHeight = dailyContinuousCanvasHeight(continuousTimelineBandCount, SLOT_HEIGHT);
+  const dailyTimelineCanvasHeight = dailyContinuousCanvasHeight(continuousTimelineBandCount, timelineSlotHeight);
   const dailyTimelineSlotCount = dailyContinuousSlotCount(continuousTimelineBandCount);
 
   useEffect(() => {
@@ -2978,7 +3042,7 @@ function App() {
       const bandIndex = continuousTimelineEnabled ? Math.floor(dateOffset / timelineColumnCount) : 0;
       let minutesFromDayStart = now.getHours() * 60 + now.getMinutes() - dayStartHour * 60;
       if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
-      const nowTop = bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+      const nowTop = bandIndex * ((24 * 60 / SLOT_MINUTES) * timelineSlotHeight) + (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight;
       const viewportTop = scrollElement.scrollTop;
       const viewportBottom = viewportTop + scrollElement.clientHeight;
       const visible = nowTop >= viewportTop + 2 && nowTop <= viewportBottom - 2;
@@ -4485,6 +4549,7 @@ function App() {
       anchorDate: continuousTimelineStartDate,
       dayStartHour,
       dayCount: continuousTimelineBandCount,
+      hourHeight: timelineHourHeight,
     });
   }
 
@@ -4497,14 +4562,14 @@ function App() {
     const bandIndex = Math.floor(offset / timelineColumnCount);
     let minutesFromDayStart = timeToMinutes(startTime) - dayStartHour * 60;
     if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
-    return bandIndex * ((24 * 60 / SLOT_MINUTES) * SLOT_HEIGHT) + (minutesFromDayStart / SLOT_MINUTES) * SLOT_HEIGHT;
+    return bandIndex * ((24 * 60 / SLOT_MINUTES) * timelineSlotHeight) + (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight;
   }
 
   function continuousPointerTarget(clientX: number, clientY: number, gridElement: HTMLElement) {
     const rect = gridElement.getBoundingClientRect();
     const columnWidth = rect.width / timelineColumnCount;
     const columnIndex = Math.min(Math.max(Math.floor((clientX - rect.left) / columnWidth), 0), timelineColumnCount - 1);
-    const pxPerMinute = SLOT_HEIGHT / SLOT_MINUTES;
+    const pxPerMinute = timelineSlotHeight / SLOT_MINUTES;
     const snappedFromTop = Math.min(
       continuousTimelineBandCount * 24 * 60 - SLOT_MINUTES,
       Math.max(0, Math.round(((clientY - rect.top) / pxPerMinute) / SLOT_MINUTES) * SLOT_MINUTES),
@@ -4536,6 +4601,7 @@ function App() {
       scrollElement: scrollEl,
       visibleDays: visDays,
       startHour: dayStartHour,
+      hourHeight: timelineHourHeight,
     });
     return minutesToTime(clampSlot(target.minutes - offsetMinutes));
   }
@@ -4563,6 +4629,7 @@ function App() {
       scrollElement: scrollEl,
       visibleDays: visDays,
       startHour: dayStartHour,
+      hourHeight: timelineHourHeight,
     });
     return { date: target.date, startTime: target.startTime, minutes: target.minutes };
   }
@@ -5240,7 +5307,7 @@ function App() {
     const duration = owningRecord ? timelineRecordDurationMinutes(owningRecord) : taskDuration(task);
     const rect = event.currentTarget.getBoundingClientRect();
     const offsetPx = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-    const offsetMinutes = Math.max(Math.round((offsetPx / SLOT_HEIGHT) * SLOT_MINUTES), 0);
+    const offsetMinutes = Math.max(Math.round((offsetPx / timelineSlotHeight) * SLOT_MINUTES), 0);
     let active = false;
     let holdCancelled = false;
     let holdReady = !compactLayout || event.pointerType !== "touch";
@@ -7207,7 +7274,7 @@ function App() {
       : (lang === "zh" ? "正计时" : "Stopwatch");
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}${settings.taskBlockFill ? " task-block-fill" : ""}`} data-timeline-view={timelineView} data-task-block-fill={settings.taskBlockFill ? "true" : undefined} style={themeVars(settings, mode)}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}${settings.taskBlockFill ? " task-block-fill" : ""}`} data-timeline-view={timelineView} data-task-block-fill={settings.taskBlockFill ? "true" : undefined} style={{ ...themeVars(settings, mode), "--timeline-slot-height": `${timelineSlotHeight}px`, "--timeline-hour-height": `${timelineHourHeight}px` } as CSSProperties}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand">
@@ -7328,13 +7395,23 @@ function App() {
               <>
               {(() => {
                 const date = new Date(`${timelineWindowAnchorDate}T00:00:00`);
-                return <div className="df-compact-date-display">
+                return <button
+                  type="button"
+                  className="df-compact-date-display df-compact-date-picker-trigger"
+                  aria-expanded={mobileDatePickerOpen}
+                  aria-label={lang === "zh" ? "打开日期快选" : "Open quick date picker"}
+                  onClick={() => {
+                    setMobileDatePickerMonth(timelineWindowAnchorDate.slice(0, 7));
+                    setMobileDatePickerOpen((open) => !open);
+                  }}
+                >
                 {timelineView === "month" ? (
                   <strong>{monthTitle(lang, date.getFullYear(), date.getMonth() + 1)}</strong>
                 ) : (
                   <><strong>{date.getDate()}</strong><span>{weekdayName(lang, date.getDay()).replace(/^周/, "")}</span></>
                 )}
-              </div>;
+                <span className={`df-date-title-chevron${mobileDatePickerOpen ? " open" : ""}`} aria-hidden="true">⌄</span>
+              </button>;
               })()}
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg></button>
@@ -7356,6 +7433,23 @@ function App() {
               </>
             )}
           </div>
+          {compactExecuteView === "schedule" && mobileDatePickerOpen && (
+            <MobileDateQuickPicker
+              month={mobileDatePickerMonth}
+              selectedDate={timelineWindowAnchorDate}
+              today={today}
+              weekStartsOn={settings.weekStartsOn}
+              lang={lang}
+              onMonthChange={setMobileDatePickerMonth}
+              onSelect={(date) => {
+                setSelectedDate(date);
+                setVisibleTimelineDate(date);
+                setMobileDatePickerOpen(false);
+                setDragCreate(null);
+                lastTimelineAutoScrollKeyRef.current = "";
+              }}
+            />
+          )}
           <CandidatePanelShell
             className={`${compactExecuteView === "tasks" ? "compact-active" : "compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`}
             ariaHidden={compactLayout && compactExecuteView !== "tasks"}
@@ -7715,7 +7809,7 @@ function App() {
                 {(timelineView === "3day" || timelineView === "weekly") ? (() => {
                   const threeDates = getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineWindowAnchorDate);
                   const weekdayShort = lang === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                  const canvasHeight = continuousTimelineEnabled ? dailyTimelineCanvasHeight : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * SLOT_HEIGHT;
+                  const canvasHeight = continuousTimelineEnabled ? dailyTimelineCanvasHeight : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) * timelineSlotHeight;
                   const slotCount = continuousTimelineEnabled ? dailyTimelineSlotCount : ((TIMELINE_END - TIMELINE_START) * 60 / SLOT_MINUTES) + 1;
                   const multiDayScheduledTasks = [...expandedVisibleTimelineTasks.filter((task) => continuousTimelineDates.includes(task.scheduledDate || "")), ...previewTasks.filter((task) => continuousTimelineDates.includes(task.scheduledDate || ""))].sort((a, b) => timeToMinutes(a.scheduledStart) - timeToMinutes(b.scheduledStart));
                   return (
@@ -7815,7 +7909,7 @@ function App() {
                                 const boundaryDate = boundarySeparator > 0 ? label.slice(0, boundarySeparator) : "";
                                 const timeLabel = boundarySeparator > 0 ? label.slice(boundarySeparator + 1) : label;
                                 return (
-                                  <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}>
+                                  <div className={`df-slot-ruler ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * timelineSlotHeight}px` }} key={index}>
                                     {isHour ? <span className={`df-timeline-ruler-label${boundaryDate ? " day-boundary" : ""}`}>{boundaryDate && <small>{boundaryDate}</small>}<b>{timeLabel}</b></span> : null}
                                   </div>
                                 );
@@ -7834,6 +7928,7 @@ function App() {
                                   scrollElement: scrollEl,
                                   visibleDays: threeDates,
                                   startHour: dayStartHour,
+                                  hourHeight: timelineHourHeight,
                                   debugLabel: `drag-${timelineView}`,
                                 });
                                 dragTargetDateRef.current = target.date;
@@ -7853,6 +7948,7 @@ function App() {
                                     scrollElement: scrollEl,
                                     visibleDays: threeDates,
                                     startHour: dayStartHour,
+                                    hourHeight: timelineHourHeight,
                                   });
                                   dragTargetDateRef.current = target.date;
                                   if (drag?.kind === "block" && recordByIdMap.has(taskId)) {
@@ -7889,6 +7985,7 @@ function App() {
                                   gridElement: gridEl, scrollElement: scrollEl,
                                   visibleDays: threeDates,
                                   startHour: dayStartHour,
+                                  hourHeight: timelineHourHeight,
                                 });
                                 const startMinutes = startTarget.minutes;
                                 const startDayIndex = startTarget.dayIndex;
@@ -7900,6 +7997,7 @@ function App() {
                                     clientX: moveEvent.clientX, clientY: moveEvent.clientY,
                                     gridElement: gridEl, scrollElement: scrollEl,
                                     visibleDays: threeDates,
+                                    hourHeight: timelineHourHeight,
                                   });
                                   if (currentTarget.date !== startTarget.date) return;
                                   let s = startMinutes, e = currentTarget.minutes;
@@ -7910,8 +8008,8 @@ function App() {
                                   const gridRect = gridEl.getBoundingClientRect();
                                   const cw = gridRect.width / threeDates.length;
                                   const gut = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
-                                  const startPx = continuousTimelineEnabled ? continuousTimedTop(startTarget.date, minutesToTime(s)) : ((s - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
-                                  const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
+                                  const startPx = continuousTimelineEnabled ? continuousTimedTop(startTarget.date, minutesToTime(s)) : ((s - TIMELINE_START * 60) / SLOT_MINUTES) * timelineSlotHeight;
+                                  const endPx = startPx + ((e - s) / SLOT_MINUTES) * timelineSlotHeight;
                                   setDragCreate({
                                     date: startTarget.date, dayIndex: startDayIndex,
                                     startMinutes: s, endMinutes: e,
@@ -7957,6 +8055,7 @@ function App() {
                                   scrollElement: scrollEl,
                                   visibleDays: threeDates,
                                   startHour: dayStartHour,
+                                  hourHeight: timelineHourHeight,
                                 });
                                 const startMinutes = timeToMinutes(target.startTime);
                                 const endMinutes = Math.min(startMinutes + 30, TIMELINE_END * 60);
@@ -7965,14 +8064,14 @@ function App() {
                                 const gutter = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                 const top = continuousTimelineEnabled
                                   ? continuousTimedTop(target.date, target.startTime)
-                                  : ((startMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * SLOT_HEIGHT;
+                                  : ((startMinutes - TIMELINE_START * 60) / SLOT_MINUTES) * timelineSlotHeight;
                                 setDragCreate({
                                   date: target.date,
                                   dayIndex: target.dayIndex,
                                   startMinutes,
                                   endMinutes,
                                   top,
-                                  height: ((endMinutes - startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT,
+                                  height: ((endMinutes - startMinutes) / SLOT_MINUTES) * timelineSlotHeight,
                                   left: target.dayIndex * columnWidth + gutter,
                                   width: columnWidth - gutter * 2,
                                   committed: true,
@@ -7985,7 +8084,7 @@ function App() {
                                   const minutes = ((dayStartHour * 60 + index * SLOT_MINUTES) % (24 * 60));
                                   const isHour = minutes % 60 === 0;
                                   const isMajor = minutes % (6 * 60) === 0;
-                                  return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index} />;
+                                  return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * timelineSlotHeight}px` }} key={index} />;
                                 })}
                               </div>
                               {/* Layer 2: Day column backgrounds and separators */}
@@ -8037,6 +8136,7 @@ function App() {
                                       viewMode={timelineView}
                                       lang={lang}
                                       dayStartHour={dayStartHour}
+                                      hourHeight={timelineHourHeight}
                                       dragState={drag?.kind === "block" && drag.taskId === task.id ? "source-placeholder" : undefined}
                                     />
                                   );
@@ -8052,6 +8152,7 @@ function App() {
                                     <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(tgtDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, top: continuousTimelineEnabled ? continuousTimedTop(tgtDate, hoverSlot) : undefined }}
                                       dayStartHour={dayStartHour}
+                                      hourHeight={timelineHourHeight}
                                     />
                                   );
                                 })()}
@@ -8073,6 +8174,7 @@ function App() {
                                         ["--df-preview" as any]: "1",
                                       } as CSSProperties}
                                       dayStartHour={dayStartHour}
+                                      hourHeight={timelineHourHeight}
                                     />
                                   );
                                 })()}
@@ -8088,7 +8190,7 @@ function App() {
                                   const todayIdx = continuousTimelineEnabled ? ((todayOffset % timelineColumnCount) + timelineColumnCount) % timelineColumnCount : threeDates.indexOf(today);
                                   if (todayIdx === -1) return null;
                                   const now = new Date();
-                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth, top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} lang={lang} dayStartHour={dayStartHour} />;
+                                  return <NowLine extraStyle={{ left: todayIdx * multiColWidth, width: multiColWidth, top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} lang={lang} dayStartHour={dayStartHour} hourHeight={timelineHourHeight} />;
                                 })()}
                                 {/* Empty state */}
                                 {multiDayScheduledTasks.length === 0 && !drag && <div className="df-timeline-empty small"><div className="blob-accent" />--</div>}
@@ -8100,7 +8202,10 @@ function App() {
                                   top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
                                   width: `${dragCreate.width}px`, height: `${dragCreate.height}px`,
                                 }}>
-                                  {dragCreate.committed ? (
+                                  <span className="df-timeline-draft-time">{minutesToTime(dragCreate.startMinutes)} – {minutesToTime(dragCreate.endMinutes)}</span>
+                                  <span className="df-timeline-draft-handle start" aria-hidden="true" />
+                                  <span className="df-timeline-draft-handle end" aria-hidden="true" />
+                                  {dragCreate.committed && !compactLayout ? (
                                     <DragCreateQuickAdd state={dragCreate} projects={projects}
                                       onSave={(title, projectId) => commitDragCreatedTask(dragCreate, title, projectId)}
                                       onCancel={() => setDragCreate(null)}
@@ -8266,7 +8371,17 @@ function App() {
                   );
                 })() : (
                   <div className="df-timeline-daily">
-                    <div className={`df-date-title df-date-title-compact${timelineWindowAnchorDate === today ? " today" : ""}`}>
+                    <button
+                      type="button"
+                      className={`df-date-title df-date-title-compact df-date-title-button${timelineWindowAnchorDate === today ? " today" : ""}`}
+                      aria-expanded={mobileDatePickerOpen}
+                      aria-label={lang === "zh" ? "打开日期快选" : "Open quick date picker"}
+                      onClick={() => {
+                        if (compactLayout) return;
+                        setMobileDatePickerMonth(timelineWindowAnchorDate.slice(0, 7));
+                        setMobileDatePickerOpen((open) => !open);
+                      }}
+                    >
                       <span className="df-date-num">{(() => { const d = new Date(`${timelineWindowAnchorDate}T00:00:00`); return d.getDate(); })()}</span>
                       <span className="df-date-sep"></span>
                       <span className="df-date-wd">
@@ -8276,7 +8391,25 @@ function App() {
                           return weekdayShort[d.getDay()];
                         })()}
                       </span>
-                    </div>
+                      <span className={`df-date-title-chevron${mobileDatePickerOpen ? " open" : ""}`} aria-hidden="true">⌄</span>
+                    </button>
+                    {!compactLayout && mobileDatePickerOpen && (
+                      <MobileDateQuickPicker
+                        month={mobileDatePickerMonth}
+                        selectedDate={timelineWindowAnchorDate}
+                        today={today}
+                        weekStartsOn={settings.weekStartsOn}
+                        lang={lang}
+                        onMonthChange={setMobileDatePickerMonth}
+                        onSelect={(date) => {
+                          setSelectedDate(date);
+                          setVisibleTimelineDate(date);
+                          setMobileDatePickerOpen(false);
+                          setDragCreate(null);
+                          lastTimelineAutoScrollKeyRef.current = "";
+                        }}
+                      />
+                    )}
                     <div
                       className={`df-timeline-allday${allDayDragDate === timelineWindowAnchorDate && drag ? " drag-over" : ""}`}
                       data-all-day-date={timelineWindowAnchorDate}
@@ -8334,6 +8467,7 @@ function App() {
                           scrollElement: scrollEl,
                           visibleDays: [timelineDate],
                           startHour: dayStartHour,
+                          hourHeight: timelineHourHeight,
                           debugLabel: "drag-daily",
                         });
                         const dailyTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : target;
@@ -8353,6 +8487,7 @@ function App() {
                             scrollElement: scrollEl,
                             visibleDays: [timelineDate],
                             startHour: dayStartHour,
+                            hourHeight: timelineHourHeight,
                           });
                           const dailyTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : target;
                           dragTargetDateRef.current = dailyTarget.date;
@@ -8374,6 +8509,7 @@ function App() {
                             gridElement: gridEl, scrollElement: scrollEl,
                             visibleDays: [timelineDate],
                             startHour: dayStartHour,
+                            hourHeight: timelineHourHeight,
                           });
                           const dailyStartTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : startTarget;
                           const startMinutes = dailyStartTarget.minutes;
@@ -8388,6 +8524,7 @@ function App() {
                               gridElement: gridEl, scrollElement: scrollEl,
                               visibleDays: [timelineDate],
                               startHour: dayStartHour,
+                              hourHeight: timelineHourHeight,
                             });
                             const dailyCurrentTarget = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(moveEvent.clientY) : currentTarget;
                             if (dailyCurrentTarget.date !== startDate) return;
@@ -8398,7 +8535,7 @@ function App() {
                             if (e - s < SLOT_MINUTES * 2) e = s + SLOT_MINUTES * 2;
                             const gridRect = gridEl.getBoundingClientRect();
                             const startPx = continuousTimedTop(startDate, minutesToTime(s));
-                            const endPx = startPx + ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT;
+                            const endPx = startPx + ((e - s) / SLOT_MINUTES) * timelineSlotHeight;
                             const gut = compactLayout ? 0 : 8;
                             setDragCreate({
                               date: startDate, dayIndex: 0,
@@ -8448,7 +8585,7 @@ function App() {
                             top: settings.continuousCrossDayScroll !== false
                               ? continuousTimedTop(target.date, startTime)
                               : timeBlockTop(startTime, dayStartHour),
-                            height: ((endMinutes - startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT,
+                            height: ((endMinutes - startMinutes) / SLOT_MINUTES) * timelineSlotHeight,
                             left: compactLayout ? 0 : 8,
                             width: canvasWidth - (compactLayout ? 0 : 16),
                             committed: true,
@@ -8460,7 +8597,7 @@ function App() {
                           const isHour = minutes % 60 === 0;
                           const isMajor = minutes % (6 * 60) === 0;
                           const label = dailyContinuousSlotLabel({ index, anchorDate: continuousTimelineStartDate, dayStartHour });
-                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * SLOT_HEIGHT}px` }} key={index}><span>{label}</span></div>;
+                          return <div className={`df-slot ${isHour ? "hour" : "quarter"} ${isMajor ? "major" : ""}`} style={{ top: `${index * timelineSlotHeight}px` }} key={index}><span>{label}</span></div>;
                         })}
                         {/* Now line — renders whenever today is inside the visible date range.
                             In non-continuous daily mode the range is [timelineDate], so this
@@ -8468,8 +8605,8 @@ function App() {
                             range is the 7-day vertical canvas. Position uses `dayStartHour`
                             in non-continuous mode (via NowLine's internal timeBlockTop) and
                             the continuous absolute coordinate in continuous mode. */}
-                        {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} hourHeight={timelineHourHeight} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
+                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} hourHeight={timelineHourHeight} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
                         {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -8477,6 +8614,7 @@ function App() {
                             duration={placementPreview.durationMinutes}
                             extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(placementPreview.date, placementPreview.startTime) : undefined, ["--df-preview" as any]: "1" } as CSSProperties}
                             dayStartHour={dayStartHour}
+                            hourHeight={timelineHourHeight}
                           />
                         )}
                         {scheduledTasks.map((task) => {
@@ -8507,6 +8645,7 @@ function App() {
                               viewMode="daily"
                               lang={lang}
                               dayStartHour={dayStartHour}
+                              hourHeight={timelineHourHeight}
                               dragState={drag?.kind === "block" && drag.taskId === task.id ? "source-placeholder" : undefined}
                             />
                           );
@@ -8518,7 +8657,10 @@ function App() {
                             top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
                             width: `${dragCreate.width}px`, height: `${dragCreate.height}px`,
                           }}>
-                            {dragCreate.committed ? (
+                            <span className="df-timeline-draft-time">{minutesToTime(dragCreate.startMinutes)} – {minutesToTime(dragCreate.endMinutes)}</span>
+                            <span className="df-timeline-draft-handle start" aria-hidden="true" />
+                            <span className="df-timeline-draft-handle end" aria-hidden="true" />
+                            {dragCreate.committed && !compactLayout ? (
                               <DragCreateQuickAdd state={dragCreate} projects={projects}
                                 onSave={(title, projectId) => commitDragCreatedTask(dragCreate, title, projectId)}
                                 onCancel={() => setDragCreate(null)}
@@ -8548,6 +8690,17 @@ function App() {
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
           <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} featureMetrics={settings.featureMetricsEnabled !== false} dayStartTime={settings.dayStartTime} metricsRangePreset={settings.metricsRangePreset} metricsGroupBy={settings.metricsGroupBy} metricsDisplayMetric={settings.metricsDisplayMetric} metricsIncludeHabits={settings.metricsIncludeHabits} metricsCompletionFilter={settings.metricsCompletionFilter} metricsCustomStart={settings.metricsCustomStart} metricsCustomEnd={settings.metricsCustomEnd} onMetricsSettingsChange={(patch) => void saveSettings(patch)} />
         </Suspense>
+      )}
+
+      {compactLayout && dragCreate?.committed && mode === "execute" && (
+        <DragCreateQuickAdd
+          sheet
+          lang={lang}
+          state={dragCreate}
+          projects={projects}
+          onSave={(title, projectId) => commitDragCreatedTask(dragCreate, title, projectId)}
+          onCancel={() => setDragCreate(null)}
+        />
       )}
 
       {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
@@ -10684,12 +10837,66 @@ function formatDuration(hours: number) {
   return formatMinutes(Math.round(hours * 60));
 }
 
+function MobileDateQuickPicker({ month, selectedDate, today, weekStartsOn, lang, onMonthChange, onSelect }: {
+  month: string;
+  selectedDate: string;
+  today: string;
+  weekStartsOn: 0 | 1;
+  lang: Language;
+  onMonthChange: (month: string) => void;
+  onSelect: (date: string) => void;
+}) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const first = new Date(year, monthNumber - 1, 1);
+  const offset = (first.getDay() - weekStartsOn + 7) % 7;
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(year, monthNumber - 1, index - offset + 1);
+    return localIsoDate(date);
+  });
+  const weekdayLabels = lang === "zh"
+    ? ["日", "一", "二", "三", "四", "五", "六"]
+    : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const orderedWeekdays = Array.from({ length: 7 }, (_, index) => weekdayLabels[(index + weekStartsOn) % 7]);
+  const moveMonth = (delta: number) => {
+    const date = new Date(year, monthNumber - 1 + delta, 1);
+    onMonthChange(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+  };
+  return (
+    <section className="df-mobile-date-picker" aria-label={lang === "zh" ? "快速选择日期" : "Quick date picker"}>
+      <header>
+        <button type="button" onClick={() => moveMonth(-1)} aria-label={lang === "zh" ? "上个月" : "Previous month"}>‹</button>
+        <strong>{monthTitle(lang, year, monthNumber)}</strong>
+        <button type="button" onClick={() => moveMonth(1)} aria-label={lang === "zh" ? "下个月" : "Next month"}>›</button>
+      </header>
+      <div className="df-mobile-date-weekdays" aria-hidden="true">
+        {orderedWeekdays.map((label) => <span key={label}>{label}</span>)}
+      </div>
+      <div className="df-mobile-date-grid">
+        {days.map((date) => {
+          const currentMonth = date.slice(0, 7) === month;
+          const selected = date === selectedDate;
+          const isToday = date === today;
+          return <button
+            key={date}
+            type="button"
+            className={`${currentMonth ? "" : "outside"}${selected ? " selected" : ""}${isToday ? " today" : ""}`}
+            aria-pressed={selected}
+            onClick={() => onSelect(date)}
+          >{Number(date.slice(8, 10))}</button>;
+        })}
+      </div>
+    </section>
+  );
+}
+
 /** Quick‑add input shown on top of a drag‑created preview block. */
-function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
+function DragCreateQuickAdd({ state, projects, onSave, onCancel, sheet = false, lang = "zh" }: {
   state: NonNullable<DragCreateState>;
   projects: Project[];
   onSave: (title: string, projectId: string | null) => void;
   onCancel: () => void;
+  sheet?: boolean;
+  lang?: Language;
 }) {
   const [input, setInput] = useState("");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -10710,9 +10917,10 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
       if (inputRef.current?.value.replace(/#[^\s#]+/g, "").trim()) handleSave();
       else onCancel();
     };
+    if (sheet) return;
     const timer = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
     return () => { window.clearTimeout(timer); document.removeEventListener("mousedown", handler); };
-  }, [onCancel]);
+  }, [onCancel, sheet]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
@@ -10748,13 +10956,25 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
     : [];
 
   const compact = state.width < 110;
+  const dateLabel = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date(`${state.date}T00:00:00`));
 
   return (
-    <form ref={containerRef} className="drag-create-quick-add"
+    <form ref={containerRef} className={`drag-create-quick-add${sheet ? " df-timeline-draft-sheet" : ""}`}
       onSubmit={(event) => { event.preventDefault(); handleSave(); }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
       style={{ "--cat": selectedProject?.color || "var(--accent-active)" } as CSSProperties}>
+      {sheet && <>
+        <div className="df-timeline-draft-grabber" aria-hidden="true" />
+        <div className="df-timeline-draft-head">
+          <span>{lang === "zh" ? "新任务" : "New task"}</span>
+          <button type="button" className="df-timeline-draft-close" onClick={onCancel} aria-label={lang === "zh" ? "关闭" : "Close"}>×</button>
+        </div>
+      </>}
       <div className="drag-create-quick-add-row">
         <span className="drag-create-quick-add-check" aria-hidden="true" />
         <input ref={inputRef} value={input} onChange={(e) => handleInputChange(e.target.value)}
@@ -10772,12 +10992,22 @@ function DragCreateQuickAdd({ state, projects, onSave, onCancel }: {
               if (inputRef.current?.value.replace(/#[^\s#]+/g, "").trim()) handleSave();
             }, 0);
           }}
-          placeholder={compact ? "任务名" : "输入任务名，#选择项目"}
+          placeholder={sheet ? (lang === "zh" ? "任务名称" : "Task title") : compact ? "任务名" : "输入任务名，#选择项目"}
         />
         <button type="submit"
           disabled={!input.replace(/#[^\s#]+/g, "").trim()}
           className="df-quick-add-confirm" aria-label="添加任务">✓</button>
       </div>
+      {sheet && (
+        <div className="df-timeline-draft-meta">
+          <span className="df-timeline-draft-clock" aria-hidden="true">◷</span>
+          <strong>{minutesToTime(state.startMinutes)}</strong>
+          <span aria-hidden="true">→</span>
+          <strong>{minutesToTime(state.endMinutes)}</strong>
+          <span>{formatMinutes(state.endMinutes - state.startMinutes)}</span>
+          <time dateTime={state.date}>{dateLabel}</time>
+        </div>
+      )}
       {showProjectMenu && filtered.length > 0 && (
         <div className="df-quick-add-project-menu drag-create-project-menu"
           onPointerDown={(event) => event.stopPropagation()}
@@ -10809,7 +11039,7 @@ function ReturnedToPlanIcon({ color }: { color?: string }) {
   );
 }
 
-function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHint = false, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, resizeEdges, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; showResizeHint?: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.PointerEvent, edge: "start" | "end") => void; resizeEdges?: { start: boolean; end: boolean }; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; dragState?: TaskBlockDragState }) {
+function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHint = false, onHover, onEdit, onToggleDone, onTaskUpdate, onProjectChange, onProjectColorChange, onCreateProject, onDragStart, onResizeStart, resizeEdges, extraStyle, onAcceptPreview, onCancelPreview, viewMode, lang, dayStartHour = 0, hourHeight = HOUR_HEIGHT, dragState }: { task: Task; preview: ResizePreview; projectName: string; projects: Project[]; hovered: boolean; showResizeHint?: boolean; onHover: (id: string) => void; onEdit: () => void; onToggleDone: () => void; onTaskUpdate?: (patch: Partial<Task>) => void; onProjectChange: (projectId: string) => void; onProjectColorChange: (projectId: string, color: string) => void; onCreateProject: (title: string) => void; onDragStart: (event: React.PointerEvent) => void; onResizeStart: (event: React.PointerEvent, edge: "start" | "end") => void; resizeEdges?: { start: boolean; end: boolean }; extraStyle?: CSSProperties; onAcceptPreview?: () => void; onCancelPreview?: () => void; viewMode?: "daily" | "3day" | "weekly"; lang: Language; dayStartHour?: number; hourHeight?: number; dragState?: TaskBlockDragState }) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const projectBtnRef = useRef<HTMLButtonElement>(null);
@@ -10830,8 +11060,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
     calculatedDurationMinutes = computedDuration;
   }
 
-  const top = timeBlockTop(start, dayStartHour);
-  const height = Math.max(timeBlockHeight(start, end), SLOT_HEIGHT);
+  const top = timeBlockTop(start, dayStartHour, hourHeight);
+  const minSlotHeight = hourHeight * SLOT_MINUTES / 60;
+  const height = Math.max(timeBlockHeight(start, end, dayStartHour, hourHeight), minSlotHeight);
   const durationMinutes = calculatedDurationMinutes;
   const startMinutes = startMinutesValue;
   const endMinutes = timeToMinutes(end);
@@ -10869,7 +11100,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   const originalDate = task.scheduledDate || preview?.startDate || "1970-01-01";
   const suppliedTop = typeof extraStyle?.top === "number" ? extraStyle.top : null;
   const resolvedTop = preview && suppliedTop !== null
-    ? resizedBlockTop(suppliedTop, originalDate, originalStart, preview.startDate || originalDate, start)
+    ? resizedBlockTop(suppliedTop, originalDate, originalStart, preview.startDate || originalDate, start, hourHeight)
     : suppliedTop ?? top;
 
   return (
@@ -10938,11 +11169,11 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   );
 }
 
-function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extraStyle, dayStartHour = 0 }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean; extraStyle?: CSSProperties; dayStartHour?: number }) {
+function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean; extraStyle?: CSSProperties; dayStartHour?: number; hourHeight?: number }) {
   if (!task) return null;
-  const top = timeBlockTop(startTime, dayStartHour);
+  const top = timeBlockTop(startTime, dayStartHour, hourHeight);
   const endTime = addMinutes(startTime, duration);
-  const height = Math.max(timeBlockHeight(startTime, endTime), SLOT_HEIGHT);
+  const height = Math.max(timeBlockHeight(startTime, endTime, dayStartHour, hourHeight), hourHeight * SLOT_MINUTES / 60);
   const color = categories[task.category]?.color || "#888";
   const isPlacementPreview = Boolean(extraStyle && (extraStyle as Record<string, unknown>)["--df-preview" as string]);
   const isEvent = isEventDisplayTask(task);
@@ -11096,7 +11327,7 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
   );
 }
 
-function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties; lang?: Language; dayStartHour?: number }) {
+function NowLine({ extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { extraStyle?: CSSProperties; lang?: Language; dayStartHour?: number; hourHeight?: number }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);
@@ -11104,7 +11335,7 @@ function NowLine({ extraStyle, dayStartHour = 0 }: { extraStyle?: CSSProperties;
   }, []);
   const minutes = now.getHours() * 60 + now.getMinutes();
   if (minutes < 0 || minutes > 24 * 60) return null;
-  const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, dayStartHour);
+  const top = timeBlockTop(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, dayStartHour, hourHeight);
   // Merge so an `undefined` top from extraStyle (non-continuous mode) does NOT
   // clobber the computed, day-start-aware top. Continuous mode supplies a real
   // top via extraStyle and wins; non-continuous mode omits it and the computed

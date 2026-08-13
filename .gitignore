@@ -5,6 +5,7 @@ dist-portfolio/
 release/
 release-*/
 .playwright-cli/
+output/playwright/
 .worktrees/
 *.log
 *.bak
