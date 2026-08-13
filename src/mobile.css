@@ -370,11 +370,9 @@
     z-index: 12 !important;
   }
 
-  #root .df-app:is(.is-mobile-sheet-open, .is-compact-quick-add-open) .df-compact-execute-controls {
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
+  #root .df-app:is(.is-mobile-sheet-open, .is-compact-quick-add-open) .df-compact-execute-controls,
+  #root .df-app.is-mobile-sheet-open .df-mobile-dock,
+  #root .df-app.is-mobile-sheet-open .df-mobile-quick-add-fab { filter: grayscale(.35) brightness(.72) !important; pointer-events:none!important; }
 
   #root .df-app.mode-execute .df-compact-date-picker-trigger {
     pointer-events: auto !important;
@@ -1182,18 +1180,19 @@
   }
 
   #root .df-app .df-time-block .df-resize-dot {
-    width: 44px !important;
-    height: 44px !important;
+    width: 30px !important;
+    height: 30px !important;
     transform: none !important;
     opacity: 0 !important;
-    z-index: 12 !important;
+    z-index: 6 !important;
     touch-action: none !important;
+    pointer-events:none!important;
   }
 
   #root .df-app .df-time-block .df-resize-dot.top {
     left: -4px !important;
     right: auto !important;
-    top: -22px !important;
+    top: -15px !important;
     bottom: auto !important;
   }
 
@@ -1201,7 +1200,7 @@
     left: auto !important;
     right: -4px !important;
     top: auto !important;
-    bottom: -22px !important;
+    bottom: -15px !important;
   }
 
   #root .df-app .df-time-block .df-resize-dot::before,
@@ -1217,46 +1216,20 @@
     height: 9px !important;
     border-radius: 50% !important;
     background: var(--accent-active) !important;
-    box-shadow: 0 0 0 2px var(--surface-main) !important;
+    box-shadow: none !important;
     opacity: 1 !important;
     pointer-events: none !important;
   }
 
-  #root .df-app .df-time-block .df-resize-dot::after {
-    content: attr(data-resize-hint) !important;
-    width: max-content !important;
-    max-width: 132px !important;
-    height: auto !important;
-    padding: 4px 7px !important;
-    border: 1px solid var(--paper-rule-strong) !important;
-    border-radius: 4px !important;
-    background: var(--surface-raised) !important;
-    box-shadow: none !important;
-    color: var(--text-main) !important;
-    font: 650 10px/1.25 var(--paper-sans) !important;
-    white-space: nowrap !important;
-  }
+  #root .df-app .df-time-block .df-resize-dot::after { display:none!important; }
 
-  #root .df-app .df-time-block .df-resize-dot.top::after {
-    left: 19px !important;
-    top: -3px !important;
-    transform: none !important;
-  }
-
-  #root .df-app .df-time-block .df-resize-dot.bottom::after {
-    left: auto !important;
-    right: 19px !important;
-    top: auto !important;
-    bottom: -3px !important;
-    transform: none !important;
-  }
-
-  #root .df-app .df-time-block:hover .df-resize-dot,
-  #root .df-app .df-time-block:focus-within .df-resize-dot,
   #root .df-app .df-time-block.resizing .df-resize-dot,
   #root .df-app .df-time-block.show-resize-hint .df-resize-dot {
     opacity: 1 !important;
+    pointer-events:auto!important;
   }
+
+  #root .df-app .df-time-block .df-task-block-check{position:relative!important;z-index:8!important}
 
   #root .df-app .df-time-block:not(.show-resize-hint) .df-resize-dot::after {
     display: none !important;
@@ -1284,10 +1257,14 @@
     padding: 14px 14px calc(14px + env(safe-area-inset-bottom)) !important;
     border-radius: 18px 18px 0 0 !important;
     overflow-y: auto !important;
+    transform:translateY(var(--mobile-sheet-drag-y,0px))!important;
+    transition:transform 180ms cubic-bezier(.22,.72,.2,1)!important;
   }
 
+  #root .df-app .df-task-detail.df-drawer.df-mobile-short-sheet.is-sheet-dragging{transition:none!important}
+
   #root .df-app .df-task-detail.df-drawer.df-mobile-quick-add-sheet {
-    bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(56px + env(safe-area-inset-bottom) + var(--mobile-keyboard-inset, 0px)) !important;
     padding-bottom: 14px !important;
   }
 
@@ -1587,7 +1564,7 @@
 
   #root .df-app .df-task-detail .df-detail-close {
     position: absolute !important;
-    inset: 8px 8px auto auto !important;
+    inset: 30px 8px auto auto !important;
     float: none !important;
     margin: 0 !important;
     z-index: 4 !important;

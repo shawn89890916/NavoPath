@@ -1348,7 +1348,6 @@ function App() {
   const timelinePinchFrameRef = useRef<number | null>(null);
   const timelinePinchPendingZoomRef = useRef<number | null>(null);
   const [resizeHintTaskId, setResizeHintTaskId] = useState("");
-  const resizeHintTimerRef = useRef<number | null>(null);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
   const layerExitHandlesRef = useRef(new Map<string, ReturnType<typeof scheduleMotionCommit> | null>());
   const layerTriggerRef = useRef(new Map<string, HTMLElement>());
@@ -1592,7 +1591,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (quickAddOpen) compactQuickInputRef.current?.focus();
+    if (quickAddOpen && !compactLayout) compactQuickInputRef.current?.focus();
   }, [quickAddOpen]);
 
   useEffect(() => {
@@ -2365,16 +2364,14 @@ function App() {
     if (mode !== "execute") return;
     const dayStart = settings?.dayStartTime || "00:00";
     const isInitial = !prevDayStartRef.current;
-    if (isInitial || prevDayStartRef.current !== dayStart) {
+    if (!isInitial && prevDayStartRef.current !== dayStart) {
       const [h, m] = dayStart.split(":").map(Number);
       const startMinutes = (h || 0) * 60 + (m || 0);
       if (timelineRef.current) {
         const targetTop = ((startMinutes - dayStartHour * 60) / SLOT_MINUTES) * timelineSlotHeight;
         timelineRef.current.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
       }
-      if (!isInitial) {
-        showToast(lang === "zh" ? `一天开始时间已设为 ${dayStart}` : `Day start time set to ${dayStart}`);
-      }
+      showToast(lang === "zh" ? `一天开始时间已设为 ${dayStart}` : `Day start time set to ${dayStart}`);
     }
     prevDayStartRef.current = dayStart;
   }, [settings?.dayStartTime, mode, lang, dayStartHour, timelineSlotHeight]);
@@ -2516,17 +2513,8 @@ function App() {
     setDragCreate(null);
   }, [timelineView, drag, drawerOpen]);
 
-  useEffect(() => () => {
-    if (resizeHintTimerRef.current) window.clearTimeout(resizeHintTimerRef.current);
-  }, []);
-
   function revealResizeHandles(taskId: string) {
-    if (resizeHintTimerRef.current) window.clearTimeout(resizeHintTimerRef.current);
     setResizeHintTaskId(taskId);
-    resizeHintTimerRef.current = window.setTimeout(() => {
-      setResizeHintTaskId("");
-      resizeHintTimerRef.current = null;
-    }, 4200);
   }
 
   function syncFailureMessage() {
@@ -3397,10 +3385,19 @@ function App() {
         if (!byDate.has(date)) byDate.set(date, []);
         byDate.get(date)!.push(task);
       }
+      if (dragCreate?.committed) {
+        const draftTask = { id: "__timeline_draft__", scheduledDate: dragCreate.date, scheduledStart: minutesToTime(dragCreate.startMinutes), scheduledEnd: minutesToTime(dragCreate.endMinutes) } as Task;
+        const group = byDate.get(dragCreate.date) || [];
+        byDate.set(dragCreate.date, [...group, draftTask]);
+      }
       for (const [, group] of byDate) computeConflictLayout(group).forEach((v, k) => map.set(k, v));
     }
     return map;
-  }, [timelineView, scheduledTasks]);
+  }, [timelineView, scheduledTasks, dragCreate]);
+  const draftConflictStyle = (state: NonNullable<DragCreateState>, view: TimelineView) => {
+    const style = computeConflictStyle("__timeline_draft__", conflictLayout, state.width, state.left, view === "weekly" ? 3 : 4, view);
+    return style ? { left: style.left, width: style.width } : { left: state.left, width: state.width };
+  };
 
   // Debug: conflict layout info
   useEffect(() => {
@@ -5442,6 +5439,16 @@ function App() {
       if (holdTimer !== undefined) window.clearTimeout(holdTimer);
       target.classList.remove("is-drag-armed");
     };
+    const jumpDate = (tap: PointerEvent) => {
+      if (!active || tap.pointerId === pointerId) return;
+      const control = document.elementFromPoint(tap.clientX, tap.clientY)?.closest<HTMLElement>("[data-date],.df-compact-date-picker-trigger");
+      const date = control?.dataset.date;
+      if (date) {
+        setSelectedDate(date);
+        dragTargetDateRef.current = date;
+        window.navigator.vibrate?.(6);
+      } else if (control?.classList.contains("df-compact-date-picker-trigger")) setMobileDatePickerOpen(true);
+    };
     suppressBlockClickRef.current = false;
     const move = (moveEvent: PointerEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
@@ -5569,6 +5576,7 @@ function App() {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
+      window.removeEventListener("pointerdown", jumpDate);
       setDrag(null);
       setDragOverlay(null);
       setDragOverlayTask(null);
@@ -5586,6 +5594,7 @@ function App() {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
+      window.removeEventListener("pointerdown", jumpDate);
       target.classList.remove("is-dragging");
       target.classList.remove("is-dragging-source");
       document.body.classList.remove("df-timeline-pointer-drag");
@@ -5604,9 +5613,11 @@ function App() {
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", keydown);
+    window.addEventListener("pointerdown", jumpDate);
   }
 
   function beginBlockResize(event: React.PointerEvent, task: Task, edge: "start" | "end") {
+    if (resizeHintTaskId !== resolveTimelineRecordId(task.id)) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.button !== 0 && event.pointerType === "mouse") return;
@@ -5775,6 +5786,7 @@ function App() {
     rememberLayerTrigger("drawer");
     const event = occurrenceToEventMap.get(task.id) || events.find((item) => task.id.startsWith(`event_occ_${item.id}_`));
     if (event) {
+      revealResizeHandles(resolveTimelineRecordId(task.id));
       openEventEdit(event);
       return;
     }
@@ -5801,12 +5813,19 @@ function App() {
       endTime: task.scheduledEnd || "",
       category: realTask.category,
       priority: realTask.priority ?? "medium",
-      importance: realTask.importance !== undefined ? realTask.importance : (realTask.priority ?? null),
+      importance: realTask.importance ?? null,
       urgency: realTask.urgency !== undefined ? realTask.urgency : null,
       estimatedHours: realTask.estimatedHours || 0.5,
       details: realTask.notes || ""
     });
     setDrawerOpen(true);
+  }
+
+  function clearTimelineSelection() {
+    if (!resizeHintTaskId && !drawerOpen) return false;
+    setResizeHintTaskId("");
+    if (drawerOpen && mobileTaskSummary) closeTaskDrawer({ autoSave: true });
+    return true;
   }
 
   function openProjectEdit(project: Project) {
@@ -5915,6 +5934,7 @@ function App() {
       }
     }
     requestLayerClose("drawer", ".df-drawer-backdrop, .df-drawer", () => {
+      setResizeHintTaskId("");
       setDrawerOpen(false);
       setEditingRecordId(undefined);
       setEditingOccurrence(null);
@@ -6046,7 +6066,7 @@ function App() {
       endTime: convertedRecord?.scheduledEnd || "",
       category: task.category,
       priority: task.priority ?? "medium",
-      importance: task.importance !== undefined ? task.importance : (task.priority ?? null),
+      importance: task.importance ?? null,
       urgency: task.urgency !== undefined ? task.urgency : null,
       estimatedHours: task.estimatedHours || 0.5,
       details: task.notes || "",
@@ -6410,11 +6430,19 @@ function App() {
     };
     let dropTime = "";
     let candidateTarget: CandidateDropTarget = null;
+    const jumpDate = (tap: PointerEvent) => {
+      if (!active || tap.pointerId === pointerId) return;
+      const control = document.elementFromPoint(tap.clientX, tap.clientY)?.closest<HTMLElement>("[data-date],.df-compact-date-picker-trigger");
+      const date = control?.dataset.date;
+      if (date) { setSelectedDate(date); dragTargetDateRef.current = date; window.navigator.vibrate?.(6); }
+      else if (control?.classList.contains("df-compact-date-picker-trigger")) setMobileDatePickerOpen(true);
+    };
     const cleanup = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keydown);
+      window.removeEventListener("pointerdown", jumpDate);
       document.body.classList.remove("df-timeline-pointer-drag");
       dragElement.classList.remove("is-dragging-source");
       setDrag(null);
@@ -6596,6 +6624,7 @@ function App() {
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", keydown);
+    window.addEventListener("pointerdown", jumpDate);
   }
 
   async function refreshQueuedRemote(options: { force?: boolean } = {}) {
@@ -7945,7 +7974,7 @@ function App() {
                             const isToday = colDate === today;
                             const dateObj = new Date(`${colDate}T00:00:00`);
                             return (
-                              <div key={colDate} className={`df-timeline-3day-date${isToday ? " today" : ""}`}>
+                              <div key={colDate} data-date={colDate} className={`df-timeline-3day-date${isToday ? " today" : ""}`}>
                                 <span className="df-timeline-3day-date-num">{dateObj.getDate()}</span>
                                 <span className="df-timeline-3day-date-sep"></span>
                                 <span className="df-timeline-3day-date-wd">{weekdayShort[dateObj.getDay()]}</span>
@@ -7994,7 +8023,7 @@ function App() {
                               ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === colDate),
                             ];
                             return (
-                              <div key={colDate} className="df-timeline-3day-allday-cell" data-all-day-date={colDate}
+                              <div key={colDate} className="df-timeline-3day-allday-cell" data-date={colDate} data-all-day-date={colDate}
                                 onClick={(event) => {
                                   if (drawerOpen || drag || resizePreview || autoScheduleState === "generating") return;
                                   if ((event.target as HTMLElement).closest("button,.df-all-day-block,.df-all-day-quick")) return;
@@ -8168,7 +8197,7 @@ function App() {
                                 if (drag || resizePreview || autoScheduleState === "generating") return;
                                 if (suppressBlockClickRef.current) return;
                                 if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule,.df-all-day-block,.df-month-task")) return;
-                                if (dragCreate) return;
+                                if (clearTimelineSelection()) return;
                                 const gridEl = timeGridRef.current;
                                 const scrollEl = timelineRef.current;
                                 if (!gridEl || !scrollEl) return;
@@ -8323,8 +8352,8 @@ function App() {
                                 <div className="drag-create-preview df-task-block df-task-block--scheduled df-time-block-quick-add" style={{
                                   position: "absolute", zIndex: 99998, borderRadius: "12px",
                                   overflow: "visible",
-                                  top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
-                                  width: `${dragCreate.width}px`, height: `${dragCreate.height}px`,
+                                  top: `${dragCreate.top}px`, height: `${dragCreate.height}px`,
+                                  ...draftConflictStyle(dragCreate, timelineView),
                                 }}>
                                   <span className="df-timeline-draft-time">{minutesToTime(dragCreate.startMinutes)} – {minutesToTime(dragCreate.endMinutes)}</span>
                                   <button type="button" className="df-timeline-draft-handle start" aria-label={lang === "zh" ? "拖动调整开始时间" : "Drag to adjust start"} onPointerDown={(event) => beginDragCreateResize(event, "start")} />
@@ -8695,7 +8724,7 @@ function App() {
                           if (suppressBlockClickRef.current) return;
                           if (drag || resizePreview) return;
                           if ((event.target as HTMLElement).closest(".df-time-block,.df-suggestion,.df-drop-preview,.df-quick-schedule")) return;
-                          if (dragCreate) return;
+                          if (clearTimelineSelection()) return;
                           const startTime = slotFromPointer(event.clientY, 0, event.clientX);
                           const target = settings.continuousCrossDayScroll !== false ? dailyTargetFromPointer(event.clientY) : { date: timelineDate };
                           const startMinutes = timeToMinutes(startTime);
@@ -8778,8 +8807,8 @@ function App() {
                           <div className="drag-create-preview df-task-block df-task-block--scheduled df-time-block-quick-add" style={{
                             position: "absolute", zIndex: 99998, borderRadius: "12px",
                             overflow: "visible",
-                            top: `${dragCreate.top}px`, left: `${dragCreate.left}px`,
-                            width: `${dragCreate.width}px`, height: `${dragCreate.height}px`,
+                            top: `${dragCreate.top}px`, height: `${dragCreate.height}px`,
+                            ...draftConflictStyle(dragCreate, "daily"),
                           }}>
                             <span className="df-timeline-draft-time">{minutesToTime(dragCreate.startMinutes)} – {minutesToTime(dragCreate.endMinutes)}</span>
                             <button type="button" className="df-timeline-draft-handle start" aria-label={lang === "zh" ? "拖动调整开始时间" : "Drag to adjust start"} onPointerDown={(event) => beginDragCreateResize(event, "start")} />
@@ -8829,7 +8858,7 @@ function App() {
         />
       )}
 
-      {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && (
+      {compactLayout && !drawerOpen && (
         <nav className="df-mobile-dock" aria-label={lang === "zh" ? "工作区导航" : "Workspace navigation"}>
           {!settings.hideAi ? <button className="df-mobile-dock-action df-mobile-ai" onClick={() => { setQuickAddOpen(false); setAiOpen(true); }} aria-label={t(lang, "fab.askNavo")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14v10H9l-4 3v-13Z"/><path d="M9 10.5h6"/></svg>
@@ -8846,7 +8875,7 @@ function App() {
 
       {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />}
       {!compactLayout && !settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
-      {compactLayout && !drawerOpen && !aiOpen && !utilityPanel && <button
+      {compactLayout && !drawerOpen && <button
         type="button"
         className="df-mobile-quick-add-fab"
         aria-label={lang === "zh" ? "快速添加任务" : "Quick add task"}
@@ -8854,7 +8883,7 @@ function App() {
         onClick={() => { if (mode !== "execute") changeMode("execute"); setMobileQuickAddKind("task"); setQuickAddOpen(true); }}
       ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>}
 
-      {drawerOpen && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
+      {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} memoryCount={settings.aiMemoryEnabled === false ? 0 : (data.aiMemories || []).filter((memory) => !memory.archived).length} historyCount={(data.chat || []).length || aiMessages.length} contextDate={selectedDate} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
@@ -11004,6 +11033,7 @@ function MobileDateQuickPicker({ month, selectedDate, today, weekStartsOn, lang,
           const isToday = date === today;
           return <button
             key={date}
+            data-date={date}
             type="button"
             className={`${currentMonth ? "" : "outside"}${selected ? " selected" : ""}${isToday ? " today" : ""}`}
             aria-pressed={selected}
@@ -11034,6 +11064,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLFormElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const selectedProjectRef = useRef<Project | null>(null);
   const savingRef = useRef(false);
 
@@ -11044,11 +11075,11 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current || containerRef.current.contains(e.target as Node)) return;
+      const container = sheet ? sheetRef.current : containerRef.current;
+      if (!container || container.contains(e.target as Node)) return;
       if (inputRef.current?.value.replace(/#[^\s#]+/g, "").trim()) handleSave();
       else onCancel();
     };
-    if (sheet) return;
     const timer = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
     return () => { window.clearTimeout(timer); document.removeEventListener("mousedown", handler); };
   }, [onCancel, sheet]);
@@ -11108,7 +11139,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
 
   const compact = state.width < 110;
   if (sheet) return (
-    <><div className="df-drawer-backdrop df-timeline-draft-backdrop" onMouseDown={() => cleanTitle() ? handleSave() : onCancel()} /><Suspense fallback={null}><MobileTimelineDraftSheet
+    <div ref={sheetRef} className="df-timeline-draft-sheet-host"><Suspense fallback={null}><MobileTimelineDraftSheet
       lang={lang}
       title={input}
       onTitleChange={handleInputChange}
@@ -11129,7 +11160,7 @@ function DragCreateQuickAdd({ state, projects, onSave, onMore, onCancel, onRange
       onSubtaskTitleChange={setSubtaskTitle}
       onAddSubtask={addSubtask}
       onCancelSubtask={() => { setAddingSubtask(false); setSubtaskTitle(""); }}
-    /></Suspense></>
+    /></Suspense></div>
   );
 
   return (
@@ -11257,11 +11288,11 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
     : suppliedTop ?? top;
 
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(e) => { e.stopPropagation(); onEdit(); }} onDoubleClick={onEdit} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {canResize && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} data-resize-hint={lang === "zh" ? "拖动调整开始" : "Drag to adjust start"} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && (showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
       <TaskBlockRow className="df-time-card-row" align="start">
         {isEvent ? (
@@ -11292,7 +11323,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
           setProjectOpen((open) => !open);
         }}># {projectName}</button>
       </span>}
-      {canResize && resizeEdges?.end !== false && <button type="button" className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} data-resize-hint={lang === "zh" ? "拖动调整结束" : "Drag to adjust end"} onPointerDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && (showResizeHint || preview) && resizeEdges?.end !== false && <button type="button" className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onPointerDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{

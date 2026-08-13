@@ -28505,6 +28505,7 @@ body:has(:active)::-webkit-scrollbar-thumb {
   border: 2px solid var(--accent-active);
   border-radius: 50%;
   background: var(--bg-surface);
+  box-shadow:none;
   pointer-events: none;
 }
 

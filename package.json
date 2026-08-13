@@ -56,7 +56,7 @@
           "dist/assets/WidgetApp-*.js",
           "dist/assets/MobileTaskSummary-*.js"
       ],
-      "limit": "271 KB"
+      "limit": "272 KB"
     },
     {
       "name": "Document parsing scripts",
