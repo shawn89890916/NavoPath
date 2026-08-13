@@ -1134,6 +1134,16 @@
     background: transparent !important;
   }
 
+  #root .df-app .drag-create-quick-add.df-timeline-draft-sheet {
+    overflow-y: auto !important;
+    padding: 10px 20px calc(20px + env(safe-area-inset-bottom)) !important;
+    background: color-mix(in srgb, var(--surface-raised) 96%, transparent) !important;
+  }
+
+  #root .df-app .df-timeline-draft-sheet .drag-create-quick-add-row {
+    padding-left: 28px !important;
+  }
+
   #root .df-app .drag-create-quick-add input {
     border: 0 !important;
     background: transparent !important;
@@ -1181,7 +1191,7 @@
   }
 
   #root .df-app .df-time-block .df-resize-dot.top {
-    left: -10px !important;
+    left: -4px !important;
     right: auto !important;
     top: -22px !important;
     bottom: auto !important;
@@ -1189,7 +1199,7 @@
 
   #root .df-app .df-time-block .df-resize-dot.bottom {
     left: auto !important;
-    right: -10px !important;
+    right: -4px !important;
     top: auto !important;
     bottom: -22px !important;
   }
@@ -1261,6 +1271,28 @@
     box-sizing: border-box !important;
     border-radius: 18px 18px 0 0 !important;
     overflow-x: hidden !important;
+  }
+
+  #root .df-app .df-task-detail.df-drawer.df-mobile-short-sheet {
+    position: fixed !important;
+    inset: auto 0 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: min(62dvh, 520px) !important;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom)) !important;
+    border-radius: 18px 18px 0 0 !important;
+    overflow-y: auto !important;
+  }
+
+  #root .df-app .df-task-detail.df-drawer.df-mobile-quick-add-sheet {
+    bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: 14px !important;
+  }
+
+  #root .df-app .df-timeline-draft-backdrop {
+    inset: 0 !important;
   }
 
   /* AI and Settings share the task-detail bottom-sheet geometry on phones. */

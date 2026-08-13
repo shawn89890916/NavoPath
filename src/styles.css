@@ -28484,16 +28484,32 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-timeline-draft-handle {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: ns-resize;
+  z-index: 4;
+}
+
+.df-timeline-draft-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
   border: 2px solid var(--accent-active);
   border-radius: 50%;
   background: var(--bg-surface);
   pointer-events: none;
 }
 
-.df-timeline-draft-handle.start { top: -7px; left: -7px; }
-.df-timeline-draft-handle.end { right: -7px; bottom: -7px; }
+.df-timeline-draft-handle.start { top: -22px; left: -4px; }
+.df-timeline-draft-handle.end { right: -4px; bottom: -22px; }
 
 .df-cloud-error-card h1 {
   margin: 0 0 12px;
@@ -33605,7 +33621,8 @@ body:has(:active)::-webkit-scrollbar-thumb {
   inset: auto 0 calc(72px + env(safe-area-inset-bottom, 0px));
   z-index: 100040;
   display: block;
-  min-height: 196px;
+  max-height: min(58dvh, 500px);
+  min-height: 0;
   padding: 10px 20px 20px;
   border: 1px solid var(--paper-rule);
   border-bottom: 0;
@@ -33614,6 +33631,13 @@ body:has(:active)::-webkit-scrollbar-thumb {
   box-shadow: 0 -10px 30px color-mix(in srgb, var(--text-main) 10%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  overflow-y: auto;
+}
+
+.df-mobile-quick-add-sheet {
+  position: fixed !important;
+  inset: auto 0 calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 100040 !important;
 }
 
 .df-timeline-draft-sheet .drag-create-quick-add-row {
@@ -33646,9 +33670,82 @@ body:has(:active)::-webkit-scrollbar-thumb {
   display: flex;
   min-height: 38px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 8px;
   color: var(--text-muted);
   font: 600 13px/1 var(--paper-sans);
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-project {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-project select {
+  min-width: 0;
+  flex: 1;
+  height: 36px;
+  padding: 0 26px 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-times {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-times label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--paper-rule);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-times select {
+  min-width: 0;
+  width: 100%;
+  height: 34px;
+  padding: 0 18px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  font: 750 16px/1 var(--paper-mono);
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 9px;
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-actions button {
+  min-height: 40px;
+  border: 1px solid var(--paper-rule);
+  border-radius: 10px;
+  background: var(--surface-main);
+  color: var(--accent-active);
+  font-weight: 750;
+}
+
+.df-timeline-draft-sheet .df-mobile-summary-subtask-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  margin-top: 8px;
 }
 
 .df-timeline-draft-close {
@@ -33660,7 +33757,20 @@ body:has(:active)::-webkit-scrollbar-thumb {
   color: var(--text-main);
   font-size: 24px;
   line-height: 1;
+  margin-left: 0;
 }
+
+.df-timeline-draft-head > span:first-child { margin-right: auto; }
+
+.df-timeline-draft-project { margin: 10px 0 8px; }
+.df-timeline-draft-times { margin-top: 4px; }
+.df-timeline-draft-date {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.df-timeline-draft-backdrop { z-index: 39 !important; }
 
 .df-timeline-draft-meta {
   display: grid;
@@ -41438,6 +41548,25 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
   display: -webkit-box !important;
 
+}
+
+/* Resize controls must remain visible outside the task border. Content owns
+   clipping instead of the task shell so the 44px touch targets are not cut. */
+.df-app .df-time-block {
+  overflow: visible !important;
+}
+
+.df-app .df-time-block .df-time-card-shell {
+  overflow: hidden !important;
+  border-radius: inherit !important;
+}
+
+.df-app .df-time-block.show-resize-hint .df-resize-dot {
+  opacity: 1 !important;
+}
+
+.df-app .df-time-block.show-resize-hint .df-resize-dot::after {
+  opacity: 1 !important;
 }
 
 
