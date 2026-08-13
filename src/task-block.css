@@ -49,6 +49,16 @@
   --task-priority-high: #C2853E;
   --task-priority-urgent: #B6423C;
 }
+
+/* Timeline resize handles use 44px touch targets that intentionally extend
+ * beyond the task border. Keep the shell visible; inner content clips itself. */
+#root .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"] {
+  overflow: visible !important;
+}
+
+#root .df-app .df-task-block[data-task-appearance][data-task-variant="scheduled"].show-resize-hint .df-resize-dot {
+  opacity: 1 !important;
+}
 /* ============================================================
  * Appearance mode 1 — Calm (default)
  * Clean pure background, neutral 1px paper border, weak bottom
