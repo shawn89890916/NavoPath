@@ -1340,6 +1340,8 @@ function App() {
   const timelineZoomRef = useRef(1);
   const timelinePinchActiveRef = useRef(false);
   const timelinePinchRef = useRef<{ distance: number; startZoom: number; anchorBaseY: number; anchorViewportY: number } | null>(null);
+  const timelinePinchFrameRef = useRef<number | null>(null);
+  const timelinePinchPendingZoomRef = useRef<number | null>(null);
   const [resizeHintTaskId, setResizeHintTaskId] = useState("");
   const resizeHintTimerRef = useRef<number | null>(null);
   const [utilityPanel, setUtilityPanel] = useState<"settings" | "about" | null>(null);
@@ -1670,6 +1672,13 @@ function App() {
   const [dailyCanvasWidth, setDailyCanvasWidth] = useState(0);
   timelineZoomRef.current = timelineZoom;
 
+  useLayoutEffect(() => {
+    const pinch = timelinePinchRef.current;
+    const scrollElement = timelineRef.current;
+    if (!pinch || !scrollElement || !timelinePinchActiveRef.current) return;
+    scrollElement.scrollTop = anchoredTimelineScrollTop(pinch.anchorBaseY, timelineZoom, pinch.anchorViewportY);
+  }, [timelineZoom]);
+
   useEffect(() => {
     const scrollElement = timelineRef.current;
     if (!scrollElement || !compactLayout || mode !== "execute" || timelineView === "month") return;
@@ -1682,6 +1691,7 @@ function App() {
       const anchorViewportY = verticalCentre(event.touches) - rect.top;
       const startZoom = timelineZoomRef.current;
       timelinePinchActiveRef.current = true;
+      scrollElement.classList.add("is-pinching");
       dragCreateSuppressClickRef.current = true;
       setDragCreate(null);
       timelinePinchRef.current = {
@@ -1696,20 +1706,38 @@ function App() {
       const pinch = timelinePinchRef.current;
       if (!pinch || event.touches.length !== 2) return;
       const nextZoom = timelineZoomFromPinch(pinch.startZoom, pinch.distance, verticalDistance(event.touches));
-      timelineZoomRef.current = nextZoom;
-      setTimelineZoom(nextZoom);
-      window.requestAnimationFrame(() => {
-        scrollElement.scrollTop = anchoredTimelineScrollTop(pinch.anchorBaseY, nextZoom, pinch.anchorViewportY);
-      });
+      timelinePinchPendingZoomRef.current = nextZoom;
+      if (timelinePinchFrameRef.current === null) {
+        timelinePinchFrameRef.current = window.requestAnimationFrame(() => {
+          timelinePinchFrameRef.current = null;
+          const pendingZoom = timelinePinchPendingZoomRef.current;
+          if (pendingZoom === null) return;
+          timelinePinchPendingZoomRef.current = null;
+          if (Math.abs(pendingZoom - timelineZoomRef.current) < 0.002) return;
+          timelineZoomRef.current = pendingZoom;
+          setTimelineZoom(pendingZoom);
+        });
+      }
       event.preventDefault();
     };
     const endPinch = (event: TouchEvent) => {
       if (!timelinePinchRef.current || event.touches.length >= 2) return;
-      timelinePinchRef.current = null;
-      window.requestAnimationFrame(() => {
+      const pendingZoom = timelinePinchPendingZoomRef.current;
+      if (timelinePinchFrameRef.current !== null) {
+        window.cancelAnimationFrame(timelinePinchFrameRef.current);
+        timelinePinchFrameRef.current = null;
+      }
+      timelinePinchPendingZoomRef.current = null;
+      if (pendingZoom !== null && Math.abs(pendingZoom - timelineZoomRef.current) >= 0.002) {
+        timelineZoomRef.current = pendingZoom;
+        setTimelineZoom(pendingZoom);
+      }
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        timelinePinchRef.current = null;
         timelinePinchActiveRef.current = false;
+        scrollElement.classList.remove("is-pinching");
         window.setTimeout(() => { dragCreateSuppressClickRef.current = false; }, 80);
-      });
+      }));
     };
 
     scrollElement.addEventListener("touchstart", beginPinch, { passive: false });
@@ -1717,6 +1745,12 @@ function App() {
     scrollElement.addEventListener("touchend", endPinch, { passive: true });
     scrollElement.addEventListener("touchcancel", endPinch, { passive: true });
     return () => {
+      if (timelinePinchFrameRef.current !== null) window.cancelAnimationFrame(timelinePinchFrameRef.current);
+      timelinePinchFrameRef.current = null;
+      timelinePinchPendingZoomRef.current = null;
+      timelinePinchRef.current = null;
+      timelinePinchActiveRef.current = false;
+      scrollElement.classList.remove("is-pinching");
       scrollElement.removeEventListener("touchstart", beginPinch);
       scrollElement.removeEventListener("touchmove", movePinch);
       scrollElement.removeEventListener("touchend", endPinch);
@@ -3060,7 +3094,7 @@ function App() {
       resizeObserver.disconnect();
       scrollElement.removeEventListener("scroll", updateNowVisibility);
     };
-  }, [compactExecuteView, continuousTimelineDates, continuousTimelineEnabled, continuousTimelineStartDate, dayStartHour, mode, timelineColumnCount, timelineView, timelineWindowAnchorDate, today]);
+  }, [compactExecuteView, continuousTimelineDates, continuousTimelineEnabled, continuousTimelineStartDate, dayStartHour, mode, timelineColumnCount, timelineSlotHeight, timelineView, timelineWindowAnchorDate, today]);
 
   const showBackToNow = !nowInTimelineViewport;
 
@@ -7069,7 +7103,10 @@ function App() {
     const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     setSelectedDate(nowDate);
     setVisibleTimelineDate(nowDate);
+    setCompactExecuteView("schedule");
+    setMobileDatePickerOpen(false);
     setTimelineView("daily");
+    lastTimelineAutoScrollKeyRef.current = "";
     setPendingTimelineFocus({ date: nowDate, startTime: nowTime, source: "schedule" });
   }
 
@@ -7274,7 +7311,7 @@ function App() {
       : (lang === "zh" ? "正计时" : "Stopwatch");
 
   return (
-    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}${settings.taskBlockFill ? " task-block-fill" : ""}`} data-timeline-view={timelineView} data-task-block-fill={settings.taskBlockFill ? "true" : undefined} style={{ ...themeVars(settings, mode), "--timeline-slot-height": `${timelineSlotHeight}px`, "--timeline-hour-height": `${timelineHourHeight}px` } as CSSProperties}>
+    <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}${settings.taskBlockFill ? " task-block-fill" : ""}${aiOpen || utilityPanel ? " is-mobile-sheet-open" : ""}${quickAddOpen ? " is-compact-quick-add-open" : ""}`} data-timeline-view={timelineView} data-task-block-fill={settings.taskBlockFill ? "true" : undefined} style={{ ...themeVars(settings, mode), "--timeline-slot-height": `${timelineSlotHeight}px`, "--timeline-hour-height": `${timelineHourHeight}px` } as CSSProperties}>
       <header className="df-header">
         <div className="df-header-inner">
           <div className="df-brand">
@@ -7382,19 +7419,25 @@ function App() {
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button
                 className={`active ${compactExecuteView === "schedule" ? "schedule-state" : "tasks-state"}`}
-                aria-label={compactExecuteView === "tasks" ? "Tasks" : "Schedule"}
+                aria-label={compactExecuteView === "tasks" ? (lang === "zh" ? "任务" : "Tasks") : (lang === "zh" ? "日程" : "Schedule")}
                 aria-pressed={compactExecuteView === "schedule"}
                 onClick={() => setCompactExecuteView((view) => view === "tasks" ? "schedule" : "tasks")}
               >
-                <span className="df-compact-mode-label tasks-label" aria-hidden="true">Tasks</span>
-                <span className="df-compact-mode-label schedule-label" aria-hidden="true">Schedule</span>
+                <span className="df-compact-mode-label tasks-label" aria-hidden="true">{lang === "zh" ? "任务" : "Tasks"}</span>
+                <span className="df-compact-mode-label schedule-label" aria-hidden="true">{lang === "zh" ? "日程" : "Schedule"}</span>
                 <span className="df-compact-mode-logo" aria-hidden="true"><ProductIcon compact /></span>
               </button>
             </nav>
-            {compactExecuteView === "schedule" && (
-              <>
-              {(() => {
+            {(() => {
                 const date = new Date(`${timelineWindowAnchorDate}T00:00:00`);
+                const dateContents = timelineView === "month" ? (
+                  <strong>{monthTitle(lang, date.getFullYear(), date.getMonth() + 1)}</strong>
+                ) : (
+                  <><strong>{date.getDate()}</strong><span>{weekdayName(lang, date.getDay()).replace(/^周/, "")}</span></>
+                );
+                if (compactExecuteView === "tasks") {
+                  return <div className="df-compact-date-display is-readonly" aria-label={lang === "zh" ? "当前日期" : "Current date"}>{dateContents}</div>;
+                }
                 return <button
                   type="button"
                   className="df-compact-date-display df-compact-date-picker-trigger"
@@ -7405,14 +7448,12 @@ function App() {
                     setMobileDatePickerOpen((open) => !open);
                   }}
                 >
-                {timelineView === "month" ? (
-                  <strong>{monthTitle(lang, date.getFullYear(), date.getMonth() + 1)}</strong>
-                ) : (
-                  <><strong>{date.getDate()}</strong><span>{weekdayName(lang, date.getDay()).replace(/^周/, "")}</span></>
-                )}
+                {dateContents}
                 <span className={`df-date-title-chevron${mobileDatePickerOpen ? " open" : ""}`} aria-hidden="true">⌄</span>
               </button>;
               })()}
+            {compactExecuteView === "schedule" && (
+              <>
               <nav className="df-compact-calendar-tabs" aria-label={t(lang, "timeline.switchView")}>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.prevSegment")} onClick={() => shiftTimeline(-1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg></button>
                 <button className="df-compact-date-arrow" aria-label={t(lang, "timeline.nextSegment")} onClick={() => shiftTimeline(1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6.5 3 5 5-5 5" /></svg></button>
@@ -11950,6 +11991,47 @@ function EditDrawer(props: {
   );
 }
 
+function MobileSheetDismissHandle({ onDismiss, lang }: { onDismiss: () => void; lang: Language }) {
+  const gestureRef = useRef<{ pointerId: number; startY: number; startedAt: number; panel: HTMLElement } | null>(null);
+  const finishGesture = (event: React.PointerEvent<HTMLButtonElement>, cancelled = false) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    gestureRef.current = null;
+    const distance = Math.max(0, event.clientY - gesture.startY);
+    const velocity = distance / Math.max(1, performance.now() - gesture.startedAt);
+    if (!cancelled && (distance >= 88 || velocity >= 0.62)) {
+      gesture.panel.classList.remove("is-sheet-dragging");
+      gesture.panel.classList.add("is-sheet-dismissing");
+      gesture.panel.style.setProperty("--mobile-sheet-drag-y", "100dvh");
+      window.setTimeout(onDismiss, 170);
+      return;
+    }
+    gesture.panel.classList.remove("is-sheet-dragging");
+    gesture.panel.style.setProperty("--mobile-sheet-drag-y", "0px");
+  };
+  return <button
+    type="button"
+    className="df-mobile-sheet-dismiss-handle"
+    aria-label={lang === "zh" ? "下滑关闭" : "Swipe down to close"}
+    onPointerDown={(event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      const panel = event.currentTarget.parentElement;
+      if (!panel) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      panel.classList.add("is-sheet-dragging");
+      gestureRef.current = { pointerId: event.pointerId, startY: event.clientY, startedAt: performance.now(), panel };
+    }}
+    onPointerMove={(event) => {
+      const gesture = gestureRef.current;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      const distance = Math.max(0, event.clientY - gesture.startY);
+      gesture.panel.style.setProperty("--mobile-sheet-drag-y", `${distance}px`);
+    }}
+    onPointerUp={(event) => finishGesture(event)}
+    onPointerCancel={(event) => finishGesture(event, true)}
+  />;
+}
+
 function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, memoryCount, historyCount, contextDate }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; memoryCount: number; historyCount: number; contextDate: string }) {
   const projects = projectList || [];
   const tasks = taskList || [];
@@ -12016,6 +12098,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     setEditMenu(null);
   };
   return <aside className="df-ai-panel df-ai-panel-reference">
+    <MobileSheetDismissHandle onDismiss={onClose} lang={lang} />
     <div className="df-ai-panel-head">
       <button className="df-ai-new-chat" onClick={onNewConversation}><span aria-hidden="true">＋</span>{text.newChat}</button>
       <div className="df-ai-head-actions">
@@ -12973,6 +13056,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     <>
       <div className="df-utility-backdrop" onMouseDown={onClose} />
       <aside className="df-utility-panel" role="dialog" aria-modal="true" aria-labelledby="df-utility-title">
+        <MobileSheetDismissHandle onDismiss={onClose} lang={lang} />
         <div className="df-utility-head">
           <h2 id="df-utility-title">{kind === "settings" ? t(lang, "settings.settings") : t(lang, "settings.aboutNavo")}</h2>
           <button ref={closeButtonRef} className="df-icon-action i-close" aria-label={t(lang, "settings.close")} onClick={onClose} />

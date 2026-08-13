@@ -310,6 +310,7 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 .df-pick-actions button.primary { color: var(--accent-active) !important; border-color: var(--paper-accent-rule) !important; background: var(--paper-note) !important; }
 
 /* AI and overlays use one neutral sheet elevation */
+.df-mobile-sheet-dismiss-handle { display: none; }
 .df-ai-plan, .df-ai-plan-toggle, .df-ai-plan-confirm, .df-ai-plan-cancel {
   border-color: var(--paper-rule) !important; border-radius: var(--paper-radius) !important;
   background: transparent !important; color: var(--text-main) !important; box-shadow: none !important; filter: none !important; text-shadow: none !important;
@@ -3284,9 +3285,9 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
     repeating-linear-gradient(
       to bottom,
       color-mix(in srgb, #c9a46f 10%, transparent) 0,
-      color-mix(in srgb, #c9a46f 10%, transparent) 80px,
-      transparent 80px,
-      transparent 160px
+      color-mix(in srgb, #c9a46f 10%, transparent) var(--timeline-hour-height, 80px),
+      transparent var(--timeline-hour-height, 80px),
+      transparent calc(2 * var(--timeline-hour-height, 80px))
     ) !important;
 }
 
@@ -3296,9 +3297,9 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
     repeating-linear-gradient(
       to bottom,
       color-mix(in srgb, #b8895f 8%, transparent) 0,
-      color-mix(in srgb, #b8895f 8%, transparent) 80px,
-      transparent 80px,
-      transparent 160px
+      color-mix(in srgb, #b8895f 8%, transparent) var(--timeline-hour-height, 80px),
+      transparent var(--timeline-hour-height, 80px),
+      transparent calc(2 * var(--timeline-hour-height, 80px))
     ) !important;
 }
 

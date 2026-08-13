@@ -353,21 +353,27 @@
 
   #root .df-app.mode-execute .df-candidate-panel.compact-active {
     position: relative !important;
-    padding: 52px 6px 0 !important;
+    padding: 64px 6px 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: var(--surface-main) !important;
   }
 
   #root .df-app.mode-execute .df-compact-execute-controls {
-    top: 4px !important;
+    top: 10px !important;
     left: 16px !important;
     right: 16px !important;
     width: auto !important;
     height: 44px !important;
     display: flex !important;
     align-items: center !important;
-    z-index: 100050 !important;
+    z-index: 12 !important;
+  }
+
+  #root .df-app:is(.is-mobile-sheet-open, .is-compact-quick-add-open) .df-compact-execute-controls {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   #root .df-app.mode-execute .df-compact-date-picker-trigger {
@@ -677,7 +683,7 @@
   }
 
   #root .df-app .df-back-to-now {
-    top: 54px !important;
+    top: 66px !important;
     right: 4px !important;
     width: 32px !important;
     min-width: 32px !important;
@@ -698,7 +704,7 @@
   }
 
   #root .df-app .df-timeline-panel.compact-active {
-    padding-top: 52px !important;
+    padding-top: 64px !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
@@ -719,6 +725,16 @@
     white-space: nowrap !important;
     pointer-events: auto !important;
     z-index: 2 !important;
+    padding: 0 5px !important;
+    border: 0 !important;
+    outline: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  #root .df-app .df-compact-date-display.is-readonly {
+    pointer-events: none !important;
   }
 
   #root .df-app .df-compact-date-display strong {
@@ -1260,13 +1276,30 @@
     border-radius: 18px 18px 0 0 !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
+    transform: translateY(var(--mobile-sheet-drag-y, 0px)) !important;
+    transition: transform 180ms cubic-bezier(.22, .72, .2, 1) !important;
   }
 
-  #root .df-app .df-ai-panel-reference::before,
-  #root .df-app .df-utility-panel::before {
+  #root .df-app .df-mobile-sheet-dismiss-handle {
+    display: block !important;
+    position: absolute !important;
+    z-index: 20 !important;
+    top: 0 !important;
+    left: 50% !important;
+    width: 96px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: translateX(-50%) !important;
+    touch-action: none !important;
+    cursor: grab !important;
+  }
+
+  #root .df-app .df-mobile-sheet-dismiss-handle::before {
     content: "" !important;
     position: absolute !important;
-    z-index: 5 !important;
     top: 7px !important;
     left: 50% !important;
     width: 34px !important;
@@ -1274,6 +1307,17 @@
     border-radius: 999px !important;
     background: color-mix(in srgb, var(--text-muted) 42%, transparent) !important;
     transform: translateX(-50%) !important;
+  }
+
+  #root .df-app .df-mobile-sheet-dismiss-handle:active {
+    cursor: grabbing !important;
+  }
+
+  #root .df-app :is(.df-ai-panel-reference, .df-utility-panel).is-sheet-dragging {
+    transition: none !important;
+  }
+
+  #root .df-app :is(.df-ai-panel-reference, .df-utility-panel).is-sheet-dismissing {
     pointer-events: none !important;
   }
 
