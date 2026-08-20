@@ -28474,6 +28474,74 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 .df-mobile-date-picker { display: none; }
 
+.df-mobile-date-picker > header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  min-height: 42px;
+}
+
+.df-mobile-date-picker > header strong {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.df-mobile-date-picker > header button,
+.df-mobile-date-grid button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+}
+
+.df-mobile-date-picker > header button {
+  color: var(--text-muted);
+  font-size: 28px;
+}
+
+.df-mobile-date-weekdays,
+.df-mobile-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  text-align: center;
+}
+
+.df-mobile-date-weekdays span {
+  padding: 5px 0 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.df-mobile-date-grid button {
+  position: relative;
+  justify-self: center;
+  width: 42px;
+  min-width: 42px;
+  min-height: 40px;
+  border-radius: 12px;
+}
+
+.df-mobile-date-grid button.outside { color: color-mix(in srgb, var(--text-muted) 48%, transparent); }
+.df-mobile-date-grid button.today::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent-active);
+  transform: translateX(-50%);
+}
+
+.df-mobile-date-grid button.selected {
+  background: color-mix(in srgb, var(--accent-active) 13%, var(--bg-surface));
+  color: var(--mode-primary-strong);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-active) 42%, transparent);
+}
+
 .df-timeline-draft-time {
   position: absolute;
   inset: 6px 10px auto;
@@ -38879,77 +38947,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
     border-bottom: 1px solid var(--paper-rule);
     background: var(--bg-surface);
     box-shadow: 0 12px 24px color-mix(in srgb, var(--text-main) 8%, transparent);
-  }
-
-  .df-mobile-date-picker > header {
-    display: grid;
-    grid-template-columns: 44px 1fr 44px;
-    align-items: center;
-    min-height: 42px;
-  }
-
-  .df-mobile-date-picker > header strong {
-    text-align: center;
-    color: var(--text-main);
-    font: 650 17px/1.2 var(--paper-sans);
-  }
-
-  .df-mobile-date-picker > header button,
-  .df-mobile-date-grid button {
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
-    background: transparent;
-    color: var(--text-main);
-    font: 500 15px/1 var(--paper-sans);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .df-mobile-date-picker > header button {
-    color: var(--text-muted);
-    font-size: 28px;
-  }
-
-  .df-mobile-date-weekdays,
-  .df-mobile-date-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    text-align: center;
-  }
-
-  .df-mobile-date-weekdays span {
-    padding: 5px 0 3px;
-    color: var(--text-muted);
-    font-size: 11px;
-  }
-
-  .df-mobile-date-grid button {
-    position: relative;
-    justify-self: center;
-    width: 42px;
-    min-width: 42px;
-    min-height: 40px;
-    border-radius: 12px;
-  }
-
-  .df-mobile-date-grid button.outside { color: color-mix(in srgb, var(--text-muted) 48%, transparent); }
-  .df-mobile-date-grid button.today::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 4px;
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--accent-active);
-    transform: translateX(-50%);
-  }
-
-  .df-mobile-date-grid button.selected {
-    background: color-mix(in srgb, var(--accent-active) 13%, var(--bg-surface));
-    color: var(--mode-primary-strong);
-    font-weight: 700;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-active) 42%, transparent);
   }
 
   .df-app .df-timeline-scroll,

@@ -1648,6 +1648,59 @@
 }
 
 @media (max-width: 1180px) and (orientation: landscape) {
+  body {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #root .df-app {
+    min-width: 0 !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #root .df-app .df-execute {
+    height: calc(100dvh - 58px) !important;
+    min-height: 0 !important;
+    grid-template-columns: minmax(288px, 38vw) minmax(0, 1fr) !important;
+    overflow: hidden !important;
+  }
+
+  #root .df-app .df-candidate-panel,
+  #root .df-app .df-timeline-panel {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #root .df-app .df-candidate-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 14px !important;
+  }
+
+  #root .df-app .df-candidate-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  #root .df-app .df-mobile-date-picker > header {
+    min-height: 30px !important;
+  }
+
+  #root .df-app .df-mobile-date-picker > header button,
+  #root .df-app .df-mobile-date-grid button {
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  #root .df-app .df-mobile-date-grid button {
+    width: 28px !important;
+  }
+
   .df-app[data-timeline-view="3day"] .df-ai-planner,
   .df-app[data-timeline-view="weekly"] .df-ai-planner {
     min-width: 34px !important;

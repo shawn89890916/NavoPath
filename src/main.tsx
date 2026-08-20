@@ -5621,7 +5621,7 @@ function App() {
   }
 
   function beginBlockResize(event: React.PointerEvent, task: Task, edge: "start" | "end") {
-    if (resizeHintTaskId !== resolveTimelineRecordId(task.id)) return;
+    if (resizeHintTaskId !== resolveTimelineRecordId(task.id) && hoveredBlock !== task.id) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.button !== 0 && event.pointerType === "mouse") return;
@@ -7985,6 +7985,7 @@ function App() {
                 {showBackToNow && (
                   <button className="df-back-to-now" type="button" onClick={goToNow} title={lang === "zh" ? "回到现在" : "Back to now"} aria-label={lang === "zh" ? "回到现在" : "Back to now"}>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
+                    <span>{lang === "zh" ? "现在" : "Now"}</span>
                   </button>
                 )}
                 {(timelineView === "3day" || timelineView === "weekly") ? (() => {
@@ -11330,7 +11331,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
       onHover("");
     }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
-      {canResize && (showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && (hovered || showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
       <TaskBlockRow className="df-time-card-row" align="start">
         {isEvent ? (
@@ -11361,7 +11362,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
           setProjectOpen((open) => !open);
         }}># {projectName}</button> : <span className="df-block-project" title={projectName}># {projectName}</span>}
       </span>}
-      {canResize && (showResizeHint || preview) && resizeEdges?.end !== false && <button type="button" className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onPointerDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
+      {canResize && (hovered || showResizeHint || preview) && resizeEdges?.end !== false && <button type="button" className="df-resize-dot bottom" aria-label={t(lang, "timeBlock.adjustEnd")} onPointerDown={(event) => onResizeStart(event, "end")} onClick={(event) => event.stopPropagation()} />}
       {projectOpen && projectBtnRef.current && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setProjectOpen(false)}>
           <div className="df-project-popover-portal" onClick={(event) => event.stopPropagation()} style={{
@@ -12299,10 +12300,10 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     <div className="df-ai-panel-head">
       <label className="df-ai-mobile-model"><span className="df-visually-hidden">{lang === "zh" ? "选择模型" : "Choose model"}</span><select value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
       <div className="df-ai-head-actions">
-        <button className="df-ai-reference-tool new-chat" onClick={onNewConversation} aria-label={text.newChat} title={text.newChat}>□<i>／</i></button>
-        <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}>▤</button>
-        <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"}>⚙</button>
-        <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}>×</button>
+        <button className="df-ai-reference-tool new-chat" onClick={onNewConversation} aria-label={text.newChat} title={text.newChat}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" /><path d="m16.5 3.5 4 4L12 16l-4.5 1 1-4.5Z" /></svg></button>
+        <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5l3.5 2" /></svg></button>
+        <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 13.5v-3l-2.1-.7a7.2 7.2 0 0 0-.7-1.7l1-2-2.1-2.1-2 1a7.2 7.2 0 0 0-1.7-.7L10.5 2h-3l-.7 2.1a7.2 7.2 0 0 0-1.7.7l-2-1L1 5.9l1 2a7.2 7.2 0 0 0-.7 1.7L0 10.5v3l2.1.7a7.2 7.2 0 0 0 .7 1.7l-1 2L3.9 20l2-1a7.2 7.2 0 0 0 1.7.7l.9 2.3h3l.7-2.1a7.2 7.2 0 0 0 1.7-.7l2 1 2.1-2.1-1-2a7.2 7.2 0 0 0 .7-1.7Z" transform="translate(1.5 0) scale(.875)" /></svg></button>
+        <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
       </div>
     </div>
     {conversationListOpen && <div className="df-ai-conversation-list">

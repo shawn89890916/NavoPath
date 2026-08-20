@@ -351,8 +351,6 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 .df-ai-reference-tool {
   display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; color: var(--text-muted); background: transparent; font: 500 23px/1 var(--paper-sans); cursor: pointer;
 }
-.df-ai-reference-tool.settings { font-size: 0; }
-.df-ai-reference-tool.settings::before { content: "AI"; font: 600 9px/1 var(--paper-mono); letter-spacing:.08em; }
 .df-ai-reference-tool:hover, .df-ai-reference-tool.active { color: var(--accent-active); background: var(--paper-note); }
 .df-ai-panel-reference .df-ai-panel-body { padding: 24px; background: var(--surface-main); }
 .df-ai-reference-empty { display: grid; gap: 30px; width: 100%; }
@@ -2508,11 +2506,15 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   position: relative;
 }
 .df-app .df-back-to-now {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
   position: absolute;
   top: 8px;
   right: 10px;
   z-index: 8;
   min-height: 32px;
+  min-width: 70px !important;
   padding: 0 10px !important;
   border-color: var(--paper-rule) !important;
   border-bottom-color: var(--accent-active) !important;
@@ -8597,4 +8599,46 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   .df-settings-detail-link,
   .df-settings-disclosure-toggle,
   .df-settings-subtabs button { transition: none; }
+}
+
+/* Landscape workspace repair: keep controls editorial while restoring the
+   interactions that are shared by desktop and rotated devices. */
+#root .df-app .df-date-title-button {
+  border: 0 !important;
+}
+
+#root .df-app .df-brand-ai-button:disabled {
+  opacity: 1 !important;
+}
+
+.df-ai-panel-reference .df-ai-reference-tool svg,
+#root .df-app .df-back-to-now svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+
+#root .df-app .df-back-to-now svg {
+  width: 16px;
+  height: 16px;
+}
+
+.df-ai-panel-reference .df-ai-reference-tool svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (min-width: 900px), (orientation: landscape) {
+  #root .df-app .df-timeline-daily > .df-mobile-date-picker {
+    position: absolute;
+    z-index: 60;
+    top: 58px;
+    left: 50%;
+    display: block;
+    width: min(360px, calc(100% - 24px));
+    padding: 10px 12px 14px;
+    border: 1px solid var(--paper-rule-strong);
+    background: var(--surface-raised);
+    transform: translateX(-50%);
+  }
 }
