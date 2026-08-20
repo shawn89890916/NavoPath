@@ -86,7 +86,7 @@ import { nextDueAiBrief } from "./aiBriefs";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch";
-import { parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { canAcknowledgeBootstrapSave, parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
 import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
 import { MAX_PLUGIN_CONFIG_STRING_LENGTH, listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
@@ -216,8 +216,8 @@ type CompactExecuteView = "tasks" | "schedule";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
 type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day" | "week"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
 type SettingsPatch = Partial<Settings>;
-type QueuedDataSave = { payload: PlannerData; version: number };
-type QueuedSettingsSave = { payload: SettingsPatch; version: number };
+type QueuedDataSave = { payload: PlannerData; version: number; pendingSavedAt: string };
+type QueuedSettingsSave = { payload: SettingsPatch; version: number; pendingSavedAt: string };
 
 /**
  * SchedulePreview — single source of truth for a preview block.
@@ -726,7 +726,10 @@ function writeBootstrapCache(
   data: PlannerData,
   settings: Settings,
   userId?: string,
-  sync: Partial<Pick<BootstrapCache, "dataDirty" | "settingsDirty" | "pendingSavedAt" | "remoteRevision">> = {},
+  sync: Partial<Pick<BootstrapCache, "dataDirty" | "settingsDirty" | "remoteRevision">> & {
+    dataPendingSavedAt?: string | null;
+    settingsPendingSavedAt?: string | null;
+  } = {},
 ) {
   try {
     const current = readBootstrapCache(userId);
@@ -736,7 +739,12 @@ function writeBootstrapCache(
       savedAt: new Date().toISOString(),
       dataDirty: sync.dataDirty ?? current?.dataDirty ?? false,
       settingsDirty: sync.settingsDirty ?? current?.settingsDirty ?? false,
-      pendingSavedAt: sync.pendingSavedAt ?? current?.pendingSavedAt,
+      dataPendingSavedAt: sync.dataPendingSavedAt === null
+        ? undefined
+        : sync.dataPendingSavedAt ?? current?.dataPendingSavedAt,
+      settingsPendingSavedAt: sync.settingsPendingSavedAt === null
+        ? undefined
+        : sync.settingsPendingSavedAt ?? current?.settingsPendingSavedAt,
       remoteRevision: sync.remoteRevision ?? current?.remoteRevision,
     } satisfies BootstrapCache));
   } catch {
@@ -1873,24 +1881,30 @@ function App() {
     const workspaceKey = `cloud:${userId}`;
     return window.plannerApi.subscribeToRemoteChanges((remote) => {
       const incomingRevision = Number(remote.revision || 0);
-      if (!shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
+      const cached = readBootstrapCache(userId);
+      const hasDirtyLocal = Boolean(cached?.dataDirty || cached?.settingsDirty);
+      if (workspaceKey !== loadedWorkspaceKeyRef.current) return;
+      if (!hasDirtyLocal && !shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
       if (pendingDataSaveRef.current || pendingSettingsSaveRef.current || dataSaveInFlightRef.current || settingsSaveInFlightRef.current) {
         queuedRemoteRefreshRef.current = true;
         return;
       }
-      const migratedData = migrateLegacyHabitTracker(remote.data, remote.settings.pluginConfigs);
+      const resolved = resolveBootstrap(cached, remote.data, remote.settings);
+      if (!resolved.data || !resolved.settings) return;
+      const migratedData = migrateLegacyHabitTracker(resolved.data, resolved.settings.pluginConfigs);
       remoteRevisionRef.current = Math.max(remoteRevisionRef.current, incomingRevision);
       dataRef.current = migratedData;
-      settingsRef.current = remote.settings;
+      settingsRef.current = resolved.settings;
       setData(migratedData);
-      setSettings(remote.settings);
-      setLang(remote.settings.language || lang);
-      writeBootstrapCache(migratedData, remote.settings, userId, {
-        dataDirty: false,
-        settingsDirty: false,
+      setSettings(resolved.settings);
+      setLang(resolved.settings.language || lang);
+      writeBootstrapCache(migratedData, resolved.settings, userId, {
+        dataDirty: resolved.replayData,
+        settingsDirty: resolved.replaySettings,
         remoteRevision: remote.revision,
       });
-      if (migratedData !== remote.data) void saveData(migratedData);
+      if (resolved.replayData || migratedData !== resolved.data) void saveData(migratedData);
+      if (resolved.replaySettings) void saveSettings(resolved.settings);
     });
   }, [authState?.user?.id]);
 
@@ -2366,6 +2380,11 @@ function App() {
     const handleOnline = () => {
       void flushPendingSave();
       void flushPendingSettings();
+      const cached = readBootstrapCache(authStateRef.current?.user?.id);
+      if (cached?.dataDirty || cached?.settingsDirty) {
+        queuedRemoteRefreshRef.current = true;
+        void refreshQueuedRemote();
+      }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pagehide", flushForLifecycle);
@@ -2655,15 +2674,22 @@ function App() {
         pendingDataSaveRef.current = null;
         try {
           const saved = await window.plannerApi.saveData(job.payload);
+          const acknowledgedRevision = Number(window.plannerApi.getKnownRemoteRevision?.() || 0);
+          if (acknowledgedRevision > 0) remoteRevisionRef.current = Math.max(remoteRevisionRef.current, acknowledgedRevision);
           dataSaveRetryCountRef.current = 0;
           dataSaveNoticeShownRef.current = false;
           if (job.version === dataSaveVersionRef.current && !pendingDataSaveRef.current) {
             dataRef.current = saved;
             setData(saved);
-            if (settingsRef.current) writeBootstrapCache(saved, settingsRef.current, authStateRef.current?.user?.id, {
-              dataDirty: false,
-              remoteRevision: remoteRevisionRef.current,
-            });
+            const userId = authStateRef.current?.user?.id;
+            const cached = readBootstrapCache(userId);
+            if (settingsRef.current && canAcknowledgeBootstrapSave(cached, "data", job.pendingSavedAt)) {
+              writeBootstrapCache(saved, settingsRef.current, userId, {
+                dataDirty: false,
+                dataPendingSavedAt: null,
+                remoteRevision: remoteRevisionRef.current,
+              });
+            }
             scheduleSnapshotWrite();
           }
         } catch {
@@ -2703,16 +2729,23 @@ function App() {
         pendingSettingsSaveRef.current = null;
         try {
           const saved = await window.plannerApi.saveSettings(job.payload);
+          const acknowledgedRevision = Number(window.plannerApi.getKnownRemoteRevision?.() || 0);
+          if (acknowledgedRevision > 0) remoteRevisionRef.current = Math.max(remoteRevisionRef.current, acknowledgedRevision);
           settingsSaveRetryCountRef.current = 0;
           settingsSaveNoticeShownRef.current = false;
           if (job.version === settingsSaveVersionRef.current && !pendingSettingsSaveRef.current) {
             settingsRef.current = saved;
             setSettings(saved);
             if (saved.language) setLang(saved.language);
-            if (dataRef.current) writeBootstrapCache(dataRef.current, saved, authStateRef.current?.user?.id, {
-              settingsDirty: false,
-              remoteRevision: remoteRevisionRef.current,
-            });
+            const userId = authStateRef.current?.user?.id;
+            const cached = readBootstrapCache(userId);
+            if (dataRef.current && canAcknowledgeBootstrapSave(cached, "settings", job.pendingSavedAt)) {
+              writeBootstrapCache(dataRef.current, saved, userId, {
+                settingsDirty: false,
+                settingsPendingSavedAt: null,
+                remoteRevision: remoteRevisionRef.current,
+              });
+            }
             if (saved.activeMode) setModeState(saved.activeMode as Mode);
             scheduleSnapshotWrite();
           }
@@ -2743,12 +2776,12 @@ function App() {
     const optimistic = { ...tracked, aiProfile: buildAiProfile(tracked), savedAt };
     const version = dataSaveVersionRef.current + 1;
     dataSaveVersionRef.current = version;
-    pendingDataSaveRef.current = { payload: optimistic, version };
+    pendingDataSaveRef.current = { payload: optimistic, version, pendingSavedAt: savedAt };
     dataRef.current = optimistic;
     setData(optimistic);
     if (settingsRef.current) writeBootstrapCache(optimistic, settingsRef.current, authStateRef.current?.user?.id, {
       dataDirty: true,
-      pendingSavedAt: savedAt,
+      dataPendingSavedAt: savedAt,
       remoteRevision: remoteRevisionRef.current,
     });
     scheduleDataFlush();
@@ -2814,15 +2847,16 @@ function App() {
     const current = settingsRef.current || settings;
     if (!current) return;
     const optimistic = { ...current, ...patch };
+    const pendingSavedAt = new Date().toISOString();
     const version = settingsSaveVersionRef.current + 1;
     settingsSaveVersionRef.current = version;
-    pendingSettingsSaveRef.current = { payload: optimistic, version };
+    pendingSettingsSaveRef.current = { payload: optimistic, version, pendingSavedAt };
     settingsRef.current = optimistic;
     setSettings(optimistic);
     if (optimistic.language) setLang(optimistic.language);
     if (dataRef.current) writeBootstrapCache(dataRef.current, optimistic, authStateRef.current?.user?.id, {
       settingsDirty: true,
-      pendingSavedAt: new Date().toISOString(),
+      settingsPendingSavedAt: pendingSavedAt,
       remoteRevision: remoteRevisionRef.current,
     });
     if (patch.activeMode) setModeState(patch.activeMode as Mode);
@@ -2854,19 +2888,15 @@ function App() {
         await flushPendingSave({ urgent: true });
         await flushPendingSettings({ urgent: true });
       } else if (direction === "pull") {
-        if (dataSaveTimerRef.current) window.clearTimeout(dataSaveTimerRef.current);
-        if (settingsSaveTimerRef.current) window.clearTimeout(settingsSaveTimerRef.current);
-        dataSaveTimerRef.current = null;
-        settingsSaveTimerRef.current = null;
-        pendingDataSaveRef.current = null;
-        pendingSettingsSaveRef.current = null;
-        dataSaveVersionRef.current += 1;
-        settingsSaveVersionRef.current += 1;
+        // Pull is intentionally non-destructive: acknowledge local work first,
+        // then reconcile the cloud baseline. Import/restore remains the explicit
+        // workflow for replacing local data.
         await Promise.all([
           flushPendingSave({ urgent: true }),
           flushPendingSettings({ urgent: true }),
         ]);
-        await refreshQueuedRemote({ force: true });
+        queuedRemoteRefreshRef.current = true;
+        await refreshQueuedRemote();
       }
       const result = direction === "push"
         ? await scheduler.runPushOnly()
@@ -6348,7 +6378,10 @@ function App() {
         ...result.agent,
         decisionState: result.agent.pending.length ? "pending" as const : result.agent.decisionState,
       } : undefined;
-      if ((agent?.applied.length || 0) > 0) await refreshQueuedRemote({ force: true });
+      if ((agent?.applied.length || 0) > 0) {
+        queuedRemoteRefreshRef.current = true;
+        await refreshQueuedRemote();
+      }
       applyAgentClientActions(agent);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
@@ -6891,19 +6924,22 @@ function App() {
     window.addEventListener("pointerdown", jumpDate);
   }
 
-  async function refreshQueuedRemote(options: { force?: boolean } = {}) {
-    if (!options.force && (!queuedRemoteRefreshRef.current
+  async function refreshQueuedRemote() {
+    if (!queuedRemoteRefreshRef.current
       || pendingDataSaveRef.current
       || pendingSettingsSaveRef.current
       || dataSaveInFlightRef.current
-      || settingsSaveInFlightRef.current)) return;
+      || settingsSaveInFlightRef.current) return;
     queuedRemoteRefreshRef.current = false;
     const workspaceKey = loadedWorkspaceKeyRef.current;
     const bootstrap = await window.plannerApi.getBootstrap?.({ force: true });
     if (!bootstrap?.data || !bootstrap.settings) return;
     const incomingRevision = Number(bootstrap.revision || 0);
-    if (!shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
-    const resolved = resolveBootstrap(options.force ? null : readBootstrapCache(authStateRef.current?.user?.id), bootstrap.data, bootstrap.settings, { preferRemote: options.force });
+    const cached = readBootstrapCache(authStateRef.current?.user?.id);
+    const hasDirtyLocal = Boolean(cached?.dataDirty || cached?.settingsDirty);
+    if (workspaceKey !== loadedWorkspaceKeyRef.current) return;
+    if (!hasDirtyLocal && !shouldApplyWorkspaceRevision(workspaceKey, loadedWorkspaceKeyRef.current, remoteRevisionRef.current, incomingRevision)) return;
+    const resolved = resolveBootstrap(cached, bootstrap.data, bootstrap.settings);
     if (!resolved.data || !resolved.settings) return;
     remoteRevisionRef.current = Math.max(remoteRevisionRef.current, incomingRevision);
     dataRef.current = resolved.data;
@@ -6912,10 +6948,18 @@ function App() {
     setSettings(resolved.settings);
     if (resolved.settings.language) setLang(resolved.settings.language);
     writeBootstrapCache(resolved.data, resolved.settings, authStateRef.current?.user?.id, {
-      dataDirty: false,
-      settingsDirty: false,
+      dataDirty: resolved.replayData,
+      settingsDirty: resolved.replaySettings,
       remoteRevision: bootstrap.revision,
     });
+    if (resolved.replayData) {
+      await saveData(resolved.data);
+      await flushPendingSave({ urgent: true });
+    }
+    if (resolved.replaySettings) {
+      await saveSettings(resolved.settings);
+      await flushPendingSettings({ urgent: true });
+    }
   }
 
   function viewAiImport(messageId: string) {
@@ -6963,7 +7007,10 @@ function App() {
         showToast(result.error.message);
         return;
       }
-      if (decision !== "reject") await refreshQueuedRemote({ force: true });
+      if (decision !== "reject") {
+        queuedRemoteRefreshRef.current = true;
+        await refreshQueuedRemote();
+      }
       if (result.agent?.applied.some((action) => action.entity === "integration")) await refreshExternalCalendarLayer("none");
       applyAgentClientActions(result.agent);
       const nextAgent: AgentRunState = {
@@ -7222,7 +7269,8 @@ function App() {
       });
       if (!result.ok) throw new Error(result.error.message);
       if (result.agent?.pending.length) throw new Error(lang === "zh" ? "拆解计划需要在 AI 对话中确认" : "Confirm the breakdown in the AI conversation");
-      await refreshQueuedRemote({ force: true });
+      queuedRemoteRefreshRef.current = true;
+      await refreshQueuedRemote();
       const addedCount = Math.max(0, (dataRef.current?.tasks.find((item) => item.id === taskId)?.subtasks || []).length - (task.subtasks || []).length);
       if (!addedCount) throw new Error(result.reply || "AI did not add subtasks");
       showToast(addedCount > 0

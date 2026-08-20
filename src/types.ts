@@ -635,6 +635,8 @@ export interface PlannerApi {
     settings: Settings | null;
     revision?: number;
   }>;
+  /** Latest revision already acknowledged by this API instance after a save. */
+  getKnownRemoteRevision?: () => number | undefined;
   signUp?: (email: string, password: string) => Promise<{
     user: { id: string; email?: string } | null;
     message?: string;

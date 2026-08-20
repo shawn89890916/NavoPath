@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerData, Settings } from "./types";
-import { parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
+import { canAcknowledgeBootstrapSave, parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 
 const data = (savedAt: string, title: string): PlannerData => ({
   version: 2, importedSeedVersion: "test", generatedAt: savedAt, savedAt, goals: [], projects: [], tasks: [{ id: title, title, dueDate: "2026-06-20", category: "personal", priority: "medium", notes: "", goalId: "", completed: false, createdAt: savedAt, updatedAt: savedAt }], longTasks: [], events: [], notes: [], drafts: [], chat: [], aiConversations: [], aiMemories: [], taskLayouts: {},
@@ -20,10 +20,10 @@ describe("resolveBootstrap", () => {
     expect(result.replayData).toBe(false);
   });
 
-  it("replays only explicitly dirty local data", () => {
+  it("merges and replays explicitly dirty local data without losing either side", () => {
     const local = cache({ dataDirty: true });
     const result = resolveBootstrap(local, data("2026-06-20T00:00:00Z", "remote"), settings("en"));
-    expect(result.data).toBe(local.data);
+    expect(result.data?.tasks.map((task) => task.id).sort()).toEqual(["cached", "remote"]);
     expect(result.settings?.language).toBe("en");
     expect(result.replayData).toBe(true);
   });
@@ -73,6 +73,8 @@ describe("parseBootstrapCache", () => {
       settings: { language: "invalid", activeMode: "invalid", theme: "dark" },
       dataDirty: "false",
       settingsDirty: true,
+      pendingSavedAt: "2026-06-19T00:01:00Z",
+      dataPendingSavedAt: "2026-06-19T00:02:00Z",
       remoteRevision: "7",
     }));
 
@@ -83,7 +85,25 @@ describe("parseBootstrapCache", () => {
     expect(parsed?.settings.theme).toBe("dark");
     expect(parsed?.dataDirty).toBe(false);
     expect(parsed?.settingsDirty).toBe(true);
+    expect(parsed?.dataPendingSavedAt).toBe("2026-06-19T00:02:00Z");
+    expect(parsed?.settingsPendingSavedAt).toBe("2026-06-19T00:01:00Z");
     expect(parsed?.remoteRevision).toBeUndefined();
+  });
+});
+
+describe("save acknowledgement tokens", () => {
+  it("does not clear a dirty marker when a newer local edit replaced the request", () => {
+    const local = cache({
+      dataDirty: true,
+      dataPendingSavedAt: "2026-06-19T00:02:00Z",
+      settingsDirty: true,
+      settingsPendingSavedAt: "2026-06-19T00:03:00Z",
+    });
+
+    expect(canAcknowledgeBootstrapSave(local, "data", "2026-06-19T00:01:00Z")).toBe(false);
+    expect(canAcknowledgeBootstrapSave(local, "data", "2026-06-19T00:02:00Z")).toBe(true);
+    expect(canAcknowledgeBootstrapSave(local, "settings", "2026-06-19T00:02:00Z")).toBe(false);
+    expect(canAcknowledgeBootstrapSave(local, "settings", "2026-06-19T00:03:00Z")).toBe(true);
   });
 });
 

@@ -81,6 +81,23 @@ describe("sync deletion tombstones", () => {
     expect(equalTime.sync?.deleted).toHaveProperty("tasks:equal");
   });
 
+  it("merges offline and cloud calendar events by id and update time", () => {
+    const remote = data([]);
+    remote.events = [
+      { id: "cloud-only", title: "Cloud", date: "2026-07-26", category: "personal", details: "", createdAt: "2026-07-26T09:00:00.000Z" },
+      { id: "shared", title: "Cloud newer", date: "2026-07-26", category: "personal", details: "", createdAt: "2026-07-26T11:00:00.000Z" },
+    ];
+    const local = data([]);
+    local.events = [
+      { id: "local-only", title: "Local", date: "2026-07-27", category: "personal", details: "", createdAt: "2026-07-26T10:00:00.000Z" },
+      { id: "shared", title: "Local older", date: "2026-07-26", category: "personal", details: "", createdAt: "2026-07-26T10:00:00.000Z" },
+    ];
+
+    const merged = mergePlannerData(remote, local, "2026-07-26T12:00:00.000Z");
+
+    expect(merged.tasks.map((item) => item.title).sort()).toEqual(["Cloud", "Cloud newer", "Local"]);
+  });
+
   it("keeps legacy objects without timestamps when no valid tombstone exists", () => {
     const legacy = task("legacy", "2026-07-26T09:00:00.000Z") as Partial<Task>;
     delete legacy.createdAt;

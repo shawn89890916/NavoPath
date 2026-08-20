@@ -5,6 +5,7 @@ export const SYNC_COLLECTIONS = [
   "goals",
   "projects",
   "tasks",
+  "events",
   "habits",
   "habitDailyStates",
   "timeEntries",
@@ -160,7 +161,6 @@ export function mergePlannerData(
   }
   pruneSupersededTombstones(merged, deleted, referenceTime);
   merged.chat = local.chat || remote.chat || [];
-  merged.events = local.events || remote.events || [];
   merged.savedAt = mergedAt;
   return normalizeData(merged);
 }

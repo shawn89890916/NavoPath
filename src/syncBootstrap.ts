@@ -1,6 +1,7 @@
 import type { PlannerData, Settings } from "./types";
 import { normalizeData } from "./browserFallback";
 import { getDefaultSettings, normalizeSettings } from "./defaultSettings";
+import { mergePlannerData } from "./syncMerge";
 
 export type BootstrapCache = {
   data: PlannerData;
@@ -8,7 +9,10 @@ export type BootstrapCache = {
   savedAt?: string;
   dataDirty?: boolean;
   settingsDirty?: boolean;
+  /** @deprecated Read only for caches written before per-resource save tokens. */
   pendingSavedAt?: string;
+  dataPendingSavedAt?: string;
+  settingsPendingSavedAt?: string;
   remoteRevision?: number;
 };
 
@@ -26,13 +30,22 @@ export function parseBootstrapCache(raw: string | null): BootstrapCache | null {
     ) return null;
     const plannerData = data as Partial<PlannerData>;
     if (!Array.isArray(plannerData.tasks) || !Array.isArray(plannerData.projects)) return null;
+    const dataDirty = candidate.dataDirty === true;
+    const settingsDirty = candidate.settingsDirty === true;
+    const legacyPendingSavedAt = typeof candidate.pendingSavedAt === "string" ? candidate.pendingSavedAt : undefined;
     return {
       data: normalizeData(plannerData as PlannerData),
       settings: normalizeSettings(settings),
       savedAt: typeof candidate.savedAt === "string" ? candidate.savedAt : undefined,
-      dataDirty: candidate.dataDirty === true,
-      settingsDirty: candidate.settingsDirty === true,
-      pendingSavedAt: typeof candidate.pendingSavedAt === "string" ? candidate.pendingSavedAt : undefined,
+      dataDirty,
+      settingsDirty,
+      pendingSavedAt: legacyPendingSavedAt,
+      dataPendingSavedAt: typeof candidate.dataPendingSavedAt === "string"
+        ? candidate.dataPendingSavedAt
+        : dataDirty ? legacyPendingSavedAt : undefined,
+      settingsPendingSavedAt: typeof candidate.settingsPendingSavedAt === "string"
+        ? candidate.settingsPendingSavedAt
+        : settingsDirty ? legacyPendingSavedAt : undefined,
       remoteRevision: typeof candidate.remoteRevision === "number"
         && Number.isFinite(candidate.remoteRevision)
         && candidate.remoteRevision >= 0
@@ -61,11 +74,27 @@ export function resolveBootstrap(
   const replayData = Boolean(cached?.dataDirty && cached.data && remoteData);
   const replaySettings = Boolean(cached?.settingsDirty && cached.settings && remoteSettings);
   return {
-    data: replayData ? cached!.data : remoteData || cached?.data || null,
+    // A dirty local snapshot is not merely "newer" than the cloud baseline: it
+    // contains acknowledged offline edits. Merge both sides before replaying so
+    // reconnecting cannot erase either offline work or concurrent cloud work.
+    data: replayData ? mergePlannerData(remoteData!, cached!.data) : remoteData || cached?.data || null,
     settings: replaySettings ? cached!.settings : remoteSettings || cached?.settings || null,
     replayData,
     replaySettings,
   };
+}
+
+export function canAcknowledgeBootstrapSave(
+  cached: BootstrapCache | null,
+  resource: "data" | "settings",
+  pendingSavedAt: string,
+) {
+  if (!cached) return true;
+  const dirty = resource === "data" ? cached.dataDirty : cached.settingsDirty;
+  const currentToken = resource === "data" ? cached.dataPendingSavedAt : cached.settingsPendingSavedAt;
+  // A different token means another edit (or browser tab) superseded this save.
+  // Its dirty marker must survive even if this older request succeeds later.
+  return !dirty || currentToken === pendingSavedAt;
 }
 
 export function recoverAccountSettings(

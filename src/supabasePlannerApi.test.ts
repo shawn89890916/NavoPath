@@ -394,6 +394,7 @@ describe("createSupabasePlannerApi", () => {
 
     expect(saved?.habits?.map((habit) => habit.id).sort()).toEqual(["habit_local", "habit_remote"]);
     expect(saved?.habitDailyStates).toEqual([remoteState]);
+    expect(api.getKnownRemoteRevision?.()).toBe(2);
   });
 
   it("retries calendar subscription generation after a transient pool timeout", async () => {

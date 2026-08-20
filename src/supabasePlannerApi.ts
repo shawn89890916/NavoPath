@@ -330,6 +330,8 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       return { auth, data: profile.data, settings: profile.settings, revision: profile.revision };
     },
 
+    getKnownRemoteRevision: () => profileCache?.revision,
+
     signUp: async (email, password) => {
       const { data, error } = await supabase.auth.signUp({
         email,
