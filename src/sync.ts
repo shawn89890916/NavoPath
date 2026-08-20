@@ -70,6 +70,14 @@ export function shouldApplyWorkspaceRevision(
     && shouldApplyRemoteRevision(currentRevision, incomingRevision);
 }
 
+export function shouldReconcileRemoteRevision(
+  currentRevision: number,
+  incomingRevision: number,
+  hasDirtyLocal: boolean,
+) {
+  return hasDirtyLocal || (incomingRevision > 0 && incomingRevision > currentRevision);
+}
+
 export function isCurrentWorkspaceLoad(loadVersion: number, currentVersion: number) {
   return loadVersion === currentVersion;
 }

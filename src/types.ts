@@ -637,6 +637,8 @@ export interface PlannerApi {
   }>;
   /** Latest revision already acknowledged by this API instance after a save. */
   getKnownRemoteRevision?: () => number | undefined;
+  /** Lightweight cloud revision check used when Realtime is unavailable. */
+  getRemoteRevision?: () => Promise<number | undefined>;
   signUp?: (email: string, password: string) => Promise<{
     user: { id: string; email?: string } | null;
     message?: string;

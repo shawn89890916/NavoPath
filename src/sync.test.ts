@@ -10,6 +10,7 @@ import {
   readSyncInterval,
   shouldApplyRemoteRevision,
   shouldApplyWorkspaceRevision,
+  shouldReconcileRemoteRevision,
   shouldRequeueFailedSave,
 } from "./sync";
 
@@ -21,6 +22,13 @@ describe("sync host account isolation", () => {
     expect(mainSource).toContain("authStateRef.current = authState;");
     expect(mainSource).toContain("authUser: authStateRef.current?.user ?? null");
     expect(mainSource).not.toMatch(/(?:read|write)BootstrapCache\([^\n]*authState\?\.user\?\.id/);
+  });
+
+  it("keeps a foreground revision fallback when Realtime is unavailable", () => {
+    expect(mainSource).toContain("const REMOTE_REVISION_POLL_MS = 5_000;");
+    expect(mainSource).toContain("window.plannerApi.getRemoteRevision");
+    expect(mainSource).toContain('window.addEventListener("pageshow", onForeground)');
+    expect(mainSource).toContain('document.addEventListener("visibilitychange", onForeground)');
   });
 });
 
@@ -43,6 +51,14 @@ describe("sync race guards", () => {
     expect(shouldApplyWorkspaceRevision("cloud:a", "cloud:b", 5, 6)).toBe(false);
     expect(shouldApplyWorkspaceRevision("cloud:a", "cloud:a", 5, 4)).toBe(false);
     expect(shouldApplyWorkspaceRevision("cloud:a", "cloud:a", 5, 6)).toBe(true);
+  });
+
+  it("reconciles only newer cloud revisions unless local work is dirty", () => {
+    expect(shouldReconcileRemoteRevision(8, 9, false)).toBe(true);
+    expect(shouldReconcileRemoteRevision(8, 8, false)).toBe(false);
+    expect(shouldReconcileRemoteRevision(8, 7, false)).toBe(false);
+    expect(shouldReconcileRemoteRevision(8, 0, false)).toBe(false);
+    expect(shouldReconcileRemoteRevision(8, 7, true)).toBe(true);
   });
 
   it("accepts only the latest workspace load", () => {

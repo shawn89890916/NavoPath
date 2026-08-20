@@ -61,6 +61,28 @@ beforeEach(() => {
 });
 
 describe("createSupabasePlannerApi", () => {
+  it("checks the cloud revision without downloading the workspace", async () => {
+    const user = { id: "user_1", email: "user@example.com" };
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { revision: 12 }, error: null });
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    createClientMock.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user } }, error: null }),
+        onAuthStateChange: vi.fn(),
+      },
+      from,
+    });
+
+    const { createSupabasePlannerApi } = await import("./supabasePlannerApi");
+    const api = createSupabasePlannerApi("https://supabase.test", "anon");
+
+    await expect(api.getRemoteRevision?.()).resolves.toBe(12);
+    expect(select).toHaveBeenCalledWith("revision");
+    expect(eq).toHaveBeenCalledWith("user_id", user.id);
+  });
+
   it("routes production Supabase fetches through the NavoPath origin", async () => {
     window.location = { origin: "https://navopath.com", href: "https://navopath.com/app" } as any;
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));

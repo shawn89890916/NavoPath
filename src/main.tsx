@@ -88,7 +88,7 @@ import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch";
 import { canAcknowledgeBootstrapSave, parseBootstrapCache, recoverAccountSettings, resolveBootstrap, type BootstrapCache } from "./syncBootstrap";
 import { preparePlannerDataRestore, withDeletionTombstones } from "./syncMerge";
-import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
+import { SyncScheduler, formatLastSyncedAt, isCurrentWorkspaceLoad, presetForMinutes, readSyncInterval, shouldApplyWorkspaceRevision, shouldReconcileRemoteRevision, shouldRequeueFailedSave, SYNC_INTERVAL_PRESETS } from "./sync";
 import { MAX_PLUGIN_CONFIG_STRING_LENGTH, listPlugins as listRegisteredPlugins, activate as activatePlugin, deactivate as deactivatePlugin, isActive as isPluginActive, register as registerPlugin, resolveConfig as resolvePluginConfig, pluginText, type NavoPlugin, type PluginHost } from "./plugins/registry";
 import { registerBuiltinPlugins } from "./plugins/builtin";
 import { DEFAULT_WIDGET_APPEARANCE, normalizeWidgetAppearance } from "./widget/widgetPreferences";
@@ -148,6 +148,7 @@ const EXECUTE_THEME_PRESETS_DARK  = ["#D7816A", "#FBF9FF", "#7EA172", "#584D3D",
 const PLANNING_THEME_PRESETS_LIGHT = ["#7EA172", "#584D3D", "#D7816A", "#0F0326", "#BE185D", "#D97706", "#2563EB"];
 const PLANNING_THEME_PRESETS_DARK  = ["#7EA172", "#FBF9FF", "#D7816A", "#584D3D", "#EC4899", "#F59E0B", "#3B82F6"];
 const SAVE_DEBOUNCE_MS = 250;
+const REMOTE_REVISION_POLL_MS = 5_000;
 const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
 
@@ -1690,6 +1691,7 @@ function App() {
   const settingsSaveNoticeShownRef = useRef(false);
   const queuedRemoteRefreshRef = useRef(false);
   const remoteRevisionRef = useRef(0);
+  const remoteRevisionPollInFlightRef = useRef(false);
   const syncSchedulerRef = useRef<SyncScheduler | null>(null);
   const snapshotTimerRef = useRef<number | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
@@ -1906,6 +1908,54 @@ function App() {
       if (resolved.replayData || migratedData !== resolved.data) void saveData(migratedData);
       if (resolved.replaySettings) void saveSettings(resolved.settings);
     });
+  }, [authState?.user?.id]);
+
+  // Supabase Realtime uses a direct WebSocket that can be delayed or blocked on
+  // some mobile networks. A tiny foreground-only revision check keeps devices
+  // converged without repeatedly downloading the full workspace.
+  useEffect(() => {
+    if (!authState?.user || !window.plannerApi.getRemoteRevision) return;
+    const userId = authState.user.id;
+    let disposed = false;
+    const reconcileIfNeeded = async () => {
+      if (disposed
+        || document.visibilityState !== "visible"
+        || (typeof navigator !== "undefined" && navigator.onLine === false)
+        || remoteRevisionPollInFlightRef.current) return;
+      remoteRevisionPollInFlightRef.current = true;
+      try {
+        const incomingRevision = Number(await window.plannerApi.getRemoteRevision?.() || 0);
+        if (disposed || authStateRef.current?.user?.id !== userId) return;
+        const cached = readBootstrapCache(authStateRef.current?.user?.id);
+        if (shouldReconcileRemoteRevision(
+          remoteRevisionRef.current,
+          incomingRevision,
+          Boolean(cached?.dataDirty || cached?.settingsDirty),
+        )) {
+          queuedRemoteRefreshRef.current = true;
+          await refreshQueuedRemote();
+        }
+      } catch {
+        // Realtime and the next foreground poll remain available after a transient failure.
+      } finally {
+        remoteRevisionPollInFlightRef.current = false;
+      }
+    };
+    const onForeground = () => {
+      if (document.visibilityState === "visible") void reconcileIfNeeded();
+    };
+    void reconcileIfNeeded();
+    const interval = window.setInterval(() => void reconcileIfNeeded(), REMOTE_REVISION_POLL_MS);
+    document.addEventListener("visibilitychange", onForeground);
+    window.addEventListener("focus", onForeground);
+    window.addEventListener("pageshow", onForeground);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onForeground);
+      window.removeEventListener("focus", onForeground);
+      window.removeEventListener("pageshow", onForeground);
+    };
   }, [authState?.user?.id]);
 
   useEffect(() => {

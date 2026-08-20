@@ -332,6 +332,18 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
 
     getKnownRemoteRevision: () => profileCache?.revision,
 
+    getRemoteRevision: async () => {
+      const user = await requireUser();
+      const { data: row, error } = await retryTransientRequest(() => supabase
+        .from(PROFILE_TABLE)
+        .select("revision")
+        .eq("user_id", user.id)
+        .maybeSingle());
+      if (error) throw new Error(error.message);
+      const revision = Number(row?.revision || 0);
+      return Number.isFinite(revision) && revision >= 0 ? revision : undefined;
+    },
+
     signUp: async (email, password) => {
       const { data, error } = await supabase.auth.signUp({
         email,
