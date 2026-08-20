@@ -102,13 +102,13 @@
 
 ### 修复
 - 修复窄横屏工作区被固定最小画布挤出视口的问题：执行双栏现在会自适应可用宽高，今日候选可独立滚动，日期标题可展开完整月历快速跳转且不再显示外框，“回到现在”拥有清晰图标与文字，时间轴任务可在悬停后拖动起止手柄。时间轴快速新建与 AI 对话顶栏改用统一的纸面细线图标，执行/规划切换保持居中，箭头 N 品牌标志恢复清晰对比；既有竖屏布局与交互保持不变。
-- 修复触屏设备横屏时从候选任务卡片上滑无法滚动的问题；纵向滑动现在优先滚动今日候选，长按任务后仍可拖到时间轴排程。
+- 修复触屏设备横屏时从候选任务卡片上滑无法滚动的问题，包括宽度超过紧凑布局断点的平板与高分辨率设备；所有横屏宽度现在都由纵向滑动优先滚动今日候选，长按任务后仍可拖到时间轴排程。
 
 ## 2026-08-20 · Landscape workspace interaction fixes
 
 ### Fixed
 - Fixed narrow landscape workspaces being pushed outside the viewport by a fixed minimum canvas. The Execute split view now adapts to available width and height, Today’s Candidates scrolls independently, the borderless date heading opens a complete monthly quick picker, Back to now has a clear icon and label, and timeline tasks expose draggable start/end handles on hover. Timeline quick creation and the AI chat header now use consistent paper-style line icons, the Execute/Planning switch stays centred, and the arrow-N brand mark has clear contrast, while existing portrait layout and interactions remain unchanged.
-- Fixed touch devices failing to scroll Today’s Candidates when a landscape swipe started on a task card. Vertical swipes now scroll the candidate list first, while a long press still lets the task be dragged onto the timeline.
+- Fixed touch devices failing to scroll Today’s Candidates when a landscape swipe started on a task card, including tablets and high-resolution devices wider than the compact-layout breakpoint. Vertical swipes now scroll the candidate list first at every landscape width, while a long press still lets the task be dragged onto the timeline.
 
 ## 2026-08-13 · AI 服务与模型更新
 

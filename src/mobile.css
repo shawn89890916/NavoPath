@@ -284,7 +284,6 @@
   #root .df-app .df-task-card {
     min-height: 62px !important;
     padding: 8px 8px 8px 10px !important;
-    touch-action: pan-y !important;
   }
 
   #root .df-app .df-task-card.is-drag-armed {
@@ -1647,6 +1646,10 @@
 
 }
 
+#root .df-app .df-candidate-list .df-task-card {
+  touch-action: pan-y !important;
+}
+
 @media (max-width: 1180px) and (orientation: landscape) {
   body {
     min-width: 0 !important;
@@ -1685,13 +1688,6 @@
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow-y: auto !important;
-    overscroll-behavior-y: contain !important;
-    touch-action: pan-y !important;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  #root .df-app .df-candidate-list .df-task-block {
-    touch-action: pan-y !important;
   }
 
   #root .df-app .df-mobile-date-picker > header {
