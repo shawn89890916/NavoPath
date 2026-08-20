@@ -114,6 +114,7 @@ const entry = (
 
 export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
   entry("calendar-feed", { category: "advanced", detail: "integrations" }, "日历订阅", "Calendar subscription", "webcal ics iPhone Notion Calendar 日历 同步 订阅"),
+  entry("external-calendar", { category: "advanced", detail: "integrations" }, "外部日历", "External calendars", "read only ICS busy time 只读 忙碌 冲突"),
   entry("language", { category: "general" }, "语言", "Language", "中文 English locale"),
   entry("day-start", { category: "general" }, "一天开始时间", "Day start time", "timeline boundary 跨天"),
   entry("default-page", { category: "general" }, "默认打开页面", "Default page", "启动 执行 规划 execution planning"),
@@ -151,6 +152,7 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
   entry("ai-reasoning", { category: "advanced", detail: "ai" }, "思考模式", "Reasoning mode", "instant high xhigh"),
   entry("ai-estimate", { category: "advanced", detail: "ai" }, "自动估算任务用时", "Estimate task duration", "AI duration"),
   entry("ai-project", { category: "advanced", detail: "ai" }, "自动归入项目", "Auto-assign project", "AI confidence"),
+  entry("ai-briefs", { category: "advanced", detail: "ai" }, "每日开工与收工简报", "Daily start and end briefs", "08:00 21:30 proactive review 主动 开工 收工 复盘"),
   entry("ai-memory", { category: "advanced", detail: "ai" }, "AI 记忆", "AI memory", "context personalization 上下文 个性化"),
   entry("hide-ai", { category: "advanced", detail: "ai" }, "隐藏所有 AI", "Hide all AI", "disable"),
   entry("ai-reset", { category: "advanced", detail: "ai" }, "重置 AI 个性化", "Reset AI personalization", "clear history 清空历史"),

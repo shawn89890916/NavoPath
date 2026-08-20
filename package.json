@@ -1,6 +1,6 @@
 {
   "name": "navopath",
-  "version": "1.3.8",
+  "version": "1.4.0",
   "description": "NavoPath — Navigate your next step.",
   "author": "NavoPath",
   "main": "electron/main.cjs",
@@ -9,7 +9,7 @@
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && set VITE_DEV_SERVER_URL=http://127.0.0.1:5173&& electron .\"",
     "build": "npm run build:navopath",
     "build:navopath": "tsc && vite build",
-    "test": "node --test \"supabase/functions/ai-assistant/*.test.ts\" \"electron/*.test.cjs\" && vitest run src",
+    "test": "node --test \"supabase/functions/ai-assistant/*.test.ts\" \"supabase/functions/external-calendar/*.test.ts\" \"electron/*.test.cjs\" && vitest run src",
     "test:calendar": "vitest run src/calendarFeed.test.ts",
     "build:portfolio": "tsc && vite build --config vite.portfolio.config.ts",
     "preview:portfolio": "vite preview --config vite.portfolio.config.ts --host 127.0.0.1",
@@ -32,7 +32,7 @@
         "dist/assets/supabase-vendor-*.js",
         "dist/assets/supabasePlannerApi-*.js"
       ],
-      "limit": "236 KB"
+      "limit": "242 KB"
     },
     {
       "name": "Deferred app scripts",
@@ -56,7 +56,7 @@
           "dist/assets/WidgetApp-*.js",
           "dist/assets/MobileTaskSummary-*.js"
       ],
-      "limit": "273 KB"
+      "limit": "280 KB"
     },
     {
       "name": "Document parsing scripts",
@@ -88,7 +88,7 @@
         "dist/assets/WidgetApp-*.css",
         "dist/assets/MobileTaskSummary-*.css"
       ],
-      "limit": "98 KB"
+      "limit": "100 KB"
     }
   ],
   "build": {
@@ -155,6 +155,7 @@
     "concurrently": "^9.2.4",
     "electron": "^43.1.1",
     "electron-builder": "^26.15.7",
+    "ical-expander": "^3.2.0",
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^6.0.227",
     "png-to-ico": "^3.0.1",

@@ -1,4 +1,4 @@
-import type { AiAction, AiPersonalizationProfile, ChatMessage, HabitDailyState, PlannerApi, PlannerData, Settings, Subtask, Task, TaskAiInference, TaskRecurrence, TimelineRecord } from "./types";
+import type { AgentRunState, AiAction, AiPersonalizationProfile, ChatMessage, HabitDailyState, PlannerApi, PlannerData, Settings, Subtask, Task, TaskAiInference, TaskRecurrence, TimelineRecord } from "./types";
 import { normalizeSettings } from "./defaultSettings";
 import { normalizeTreeOrder } from "./utils/treeOrder";
 import { inferWorkflowStatus, normalizeTimeEntry } from "./utils/productivity";
@@ -440,6 +440,11 @@ function normalizeChatMessages(value: unknown, forceSaved = false): ChatMessage[
           reason: boundedPersistedString(block.reason, MAX_PERSISTED_TITLE_LENGTH) || undefined,
         }))
       : [];
+    const agentBudget = { remaining: MAX_AI_JSON_NODES };
+    const normalizedAgent = role === "assistant" ? normalizePersistedJson(message.agent, 0, agentBudget) : undefined;
+    const agent = isRecord(normalizedAgent) && Boolean(persistedId(normalizedAgent.runId))
+      ? normalizedAgent as unknown as AgentRunState
+      : undefined;
     return {
       id: persistedId(message.id) || uid("chat"),
       role,
@@ -456,6 +461,7 @@ function normalizeChatMessages(value: unknown, forceSaved = false): ChatMessage[
       intent: boundedPersistedString(message.intent, MAX_AI_INTENT_LENGTH) || undefined,
       plan: plan.length > 0 ? plan : undefined,
       format: message.format === "markdown" ? "markdown" : "text",
+      agent,
     };
   });
 }

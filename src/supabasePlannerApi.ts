@@ -1,5 +1,5 @@
 import { createClient, type User } from "@supabase/supabase-js";
-import type { AiAction, CalendarFeedTokenMetadata, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
+import type { AiAction, CalendarFeedTokenMetadata, ExternalCalendarOccurrence, ExternalCalendarSource, McpTokenMetadata, PlannerApi, PlannerData, Settings } from "./types";
 import { fallbackData, normalizeData } from "./browserFallback";
 import { getDefaultSettings, normalizeSettings } from "./defaultSettings";
 import { mergePlannerData } from "./syncMerge";
@@ -184,6 +184,17 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
     const user = await getUser();
     if (!user) throw new Error("请先登录 NavoPath。");
     return user;
+  }
+
+  async function invokeEdgeFunction(name: string, body: unknown, signal?: AbortSignal) {
+    await requireUser();
+    const { data, error } = await supabase.functions.invoke(name, { body: body as Record<string, unknown>, signal });
+    if (!error) return data;
+    let payload: any = null;
+    try { payload = error.context ? await error.context.clone().json() : null; } catch { payload = null; }
+    const wrapped = new Error(payload?.error?.message || payload?.error || error.message || "Edge function failed") as Error & { payload?: unknown };
+    wrapped.payload = payload;
+    throw wrapped;
   }
 
   async function runCloudRequest(call: () => any) {
@@ -596,6 +607,22 @@ export function createSupabasePlannerApi(supabaseUrl: string, supabaseAnonKey: s
       await requireUser();
       const { error } = await retryTransientRequest(() => supabase.rpc("revoke_calendar_feed_token", { token_id: id }));
       if (error) throw new Error(error.message);
+    },
+    invokeEdgeFunction,
+    listExternalCalendars: async (range) => {
+      const payload = await invokeEdgeFunction("external-calendar", { op: "list", ...(range || {}) }) as { sources?: ExternalCalendarSource[]; occurrences?: ExternalCalendarOccurrence[] };
+      return { sources: payload.sources || [], occurrences: payload.occurrences || [] };
+    },
+    connectExternalCalendar: async (input) => {
+      const payload = await invokeEdgeFunction("external-calendar", { op: "connect", ...input }) as { source: ExternalCalendarSource; occurrenceCount?: number };
+      return { source: payload.source, occurrenceCount: Number(payload.occurrenceCount || 0) };
+    },
+    refreshExternalCalendar: async (sourceId, force = false) => {
+      const payload = await invokeEdgeFunction("external-calendar", { op: "refresh", sourceId, force }) as { source: ExternalCalendarSource };
+      return payload.source;
+    },
+    removeExternalCalendar: async (sourceId) => {
+      await invokeEdgeFunction("external-calendar", { op: "remove", sourceId });
     },
 
     selectBackgroundImage: async () => ({ path: "" }),

@@ -4,8 +4,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { localIsoDate } from "./utils/localDate";
 import { filterAiModels } from "./utils/aiModels";
+import type { AgentRunState } from "./types";
 
-export type AiMode = "health" | "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "plan_schedule" | "enrich_task" | "import_schedule" | "summarize_memory";
+export type AiMode = "health" | "agent" | "agent_confirm" | "agent_reject" | "agent_undo" | "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "plan_schedule" | "enrich_task" | "import_schedule" | "summarize_memory";
 export type AiStep = { label: string; status: "pending" | "running" | "done" | "error" };
 export type AiChatMessage = { role: "user" | "assistant" | "system"; content: string };
 export type AiMemoryPatch = { content: string; tags?: string[] };
@@ -45,7 +46,7 @@ export type AiAction =
 
 export type AiPlanBlock = { taskId?: string; title: string; start: string; end: string; durationMinutes?: number; reason?: string };
 export type AiServiceError = {
-  code: "AI_NOT_CONFIGURED" | "AI_AUTH" | "AI_RATE_LIMIT" | "AI_TIMEOUT" | "AI_CANCELLED" | "AI_PROVIDER" | "AI_NETWORK" | "AI_BAD_RESPONSE";
+  code: "AI_NOT_CONFIGURED" | "AI_AUTH" | "AI_RATE_LIMIT" | "AI_TIMEOUT" | "AI_CANCELLED" | "AI_PROVIDER" | "AI_NETWORK" | "AI_BAD_RESPONSE" | "AI_PLAN_EXPIRED";
   retryable: boolean;
   requestId?: string;
   message: string;
@@ -60,6 +61,7 @@ type AiAssistantPayload = {
   plan?: AiPlanBlock[];
   format?: "text" | "markdown";
   enrichment?: { durationMinutes?: number; projectId?: string; confidence?: number };
+  agent?: AgentRunState;
 };
 
 export type AiAssistantResponse =
@@ -131,10 +133,10 @@ function getClient(): SupabaseClient | null {
 }
 
 async function readFunctionError(error: unknown): Promise<AiServiceError> {
-  const candidate = error as { message?: string; context?: Response };
-  let payload: any = null;
+  const candidate = error as { message?: string; context?: Response; payload?: any };
+  let payload: any = candidate.payload || null;
   try {
-    payload = candidate.context ? await candidate.context.clone().json() : null;
+    payload = payload || (candidate.context ? await candidate.context.clone().json() : null);
   } catch {
     payload = null;
   }
@@ -153,16 +155,21 @@ async function readFunctionError(error: unknown): Promise<AiServiceError> {
 
 export async function invokeAiAssistant(client: SupabaseClient, params: {
   mode: AiMode;
-  message: string;
+  message?: string;
   model?: string;
   reasoningMode?: "instant" | "high" | "xhigh";
   context?: unknown;
   history?: AiChatMessage[];
   memories?: AiMemoryPatch[];
+  conversationId?: string;
+  trigger?: "manual" | "start_brief" | "end_review";
+  attachmentText?: string;
+  attachmentName?: string;
+  runId?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
 }): Promise<AiAssistantResponse> {
-  const timeoutMs = params.timeoutMs || AI_REQUEST_TIMEOUT_MS;
+  const timeoutMs = params.timeoutMs || (params.mode.startsWith("agent") ? 65_000 : AI_REQUEST_TIMEOUT_MS);
   const controller = new AbortController();
   let timedOut = false;
   const timeoutId = window.setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
@@ -198,6 +205,7 @@ export async function invokeAiAssistant(client: SupabaseClient, params: {
       plan: Array.isArray(data.plan) ? data.plan : undefined,
       format: data.format === "markdown" ? "markdown" : "text",
       enrichment: data.enrichment && typeof data.enrichment === "object" ? data.enrichment : undefined,
+      agent: data.agent && typeof data.agent === "object" ? data.agent as AgentRunState : undefined,
     });
   } catch (error) {
     console.error("AI Assistant network error:", error);
@@ -212,9 +220,28 @@ export async function invokeAiAssistant(client: SupabaseClient, params: {
 }
 
 export async function callAiAssistant(params: Parameters<typeof invokeAiAssistant>[1]): Promise<AiAssistantResponse> {
+  const sharedInvoker = window.plannerApi?.invokeEdgeFunction;
+  if (sharedInvoker) {
+    const adapter = {
+      functions: {
+        invoke: async (_name: string, options: { body: unknown; signal?: AbortSignal }) => {
+          try {
+            return { data: await sharedInvoker("ai-assistant", options.body, options.signal), error: null };
+          } catch (error) {
+            return { data: null, error };
+          }
+        },
+      },
+    } as unknown as SupabaseClient;
+    return invokeAiAssistant(adapter, params);
+  }
   const client = getClient();
   if (!client) return failure({ code: "AI_NOT_CONFIGURED", retryable: false, message: "AI 服务未配置，请在设置中连接 Supabase。" });
   return invokeAiAssistant(client, params);
+}
+
+export function decideAgentRun(mode: "agent_confirm" | "agent_reject" | "agent_undo", runId: string, signal?: AbortSignal) {
+  return callAiAssistant({ mode, runId, signal, timeoutMs: 30_000 });
 }
 
 export async function getAiHealth(): Promise<AiHealthResponse> {

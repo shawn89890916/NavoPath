@@ -88,6 +88,33 @@ export interface CalendarFeedTokenMetadata {
   lastUsedAt?: string;
 }
 
+export interface ExternalCalendarSource {
+  id: string;
+  name: string;
+  displayUrl: string;
+  color?: string;
+  enabled: boolean;
+  syncStatus: "pending" | "ready" | "error";
+  syncError?: string;
+  lastSyncedAt?: string;
+  nextSyncAt?: string;
+}
+
+export interface ExternalCalendarOccurrence {
+  id: string;
+  source_id: string;
+  external_uid: string;
+  title: string;
+  description: string;
+  location: string;
+  start_at: string;
+  end_at: string;
+  start_date: string;
+  end_date: string;
+  all_day: boolean;
+  status: string;
+}
+
 export interface TaskAiInference {
   duration?: AiFieldInference & { minutes: number };
   project?: AiFieldInference & { projectId: string };
@@ -235,6 +262,39 @@ export interface ChatMessage {
   intent?: string;
   plan?: Array<{ taskId?: string; title: string; start: string; end: string; durationMinutes?: number; reason?: string }>;
   format?: "text" | "markdown";
+  agent?: AgentRunState;
+}
+
+export type AgentEntity = "task" | "project" | "habit" | "note" | "memory" | "template" | "settings" | "app" | "timer";
+export type AgentOperation = "create" | "update" | "schedule" | "unschedule" | "complete" | "checkin" | "append_subtasks" | "archive" | "delete" | "update_settings" | "navigate" | "start" | "pause";
+
+export interface AgentCommand {
+  id: string;
+  entity: AgentEntity;
+  operation: AgentOperation;
+  targetId?: string;
+  values?: Record<string, unknown>;
+  reason?: string;
+}
+
+export interface AgentAppliedAction {
+  commandId: string;
+  entity: AgentEntity;
+  operation: AgentOperation;
+  targetId?: string;
+  title: string;
+}
+
+export interface AgentRunState {
+  runId: string;
+  trace?: Array<{ id: string; name: string; status: "done" | "error" }>;
+  applied: AgentAppliedAction[];
+  pending: AgentCommand[];
+  forbidden?: Array<{ id: string; reason: string }>;
+  clientActions?: AgentCommand[];
+  appliedRevision?: number;
+  undoExpiresAt?: string;
+  decisionState?: "pending" | "approved" | "rejected" | "undone";
 }
 
 export interface AiConversation {
@@ -455,6 +515,11 @@ export interface Settings {
   chatMessageMaxHeight: number;
   aiMemoryEnabled: boolean;
   hideAi: boolean;
+  aiBriefsEnabled?: boolean;
+  aiStartBriefTime?: string;
+  aiEndBriefTime?: string;
+  aiLastStartBriefDate?: string;
+  aiLastEndReviewDate?: string;
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
   dayStartTime: string;
@@ -590,6 +655,11 @@ export interface PlannerApi {
   listCalendarFeedTokens?: () => Promise<CalendarFeedTokenMetadata[]>;
   createCalendarFeedToken?: () => Promise<{ token: string; metadata: CalendarFeedTokenMetadata }>;
   revokeCalendarFeedToken?: (id: string) => Promise<void>;
+  invokeEdgeFunction?: (name: string, body: unknown, signal?: AbortSignal) => Promise<unknown>;
+  listExternalCalendars?: (range?: { from?: string; to?: string }) => Promise<{ sources: ExternalCalendarSource[]; occurrences: ExternalCalendarOccurrence[] }>;
+  connectExternalCalendar?: (input: { name: string; url: string; color?: string }) => Promise<{ source: ExternalCalendarSource; occurrenceCount: number }>;
+  refreshExternalCalendar?: (sourceId: string, force?: boolean) => Promise<ExternalCalendarSource>;
+  removeExternalCalendar?: (sourceId: string) => Promise<void>;
   selectBackgroundImage: () => Promise<{ path: string }>;
 }
 

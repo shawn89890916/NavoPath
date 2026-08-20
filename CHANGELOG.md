@@ -3,6 +3,9 @@
 ## 本轮补充 / Current update
 
 ### 新增
+- 登录后的 Navo AI 升级为全局工作区 Agent：可按需检索完整任务、项目、习惯、笔记、模板、记忆、统计与设置，不再依赖 24 个项目 / 30 个任务 / 14 天日程快照。低风险应用内操作会自动执行并留下 24 小时撤销入口；删除、归档、批量、重复规则、设置与集成修改必须通过逐字段确认卡，所有写入均使用用户 JWT、RLS、工作区 revision 和原子 RPC，并保留不含敏感内容的 30 天审计记录。
+- 新增通用 HTTPS ICS 外部日历：最多连接 10 个只读来源，支持全天、跨日、时区、重复、例外与取消实例；连接、启动、主动简报前及应用活跃期间每 15 分钟同步。URL 经服务端 AES-GCM 加密，抓取器限制 443 端口、重定向、DNS 私网地址、10 秒与 5 MB；事项以安静的活动主题时间块参与冲突检测、自动排程和 AI 简报，不导入任务也不写回来源。
+- 新增可选的每日开工简报与收工复盘，默认时间为 08:00 / 21:30，现有账号默认关闭。启用后每种简报每天最多自动生成一次，错过时间会在当日下次打开时补生成；简报本身只读，失败时保留重试入口。
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
@@ -48,6 +51,9 @@
 - 优化首次加载性能：首页与桌面小组件资源改为按需加载，主工作区不再提前下载这些界面资源，并通过更紧凑的生产构建降低首屏脚本与样式体积。
 
 ### Added
+- Upgraded signed-in Navo AI into a global workspace Agent that queries the complete task, project, habit, note, template, memory, metrics, and settings data on demand instead of relying on 24-project / 30-task / 14-day snapshots. Low-risk in-app actions execute automatically with a 24-hour undo path; deletion, archival, bulk, recurrence, settings, and integration changes require a field-level confirmation card. Every write uses the user JWT, RLS, workspace revision, and an atomic RPC, with a 30-day audit record that excludes sensitive content.
+- Added generic HTTPS ICS external calendars with up to 10 read-only sources and support for all-day, cross-day, timezone, recurrence, exception, and cancelled instances. Sources sync on connect, app start, before proactive briefs, and every 15 active minutes. URLs are AES-GCM encrypted server-side; fetching enforces port 443, redirect and DNS private-network checks, a 10-second timeout, and a 5 MB cap. Quiet active-theme blocks participate in conflicts, automatic scheduling, and AI briefs without importing tasks or writing back.
+- Added opt-in daily start and end briefs, defaulting to 08:00 and 21:30 and disabled for existing accounts. Each brief runs automatically at most once per day, catches up on the next open that day, remains read-only, and leaves a visible retry path after failure.
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed

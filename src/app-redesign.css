@@ -8642,3 +8642,70 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
     transform: translateX(-50%);
   }
 }
+
+/* Global Agent — evidence, deterministic approvals, and reversible results. */
+.df-ai-capability-state,
+.df-agent-run-card,
+.df-agent-confirm-card,
+.df-agent-applied {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--paper-rule);
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--accent-active) 8%);
+  padding: 11px 12px;
+}
+
+.df-ai-capability-state span,
+.df-agent-run-card small,
+.df-agent-run-card p,
+.df-agent-run-card dd { color: var(--text-muted); }
+.df-ai-capability-state.locked { border-style: dashed; }
+.df-agent-run-card { margin-top: 10px; }
+.df-agent-trace summary { cursor: pointer; color: var(--text-muted); }
+.df-agent-trace > div { display: flex; gap: 8px; align-items: center; padding-top: 6px; }
+.df-agent-trace code,
+.df-agent-confirm-card code { overflow-wrap: anywhere; font-size: 11px; }
+.df-agent-applied > span { font-size: 12px; }
+.df-agent-applied button,
+.df-agent-confirm-card button,
+.df-external-calendar-settings button { border: 1px solid var(--paper-rule-strong); background: var(--surface-raised); color: var(--text-primary); padding: 7px 10px; }
+.df-agent-confirm-card { border-color: color-mix(in srgb, var(--accent-active) 50%, var(--paper-rule)); }
+.df-agent-confirm-card header,
+.df-agent-confirm-card footer,
+.df-agent-confirm-card article > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.df-agent-confirm-card article { display: grid; gap: 5px; padding: 9px 0; border-top: 1px solid var(--paper-rule); }
+.df-agent-confirm-card dl { display: grid; gap: 4px; margin: 0; }
+.df-agent-confirm-card dl > div { display: grid; grid-template-columns: minmax(90px, .4fr) 1fr; gap: 8px; font-size: 12px; }
+.df-agent-confirm-card dt { font-weight: 650; }
+.df-agent-confirm-card dd { margin: 0; overflow-wrap: anywhere; }
+.df-agent-confirm-card .primary { background: var(--accent-active); color: var(--accent-contrast); border-color: var(--accent-active); }
+.df-agent-forbidden { border-left: 2px solid var(--danger); padding-left: 8px; color: var(--danger); font-size: 12px; }
+.df-agent-decision-outcome { color: var(--text-muted); font-size: 12px; }
+
+/* External calendars stay quiet and strictly read-only on the paper timeline. */
+.df-time-block.is-external-calendar {
+  cursor: default !important;
+  opacity: .76;
+  border-style: dashed !important;
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--accent-active) 12%) !important;
+}
+.df-all-day-block.is-external-calendar { cursor: default !important; opacity: .76; border-style: dashed !important; }
+.df-time-block.is-external-calendar .df-time-card-event-mark { opacity: .55; }
+.df-time-block.is-external-calendar .df-event-kind-label { letter-spacing: .04em; }
+
+.df-external-calendar-settings { display: grid; gap: 12px; }
+.df-external-calendar-settings > p { margin: 0; color: var(--text-muted); }
+.df-external-calendar-connect { display: grid; grid-template-columns: minmax(120px, .55fr) minmax(220px, 1.45fr) auto; gap: 8px; }
+.df-external-calendar-connect input { min-width: 0; border: 1px solid var(--paper-rule); background: var(--surface-raised); color: var(--text-primary); padding: 9px 10px; }
+.df-external-calendar-list { display: grid; gap: 8px; }
+.df-external-calendar-source { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--paper-rule); padding-top: 10px; }
+.df-external-calendar-source > div { display: grid; gap: 3px; }
+.df-external-calendar-source > div:last-child { display: flex; align-items: start; }
+.df-external-calendar-source code,
+.df-external-calendar-source small { color: var(--text-muted); overflow-wrap: anywhere; }
+.df-external-calendar-source.error { border-left: 2px solid var(--danger); padding-left: 10px; }
+
+@media (max-width: 720px) {
+  .df-external-calendar-connect { grid-template-columns: 1fr; }
+  .df-external-calendar-source { align-items: stretch; flex-direction: column; }
+}

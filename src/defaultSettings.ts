@@ -56,6 +56,9 @@ export const defaultSettings: Settings = {
   chatMessageMaxHeight: 220,
   aiMemoryEnabled: true,
   hideAi: false,
+  aiBriefsEnabled: false,
+  aiStartBriefTime: "08:00",
+  aiEndBriefTime: "21:30",
   addAdvancedOpen: false,
   uiStyle: "gradient",
   dayStartTime: "00:00",
@@ -298,6 +301,12 @@ export function normalizeSettings(value: unknown): Settings {
   normalized.planningAccentColor = boundedString(stored.planningAccentColor, defaults.planningAccentColor, 64);
   normalized.hasApiKey = false;
   normalized.apiKeyPreview = "";
+  normalized.aiStartBriefTime = typeof stored.aiStartBriefTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(stored.aiStartBriefTime)
+    ? stored.aiStartBriefTime
+    : defaults.aiStartBriefTime;
+  normalized.aiEndBriefTime = typeof stored.aiEndBriefTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(stored.aiEndBriefTime)
+    ? stored.aiEndBriefTime
+    : defaults.aiEndBriefTime;
   if (typeof normalized.syncIntervalMinutes !== "number" || normalized.syncIntervalMinutes < 0) {
     normalized.syncIntervalMinutes = defaults.syncIntervalMinutes;
   }
@@ -332,6 +341,8 @@ export function normalizeSettings(value: unknown): Settings {
   );
 
   if (typeof stored.lastSyncedAt !== "string") normalized.lastSyncedAt = undefined;
+  if (typeof stored.aiLastStartBriefDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(stored.aiLastStartBriefDate)) normalized.aiLastStartBriefDate = undefined;
+  if (typeof stored.aiLastEndReviewDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(stored.aiLastEndReviewDate)) normalized.aiLastEndReviewDate = undefined;
   if (stored.timelineFontScale !== undefined) {
     normalized.timelineFontScale = typeof stored.timelineFontScale === "number" && Number.isFinite(stored.timelineFontScale)
       ? Math.min(1.3, Math.max(0.85, stored.timelineFontScale))

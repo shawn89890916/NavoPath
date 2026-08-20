@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { normalizeSettings } from "./defaultSettings";
 
 describe("plugin settings normalization", () => {
+  it("keeps proactive AI briefs opt-in with bounded daily defaults", () => {
+    const defaults = normalizeSettings({});
+    expect(defaults.aiBriefsEnabled).toBe(false);
+    expect(defaults.aiStartBriefTime).toBe("08:00");
+    expect(defaults.aiEndBriefTime).toBe("21:30");
+    const normalized = normalizeSettings({ aiBriefsEnabled: true, aiStartBriefTime: "99:99", aiEndBriefTime: "18:45", aiLastStartBriefDate: "not-a-date", aiLastEndReviewDate: "2026-08-20" });
+    expect(normalized.aiStartBriefTime).toBe("08:00");
+    expect(normalized.aiEndBriefTime).toBe("18:45");
+    expect(normalized.aiLastStartBriefDate).toBeUndefined();
+    expect(normalized.aiLastEndReviewDate).toBe("2026-08-20");
+  });
+
   it("migrates retired AI models to the current default", () => {
     expect(normalizeSettings({ model: "deepseek-ai/DeepSeek-V3.2" }).model).toBe("deepseek-ai/DeepSeek-V4-Flash");
     expect(normalizeSettings({ model: "Qwen/Qwen3.5-397B-A17B" }).model).toBe("deepseek-ai/DeepSeek-V4-Flash");

@@ -58,6 +58,7 @@ export async function callAiGateway(params: {
   perProviderTimeoutMs?: number;
   totalTimeoutMs?: number;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
   onAttempt?: (entry: { provider: string; ok: boolean; code?: GatewayErrorCode; status?: number; elapsedMs: number }) => void;
 }): Promise<{ content: string; provider: string; model: string; attempts: number }> {
   const providers = params.providers.filter((provider) => provider.apiKey).slice(0, 2);
@@ -69,10 +70,13 @@ export async function callAiGateway(params: {
   const attempts: AiGatewayError["attempts"] = [];
 
   for (const provider of providers) {
+    if (params.signal?.aborted) break;
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     const startedAt = Date.now();
     const controller = new AbortController();
+    const abort = () => controller.abort();
+    params.signal?.addEventListener("abort", abort, { once: true });
     const timeoutId = setTimeout(() => controller.abort(), Math.min(perProviderTimeoutMs, remaining));
     try {
       const response = await fetchImpl(providerUrl(provider.baseUrl), {
@@ -110,9 +114,11 @@ export async function callAiGateway(params: {
       params.onAttempt?.({ provider: provider.name, ok: false, code, elapsedMs });
     } finally {
       clearTimeout(timeoutId);
+      params.signal?.removeEventListener("abort", abort);
     }
   }
 
+  if (params.signal?.aborted) throw new AiGatewayError("AI_TIMEOUT", "AI run deadline exceeded", true, attempts);
   const last = attempts[attempts.length - 1];
   const retryable = attempts.some((attempt) => attempt.code === "AI_TIMEOUT" || attempt.code === "AI_RATE_LIMIT" || attempt.code === "AI_PROVIDER");
   throw new AiGatewayError(last?.code || "AI_PROVIDER", "All configured AI providers failed", retryable, attempts);

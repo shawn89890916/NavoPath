@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, Habit, HabitDailyState, Language, McpTokenMetadata, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
-import { callAiAssistant, FALLBACK_AI_MODELS, type AiAction, type AiStep } from "./aiAssistantApi";
+import type { AgentRunState, AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, ExternalCalendarOccurrence, ExternalCalendarSource, Habit, HabitDailyState, Language, McpTokenMetadata, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
+import { callAiAssistant, decideAgentRun, FALLBACK_AI_MODELS, type AiAction, type AiStep } from "./aiAssistantApi";
 import {
   buildAiContext,
   compactText,
@@ -307,6 +307,11 @@ function isEventDisplayTask(taskOrId: Task | string) {
   return id.startsWith("event_occ_");
 }
 
+function isExternalCalendarDisplayTask(taskOrId: Task | string) {
+  const id = typeof taskOrId === "string" ? taskOrId : taskOrId.id;
+  return id.startsWith("event_occ_external_");
+}
+
 function normalizeHexColor(value: string, fallback: string) {
   const input = value.trim();
   if (/^#[0-9a-f]{6}$/i.test(input)) return input;
@@ -505,6 +510,7 @@ type AiSessionMessage = {
   intent?: string;
   plan?: Array<{ taskId?: string; title: string; start: string; end: string; durationMinutes?: number; reason?: string }>;
   format?: "text" | "markdown";
+  agent?: AgentRunState;
   importCommit?: {
     focus?: TimelineFocusTarget;
     addedCount: number;
@@ -843,6 +849,7 @@ function chatToSessionMessages(chat: PlannerData["chat"] = []): AiSessionMessage
     actions: (message.actions || []).map((action) => (action as AiAction).type === "import_schedule_item" ? { ...(action as AiAction), kind: "task" as const } : action) as AiAction[],
     selectedActions: message.selectedActions,
     actionState: message.actionState,
+    agent: message.agent,
     intent: message.intent,
     plan: message.plan,
     format: message.format,
@@ -1278,6 +1285,11 @@ function App() {
   const [aiActionPatches, setAiActionPatches] = useState<Record<string, Record<number, Record<string, unknown>>>>({});
   const [aiAttachment, setAiAttachment] = useState<ParsedAttachment | null>(null);
   const [aiAttachmentStatus, setAiAttachmentStatus] = useState("");
+  const briefAutomationBusyRef = useRef(false);
+  const briefAttemptedRef = useRef(new Set<string>());
+  const [externalCalendarSources, setExternalCalendarSources] = useState<ExternalCalendarSource[]>([]);
+  const [externalCalendarOccurrences, setExternalCalendarOccurrences] = useState<ExternalCalendarOccurrence[]>([]);
+  const externalCalendarSyncRef = useRef<Promise<void> | null>(null);
   // ── Auto-schedule: single source of truth ──
   const [schedulePreviews, setSchedulePreviews] = useState<SchedulePreview[]>([]);
   const [scheduleUnscheduled, setScheduleUnscheduled] = useState<UnscheduledTask[]>([]);
@@ -1676,6 +1688,65 @@ function App() {
   const [multiColWidth, setMultiColWidth] = useState(0);
   const [dailyCanvasWidth, setDailyCanvasWidth] = useState(0);
   timelineZoomRef.current = timelineZoom;
+
+  const refreshExternalCalendarLayer = useCallback(async (refreshMode: "none" | "due" | "force" = "none") => {
+    const api = window.plannerApi;
+    const listExternalCalendars = api.listExternalCalendars;
+    if (!authStateRef.current?.user || !listExternalCalendars) {
+      if (!authStateRef.current?.user) {
+        setExternalCalendarSources([]);
+        setExternalCalendarOccurrences([]);
+      }
+      return;
+    }
+    if (externalCalendarSyncRef.current) {
+      await externalCalendarSyncRef.current;
+      if (refreshMode !== "force") return;
+    }
+    const sync = (async () => {
+    try {
+      let layer = await listExternalCalendars({ from: addDays(todayIso(), -30), to: addDays(todayIso(), 365) });
+      if (refreshMode !== "none" && api.refreshExternalCalendar) {
+        const now = Date.now();
+        const due = layer.sources.filter((source) => source.enabled && (refreshMode === "force" || !source.nextSyncAt || Date.parse(source.nextSyncAt) <= now));
+        if (due.length) {
+          await Promise.allSettled(due.map((source) => api.refreshExternalCalendar!(source.id, refreshMode === "force")));
+          layer = await listExternalCalendars({ from: addDays(todayIso(), -30), to: addDays(todayIso(), 365) });
+        }
+      }
+      setExternalCalendarSources(layer.sources);
+      setExternalCalendarOccurrences(layer.occurrences);
+    } catch (error) {
+      console.warn("External calendar refresh failed", error);
+    }
+    })();
+    externalCalendarSyncRef.current = sync;
+    try { await sync; }
+    finally { if (externalCalendarSyncRef.current === sync) externalCalendarSyncRef.current = null; }
+  }, []);
+
+  useEffect(() => {
+    if (!authState?.user) {
+      setExternalCalendarSources([]);
+      setExternalCalendarOccurrences([]);
+      return;
+    }
+    void refreshExternalCalendarLayer("force");
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshExternalCalendarLayer("due");
+    }, 15 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshExternalCalendarLayer("due");
+    };
+    const onCalendarChanged = () => void refreshExternalCalendarLayer("none");
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("navopath:external-calendar-changed", onCalendarChanged);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("navopath:external-calendar-changed", onCalendarChanged);
+    };
+  }, [authState?.user?.id, refreshExternalCalendarLayer]);
 
   useLayoutEffect(() => {
     const pinch = timelinePinchRef.current;
@@ -3230,6 +3301,58 @@ function App() {
     return { tasks: expanded, ownerMap, resizeEdges };
   }
 
+  function expandExternalCalendarOccurrences(dates: Set<string>) {
+    const resizeEdges = new Map<string, { start: boolean; end: boolean }>();
+    const expanded: Task[] = [];
+    const enabledSources = new Set(externalCalendarSources.filter((source) => source.enabled).map((source) => source.id));
+    for (const occurrence of externalCalendarOccurrences) {
+      if (!enabledSources.has(occurrence.source_id) || occurrence.status === "cancelled") continue;
+      const createdAt = occurrence.start_at || new Date().toISOString();
+      if (occurrence.all_day) {
+        for (const date of dates) {
+          if (date < occurrence.start_date || date > occurrence.end_date) continue;
+          const id = `event_occ_external_${occurrence.id}_${date}_all`;
+          expanded.push({
+            id, title: occurrence.title, dueDate: date, category: "personal", priority: "medium",
+            notes: [occurrence.location, occurrence.description].filter(Boolean).join(" · "), goalId: "", completed: false,
+            estimatedHours: 0.5, scheduledDate: date, createdAt, updatedAt: createdAt,
+          });
+          resizeEdges.set(id, { start: false, end: false });
+        }
+        continue;
+      }
+      const start = new Date(occurrence.start_at);
+      const end = new Date(occurrence.end_at);
+      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) continue;
+      const startDate = localIsoDate(start);
+      const endDate = localIsoDate(end);
+      const time = (value: Date) => `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+      const event: CalendarEvent = {
+        id: `external_${occurrence.id}`,
+        title: occurrence.title,
+        date: startDate,
+        startDate,
+        endDate,
+        startTime: time(start),
+        endTime: time(end),
+        category: "personal",
+        details: [occurrence.location, occurrence.description].filter(Boolean).join(" · "),
+        createdAt,
+      };
+      for (const slice of expandTimedCalendarEvent(event, [...dates])) {
+        const id = `event_occ_external_${occurrence.id}_${slice.date}_${slice.startTime.replace(":", "")}`;
+        expanded.push({
+          id, title: occurrence.title, dueDate: slice.date, category: "personal", priority: "medium",
+          notes: event.details, goalId: "", completed: false, estimatedHours: slice.durationMinutes / 60,
+          scheduledDate: slice.date, scheduledStart: slice.startTime, scheduledEnd: slice.endTime,
+          createdAt, updatedAt: createdAt,
+        });
+        resizeEdges.set(id, { start: false, end: false });
+      }
+    }
+    return { tasks: expanded, resizeEdges };
+  }
+
   const explicitVisibleTimeline = useMemo(
     () => expandTimelineRecords(visibleTimelineDates),
     [tasks, visibleTimelineDates],
@@ -3239,7 +3362,12 @@ function App() {
     return expandRecurrenceOccurrences(visibleTimelineDates);
   }, [tasks, visibleTimelineDates]);
 
-  const eventVisibleTimeline = useMemo(() => expandEventOccurrences(visibleTimelineDates), [events, visibleTimelineDates]);
+  const eventVisibleTimeline = useMemo(() => {
+    const internal = expandEventOccurrences(visibleTimelineDates);
+    const external = expandExternalCalendarOccurrences(visibleTimelineDates);
+    external.resizeEdges.forEach((edges, id) => internal.resizeEdges.set(id, edges));
+    return { ...internal, tasks: [...internal.tasks, ...external.tasks] };
+  }, [events, externalCalendarOccurrences, externalCalendarSources, visibleTimelineDates]);
 
   const conflictTimelineDates = useMemo(() => {
     const dates = new Set<string>();
@@ -3256,9 +3384,10 @@ function App() {
       ...expandTimelineRecords(conflictTimelineDates).tasks,
       ...expandRecurrenceOccurrences(conflictTimelineDates).tasks,
       ...expandEventOccurrences(conflictTimelineDates).tasks.filter((task) => task.scheduledStart),
+      ...expandExternalCalendarOccurrences(conflictTimelineDates).tasks.filter((task) => task.scheduledStart),
       ...previewTasks.filter((task) => conflictTimelineDates.has(task.scheduledDate || "")),
     ],
-    [tasks, events, conflictTimelineDates, previewTasks],
+    [tasks, events, externalCalendarOccurrences, externalCalendarSources, conflictTimelineDates, previewTasks],
   );
 
   const expandedVisibleTimelineTasks = useMemo(
@@ -4768,7 +4897,15 @@ function App() {
         scheduledStart: event.startTime,
         scheduledEnd: event.endTime,
       }));
-    return [...explicit, ...recurrence, ...fixedEvents];
+    const externalEvents = expandExternalCalendarOccurrences(visibleSet).tasks
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        scheduledDate: task.scheduledDate,
+        scheduledStart: task.scheduledStart || "00:00",
+        scheduledEnd: task.scheduledEnd || "23:59",
+      }));
+    return [...explicit, ...recurrence, ...fixedEvents, ...externalEvents];
   }
 
   function findCandidatePlacement(task: Task) {
@@ -5420,6 +5557,10 @@ function App() {
 
   function beginBlockDrag(event: React.PointerEvent, task: Task) {
     if ((event.target as HTMLElement).closest("button,input,textarea,select")) return;
+    if (isExternalCalendarDisplayTask(task)) {
+      showToast(lang === "zh" ? "外部日历事项为只读" : "External calendar events are read-only");
+      return;
+    }
     const isEvent = isEventDisplayTask(task);
     if (!isEvent && hasRecurringRule(resolveOwningTask(task) || task)) return;
     const target = event.currentTarget as HTMLElement;
@@ -5621,6 +5762,10 @@ function App() {
   }
 
   function beginBlockResize(event: React.PointerEvent, task: Task, edge: "start" | "end") {
+    if (isExternalCalendarDisplayTask(task)) {
+      showToast(lang === "zh" ? "外部日历事项为只读" : "External calendar events are read-only");
+      return;
+    }
     if (resizeHintTaskId !== resolveTimelineRecordId(task.id) && hoveredBlock !== task.id) return;
     event.preventDefault();
     event.stopPropagation();
@@ -5786,6 +5931,10 @@ function App() {
   }
 
   function openTaskEdit(task: Task) {
+    if (isExternalCalendarDisplayTask(task)) {
+      showToast(lang === "zh" ? "外部日历事项为只读；请在来源日历中修改" : "External calendar events are read-only; edit them in the source calendar");
+      return;
+    }
     if (suppressBlockClickRef.current) return;
     rememberLayerTrigger("drawer");
     const event = occurrenceToEventMap.get(task.id) || events.find((item) => task.id.startsWith(`event_occ_${item.id}_`));
@@ -6087,10 +6236,33 @@ function App() {
     setAiOpen(true);
   }
 
-  async function sendAi(messageOverride?: string) {
-    if (!(messageOverride ?? aiInput).trim() && !aiAttachment) return;
-    if (!data) return;
-    const task = tasks.find((item) => item.id === referencedTaskId);
+  function applyAgentClientActions(agent?: AgentRunState) {
+    for (const command of agent?.clientActions || []) {
+      if (command.entity === "timer") {
+        if (command.operation === "pause") pauseTimer();
+        else if (command.operation === "start" && command.targetId && dataRef.current?.tasks.some((item) => item.id === command.targetId)) startTimer(command.targetId);
+        continue;
+      }
+      if (command.entity !== "app" || command.operation !== "navigate") continue;
+      const values = command.values || {};
+      if (values.mode === "execute" || values.mode === "planning") setModeState(values.mode);
+      if (values.view === "daily" || values.view === "3day" || values.view === "weekly" || values.view === "month") setTimelineView(values.view);
+      if (typeof values.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(values.date)) setSelectedDate(values.date);
+      if (command.targetId && dataRef.current?.tasks.some((item) => item.id === command.targetId)) {
+        const target = dataRef.current.tasks.find((item) => item.id === command.targetId)!;
+        setSelectedDate(target.scheduledDate || target.dueDate || todayIso());
+        setModeState("execute");
+      }
+    }
+  }
+
+  async function sendAi(messageOverride?: string, trigger: "manual" | "start_brief" | "end_review" = "manual") {
+    if (!(messageOverride ?? aiInput).trim() && !aiAttachment) return false;
+    if (!data) return false;
+    if (!authStateRef.current?.user || authStateRef.current.mode !== "cloud") {
+      showToast(lang === "zh" ? "全局 AI 需要先登录云端账号" : "Sign in to use the global AI agent");
+      return false;
+    }
     const msg = (messageOverride ?? aiInput).trim() || "解析附件中的任务和事件";
     const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
       name: aiAttachment.name,
@@ -6118,15 +6290,9 @@ function App() {
     clearAiAttachment();
 
     const dataForHistory = dataRef.current || data;
-    const activeConversationForHistory = (dataForHistory.aiConversations || [])
-      .find((conversation) => conversation.id === (activeAiConversationId || dataForHistory.activeAiConversationId));
-    const context = settings?.aiMemoryEnabled === false
-      ? { currentViewDate: selectedDate || today, page: mode, language: settings?.language || lang }
-      : { ...buildAiContext(data, { date: selectedDate || today, mode, focusTask: task }), language: settings?.language || lang };
-    const history = toAiHistory(aiMessages, data.chat, activeConversationForHistory?.messages || []);
-    const memories = settings?.aiMemoryEnabled === false
-      ? []
-      : pickMemoriesForContext(data.aiMemories || []);
+    const conversationsBefore = dataForHistory.aiConversations || [];
+    const conversationId = activeAiConversationId || dataForHistory.activeAiConversationId || conversationsBefore[0]?.id || uid("conversation");
+    if (!activeAiConversationId) setActiveAiConversationId(conversationId);
 
     let thinkingStage = 0;
     const requestController = new AbortController();
@@ -6140,14 +6306,19 @@ function App() {
       } : message));
     }, 1800);
     try {
+      await flushPendingSave({ urgent: true });
+      await flushPendingSettings({ urgent: true });
+      if (trigger !== "manual") await refreshExternalCalendarLayer("force");
       const result = await callAiAssistant({
-        mode: attachmentSnapshot ? "import_schedule" : "chat",
+        mode: "agent",
         model: settings?.model,
         reasoningMode: settings?.reasoningMode || "instant",
-        message: aiAttachment ? `${msg}\n\n附件：${aiAttachment.name}\n\n${aiAttachment.text}` : msg,
-        context,
-        history,
-        memories,
+        message: msg,
+        attachmentText: aiAttachment?.text,
+        attachmentName: aiAttachment?.name,
+        context: { currentViewDate: selectedDate || today, page: mode, language: settings?.language || lang },
+        conversationId,
+        trigger,
         signal: requestController.signal,
       });
       if (!result.ok) {
@@ -6158,11 +6329,17 @@ function App() {
           content: result.error.message,
           steps: [{ label: result.error.message, status: "error" }],
         } : message));
-        return;
+        return false;
       }
       const validActions = (result.actions || [])
         .map((action) => action.type === "import_schedule_item" ? { ...action, kind: "task" as const } : action)
         .filter(isValidAiAction);
+      const agent = result.agent ? {
+        ...result.agent,
+        decisionState: result.agent.pending.length ? "pending" as const : result.agent.decisionState,
+      } : undefined;
+      if ((agent?.applied.length || 0) > 0) await refreshQueuedRemote({ force: true });
+      applyAgentClientActions(agent);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
         status: "done",
@@ -6174,6 +6351,7 @@ function App() {
         intent: result.intent,
         plan: result.plan,
         format: result.format || "text",
+        agent,
       } : message));
       const currentData = dataRef.current;
       if (currentData) {
@@ -6191,17 +6369,11 @@ function App() {
           intent: result.intent,
           plan: result.plan,
           format: result.format || "text" as const,
+          agent,
         };
         const userChat = { id: userMessage.id, role: "user" as const, content: msg, createdAt: userMessage.createdAt, saved: true };
         const conversations = currentData.aiConversations || [];
-        let conversationId = activeAiConversationId || currentData.activeAiConversationId || conversations[0]?.id || "";
         let nextConversations = conversations;
-        if (!conversationId) {
-          const created = makeAiConversation(aiConversationTitle(msg));
-          conversationId = created.id;
-          nextConversations = [created, ...conversations];
-          setActiveAiConversationId(conversationId);
-        }
         nextConversations = nextConversations.map((conversation) => {
           if (conversation.id !== conversationId) return conversation;
           const nextMessages = [...(conversation.messages || []), userChat, assistantChat].slice(-80);
@@ -6226,7 +6398,10 @@ function App() {
           setAiMemoryNotice(lang === "zh" ? `已记住 ${savedCount} 条偏好` : `Saved ${savedCount} memory item${savedCount === 1 ? "" : "s"}`);
         }
         await saveData({ ...currentData, chat: nextChat, aiConversations: nextConversations, activeAiConversationId: conversationId, aiMemories: nextMemories });
+        if (agent?.pending.length) showToast(lang === "zh" ? `有 ${agent.pending.length} 项操作等待确认` : `${agent.pending.length} action(s) need confirmation`);
+        else if (agent?.applied.length) showToast(lang === "zh" ? `AI 已执行 ${agent.applied.length} 项操作，可在 24 小时内撤销` : `AI applied ${agent.applied.length} action(s); undo is available for 24 hours`);
       }
+      return true;
     } catch (error) {
       setAiInput((current) => current || msg);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
@@ -6235,12 +6410,49 @@ function App() {
         content: error instanceof Error ? error.message : "网络异常，请稍后重试。",
         steps: [{ label: "请求失败", status: "error" }],
       } : message));
+      return false;
     } finally {
       window.clearInterval(thinkingTimer);
       if (aiAbortRef.current === requestController) aiAbortRef.current = null;
       setAiBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!settings?.aiBriefsEnabled || !authState?.user) return;
+    const check = async () => {
+      if (briefAutomationBusyRef.current || aiBusy) return;
+      const now = new Date();
+      const date = localIsoDate(now);
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      const parseMinutes = (value: string | undefined, fallback: string) => {
+        const [hour, minute] = (value || fallback).split(":").map(Number);
+        return hour * 60 + minute;
+      };
+      let kind: "start" | "review" | null = null;
+      if (minutes >= parseMinutes(settings.aiStartBriefTime, "08:00") && settings.aiLastStartBriefDate !== date) kind = "start";
+      else if (minutes >= parseMinutes(settings.aiEndBriefTime, "21:30") && settings.aiLastEndReviewDate !== date) kind = "review";
+      if (!kind) return;
+      const attemptKey = `${kind}:${date}`;
+      if (briefAttemptedRef.current.has(attemptKey)) return;
+      briefAttemptedRef.current.add(attemptKey);
+      briefAutomationBusyRef.current = true;
+      try {
+        setAiOpen(true);
+        const prompt = kind === "start"
+          ? (lang === "zh" ? "请生成今天的开工简报：结合完整工作区、截止日期、已排程内容和外部日历忙碌时间，总结三项重点、首个行动和一项风险。简报只读，不执行任何操作。" : "Generate today's start brief using the full workspace, deadlines, schedule, and external calendar busy time. Give three priorities, the first action, and one risk. This brief is read-only; execute no actions.")
+          : (lang === "zh" ? "请生成今天的收工复盘：结合完整工作区、完成情况、计时记录和排程偏差，总结进展并给出明天的一项调整建议。复盘只读，不执行任何操作。" : "Generate today's end-of-day review using the full workspace, completion state, timer records, and schedule variance. Summarize progress and suggest one adjustment for tomorrow. This review is read-only; execute no actions.");
+        const success = await sendAi(prompt, kind === "start" ? "start_brief" : "end_review");
+        if (success) await saveSettings(kind === "start" ? { aiLastStartBriefDate: date } : { aiLastEndReviewDate: date });
+        else showToast(lang === "zh" ? "简报生成失败，可在 AI 抽屉中重试" : "Brief generation failed; retry from the AI drawer");
+      } finally {
+        briefAutomationBusyRef.current = false;
+      }
+    };
+    void check();
+    const interval = window.setInterval(() => void check(), 60_000);
+    return () => window.clearInterval(interval);
+  }, [authState?.user?.id, aiBusy, lang, settings?.aiBriefsEnabled, settings?.aiStartBriefTime, settings?.aiEndBriefTime, settings?.aiLastStartBriefDate, settings?.aiLastEndReviewDate]);
 
   function openDailyAiPrompt(kind: "start" | "review") {
     setAiInput(kind === "start"
@@ -6411,6 +6623,10 @@ function App() {
   }
 
   function beginShelfDrag(event: React.PointerEvent, task: Task, source: "candidate" | "allDay", options: CandidateDragOptions = {}) {
+    if (isExternalCalendarDisplayTask(task)) {
+      showToast(lang === "zh" ? "外部日历事项为只读" : "External calendar events are read-only");
+      return;
+    }
     const target = event.target as HTMLElement;
     const interactiveTarget = target.closest("button,input,textarea,select,a");
     if (event.button !== 0 || (interactiveTarget && !target.closest(".icon-schedule"))) return;
@@ -6711,6 +6927,35 @@ function App() {
     });
   }
 
+  async function handleAgentDecision(messageId: string, decision: "approve" | "reject" | "undo") {
+    const existing = aiMessages.find((message) => message.id === messageId)?.agent;
+    if (!existing?.runId || aiBusy) return;
+    setAiBusy(true);
+    try {
+      const mode = decision === "approve" ? "agent_confirm" : decision === "reject" ? "agent_reject" : "agent_undo";
+      const result = await decideAgentRun(mode, existing.runId);
+      if (!result.ok) {
+        showToast(result.error.message);
+        return;
+      }
+      if (decision !== "reject") await refreshQueuedRemote({ force: true });
+      applyAgentClientActions(result.agent);
+      const nextAgent: AgentRunState = {
+        ...(result.agent || existing),
+        trace: existing.trace,
+        applied: decision === "undo" ? [] : [...existing.applied, ...(result.agent?.applied || [])],
+        pending: [],
+        forbidden: existing.forbidden,
+        decisionState: decision === "approve" ? "approved" : decision === "reject" ? "rejected" : "undone",
+      };
+      setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, agent: nextAgent } : message));
+      persistAiMessage(messageId, { agent: nextAgent });
+      showToast(result.reply);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   async function confirmAiAction(action: AiAction, messageId?: string, actionIndex?: number) {
     const currentData = dataRef.current;
     if (!currentData) return;
@@ -6939,37 +7184,20 @@ function App() {
     if (!snapshot || !task || subtaskAiBusyId) return;
     setSubtaskAiBusyId(taskId);
     try {
+      if (!authStateRef.current?.user) throw new Error(lang === "zh" ? "全局 AI 需要先登录云端账号" : "Sign in to use the global AI agent");
+      await flushPendingSave({ urgent: true });
       const result = await callAiAssistant({
-        mode: "suggest_subtasks",
+        mode: "agent",
         model: settings?.model,
         reasoningMode: settings?.reasoningMode || "instant",
-        message: lang === "zh" ? `把任务“${task.title}”拆解为可执行的子任务` : `Break “${task.title}” into actionable subtasks`,
-        context: {
-          language: lang,
-          taskId: task.id,
-          taskTitle: task.title,
-          focusTask: {
-            id: task.id,
-            title: task.title,
-            notes: task.notes || "",
-            estimatedMinutes: Math.round((task.estimatedHours || 0.5) * 60),
-            existingSubtasks: (task.subtasks || []).map((subtask) => subtask.title),
-          },
-        },
+        message: lang === "zh" ? `请把现有任务“${task.title}”（ID: ${task.id}）拆解为 3–8 个可执行子任务，并直接追加到这个任务。` : `Break the existing task “${task.title}” (ID: ${task.id}) into 3–8 actionable subtasks and append them to that task.`,
+        context: { language: lang, currentViewDate: selectedDate, page: mode },
       });
       if (!result.ok) throw new Error(result.error.message);
-      const action = result.actions.find((item): item is Extract<AiAction, { type: "create_subtasks" }> => item.type === "create_subtasks");
-      if (!action?.subtasks?.length) throw new Error("AI did not return subtasks");
-      const latest = dataRef.current;
-      const latestTask = latest?.tasks.find((item) => item.id === taskId);
-      if (!latest || !latestTask) return;
-      const now = new Date().toISOString();
-      const subtasks = appendAiSubtasks(latestTask.subtasks, action.subtasks, () => uid("subtask"), now);
-      const addedCount = subtasks.length - (latestTask.subtasks || []).length;
-      await saveData({
-        ...latest,
-        tasks: latest.tasks.map((item) => item.id === taskId ? { ...item, subtasks, updatedAt: now } : item),
-      });
+      if (result.agent?.pending.length) throw new Error(lang === "zh" ? "拆解计划需要在 AI 对话中确认" : "Confirm the breakdown in the AI conversation");
+      await refreshQueuedRemote({ force: true });
+      const addedCount = Math.max(0, (dataRef.current?.tasks.find((item) => item.id === taskId)?.subtasks || []).length - (task.subtasks || []).length);
+      if (!addedCount) throw new Error(result.reply || "AI did not add subtasks");
       showToast(addedCount > 0
         ? (lang === "zh" ? `AI 已添加 ${addedCount} 个子任务` : `AI added ${addedCount} subtasks`)
         : (lang === "zh" ? "没有新的子任务可添加" : "No new subtasks to add"));
@@ -8922,7 +9150,7 @@ function App() {
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
@@ -8964,7 +9192,7 @@ function App() {
         <ScheduleTemplateModal
           lang={lang}
           date={timelineDate}
-          tasks={tasks}
+          tasks={[...tasks, ...expandExternalCalendarOccurrences(new Set([timelineDate])).tasks.map((task) => task.scheduledStart ? task : { ...task, scheduledStart: "00:00", scheduledEnd: "23:59" })]}
           customTemplates={data.scheduleTemplates || []}
           onSaveCustomTemplates={(templates) => void saveData({ ...dataRef.current!, scheduleTemplates: templates })}
           onApply={applyTemplateToDate}
@@ -11292,6 +11520,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   const next = extractNextAction(task.notes);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   const isEvent = isEventDisplayTask(task);
+  const isExternalEvent = isExternalCalendarDisplayTask(task);
   const [badgeWidth, setBadgeWidth] = useState(0);
   useLayoutEffect(() => {
     if (hovered && projectInteractive && projectBtnRef.current) {
@@ -11316,7 +11545,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   );
   const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
-  const canResize = !isReturnedUnfinished && (isEvent || !recurringLocked);
+  const canResize = !isExternalEvent && !isReturnedUnfinished && (isEvent || !recurringLocked);
   const eventId = task.id;
   const sizeClass = height < 56 ? "short" : height >= 120 ? "tall" : "normal";
   const originalStart = task.scheduledStart || "09:00";
@@ -11327,9 +11556,9 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
     : suppliedTop ?? top;
 
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id, readonly: isExternalEvent ? "true" : undefined }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
-    }} onPointerDown={isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
+    }} onPointerDown={isExternalEvent || isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
       {canResize && (hovered || showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
@@ -11345,7 +11574,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
           </TaskCheckbox>
         )}
         <TaskBlockContent className="df-time-card-main" title={task.title}>
-          {isEvent ? <span className="df-event-kind-label">{t(lang, "form.event")}</span> : null}
+          {isEvent ? <span className="df-event-kind-label">{isExternalEvent ? (lang === "zh" ? "外部日历" : "External") : t(lang, "form.event")}</span> : null}
           {next && <span className="df-next df-time-card-next">{t(lang, "timeBlock.nextStep")}：{next}</span>}
         </TaskBlockContent>
       </TaskBlockRow>
@@ -11496,6 +11725,7 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const stripeColor = projects.find((project) => String(project.id) === String(task.projectId || ""))?.color || categories[task.category].color;
   const isEvent = isEventDisplayTask(task);
+  const isExternalEvent = isExternalCalendarDisplayTask(task);
   const isShortName = task.title.length <= 6;
   const isReturnedUnfinished = task.executionStatus === "returned_unfinished";
   const recurringLocked = hasRecurringRule(task);
@@ -11508,14 +11738,14 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
     }
   }, [hovered]);
   return (
-    <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task" }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+    <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", readonly: isExternalEvent ? "true" : undefined }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
       <TaskBlockRow className="df-all-day-row">
         {!isEvent && <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} returned={isReturnedUnfinished} onClick={(event) => {
           event.stopPropagation();
           onToggleDone();
         }}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}</TaskCheckbox>}
         <TaskBlockContent className="df-all-day-main" title={task.title}>
-          {isEvent ? <span className="df-event-kind-label">{t(lang, "form.event")}</span> : null}
+          {isEvent ? <span className="df-event-kind-label">{isExternalEvent ? (lang === "zh" ? "外部日历" : "External") : t(lang, "form.event")}</span> : null}
         </TaskBlockContent>
         {!isEvent && hovered && <TaskActions className="df-all-day-actions" onClick={(event) => event.stopPropagation()}>
           <button ref={projectBtnRef} className="df-block-project" title={projectName} onClick={(event) => { event.stopPropagation(); setProjectOpen((open) => !open); }}># {projectName}</button>
@@ -12227,7 +12457,7 @@ function MobileSheetDismissHandle({ onDismiss, onCollapse, onExpand, collapsed =
   />;
 }
 
-function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void }) {
+function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
   const projects = projectList || [];
   const tasks = taskList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -12320,6 +12550,10 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       followLatestRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 72;
     }}>
       {messages.length === 0 && <div className="df-ai-reference-empty">
+        <div className={`df-ai-capability-state ${globalAgentAvailable ? "ready" : "locked"}`}>
+          <strong>{globalAgentAvailable ? (lang === "zh" ? "全局 Agent 已连接" : "Global Agent connected") : (lang === "zh" ? "登录后启用全局 Agent" : "Sign in to enable the Global Agent")}</strong>
+          <span>{globalAgentAvailable ? (lang === "zh" ? "可按需查询完整工作区；高风险操作会先请求确认。" : "Can query the full workspace on demand; high-risk actions require confirmation.") : (lang === "zh" ? "本地估时、分类和规则排程仍可使用。" : "Local estimates, categorization, and rule-based scheduling remain available.")}</span>
+        </div>
         <div className="df-ai-reference-prompt">{lang === "zh" ? "需要我帮什么？直接问吧……" : "How can I help? Just ask…"}</div>
         <div className="df-ai-reference-suggestions">
           {promptSuggestions.map((suggestion) => <button key={suggestion} onClick={() => setInput(suggestion)}>{suggestion}</button>)}
@@ -12335,6 +12569,30 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
             {message.steps.map((step, index) => <div key={index} className={`df-ai-step ${step.status}`}><span className="df-ai-step-icon">{step.status === "done" ? "✓" : step.status === "error" ? "✕" : step.status === "running" ? "●" : "○"}</span><span>{step.label}</span></div>)}
           </div>}
           {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.content}</div>}
+          {message.agent && <div className="df-agent-run-card">
+            <small>{lang === "zh" ? "审计 ID" : "Audit ID"} · <code>{message.agent.runId}</code>{message.agent.undoExpiresAt ? ` · ${lang === "zh" ? "撤销截止" : "Undo until"} ${new Date(message.agent.undoExpiresAt).toLocaleString()}` : ""}</small>
+            {message.agent.trace && message.agent.trace.length > 0 && <details className="df-agent-trace">
+              <summary>{lang === "zh" ? `实际查询步骤（${message.agent.trace.length}）` : `Queries performed (${message.agent.trace.length})`}</summary>
+              {message.agent.trace.map((step) => <div key={step.id} className={step.status}><span>{step.status === "done" ? "✓" : "✕"}</span><code>{step.name}</code></div>)}
+            </details>}
+            {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied">
+              <strong>{lang === "zh" ? `已自动执行 ${message.agent.applied.length} 项` : `${message.agent.applied.length} action(s) applied`}</strong>
+              {message.agent.applied.map((action) => <span key={action.commandId}>{action.title} · {action.operation}</span>)}
+              {message.agent.undoExpiresAt && <button type="button" disabled={busy} onClick={() => onUndoAgent(message.id)}>{lang === "zh" ? "撤销本轮操作" : "Undo this run"}</button>}
+            </div>}
+            {message.agent.pending.length > 0 && message.agent.decisionState === "pending" && <div className="df-agent-confirm-card">
+              <header><strong>{lang === "zh" ? "需要确认" : "Confirmation required"}</strong><small>{lang === "zh" ? `将影响 ${message.agent.pending.length} 个操作` : `${message.agent.pending.length} operation(s)`}</small></header>
+              {message.agent.pending.map((command) => <article key={command.id}>
+                <div><strong>{command.operation} · {command.entity}</strong>{command.targetId && <code>{command.targetId}</code>}</div>
+                {command.reason && <p>{command.reason}</p>}
+                {command.values && Object.keys(command.values).length > 0 && <dl>{Object.entries(command.values).filter(([key]) => !/(token|secret|password|url)/i.test(key)).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd></div>)}</dl>}
+              </article>)}
+              <footer><button type="button" disabled={busy} onClick={() => onRejectAgent(message.id)}>{lang === "zh" ? "取消" : "Cancel"}</button><button type="button" className="primary" disabled={busy} onClick={() => onApproveAgent(message.id)}>{lang === "zh" ? "确认并执行" : "Confirm and apply"}</button></footer>
+            </div>}
+            {message.agent.forbidden && message.agent.forbidden.length > 0 && <div className="df-agent-forbidden">{lang === "zh" ? `已阻止 ${message.agent.forbidden.length} 项越权操作` : `${message.agent.forbidden.length} unauthorized action(s) blocked`}</div>}
+            {message.agent.decisionState === "rejected" && <div className="df-agent-decision-outcome">{lang === "zh" ? "待确认操作已取消" : "Pending actions cancelled"}</div>}
+            {message.agent.decisionState === "undone" && <div className="df-agent-decision-outcome">{lang === "zh" ? "本轮 AI 操作已撤销" : "This AI run was undone"}</div>}
+          </div>}
           {message.plan && message.plan.length > 0 && <div className="df-ai-plan">
             <div className="df-ai-plan-header"><span>{lang === "zh" ? "今日时间块" : "Today's time blocks"}</span><small>{message.plan.length} {text.itemUnit}</small></div>
             {message.plan.map((block, pi) => <div key={pi} className="df-ai-plan-row">
@@ -12625,6 +12883,58 @@ function CalendarFeedManager({ lang }: { lang: Language }) {
       }}>{lang === "zh" ? "撤销" : "Revoke"}</button></div>)}
     </section>
   );
+}
+
+function ExternalCalendarManager({ lang }: { lang: Language }) {
+  const api = window.plannerApi;
+  const supported = Boolean(api.listExternalCalendars && api.connectExternalCalendar && api.refreshExternalCalendar && api.removeExternalCalendar);
+  const [sources, setSources] = useState<ExternalCalendarSource[]>([]);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [confirmRemoveId, setConfirmRemoveId] = useState("");
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    if (!api.listExternalCalendars) return;
+    try {
+      const result = await api.listExternalCalendars();
+      setSources(result.sources);
+      setError("");
+    } catch (caught) {
+      setError(calendarFeedErrorMessage(caught, lang));
+    }
+  }, [api, lang]);
+  useEffect(() => { if (supported) void load(); }, [load, supported]);
+  const changed = () => window.dispatchEvent(new CustomEvent("navopath:external-calendar-changed"));
+  return <section className="df-external-calendar-settings">
+    <strong>{lang === "zh" ? "外部 ICS 日历（只读）" : "External ICS calendars (read-only)"}</strong>
+    <p>{supported
+      ? (lang === "zh" ? "最多连接 10 个 HTTPS ICS 地址。事项只作为忙碌时间参与冲突检测和 AI 规划，不会导入任务，也不会写回来源日历。" : "Connect up to 10 HTTPS ICS URLs. Events are used only as read-only busy time for conflicts and AI planning; they are never imported as tasks or written back.")
+      : (lang === "zh" ? "登录云端账号并部署外部日历服务后可用。" : "Available after signing in and deploying the external-calendar service.")}</p>
+    {supported && <div className="df-external-calendar-connect">
+      <input value={name} maxLength={120} onChange={(event) => setName(event.target.value)} placeholder={lang === "zh" ? "日历名称" : "Calendar name"} />
+      <input value={url} type="url" inputMode="url" onChange={(event) => setUrl(event.target.value)} placeholder="https://…/calendar.ics" />
+      <button type="button" disabled={Boolean(busyId) || sources.length >= 10 || !name.trim() || !url.trim()} onClick={async () => {
+        if (!api.connectExternalCalendar) return;
+        setBusyId("connect"); setError("");
+        try {
+          await api.connectExternalCalendar({ name: name.trim(), url: url.trim() });
+          setName(""); setUrl(""); await load(); changed();
+        } catch (caught) { setError(calendarFeedErrorMessage(caught, lang)); }
+        finally { setBusyId(""); }
+      }}>{busyId === "connect" ? (lang === "zh" ? "连接中…" : "Connecting…") : (lang === "zh" ? "连接" : "Connect")}</button>
+    </div>}
+    {error && <p className="df-mcp-status error" role="alert">{error}</p>}
+    {!supported && <p className="df-mcp-status muted">{lang === "zh" ? "当前环境不可用" : "Unavailable in this environment"}</p>}
+    {supported && sources.length === 0 && !error && <p className="df-mcp-status muted">{lang === "zh" ? "尚未连接外部日历。" : "No external calendars connected."}</p>}
+    <div className="df-external-calendar-list">{sources.map((source) => <article key={source.id} className={`df-external-calendar-source ${source.syncStatus}`}>
+      <div><strong>{source.name}</strong><code>{source.displayUrl}</code><small>{source.syncStatus === "error" ? source.syncError : source.lastSyncedAt ? `${lang === "zh" ? "上次同步" : "Last synced"} ${new Date(source.lastSyncedAt).toLocaleString()}` : (lang === "zh" ? "等待首次同步" : "Waiting for first sync")}</small></div>
+      <div>
+        <button type="button" disabled={Boolean(busyId)} onClick={async () => { if (!api.refreshExternalCalendar) return; setBusyId(source.id); setError(""); try { await api.refreshExternalCalendar(source.id, true); await load(); changed(); } catch (caught) { setError(calendarFeedErrorMessage(caught, lang)); } finally { setBusyId(""); } }}>{busyId === source.id ? "…" : (lang === "zh" ? "同步" : "Sync")}</button>
+        {confirmRemoveId === source.id ? <><button type="button" onClick={() => setConfirmRemoveId("")}>{lang === "zh" ? "取消" : "Cancel"}</button><button type="button" className="danger-lite" disabled={Boolean(busyId)} onClick={async () => { if (!api.removeExternalCalendar) return; setBusyId(source.id); try { await api.removeExternalCalendar(source.id); setConfirmRemoveId(""); await load(); changed(); } catch (caught) { setError(calendarFeedErrorMessage(caught, lang)); } finally { setBusyId(""); } }}>{lang === "zh" ? "确认移除" : "Confirm removal"}</button></> : <button type="button" onClick={() => setConfirmRemoveId(source.id)}>{lang === "zh" ? "移除" : "Remove"}</button>}
+      </div>
+    </article>)}</div>
+  </section>;
 }
 
 function SyncSettingsControl({
@@ -13012,7 +13322,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
   const [accentSettingsOpen, setAccentSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [widgetThemeOpen, setWidgetThemeOpen] = useState<"light" | "dark">("light");
-  const [integrationTab, setIntegrationTab] = useState<"calendar" | "plugins" | "mcp">("calendar");
+  const [integrationTab, setIntegrationTab] = useState<"calendar" | "external-calendar" | "plugins" | "mcp">("calendar");
   const settingsContentRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const settingsResults = useMemo(() => searchSettings(settingsQuery, lang), [settingsQuery, lang]);
@@ -13039,6 +13349,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     if (settingsTarget.anchor?.startsWith("widget-dark")) setWidgetThemeOpen("dark");
     if (settingsTarget.anchor === "mcp") setIntegrationTab("mcp");
     if (settingsTarget.anchor === "plugins") setIntegrationTab("plugins");
+    if (settingsTarget.anchor === "external-calendar") setIntegrationTab("external-calendar");
   }, [settingsTarget.anchor]);
   useEffect(() => {
     const content = settingsContentRef.current;
@@ -13065,6 +13376,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
     if (target.anchor === "mcp") setIntegrationTab("mcp");
     if (target.anchor === "plugins") setIntegrationTab("plugins");
     if (target.anchor === "calendar-feed") setIntegrationTab("calendar");
+    if (target.anchor === "external-calendar") setIntegrationTab("external-calendar");
     setSettingsTarget(target);
     setSettingsQuery("");
   }
@@ -13804,6 +14116,9 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               ]} />} />
               <SettingRow anchor="ai-estimate" title={lang === "zh" ? "自动估算任务用时" : "Estimate task duration"} control={<SettingToggle checked={settings.autoEstimateTaskDuration !== false} ariaLabel={lang === "zh" ? "自动估算任务用时" : "Estimate task duration"} onChange={(next) => onSave({ autoEstimateTaskDuration: next })} />} />
               <SettingRow anchor="ai-project" title={lang === "zh" ? "自动归入项目" : "Auto-assign project"} description={lang === "zh" ? "仅在判断置信度较高时归入已有项目。" : "Assign to an existing project only at high confidence."} control={<SettingToggle checked={settings.autoAssignTaskProject !== false} ariaLabel={lang === "zh" ? "自动归入项目" : "Auto-assign project"} onChange={(next) => onSave({ autoAssignTaskProject: next })} />} />
+              <SettingRow anchor="ai-briefs" title={lang === "zh" ? "每日开工与收工简报" : "Daily start and end briefs"} description={cloudReady ? (lang === "zh" ? "应用运行时跨过时间点生成；当天错过后会在下次打开时补生成一次。简报只读。" : "Generated when the running app crosses each time; a missed brief is generated on the next open that day. Briefs are read-only.") : (lang === "zh" ? "登录云端账号后可启用。" : "Sign in to a cloud account to enable briefs.")} control={<SettingToggle checked={Boolean(settings.aiBriefsEnabled)} disabled={!cloudReady} ariaLabel={lang === "zh" ? "每日 AI 简报" : "Daily AI briefs"} onChange={(next) => onSave({ aiBriefsEnabled: next })} />} />
+              <SettingRow title={lang === "zh" ? "开工时间" : "Start brief time"} control={<SettingTextInput type="time" value={settings.aiStartBriefTime || "08:00"} disabled={!settings.aiBriefsEnabled || !cloudReady} ariaLabel={lang === "zh" ? "开工简报时间" : "Start brief time"} onChange={(value) => onSave({ aiStartBriefTime: value })} />} />
+              <SettingRow title={lang === "zh" ? "收工时间" : "End review time"} control={<SettingTextInput type="time" value={settings.aiEndBriefTime || "21:30"} disabled={!settings.aiBriefsEnabled || !cloudReady} ariaLabel={lang === "zh" ? "收工复盘时间" : "End review time"} onChange={(value) => onSave({ aiEndBriefTime: value })} />} />
               <SettingRow anchor="ai-memory" title={t(lang, "settings.allowAiContext")} description={lang === "zh" ? "启用后，下方才显示可参与上下文的记忆。" : "When enabled, memories available to context appear below."} control={<SettingToggle checked={Boolean(settings.aiMemoryEnabled)} ariaLabel={t(lang, "settings.allowAiContext")} onChange={(next) => onSave({ aiMemoryEnabled: next })} />} />
               <SettingRow anchor="hide-ai" title={t(lang, "settings.hideAllAi")} control={<SettingToggle checked={Boolean(settings.hideAi)} ariaLabel={t(lang, "settings.hideAllAi")} onChange={(next) => onSave({ hideAi: next })} />} />
               <SettingRow
@@ -13836,10 +14151,12 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
             </SettingSection>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && <div className="df-settings-subtabs df-settings-integration-tabs" role="tablist" aria-label={lang === "zh" ? "日历与集成" : "Calendar and integrations"}>
               <button type="button" role="tab" aria-selected={integrationTab === "calendar"} className={integrationTab === "calendar" ? "active" : ""} onClick={() => { setIntegrationTab("calendar"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "calendar-feed" }); }}>{lang === "zh" ? "日历订阅" : "Calendar"}</button>
+              <button type="button" role="tab" aria-selected={integrationTab === "external-calendar"} className={integrationTab === "external-calendar" ? "active" : ""} onClick={() => { setIntegrationTab("external-calendar"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "external-calendar" }); }}>{lang === "zh" ? "外部日历" : "External"}</button>
               <button type="button" role="tab" aria-selected={integrationTab === "plugins"} className={integrationTab === "plugins" ? "active" : ""} onClick={() => { setIntegrationTab("plugins"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "plugins" }); }}>{lang === "zh" ? "插件" : "Plugins"}</button>
               <button type="button" role="tab" aria-selected={integrationTab === "mcp"} className={integrationTab === "mcp" ? "active" : ""} onClick={() => { setIntegrationTab("mcp"); setSettingsTarget({ category: "advanced", detail: "integrations", anchor: "mcp" }); }}>MCP</button>
             </div>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "calendar" && <section className="df-settings-group" data-settings-anchor="calendar-feed" tabIndex={-1}><h3>{lang === "zh" ? "日历订阅" : "Calendar Subscription"}</h3><CalendarFeedManager lang={lang} /></section>}
+            {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "external-calendar" && <section className="df-settings-group" data-settings-anchor="external-calendar" tabIndex={-1}><h3>{lang === "zh" ? "外部日历" : "External Calendars"}</h3><ExternalCalendarManager lang={lang} /></section>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "mcp" && <section className="df-settings-group" data-settings-anchor="mcp" tabIndex={-1}><h3>MCP</h3><McpTokenManager lang={lang} /></section>}
             {settingsTarget.category === "advanced" && settingsTarget.detail === "integrations" && integrationTab === "plugins" && <section className="df-settings-group" data-settings-anchor="plugins" tabIndex={-1}>
               <h3>{lang === "zh" ? "插件" : "Plugins"}</h3>

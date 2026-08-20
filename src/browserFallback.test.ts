@@ -1036,4 +1036,30 @@ describe("browser fallback preview mode", () => {
     expect(message?.plan?.[0].reason).toHaveLength(10_000);
     expect(message?.format).toBe("text");
   });
+
+  it("preserves bounded global Agent confirmation and undo state in conversations", () => {
+    const source = structuredClone(fallbackData()) as any;
+    source.aiConversations = [{
+      id: "agent-conversation",
+      title: "Agent",
+      createdAt: "2026-08-20T00:00:00.000Z",
+      updatedAt: "2026-08-20T00:00:00.000Z",
+      messages: [{
+        id: "agent-message",
+        role: "assistant",
+        content: "Please confirm",
+        createdAt: "2026-08-20T00:00:00.000Z",
+        agent: {
+          runId: "run-1",
+          trace: [{ id: "tool-1", name: "search_workspace", status: "done" }],
+          applied: [],
+          pending: [{ id: "command-1", entity: "task", operation: "delete", targetId: "task-1", values: {}, reason: "Requested" }],
+          decisionState: "pending",
+        },
+      }],
+    }];
+    const message = normalizeData(source).aiConversations?.[0].messages[0];
+    expect(message?.agent).toMatchObject({ runId: "run-1", decisionState: "pending" });
+    expect(message?.agent?.pending[0]).toMatchObject({ operation: "delete", targetId: "task-1" });
+  });
 });
