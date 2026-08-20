@@ -6638,7 +6638,10 @@ function App() {
     const duration = taskDuration(task);
     let active = false;
     let holdCancelled = false;
-    let holdReady = !(compactLayout && source === "candidate" && event.pointerType === "touch");
+    // Candidate rows live inside a scroll container on every touch layout.
+    // Require a hold before dragging so an ordinary vertical swipe remains a
+    // native list scroll in both portrait and landscape orientations.
+    let holdReady = !(source === "candidate" && event.pointerType === "touch");
     const holdTimer = holdReady ? undefined : window.setTimeout(() => {
       holdReady = true;
       dragElement.classList.add("is-drag-armed");

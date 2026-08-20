@@ -1685,6 +1685,13 @@
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root .df-app .df-candidate-list .df-task-block {
+    touch-action: pan-y !important;
   }
 
   #root .df-app .df-mobile-date-picker > header {
