@@ -50,6 +50,18 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Deploy Supabase backend
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          ICS_ENCRYPTION_KEY: ${{ secrets.ICS_ENCRYPTION_KEY }}
+        run: |
+          npx supabase@2.115.0 link --project-ref "$SUPABASE_PROJECT_REF"
+          npx supabase@2.115.0 db push --linked --yes
+          npx supabase@2.115.0 secrets set "ICS_ENCRYPTION_KEY=$ICS_ENCRYPTION_KEY" --project-ref "$SUPABASE_PROJECT_REF"
+          npx supabase@2.115.0 functions deploy ai-assistant --project-ref "$SUPABASE_PROJECT_REF" --use-api
+          npx supabase@2.115.0 functions deploy external-calendar --project-ref "$SUPABASE_PROJECT_REF" --use-api
+
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy dist --project-name navopath-xiaoyang --branch production
         env:

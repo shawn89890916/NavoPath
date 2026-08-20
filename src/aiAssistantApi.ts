@@ -4,9 +4,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { localIsoDate } from "./utils/localDate";
 import { filterAiModels } from "./utils/aiModels";
-import type { AgentRunState } from "./types";
+import type { AgentAuditEntry, AgentRunState } from "./types";
 
-export type AiMode = "health" | "agent" | "agent_confirm" | "agent_reject" | "agent_undo" | "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "plan_schedule" | "enrich_task" | "import_schedule" | "summarize_memory";
+export type AiMode = "health" | "agent" | "agent_audit" | "agent_confirm" | "agent_reject" | "agent_undo" | "chat" | "suggest_subtasks" | "parse_task" | "plan_day" | "plan_schedule" | "enrich_task" | "import_schedule" | "summarize_memory";
 export type AiStep = { label: string; status: "pending" | "running" | "done" | "error" };
 export type AiChatMessage = { role: "user" | "assistant" | "system"; content: string };
 export type AiMemoryPatch = { content: string; tags?: string[] };
@@ -62,6 +62,7 @@ type AiAssistantPayload = {
   format?: "text" | "markdown";
   enrichment?: { durationMinutes?: number; projectId?: string; confidence?: number };
   agent?: AgentRunState;
+  audits?: AgentAuditEntry[];
 };
 
 export type AiAssistantResponse =
@@ -206,6 +207,7 @@ export async function invokeAiAssistant(client: SupabaseClient, params: {
       format: data.format === "markdown" ? "markdown" : "text",
       enrichment: data.enrichment && typeof data.enrichment === "object" ? data.enrichment : undefined,
       agent: data.agent && typeof data.agent === "object" ? data.agent as AgentRunState : undefined,
+      audits: Array.isArray(data.audits) ? data.audits as AgentAuditEntry[] : undefined,
     });
   } catch (error) {
     console.error("AI Assistant network error:", error);
@@ -242,6 +244,12 @@ export async function callAiAssistant(params: Parameters<typeof invokeAiAssistan
 
 export function decideAgentRun(mode: "agent_confirm" | "agent_reject" | "agent_undo", runId: string, signal?: AbortSignal) {
   return callAiAssistant({ mode, runId, signal, timeoutMs: 30_000 });
+}
+
+export async function listAgentAuditRuns(signal?: AbortSignal): Promise<AgentAuditEntry[]> {
+  const result = await callAiAssistant({ mode: "agent_audit", signal, timeoutMs: 20_000 });
+  if (!result.ok) throw new Error(result.error.message);
+  return result.audits || [];
 }
 
 export async function getAiHealth(): Promise<AiHealthResponse> {

@@ -220,6 +220,6 @@ serve(async (req: Request) => {
   } catch (error) {
     const publicMessage = safeCalendarError(error);
     console.error("External calendar error", { code: publicMessage, name: error instanceof Error ? error.name : "unknown" });
-    return response({ error: publicMessage }, 500);
+    return response({ error: publicMessage }, publicMessage === "Calendar address is not permitted" ? 400 : 500);
   }
 });

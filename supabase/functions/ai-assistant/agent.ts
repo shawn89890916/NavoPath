@@ -1,4 +1,4 @@
-export type AgentEntity = "task" | "project" | "habit" | "note" | "memory" | "template" | "settings" | "app" | "timer";
+export type AgentEntity = "task" | "project" | "habit" | "note" | "memory" | "template" | "settings" | "integration" | "app" | "timer";
 
 export type AgentOperation =
   | "create"
@@ -17,6 +17,7 @@ export type AgentOperation =
   | "restore_entity";
 
 export type AgentRisk = "auto" | "confirm" | "forbidden";
+export type AgentSafetyLevel = "standard" | "strict" | "readonly";
 
 export interface AgentCommand {
   id: string;
@@ -39,6 +40,7 @@ export interface AgentExecutionResult {
   applied: Array<{ commandId: string; entity: AgentEntity; operation: AgentOperation; targetId?: string; title: string }>;
   inverseCommands: AgentCommand[];
   clientActions: AgentCommand[];
+  integrationCommands: AgentCommand[];
 }
 
 type BusyOccurrence = { start_at?: string; end_at?: string; start_date?: string; end_date?: string; all_day?: boolean; status?: string };
@@ -60,6 +62,7 @@ const ALLOWED_OPERATIONS: Record<AgentEntity, Set<AgentOperation>> = {
   memory: new Set(["create", "update", "archive", "delete"]),
   template: new Set(["create", "update", "delete"]),
   settings: new Set(["update_settings"]),
+  integration: new Set(["update"]),
   app: new Set(["navigate"]),
   timer: new Set(["start", "pause"]),
 };
@@ -185,6 +188,12 @@ export function classifyAgentCommands(input: AgentCommand[]): AgentCommandDecisi
     if (command.entity === "settings" && valueKeys.some((key) => SENSITIVE_SETTING_RE.test(key))) {
       return { command, risk: "forbidden", reason: "Sensitive account and credential settings are never available to AI." };
     }
+    if (command.entity === "integration") {
+      const validToggle = command.operation === "update" && typeof command.values?.enabled === "boolean" && valueKeys.every((key) => key === "enabled");
+      return validToggle
+        ? { command, risk: "confirm", reason: "External calendar changes require confirmation." }
+        : { command, risk: "forbidden", reason: "AI may only enable or disable an existing external calendar; URLs and connection credentials stay manual." };
+    }
     if (valueKeys.some((key) => /(?:password|secret|token|api.?key|authorization)/i.test(key))) {
       return { command, risk: "forbidden", reason: "Commands may not contain credentials or authorization material." };
     }
@@ -198,6 +207,21 @@ export function classifyAgentCommands(input: AgentCommand[]): AgentCommandDecisi
       return { command, risk: "confirm", reason: "Bulk changes require confirmation." };
     }
     return { command, risk: "auto", reason: "This is a reversible, low-risk NavoPath action." };
+  });
+}
+
+export function applyAgentSafetyLevel(decisions: AgentCommandDecision[], level: unknown): AgentCommandDecision[] {
+  const safetyLevel: AgentSafetyLevel = level === "strict" || level === "readonly" ? level : "standard";
+  if (safetyLevel === "standard") return decisions;
+  return decisions.map((decision) => {
+    if (decision.risk === "forbidden" || decision.command.entity === "app") return decision;
+    if (safetyLevel === "readonly") {
+      return { ...decision, risk: "forbidden", reason: "Read-only safety level blocks AI writes and timer controls." };
+    }
+    if (decision.risk === "auto" && decision.command.entity !== "timer") {
+      return { ...decision, risk: "confirm", reason: "Strict safety level requires confirmation for every workspace write." };
+    }
+    return decision;
   });
 }
 
@@ -271,7 +295,7 @@ export function executeAgentCommands(
   originalData: Record<string, any>,
   originalSettings: Record<string, any>,
   input: AgentCommand[],
-  options: { allowInternalRestore?: boolean; timestamp?: string; busyOccurrences?: BusyOccurrence[]; timezone?: string } = {},
+  options: { allowInternalRestore?: boolean; timestamp?: string; busyOccurrences?: BusyOccurrence[]; timezone?: string; integrations?: Array<Record<string, any>> } = {},
 ): AgentExecutionResult {
   const commands = normalizeAgentCommands(input, { allowInternalRestore: options.allowInternalRestore });
   const data = clone(originalData);
@@ -279,12 +303,22 @@ export function executeAgentCommands(
   const applied: AgentExecutionResult["applied"] = [];
   const inverseCommands: AgentCommand[] = [];
   const clientActions: AgentCommand[] = [];
+  const integrationCommands: AgentCommand[] = [];
   const timestamp = options.timestamp || now();
 
   for (const command of commands) {
     if (command.operation === "navigate" || command.entity === "timer") {
       clientActions.push(command);
       applied.push({ commandId: command.id, entity: command.entity, operation: command.operation, targetId: command.targetId, title: command.reason || command.operation });
+      continue;
+    }
+    if (command.entity === "integration") {
+      const source = (options.integrations || []).find((item) => item.id === command.targetId);
+      if (!source) throw new Error(`integration not found: ${command.targetId}`);
+      if (typeof command.values?.enabled !== "boolean") throw new Error("Integration enabled state is required");
+      integrationCommands.push(command);
+      inverseCommands.unshift({ id: `undo_${command.id}`, entity: "integration", operation: "update", targetId: command.targetId, values: { enabled: Boolean(source.enabled) } });
+      applied.push({ commandId: command.id, entity: command.entity, operation: command.operation, targetId: command.targetId, title: boundedText(source.name, 120, "External calendar") });
       continue;
     }
     if (command.operation === "update_settings") {
@@ -373,7 +407,7 @@ export function executeAgentCommands(
     applied.push({ commandId: command.id, entity: command.entity, operation: command.operation, targetId: command.targetId, title: titleFor(previous, command.entity) });
   }
 
-  return { data, settings, applied, inverseCommands, clientActions };
+  return { data, settings, applied, inverseCommands, clientActions, integrationCommands };
 }
 
 export type AgentReadToolName =
@@ -387,7 +421,9 @@ export type AgentReadToolName =
   | "list_memories"
   | "get_settings"
   | "list_calendar"
-  | "get_metrics";
+  | "get_metrics"
+  | "get_timer_status"
+  | "list_integrations";
 
 export interface AgentToolCall {
   id: string;
@@ -397,7 +433,7 @@ export interface AgentToolCall {
 
 export function normalizeToolCalls(value: unknown): AgentToolCall[] {
   if (!Array.isArray(value)) return [];
-  const allowed = new Set<AgentReadToolName>(["workspace_overview", "search_workspace", "list_tasks", "list_projects", "list_habits", "list_notes", "list_templates", "list_memories", "get_settings", "list_calendar", "get_metrics"]);
+  const allowed = new Set<AgentReadToolName>(["workspace_overview", "search_workspace", "list_tasks", "list_projects", "list_habits", "list_notes", "list_templates", "list_memories", "get_settings", "list_calendar", "get_metrics", "get_timer_status", "list_integrations"]);
   return value.slice(0, 20).flatMap((raw) => {
     if (!isRecord(raw)) return [];
     const id = boundedText(raw.id, 200);
@@ -426,7 +462,13 @@ function filtered(items: Array<Record<string, any>>, args: Record<string, unknow
     && (!to || (item.dueDate || item.date || item.createdAt || "") <= to));
 }
 
-export function executeReadTool(call: AgentToolCall, data: Record<string, any>, settings: Record<string, any>, externalOccurrences: Array<Record<string, any>> = []) {
+export function executeReadTool(
+  call: AgentToolCall,
+  data: Record<string, any>,
+  settings: Record<string, any>,
+  externalOccurrences: Array<Record<string, any>> = [],
+  runtime: { timerStatus?: Record<string, unknown>; integrations?: Array<Record<string, any>> } = {},
+) {
   const limit = Math.max(1, Math.min(200, Number(call.arguments.limit) || 100));
   if (call.name === "workspace_overview") return {
     projects: (data.projects || []).length,
@@ -437,6 +479,7 @@ export function executeReadTool(call: AgentToolCall, data: Record<string, any>, 
     memories: (data.aiMemories || []).filter((memory: Record<string, any>) => !memory.archived).length,
     templates: (data.scheduleTemplates || []).length,
     externalCalendarOccurrences: externalOccurrences.length,
+    externalCalendars: (runtime.integrations || []).length,
   };
   if (call.name === "search_workspace") {
     const types = Array.isArray(call.arguments.types) ? call.arguments.types.map(String) : ["tasks", "projects", "habits", "notes", "memories", "templates"];
@@ -463,6 +506,15 @@ export function executeReadTool(call: AgentToolCall, data: Record<string, any>, 
   if (call.name === "get_metrics") {
     const tasks = filtered(data.tasks || [], call.arguments);
     return { totalTasks: tasks.length, completedTasks: tasks.filter((task) => task.completed).length, plannedMinutes: tasks.reduce((sum, task) => sum + (task.timelineRecords || []).reduce((inner: number, record: Record<string, any>) => inner + Math.max(0, ((Number(record.scheduledEnd?.slice(0, 2)) * 60 + Number(record.scheduledEnd?.slice(3))) || 0) - ((Number(record.scheduledStart?.slice(0, 2)) * 60 + Number(record.scheduledStart?.slice(3))) || 0)), 0), 0) };
+  }
+  if (call.name === "get_timer_status") {
+    const status = runtime.timerStatus || {};
+    const taskId = boundedText(status.taskId, 200);
+    const task = (data.tasks || []).find((item: Record<string, any>) => item.id === taskId);
+    return { running: status.running === true, elapsedSeconds: Math.max(0, Math.floor(Number(status.elapsedSeconds) || 0)), taskId: task?.id || null, taskTitle: task?.title || null };
+  }
+  if (call.name === "list_integrations") {
+    return (runtime.integrations || []).slice(0, limit).map((source) => ({ id: source.id, name: source.name, displayUrl: source.display_url, enabled: source.enabled, syncStatus: source.sync_status, lastSyncedAt: source.last_synced_at || null }));
   }
   throw new Error(`Unknown read tool: ${call.name}`);
 }

@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
-import type { AgentRunState, AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, ExternalCalendarOccurrence, ExternalCalendarSource, Habit, HabitDailyState, Language, McpTokenMetadata, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
-import { callAiAssistant, decideAgentRun, FALLBACK_AI_MODELS, type AiAction, type AiStep } from "./aiAssistantApi";
+import type { AgentAuditEntry, AgentRunState, AiConversation, AiMemory, CalendarEvent, CalendarFeedTokenMetadata, Category, DesktopExternalPlugin, DesktopUpdateState, ExecutionLane, ExternalCalendarOccurrence, ExternalCalendarSource, Habit, HabitDailyState, Language, McpTokenMetadata, NullablePriority, PlannerApi, PlannerData, Priority, Project, RecurrenceFrequency, ScheduleTemplate, Settings, Subtask, Task, TaskLevel, TaskRecurrence, TimelineRecord, WidgetAction, WidgetSnapshot, WidgetTimerMode, WidgetTimerRuntime } from "./types";
+import { callAiAssistant, decideAgentRun, FALLBACK_AI_MODELS, listAgentAuditRuns, type AiAction, type AiStep } from "./aiAssistantApi";
 import {
   buildAiContext,
   compactText,
@@ -82,6 +82,7 @@ import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, Candid
 import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumberInput, SettingTextInput, SettingColorInput, SettingActionButton, SettingDivider, SettingDescription } from "./components/SettingsControls";
 import { SETTINGS_CATEGORIES, normalizeSettingsTarget, searchSettings, settingsDetailLabel, settingsSearchPath, settingsTargetForSearchId, type SettingsCategory, type SettingsTarget, type SettingsTargetInput } from "./settingsNavigation";
 import { getDefaultSettings } from "./defaultSettings";
+import { nextDueAiBrief } from "./aiBriefs";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch";
@@ -1281,6 +1282,10 @@ function App() {
   const [aiMessages, setAiMessages] = useState<AiSessionMessage[]>([]);
   const [activeAiConversationId, setActiveAiConversationId] = useState("");
   const [aiConversationListOpen, setAiConversationListOpen] = useState(false);
+  const [aiAuditOpen, setAiAuditOpen] = useState(false);
+  const [aiAuditRuns, setAiAuditRuns] = useState<AgentAuditEntry[]>([]);
+  const [aiAuditLoading, setAiAuditLoading] = useState(false);
+  const [aiAuditError, setAiAuditError] = useState("");
   const [aiMemoryNotice, setAiMemoryNotice] = useState("");
   const [aiActionPatches, setAiActionPatches] = useState<Record<string, Record<number, Record<string, unknown>>>>({});
   const [aiAttachment, setAiAttachment] = useState<ParsedAttachment | null>(null);
@@ -6316,7 +6321,12 @@ function App() {
         message: msg,
         attachmentText: aiAttachment?.text,
         attachmentName: aiAttachment?.name,
-        context: { currentViewDate: selectedDate || today, page: mode, language: settings?.language || lang },
+        context: {
+          currentViewDate: selectedDate || today,
+          page: mode,
+          language: settings?.language || lang,
+          timerStatus: { taskId: timerTaskId || "", running: timerRunning, elapsedSeconds: timerElapsed },
+        },
         conversationId,
         trigger,
         signal: requestController.signal,
@@ -6425,13 +6435,7 @@ function App() {
       const now = new Date();
       const date = localIsoDate(now);
       const minutes = now.getHours() * 60 + now.getMinutes();
-      const parseMinutes = (value: string | undefined, fallback: string) => {
-        const [hour, minute] = (value || fallback).split(":").map(Number);
-        return hour * 60 + minute;
-      };
-      let kind: "start" | "review" | null = null;
-      if (minutes >= parseMinutes(settings.aiStartBriefTime, "08:00") && settings.aiLastStartBriefDate !== date) kind = "start";
-      else if (minutes >= parseMinutes(settings.aiEndBriefTime, "21:30") && settings.aiLastEndReviewDate !== date) kind = "review";
+      const kind = nextDueAiBrief({ date, minutes, startTime: settings.aiStartBriefTime, endTime: settings.aiEndBriefTime, lastStartDate: settings.aiLastStartBriefDate, lastEndDate: settings.aiLastEndReviewDate });
       if (!kind) return;
       const attemptKey = `${kind}:${date}`;
       if (briefAttemptedRef.current.has(attemptKey)) return;
@@ -6463,6 +6467,24 @@ function App() {
 
   function cancelAi() {
     aiAbortRef.current?.abort();
+  }
+
+  async function toggleAiAuditHistory() {
+    if (aiAuditOpen) {
+      setAiAuditOpen(false);
+      return;
+    }
+    setAiConversationListOpen(false);
+    setAiAuditOpen(true);
+    setAiAuditLoading(true);
+    setAiAuditError("");
+    try {
+      setAiAuditRuns(await listAgentAuditRuns());
+    } catch (error) {
+      setAiAuditError(error instanceof Error ? error.message : (lang === "zh" ? "暂时无法读取审计记录" : "Could not load audit history"));
+    } finally {
+      setAiAuditLoading(false);
+    }
   }
 
   async function handleAiAttachment(file: File) {
@@ -6942,6 +6964,7 @@ function App() {
         return;
       }
       if (decision !== "reject") await refreshQueuedRemote({ force: true });
+      if (result.agent?.applied.some((action) => action.entity === "integration")) await refreshExternalCalendarLayer("none");
       applyAgentClientActions(result.agent);
       const nextAgent: AgentRunState = {
         ...(result.agent || existing),
@@ -6953,6 +6976,7 @@ function App() {
       };
       setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, agent: nextAgent } : message));
       persistAiMessage(messageId, { agent: nextAgent });
+      if (aiAuditOpen) void listAgentAuditRuns().then(setAiAuditRuns).catch(() => undefined);
       showToast(result.reply);
     } finally {
       setAiBusy(false);
@@ -9153,7 +9177,7 @@ function App() {
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => setAiConversationListOpen((open) => !open)} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} safetyLevel={settings.aiSafetyLevel || "standard"} onSafetyLevelChange={(aiSafetyLevel) => void saveSettings({ aiSafetyLevel })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => { setAiAuditOpen(false); setAiConversationListOpen((open) => !open); }} auditOpen={aiAuditOpen} auditRuns={aiAuditRuns} auditLoading={aiAuditLoading} auditError={aiAuditError} onToggleAudit={() => void toggleAiAuditHistory()} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
@@ -12460,14 +12484,14 @@ function MobileSheetDismissHandle({ onDismiss, onCollapse, onExpand, collapsed =
   />;
 }
 
-function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
+function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, auditOpen, auditRuns, auditLoading, auditError, onToggleAudit, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, safetyLevel, onSafetyLevelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; auditOpen: boolean; auditRuns: AgentAuditEntry[]; auditLoading: boolean; auditError: string; onToggleAudit: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; safetyLevel: Settings["aiSafetyLevel"]; onSafetyLevelChange: (level: Settings["aiSafetyLevel"]) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
   const projects = projectList || [];
   const tasks = taskList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
-  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !followLatestRef.current) return;
@@ -12526,15 +12550,15 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     const file = event.target.files?.[0];
     if (file) onAttachment(file);
     event.currentTarget.value = "";
-    setAttachmentMenuOpen(false);
+    setComposerMenuOpen(false);
   };
   return <aside className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}`}>
     <MobileSheetDismissHandle onDismiss={onClose} onCollapse={() => setMobileCollapsed(true)} onExpand={() => setMobileCollapsed(false)} collapsed={mobileCollapsed} lang={lang} />
     <div className="df-ai-panel-head">
-      <label className="df-ai-mobile-model"><span className="df-visually-hidden">{lang === "zh" ? "选择模型" : "Choose model"}</span><select value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
       <div className="df-ai-head-actions">
         <button className="df-ai-reference-tool new-chat" onClick={onNewConversation} aria-label={text.newChat} title={text.newChat}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" /><path d="m16.5 3.5 4 4L12 16l-4.5 1 1-4.5Z" /></svg></button>
         <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5l3.5 2" /></svg></button>
+        <button className={`df-ai-reference-tool audit ${auditOpen ? "active" : ""}`} onClick={onToggleAudit} aria-label={lang === "zh" ? "Agent 审计" : "Agent audit"} title={lang === "zh" ? "Agent 审计" : "Agent audit"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.6 2.8 8 7 10 4.2-2 7-5.4 7-10V6Z"/><path d="m9 12 2 2 4-5"/></svg></button>
         <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 13.5v-3l-2.1-.7a7.2 7.2 0 0 0-.7-1.7l1-2-2.1-2.1-2 1a7.2 7.2 0 0 0-1.7-.7L10.5 2h-3l-.7 2.1a7.2 7.2 0 0 0-1.7.7l-2-1L1 5.9l1 2a7.2 7.2 0 0 0-.7 1.7L0 10.5v3l2.1.7a7.2 7.2 0 0 0 .7 1.7l-1 2L3.9 20l2-1a7.2 7.2 0 0 0 1.7.7l.9 2.3h3l.7-2.1a7.2 7.2 0 0 0 1.7-.7l2 1 2.1-2.1-1-2a7.2 7.2 0 0 0 .7-1.7Z" transform="translate(1.5 0) scale(.875)" /></svg></button>
         <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
       </div>
@@ -12547,6 +12571,17 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           <small>{conversation.messages.length} {lang === "zh" ? "条" : "messages"} · {(conversation.updatedAt || conversation.createdAt).slice(0, 10)}</small>
         </button>
       ))}
+    </div>}
+    {auditOpen && <div className="df-agent-audit-list">
+      <header><strong>{lang === "zh" ? "Agent 审计记录" : "Agent audit history"}</strong><small>{lang === "zh" ? "保留最近 30 天，最多显示 50 条" : "Last 30 days, up to 50 runs"}</small></header>
+      {auditLoading && <p>{lang === "zh" ? "正在读取…" : "Loading…"}</p>}
+      {auditError && <p className="error" role="alert">{auditError}</p>}
+      {!auditLoading && !auditError && auditRuns.length === 0 && <p>{lang === "zh" ? "暂无审计记录" : "No audit runs yet"}</p>}
+      {auditRuns.map((run) => <article key={run.id}>
+        <div><strong>{run.status}</strong><time>{new Date(run.createdAt).toLocaleString()}</time></div>
+        <small>{run.trigger} · {run.tools.length} {lang === "zh" ? "次查询" : "queries"} · {run.commands.length} {lang === "zh" ? "个命令" : "commands"}</small>
+        <code>{run.id}</code>
+      </article>)}
     </div>}
     <div className="df-ai-panel-body" ref={bodyRef} onScroll={(event) => {
       const element = event.currentTarget;
@@ -12693,13 +12728,17 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
       <div className="df-ai-composer-row">
         <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
-        <button type="button" className={`df-ai-attach-btn${attachmentMenuOpen ? " active" : ""}`} title={text.upload} aria-expanded={attachmentMenuOpen} onClick={() => setAttachmentMenuOpen((open) => !open)}>＋</button>
-        {attachmentMenuOpen && <div className="df-ai-attach-menu">{[
+        <button type="button" className={`df-ai-attach-btn${composerMenuOpen ? " active" : ""}`} title={lang === "zh" ? "模型、安全与附件" : "Model, safety, and attachments"} aria-label={lang === "zh" ? "打开更多选项" : "Open more options"} aria-expanded={composerMenuOpen} onClick={() => setComposerMenuOpen((open) => !open)}>＋</button>
+        {composerMenuOpen && <div className="df-ai-attach-menu df-ai-composer-menu">
+          <label className="df-ai-composer-setting"><span>{lang === "zh" ? "模型" : "Model"}</span><select aria-label={lang === "zh" ? "选择模型" : "Choose model"} value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
+          <label className="df-ai-composer-setting"><span>{lang === "zh" ? "安全等级" : "Safety level"}</span><select aria-label={lang === "zh" ? "选择安全等级" : "Choose safety level"} value={safetyLevel} onChange={(event) => onSafetyLevelChange(event.target.value as Settings["aiSafetyLevel"])}><option value="standard">{lang === "zh" ? "标准 · 低风险自动执行" : "Standard · Auto low-risk"}</option><option value="strict">{lang === "zh" ? "严格 · 所有写入确认" : "Strict · Confirm all writes"}</option><option value="readonly">{lang === "zh" ? "只读 · 禁止写入" : "Read only · Block writes"}</option></select></label>
+          <div className="df-ai-composer-menu-rule" />
+          {[
           [lang === "zh" ? "相机" : "Camera", "image/*", "environment"],
           [lang === "zh" ? "照片" : "Photos", "image/*", ""],
           [lang === "zh" ? "文件" : "Files", ATTACHMENT_ACCEPT, ""],
           [lang === "zh" ? "同步硬件" : "Sync hardware", ATTACHMENT_ACCEPT, ""],
-        ].map(([label, accept, capture]) => <label key={label}>{label}<input type="file" accept={accept} capture={capture === "environment" ? "environment" : undefined} onChange={acceptAttachment} /></label>)}</div>}
+        ].map(([label, accept, capture]) => <label className="df-ai-composer-upload" key={label}>{label}<input type="file" accept={accept} capture={capture === "environment" ? "environment" : undefined} onChange={acceptAttachment} /></label>)}</div>}
         <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")}>{busy ? "■" : "↑"}</button>
       </div>
       <small className="df-ai-reference-disclaimer">{lang === "zh" ? "AI 生成内容可能有误，请核对重要安排。" : "AI can make mistakes. Check important schedule changes."}</small>

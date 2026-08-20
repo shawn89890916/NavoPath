@@ -265,7 +265,7 @@ export interface ChatMessage {
   agent?: AgentRunState;
 }
 
-export type AgentEntity = "task" | "project" | "habit" | "note" | "memory" | "template" | "settings" | "app" | "timer";
+export type AgentEntity = "task" | "project" | "habit" | "note" | "memory" | "template" | "settings" | "integration" | "app" | "timer";
 export type AgentOperation = "create" | "update" | "schedule" | "unschedule" | "complete" | "checkin" | "append_subtasks" | "archive" | "delete" | "update_settings" | "navigate" | "start" | "pause";
 
 export interface AgentCommand {
@@ -295,6 +295,16 @@ export interface AgentRunState {
   appliedRevision?: number;
   undoExpiresAt?: string;
   decisionState?: "pending" | "approved" | "rejected" | "undone";
+}
+
+export interface AgentAuditEntry {
+  id: string;
+  trigger: "manual" | "start_brief" | "end_review";
+  status: "planned" | "applied" | "pending_confirmation" | "rejected" | "undone" | "failed";
+  tools: Array<{ id: string; name: string; status: "done" | "error" }>;
+  commands: Array<{ id: string; entity: AgentEntity; operation: AgentOperation; targetId?: string; risk: "auto" | "confirm" | "forbidden"; reason: string }>;
+  undoExpiresAt?: string;
+  createdAt: string;
 }
 
 export interface AiConversation {
@@ -483,6 +493,7 @@ export interface Settings {
   appTitle: string;
   model: string;
   reasoningMode: "instant" | "high" | "xhigh";
+  aiSafetyLevel: "standard" | "strict" | "readonly";
   baseUrl: string;
   hasApiKey: boolean;
   apiKeyPreview: string;

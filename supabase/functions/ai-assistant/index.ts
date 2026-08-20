@@ -7,7 +7,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { chatPrompt, globalAgentPrompt, importSchedulePrompt, suggestSubtasksPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
 import { AiGatewayError, callAiGateway, type AiProviderConfig } from "./gateway.ts";
-import { classifyAgentCommands, executeAgentCommands, executeReadTool, normalizeAgentCommands, normalizeToolCalls, type AgentCommand, type AgentToolCall } from "./agent.ts";
+import { applyAgentSafetyLevel, classifyAgentCommands, executeAgentCommands, executeReadTool, normalizeAgentCommands, normalizeToolCalls, type AgentCommand, type AgentToolCall } from "./agent.ts";
 
 function localDateForTimeZone(timeZone: string) {
   try {
@@ -280,6 +280,7 @@ async function insertAgentRun(params: {
   summary: string;
   baseRevision: number;
   commandLog: unknown[];
+  toolLog?: unknown[];
   pendingCommands: AgentCommand[];
 }) {
   const retentionCutoff = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
@@ -291,6 +292,7 @@ async function insertAgentRun(params: {
     status: params.status,
     summary: params.summary.slice(0, 2_000),
     base_revision: params.baseRevision,
+    tool_log: params.toolLog || [],
     command_log: params.commandLog,
     pending_commands: params.pendingCommands,
   }).select().single();
@@ -314,6 +316,7 @@ async function applyAgentExecution(params: {
     next_settings: params.execution.settings,
     target_run_id: params.runId,
     next_status: params.status,
+    next_integration_commands: params.execution.integrationCommands,
     next_command_log: params.commandLog,
     next_inverse_commands: params.inverseCommands,
     next_undo_expires_at: params.undoExpiresAt || null,
@@ -357,6 +360,15 @@ async function loadExternalOccurrences(admin: ReturnType<typeof createClient>, u
   return data || [];
 }
 
+async function loadExternalSources(admin: ReturnType<typeof createClient>, userId: string) {
+  const { data, error } = await admin.from("navopath_calendar_sources")
+    .select("id,name,display_url,enabled,sync_status,last_synced_at")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (error) throw new Error("Could not read external calendar sources");
+  return data || [];
+}
+
 async function runGlobalAgent(req: Request, params: {
   apiKey: string | undefined;
   model: string;
@@ -370,7 +382,18 @@ async function runGlobalAgent(req: Request, params: {
 }) {
   const workspace = await authenticatedWorkspace(req);
   const ctx = agentPromptContext(workspace.profile, params.context);
-  const externalOccurrences = await loadExternalOccurrences(workspace.admin, workspace.userId, ctx.currentDate);
+  const [externalOccurrences, externalSources] = await Promise.all([
+    loadExternalOccurrences(workspace.admin, workspace.userId, ctx.currentDate),
+    loadExternalSources(workspace.admin, workspace.userId),
+  ]);
+  const timerInput = params.context?.timerStatus;
+  const timerStatus = timerInput && typeof timerInput === "object" && !Array.isArray(timerInput)
+    ? {
+        taskId: typeof (timerInput as Record<string, unknown>).taskId === "string" ? (timerInput as Record<string, unknown>).taskId : "",
+        running: (timerInput as Record<string, unknown>).running === true,
+        elapsedSeconds: Math.max(0, Math.min(31_536_000, Math.floor(Number((timerInput as Record<string, unknown>).elapsedSeconds) || 0))),
+      }
+    : {};
   const conversation = (workspace.profile.data.aiConversations || []).find((item: Record<string, any>) => item.id === params.conversationId);
   const history = (conversation?.messages || []).filter((item: Record<string, any>) => (item.role === "user" || item.role === "assistant") && typeof item.content === "string").slice(-20).map((item: Record<string, any>) => ({ role: item.role, content: item.content.slice(0, 3_000) }));
   const messages: Array<{ role: string; content: string }> = [
@@ -385,8 +408,25 @@ async function runGlobalAgent(req: Request, params: {
   ];
   const trace: Array<{ id: string; name: string; status: "done" | "error" }> = [];
   let toolCallCount = 0;
+  let recordedRunId = "";
   const runController = new AbortController();
   const runTimeout = setTimeout(() => runController.abort(), 60_000);
+  const recordReadOnlyFailure = async (summary: string) => {
+    const run = await insertAgentRun({
+      admin: workspace.admin,
+      userId: workspace.userId,
+      conversationId: params.conversationId,
+      trigger: params.trigger || "manual",
+      status: "failed",
+      summary,
+      baseRevision: workspace.profile.revision,
+      toolLog: trace,
+      commandLog: [],
+      pendingCommands: [],
+    });
+    recordedRunId = run.id;
+    return run.id;
+  };
 
   try {
   for (let round = 0; round < AGENT_MAX_ROUNDS; round += 1) {
@@ -400,18 +440,22 @@ async function runGlobalAgent(req: Request, params: {
         messages.push({ role: "user", content: "Your response did not match the required JSON protocol. Return one valid tool_calls or final object only." });
         continue;
       }
-      return { reply: unwrapReplyLayers(content), steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { trace, applied: [], pending: [] } };
+      const reply = unwrapReplyLayers(content);
+      const runId = await recordReadOnlyFailure(reply);
+      return { reply, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
     }
 
     if (parsed.kind === "tool_calls") {
       const calls = normalizeToolCalls(parsed.calls);
       if (!calls.length || toolCallCount + calls.length > AGENT_MAX_TOOL_CALLS) {
-        return { reply: ctx.language === "zh" ? "本次查询已达到安全上限，请缩小范围后重试。" : "This request reached the safe tool limit. Narrow the scope and try again.", steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { trace, applied: [], pending: [] } };
+        const reply = ctx.language === "zh" ? "本次查询已达到安全上限，请缩小范围后重试。" : "This request reached the safe tool limit. Narrow the scope and try again.";
+        const runId = await recordReadOnlyFailure(reply);
+        return { reply, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
       }
       toolCallCount += calls.length;
       const results = calls.map((call: AgentToolCall) => {
         try {
-          const result = executeReadTool(call, workspace.profile.data, workspace.profile.settings, externalOccurrences);
+          const result = executeReadTool(call, workspace.profile.data, workspace.profile.settings, externalOccurrences, { timerStatus, integrations: externalSources });
           trace.push({ id: call.id, name: call.name, status: "done" });
           return { id: call.id, name: call.name, ok: true, data: result };
         } catch (error) {
@@ -437,18 +481,19 @@ async function runGlobalAgent(req: Request, params: {
     const commands = params.trigger && params.trigger !== "manual"
       ? []
       : normalizeAgentCommands([...(Array.isArray(parsed.commands) ? parsed.commands : []), ...memoryCommands]);
-    const decisions = classifyAgentCommands(commands);
+    const decisions = applyAgentSafetyLevel(classifyAgentCommands(commands), workspace.profile.settings.aiSafetyLevel);
     const autoCommands = decisions.filter((decision) => decision.risk === "auto").map((decision) => decision.command);
     const pendingCommands = decisions.filter((decision) => decision.risk === "confirm").map((decision) => decision.command);
     const forbidden = decisions.filter((decision) => decision.risk === "forbidden");
     const status = pendingCommands.length ? "pending_confirmation" : autoCommands.length ? "planned" : "planned";
-    const run = await insertAgentRun({ admin: workspace.admin, userId: workspace.userId, conversationId: params.conversationId, trigger: params.trigger || "manual", status, summary: reply, baseRevision: workspace.profile.revision, commandLog: publicCommandLog(decisions), pendingCommands });
+    const run = await insertAgentRun({ admin: workspace.admin, userId: workspace.userId, conversationId: params.conversationId, trigger: params.trigger || "manual", status, summary: reply, baseRevision: workspace.profile.revision, toolLog: trace, commandLog: publicCommandLog(decisions), pendingCommands });
+    recordedRunId = run.id;
     let execution: ReturnType<typeof executeAgentCommands> | null = null;
     let appliedRevision: number | undefined;
     let undoExpiresAt: string | undefined;
     try {
     if (autoCommands.length) {
-      execution = executeAgentCommands(workspace.profile.data, workspace.profile.settings, autoCommands, { busyOccurrences: externalOccurrences, timezone: ctx.timezone });
+      execution = executeAgentCommands(workspace.profile.data, workspace.profile.settings, autoCommands, { busyOccurrences: externalOccurrences, timezone: ctx.timezone, integrations: externalSources });
       undoExpiresAt = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
       const applied = await applyAgentExecution({ userClient: workspace.userClient, runId: run.id, expectedRevision: workspace.profile.revision, status: pendingCommands.length ? "pending_confirmation" : "applied", execution, commandLog: publicCommandLog(decisions), inverseCommands: execution.inverseCommands, undoExpiresAt });
       appliedRevision = applied.revision;
@@ -476,7 +521,20 @@ async function runGlobalAgent(req: Request, params: {
       throw error;
     }
   }
-  return { reply: ctx.language === "zh" ? "本次分析未能在安全轮次内完成，请缩小范围后重试。" : "The agent could not finish within the safe round limit. Narrow the request and try again.", steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { trace, applied: [], pending: [] } };
+  const reply = ctx.language === "zh" ? "本次分析未能在安全轮次内完成，请缩小范围后重试。" : "The agent could not finish within the safe round limit. Narrow the request and try again.";
+  const runId = await recordReadOnlyFailure(reply);
+  return { reply, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
+  } catch (error) {
+    try {
+      if (recordedRunId) {
+        await workspace.admin.from("navopath_agent_runs").update({ status: "failed", tool_log: trace, updated_at: new Date().toISOString() }).eq("id", recordedRunId).eq("user_id", workspace.userId);
+      } else {
+        await recordReadOnlyFailure(ctx.language === "zh" ? "Agent 运行失败。" : "Agent run failed.");
+      }
+    } catch {
+      // The original Agent error remains authoritative when audit persistence also fails.
+    }
+    throw error;
   } finally {
     clearTimeout(runTimeout);
   }
@@ -500,11 +558,14 @@ async function handleAgentDecision(req: Request, mode: string, body: Record<stri
   if (mode === "agent_confirm") {
     const commands = normalizeAgentCommands(run.pending_commands);
     if (!commands.length) throw new Error("No pending commands");
-    const decisions = classifyAgentCommands(commands);
+    const decisions = applyAgentSafetyLevel(classifyAgentCommands(commands), workspace.profile.settings.aiSafetyLevel);
     if (decisions.some((decision) => decision.risk === "forbidden")) throw new Error("Forbidden command");
     const currentDate = localDateForTimeZone(typeof body.context?.timezone === "string" ? body.context.timezone : "Asia/Shanghai");
-    const externalOccurrences = await loadExternalOccurrences(workspace.admin, workspace.userId, currentDate);
-    const execution = executeAgentCommands(workspace.profile.data, workspace.profile.settings, commands, { busyOccurrences: externalOccurrences, timezone: typeof body.context?.timezone === "string" ? body.context.timezone : "Asia/Shanghai" });
+    const [externalOccurrences, externalSources] = await Promise.all([
+      loadExternalOccurrences(workspace.admin, workspace.userId, currentDate),
+      loadExternalSources(workspace.admin, workspace.userId),
+    ]);
+    const execution = executeAgentCommands(workspace.profile.data, workspace.profile.settings, commands, { busyOccurrences: externalOccurrences, timezone: typeof body.context?.timezone === "string" ? body.context.timezone : "Asia/Shanghai", integrations: externalSources });
     const inverseCommands = [...execution.inverseCommands, ...(Array.isArray(run.inverse_commands) ? run.inverse_commands : [])];
     const undoExpiresAt = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
     const applied = await applyAgentExecution({ userClient: workspace.userClient, runId, expectedRevision, status: "applied", execution, commandLog: [...(run.command_log || [])], inverseCommands, undoExpiresAt });
@@ -515,11 +576,31 @@ async function handleAgentDecision(req: Request, mode: string, body: Record<stri
     if (!run.undo_expires_at || new Date(run.undo_expires_at).getTime() < Date.now()) throw new Error("UNDO_EXPIRED");
     const inverseCommands = normalizeAgentCommands(run.inverse_commands, { allowInternalRestore: true });
     if (!inverseCommands.length) throw new Error("Nothing to undo");
-    const execution = executeAgentCommands(workspace.profile.data, workspace.profile.settings, inverseCommands, { allowInternalRestore: true });
+    const externalSources = await loadExternalSources(workspace.admin, workspace.userId);
+    const execution = executeAgentCommands(workspace.profile.data, workspace.profile.settings, inverseCommands, { allowInternalRestore: true, integrations: externalSources });
     const applied = await applyAgentExecution({ userClient: workspace.userClient, runId, expectedRevision, status: "undone", execution, commandLog: run.command_log || [], inverseCommands: [] });
     return { reply: zh ? "已撤销本轮 AI 操作。" : "This AI run was undone.", steps: [], actions: [], agent: { runId, applied: execution.applied, pending: [], appliedRevision: applied.revision } };
   }
   throw new Error("Unknown agent decision");
+}
+
+async function handleAgentAudit(req: Request) {
+  const workspace = await authenticatedWorkspace(req);
+  const { data, error } = await workspace.userClient.from("navopath_agent_runs")
+    .select("id,trigger,status,tool_log,command_log,undo_expires_at,created_at")
+    .eq("user_id", workspace.userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error("Could not read Agent audit history");
+  return (data || []).map((row: Record<string, any>) => ({
+    id: row.id,
+    trigger: row.trigger,
+    status: row.status,
+    tools: Array.isArray(row.tool_log) ? row.tool_log : [],
+    commands: Array.isArray(row.command_log) ? row.command_log : [],
+    undoExpiresAt: row.undo_expires_at || undefined,
+    createdAt: row.created_at,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -568,6 +649,15 @@ serve(async (req: Request) => {
 
     if (mode === "list_models") {
       return new Response(JSON.stringify({ models: FALLBACK_MODELS, version: AI_GATEWAY_VERSION }), { headers: corsHeaders });
+    }
+
+    if (mode === "agent_audit") {
+      try {
+        return new Response(JSON.stringify({ ok: true, reply: "", actions: [], audits: await handleAgentAudit(req), version: AI_GATEWAY_VERSION }), { headers: corsHeaders });
+      } catch (error) {
+        const authFailed = error instanceof Error && error.message === "AI_AUTH";
+        return new Response(JSON.stringify({ ok: false, reply: authFailed ? "请先登录云端账号。" : "暂时无法读取审计记录。", actions: [], error: { code: authFailed ? "AI_AUTH" : "AI_PROVIDER", retryable: !authFailed, message: authFailed ? "请先登录云端账号。" : "暂时无法读取审计记录。" } }), { status: authFailed ? 401 : 503, headers: corsHeaders });
+      }
     }
 
     if (mode === "agent_confirm" || mode === "agent_reject" || mode === "agent_undo") {

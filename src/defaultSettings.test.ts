@@ -20,6 +20,13 @@ describe("plugin settings normalization", () => {
     expect(normalizeSettings({ model: "deepseek-ai/DeepSeek-V4-Pro" }).model).toBe("deepseek-ai/DeepSeek-V4-Pro");
   });
 
+  it("normalizes the AI safety level to the safe standard default", () => {
+    expect(normalizeSettings({}).aiSafetyLevel).toBe("standard");
+    expect(normalizeSettings({ aiSafetyLevel: "strict" }).aiSafetyLevel).toBe("strict");
+    expect(normalizeSettings({ aiSafetyLevel: "readonly" }).aiSafetyLevel).toBe("readonly");
+    expect(normalizeSettings({ aiSafetyLevel: "unsafe" }).aiSafetyLevel).toBe("standard");
+  });
+
   it("deduplicates and bounds enabled plugin ids", () => {
     const enabledPlugins = [
       "pomodoro",

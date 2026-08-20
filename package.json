@@ -1,6 +1,6 @@
 {
   "name": "navopath",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "NavoPath — Navigate your next step.",
   "author": "NavoPath",
   "main": "electron/main.cjs",
@@ -10,6 +10,7 @@
     "build": "npm run build:navopath",
     "build:navopath": "tsc && vite build",
     "test": "node --test \"supabase/functions/ai-assistant/*.test.ts\" \"supabase/functions/external-calendar/*.test.ts\" \"electron/*.test.cjs\" && vitest run src",
+    "test:cloud-agent": "node scripts/cloud-agent-smoke.mjs",
     "test:calendar": "vitest run src/calendarFeed.test.ts",
     "build:portfolio": "tsc && vite build --config vite.portfolio.config.ts",
     "preview:portfolio": "vite preview --config vite.portfolio.config.ts --host 127.0.0.1",

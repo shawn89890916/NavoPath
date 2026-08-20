@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyAgentCommands, executeAgentCommands, executeReadTool, normalizeAgentCommands, normalizeToolCalls, type AgentCommand } from "./agent.ts";
+import { applyAgentSafetyLevel, classifyAgentCommands, executeAgentCommands, executeReadTool, normalizeAgentCommands, normalizeToolCalls, type AgentCommand } from "./agent.ts";
 
 const task = (id: string, title: string) => ({ id, title, dueDate: "2026-08-20", category: "personal", priority: "medium", notes: "", goalId: "", completed: false, createdAt: "2026-08-20T00:00:00.000Z", updatedAt: "2026-08-20T00:00:00.000Z" });
 const data = () => ({ tasks: [task("t1", "Physics"), ...Array.from({ length: 40 }, (_, index) => task(`t${index + 2}`, `Task ${index + 2}`))], projects: [], habits: [], habitDailyStates: [], notes: [], aiMemories: [], scheduleTemplates: [], events: [] });
@@ -25,6 +25,20 @@ test("uses deterministic confirmation thresholds", () => {
   assert.ok(classifyAgentCommands(bulk).every((decision) => decision.risk === "confirm"));
   assert.equal(classifyAgentCommands([{ id: "delete", entity: "task", operation: "delete", targetId: "t1" }])[0].risk, "confirm");
   assert.ok(classifyAgentCommands(Array.from({ length: 6 }, (_, index) => ({ id: `c${index}`, entity: "task" as const, operation: "create" as const, values: { title: `New ${index}` } }))).every((decision) => decision.risk === "confirm"));
+});
+
+test("safety levels can only tighten deterministic permissions", () => {
+  const write = classifyAgentCommands([{ id: "one", entity: "task", operation: "complete", targetId: "t1", values: { completed: true } }]);
+  assert.equal(applyAgentSafetyLevel(write, "standard")[0].risk, "auto");
+  assert.equal(applyAgentSafetyLevel(write, "strict")[0].risk, "confirm");
+  assert.equal(applyAgentSafetyLevel(write, "readonly")[0].risk, "forbidden");
+  const navigation = classifyAgentCommands([{ id: "open", entity: "app", operation: "navigate", values: { page: "tasks" } }]);
+  assert.equal(applyAgentSafetyLevel(navigation, "readonly")[0].risk, "auto");
+  const timer = classifyAgentCommands([{ id: "timer", entity: "timer", operation: "start", values: { taskId: "t1" } }]);
+  assert.equal(applyAgentSafetyLevel(timer, "strict")[0].risk, "auto");
+  assert.equal(applyAgentSafetyLevel(timer, "readonly")[0].risk, "forbidden");
+  const secret = classifyAgentCommands([{ id: "secret", entity: "settings", operation: "update_settings", values: { apiKey: "x" } }]);
+  assert.equal(applyAgentSafetyLevel(secret, "standard")[0].risk, "forbidden");
 });
 
 test("executes a low-risk command and restores it with its inverse", () => {
@@ -61,12 +75,27 @@ test("workspace text is returned as data and cannot become a tool or command", (
 
 test("settings, integrations, recurrence, and multi-record writes always require confirmation", () => {
   assert.equal(classifyAgentCommands([{ id: "setting", entity: "settings", operation: "update_settings", values: { enabledPlugins: ["x"] } }])[0].risk, "confirm");
+  assert.equal(classifyAgentCommands([{ id: "calendar", entity: "integration", operation: "update", targetId: "source-1", values: { enabled: false } }])[0].risk, "confirm");
+  assert.equal(classifyAgentCommands([{ id: "calendar-url", entity: "integration", operation: "update", targetId: "source-1", values: { url: "https://example.com/a.ics" } }])[0].risk, "forbidden");
   assert.equal(classifyAgentCommands([{ id: "repeat", entity: "task", operation: "update", targetId: "t1", values: { recurrence: { frequency: "daily" } } }])[0].risk, "confirm");
   const two = classifyAgentCommands([
     { id: "a", entity: "task", operation: "schedule", targetId: "t1", values: { date: "2026-08-20", start: "09:00" } },
     { id: "b", entity: "task", operation: "complete", targetId: "t2", values: { completed: true } },
   ]);
   assert.ok(two.every((decision) => decision.risk === "confirm"));
+});
+
+test("exposes bounded local timer status and redacted integration metadata", () => {
+  const timerCall = normalizeToolCalls([{ id: "timer", name: "get_timer_status", arguments: {} }])[0];
+  assert.deepEqual(executeReadTool(timerCall, data(), {}, [], { timerStatus: { taskId: "t1", running: true, elapsedSeconds: 42.8 } }), { running: true, elapsedSeconds: 42, taskId: "t1", taskTitle: "Physics" });
+  const integrationsCall = normalizeToolCalls([{ id: "integrations", name: "list_integrations", arguments: {} }])[0];
+  assert.deepEqual(executeReadTool(integrationsCall, data(), {}, [], { integrations: [{ id: "source-1", name: "School", display_url: "https://calendar.example/…", enabled: true, sync_status: "ready", url_ciphertext: "secret" }] }), [{ id: "source-1", name: "School", displayUrl: "https://calendar.example/…", enabled: true, syncStatus: "ready", lastSyncedAt: null }]);
+});
+
+test("prepares reversible confirmed integration updates without exposing URLs", () => {
+  const result = executeAgentCommands(data(), {}, [{ id: "disable", entity: "integration", operation: "update", targetId: "source-1", values: { enabled: false } }], { integrations: [{ id: "source-1", name: "School", enabled: true }] });
+  assert.equal(result.integrationCommands[0].values?.enabled, false);
+  assert.equal(result.inverseCommands[0].values?.enabled, true);
 });
 
 test("external calendar busy time deterministically blocks conflicting schedules", () => {

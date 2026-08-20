@@ -68,6 +68,12 @@ describe("AI assistant client", () => {
     await expect(invokeAiAssistant(client, { mode: "agent", message: "delete it", timeoutMs: 200 })).resolves.toMatchObject({ ok: true, agent });
   });
 
+  it("preserves the sanitized Agent audit history payload", async () => {
+    const audits = [{ id: "run-1", trigger: "manual", status: "applied", tools: [], commands: [], createdAt: "2026-08-20T00:00:00.000Z" }];
+    const client = { functions: { invoke: vi.fn().mockResolvedValue({ data: { ok: true, reply: "", actions: [], audits }, error: null }) } } as any;
+    await expect(invokeAiAssistant(client, { mode: "agent_audit", timeoutMs: 200 })).resolves.toMatchObject({ ok: true, audits });
+  });
+
   it("keeps attachment data separate from the user instruction", async () => {
     const invoke = vi.fn().mockResolvedValue({ data: { ok: true, reply: "ok", actions: [] }, error: null });
     const client = { functions: { invoke } } as any;
