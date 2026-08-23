@@ -10,7 +10,7 @@
 - 新增可持续开发的 iOS 原生工程：现有 React/Vite 竖屏应用现在可通过 Capacitor 同步到 iOS 15+，在真机上使用原生状态栏、刘海与底部安全区，并在原生环境中移除网页预览用的模拟手机外框。首版锁定竖屏，同时提供 Windows 局域网手机预览、iOS 工程同步与交付到 Xcode 的开发流程。
 
 ### 修复
-- 修复时间轴任务拖入全天栏后会从日历消失的问题：基于排程记录的全天任务现在可正确保存、重新载入并显示，也能按原预计时长再次拖回具体时间。
+- 修复全天任务在保存后从日历消失的问题：时间轴拖入和全天栏中新建的任务现在都可正确保存、重新载入并显示；勾选完成后会保留在原日期，也能按原预计时长再次拖回具体时间。
 - 修复部分手机网络阻断或延迟 Supabase Realtime WebSocket 时，手机与电脑长期不同步的问题：前台现在每 5 秒通过同源安全中转只检查轻量 revision，发现云端版本变化才拉取完整工作区；页面重新可见、窗口重新聚焦或从手机后台恢复时会立即检查，因此不再依赖 15 分钟至 24 小时的用户定时同步设置。
 - 修复离线使用后恢复联网时云端旧快照可能覆盖本地近期记录的问题：启动加载、实时更新、手动拉取与自动重连现在统一优先保护持久化的未同步修改，先按记录 ID 和更新时间合并本地与云端内容，再上传合并结果；只有对应的最新保存请求得到云端确认后才清除待同步状态，过期请求与旧 revision 均不能误判为最新版本或清除后续编辑。
 - 打磨手机版时间轴、AI、设置与规划交互：时间轴任务现在单击即选中并显示缩放点、双击才打开短栏，缩放手势通过指针捕获与短栏下滑关闭隔离；已有任务短栏恢复独立的“完成 / 未完成 / 添加子任务”并高亮当前状态。AI 对话保留新对话、历史侧栏和设置图标，模型、安全等级与相机、照片、文件、硬件同步统一移入输入框左下角“+”菜单；首次下滑收为半屏、再次下滑关闭。设置与 AI 的背景遮罩不再让顶栏额外灰化，手机版高级设置隐藏桌面窗口、插件与快捷键入口，并把新手指南和重置放在末尾。规划树缩进更紧凑，手机版长按可整块拖动重排，今日任务拖到左缘可移回规划；指标筛选统一到右上角并放大圆环，AI 排程建议在 Tasks 中可直接预览日期与时间。
@@ -62,7 +62,7 @@
 - Added a maintainable native iOS project. The existing React/Vite portrait app can now sync through Capacitor for iOS 15+, uses the native status bar and device safe areas, and removes the simulated phone frame inside the native container. The first release is portrait-only and includes Windows LAN phone preview, iOS project sync, and Xcode handoff workflows.
 
 ### Fixed
-- Fixed timeline tasks disappearing after being dragged into the all-day row. Record-based all-day tasks now persist, reload, and render correctly, and can be dragged back to a specific time using their original estimated duration.
+- Fixed all-day tasks disappearing after a save. Tasks dragged into or created directly in the all-day row now persist, reload, and render correctly, stay on their date after completion, and can be dragged back to a specific time using their original estimated duration.
 - Fixed mobile and desktop workspaces remaining out of sync when a mobile network blocks or delays the Supabase Realtime WebSocket. Visible clients now check only the lightweight cloud revision every five seconds through the same-origin secure relay and download the full workspace only when it changes. Returning to a visible page, refocusing the window, or resuming from the mobile background triggers an immediate check, independent of the user’s 15-minute-to-24-hour scheduled-sync preference.
 - Fixed an offline-to-online sync path where an older cloud snapshot could overwrite recent local records. Startup loading, realtime updates, manual pulls, and automatic reconnects now protect persistently dirty local changes first, merge local and cloud records by identity and update time, and upload the merged result. Dirty state is cleared only when the matching latest save is acknowledged by the cloud, so stale requests and old revisions cannot masquerade as the newest version or clear later edits.
 - Refined the mobile timeline, AI, Settings, and Planning interactions. Timeline tasks now select and reveal resize handles on one tap and open their short sheet on double tap; pointer capture keeps resizing isolated from sheet-dismiss gestures. Existing-task sheets restore separate Complete, Incomplete, and Add subtask actions with visible selected-state feedback. AI chat keeps compose, history-sidebar, and settings icons, while model, safety level, Camera, Photos, Files, and hardware sync now share the lower-left “+” menu; the first downward swipe collapses it to a half sheet and the next dismisses it. Settings and AI use one consistent backdrop without extra top-bar grayscale, mobile Advanced hides desktop-window, plugin, and shortcut entries, and onboarding/reset actions sit at the end. Planning tree indentation is tighter, mobile long-press lifts whole blocks for reordering, dragging a Today task to the left returns it to Planning, Metrics uses the same top-right filter placement with a larger donut, and AI schedule suggestions expose date/time previews directly in Tasks.
@@ -109,12 +109,12 @@
 ## 2026-08-23 · 全天任务拖放修复
 
 ### 修复
-- 时间轴任务拖入全天栏后不再从日历消失；基于排程记录的全天任务可正确保存、重新载入并显示，也能按原预计时长再次拖回具体时间。
+- 全天任务在保存后不再从日历消失；时间轴拖入和全天栏中新建的任务都可正确保存、重新载入并显示，勾选完成后会保留在原日期，也能按原预计时长再次拖回具体时间。
 
 ## 2026-08-23 · All-day task drag-and-drop fix
 
 ### Fixed
-- Timeline tasks no longer disappear after being dragged into the all-day row. Record-based all-day tasks persist, reload, and render correctly, and can be dragged back to a specific time using their original estimated duration.
+- All-day tasks no longer disappear after a save. Tasks dragged into or created directly in the all-day row persist, reload, and render correctly, stay on their date after completion, and can be dragged back to a specific time using their original estimated duration.
 
 ## 2026-08-20 · 横屏工作区交互修复
 

@@ -930,6 +930,26 @@ describe("browser fallback preview mode", () => {
     });
   });
 
+  it("keeps a completed legacy all-day task on its scheduled date", () => {
+    const persisted = fallbackData();
+    persisted.tasks[0] = {
+      ...persisted.tasks[0],
+      completed: true,
+      plannedForDate: "2026-07-28",
+      scheduledDate: "2026-07-28",
+      scheduledStart: undefined,
+      scheduledEnd: undefined,
+      timelineRecords: [],
+    };
+
+    expect(normalizeData(persisted).tasks[0]).toMatchObject({
+      completed: true,
+      scheduledDate: "2026-07-28",
+      scheduledStart: undefined,
+      scheduledEnd: undefined,
+    });
+  });
+
   it("normalizes recurrence rules and bounded AI message metadata", () => {
     const malformed = fallbackData() as any;
     malformed.tasks[0].recurrence = {

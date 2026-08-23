@@ -840,7 +840,10 @@ export function normalizeData(data: PlannerData): PlannerData {
     const plannedForDate = persistedDate(task.plannedForDate);
     const scheduledDate = persistedDate(task.scheduledDate);
     const scheduledStart = persistedTime(task.scheduledStart, "");
-    const hasLegacySchedule = Boolean(scheduledDate && scheduledStart);
+    const scheduledEnd = persistedTime(task.scheduledEnd, "");
+    const hasLegacyTimedSchedule = Boolean(scheduledDate && scheduledStart);
+    const hasLegacyAllDaySchedule = Boolean(scheduledDate && !scheduledStart && !scheduledEnd);
+    const hasLegacySchedule = hasLegacyTimedSchedule || hasLegacyAllDaySchedule;
     const estimatedHours = typeof task.estimatedHours === "number"
       && Number.isFinite(task.estimatedHours)
       && task.estimatedHours > 0
@@ -866,10 +869,8 @@ export function normalizeData(data: PlannerData): PlannerData {
         ? task.executionLane
         : undefined,
       scheduledDate: hasLegacySchedule ? scheduledDate : undefined,
-      scheduledStart: hasLegacySchedule ? scheduledStart : undefined,
-      scheduledEnd: hasLegacySchedule
-        ? persistedTime(task.scheduledEnd, "") || undefined
-        : undefined,
+      scheduledStart: hasLegacyTimedSchedule ? scheduledStart : undefined,
+      scheduledEnd: hasLegacyTimedSchedule ? scheduledEnd || undefined : undefined,
       executionStatus: hasLegacySchedule
         && ["scheduled", "completed", "returned_unfinished", "cancelled"].includes(String(task.executionStatus))
         ? task.executionStatus
