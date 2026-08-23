@@ -60,7 +60,7 @@ import { normalizeTaskCheckTone, normalizeTaskState, taskMetaPatch, validateProj
 import { SHORTCUTS, groupShortcutsByScope, matchShortcut, type ShortcutScope } from "./utils/shortcuts";
 import { buildTaskMetaBadges } from "./utils/taskMetaBadges";
 import { computeConflictLayout, computeConflictStyle, scheduledDateTimesOverlap, scheduledTaskIntervalsOnDate } from "./utils/conflictLayout";
-import { expandTaskTimelineSlices } from "./utils/taskTimelineSlices";
+import { expandTaskAllDayRecords, expandTaskTimelineSlices } from "./utils/taskTimelineSlices";
 import {
   addDays,
   addMonths,
@@ -3443,6 +3443,11 @@ function App() {
     [tasks, visibleTimelineDates],
   );
 
+  const allDayTimelineTasks = useMemo(
+    () => expandTaskAllDayRecords(tasks, [...visibleTimelineDates]),
+    [tasks, visibleTimelineDates],
+  );
+
   const recurrenceVisibleTimeline = useMemo(() => {
     return expandRecurrenceOccurrences(visibleTimelineDates);
   }, [tasks, visibleTimelineDates]);
@@ -4735,7 +4740,7 @@ function App() {
                 executionLane: undefined,
                 timelineRecords: (t.timelineRecords || []).map((r) =>
                   r.id === sourceRecordId
-                    ? { ...r, scheduledDate: targetDate, scheduledStart: "", scheduledEnd: "" }
+                    ? { ...r, scheduledDate: targetDate, scheduledStart: "", scheduledEndDate: undefined, scheduledEnd: "" }
                     : r
                 ),
                 updatedAt: new Date().toISOString(),
@@ -5342,6 +5347,16 @@ function App() {
       dragTargetDateRef.current = "";
       return;
     }
+    const allDayRecord = recordByIdMap.get(taskId);
+    const allDayOwner = recordToTaskMap.get(taskId);
+    if (allDayRecord && allDayOwner && !allDayRecord.scheduledStart && !allDayRecord.scheduledEnd) {
+      moveTimelineRecord(taskId, startTime, targetDate, taskDuration(allDayOwner));
+      requestTimelineFocus({ date: targetDate, startTime, taskId, source: "schedule" });
+      setHoverSlot("");
+      setDrag(null);
+      dragTargetDateRef.current = "";
+      return;
+    }
     const task = data?.tasks.find((item) => item.id === taskId);
     if (!task) return;
     applyCandidateTimeSettings(taskId, {
@@ -5528,7 +5543,7 @@ function App() {
   }
 
   /** Move a TimelineRecord to a new start time, preserving duration. */
-  function moveTimelineRecord(recordId: string, newStart: string, newDate?: string) {
+  function moveTimelineRecord(recordId: string, newStart: string, newDate?: string, durationMinutes?: number) {
     if (!data) return;
     const sourceRecordId = resolveTimelineRecordId(recordId);
     const now = new Date().toISOString();
@@ -5556,6 +5571,7 @@ function App() {
           updated[idx],
           newDate || updated[idx].scheduledDate,
           newStart,
+          durationMinutes,
         );
         return { ...task, timelineRecords: updated, updatedAt: now };
       }),
@@ -8402,6 +8418,7 @@ function App() {
                           {threeDates.map((colDate, ci) => {
                             const adTasks = [
                               ...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === colDate),
+                              ...allDayTimelineTasks.filter((task) => task.scheduledDate === colDate),
                               ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === colDate),
                             ];
                             return (
@@ -8985,6 +9002,7 @@ function App() {
                         {allDayDragDate === timelineWindowAnchorDate && drag && draggedTask && <AllDayDropPreview task={draggedTask} />}
                         {[
                           ...tasks.filter((task) => isAllDayTask(task) && task.scheduledDate === timelineWindowAnchorDate),
+                          ...allDayTimelineTasks.filter((task) => task.scheduledDate === timelineWindowAnchorDate),
                           ...eventVisibleTimeline.tasks.filter((task) => !task.scheduledStart && task.scheduledDate === timelineWindowAnchorDate),
                         ].map((task) => (
                           <AllDayBlock key={task.id} task={task} dragging={drag?.source === "allDay" && drag.taskId === task.id} projectName={projectName(task)} projects={projects} onEdit={() => { if (!suppressBlockClickRef.current) openTaskEdit(task); }} onToggleDone={() => toggleTaskDone(task.id)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => createProjectForTask(task.id, title)} onPointerDragStart={(event) => beginShelfDrag(event, task, "allDay")} lang={lang} />

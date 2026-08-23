@@ -9,6 +9,25 @@ export type TaskTimelineSliceExpansion = {
   resizeEdges: Map<string, { start: boolean; end: boolean }>;
 };
 
+export function expandTaskAllDayRecords(tasks: Task[], visibleDates: string[]): Task[] {
+  const dates = new Set(visibleDates);
+  return tasks.flatMap((task) => (task.timelineRecords || [])
+    .filter((record) =>
+      record.executionStatus !== "cancelled"
+      && dates.has(record.scheduledDate)
+      && !record.scheduledStart
+      && !record.scheduledEnd
+    )
+    .map((record) => ({
+      ...task,
+      id: record.id,
+      scheduledDate: record.scheduledDate,
+      scheduledStart: undefined,
+      scheduledEnd: undefined,
+      executionStatus: record.executionStatus,
+    })));
+}
+
 function clockTime(minutes: number) {
   const normalized = minutes % 1_440;
   return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;

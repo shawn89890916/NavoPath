@@ -474,12 +474,13 @@ function normalizeTimelineRecords(value: unknown, taskId: string): TimelineRecor
     const scheduledDate = persistedDate(record.scheduledDate);
     const scheduledStart = persistedTime(record.scheduledStart, "");
     const scheduledEnd = persistedTime(record.scheduledEnd, "");
-    if (!scheduledDate || !scheduledStart || !scheduledEnd) continue;
+    const allDay = !scheduledStart && !scheduledEnd;
+    if (!scheduledDate || (!allDay && (!scheduledStart || !scheduledEnd))) continue;
     const id = persistedId(record.id) || uid("timeline");
     if (seenIds.has(id)) continue;
     seenIds.add(id);
-    const explicitEndDate = persistedDate(record.scheduledEndDate);
-    const inferredEndDate = normalizeTimelineRecord({
+    const explicitEndDate = allDay ? scheduledDate : persistedDate(record.scheduledEndDate);
+    const inferredEndDate = allDay ? scheduledDate : normalizeTimelineRecord({
       ...record,
       scheduledDate,
       scheduledStart,

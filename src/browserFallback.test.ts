@@ -910,6 +910,26 @@ describe("browser fallback preview mode", () => {
     expect(record?.scheduledEndDate).toBe("2026-07-29");
   });
 
+  it("preserves a persisted record-based all-day task", () => {
+    const persisted = fallbackData();
+    persisted.tasks[0].timelineRecords = [{
+      id: "all-day-record",
+      taskId: persisted.tasks[0].id,
+      scheduledDate: "2026-07-28",
+      scheduledStart: "",
+      scheduledEnd: "",
+      executionStatus: "scheduled",
+      createdAt: "2026-07-28T00:00:00.000Z",
+    }];
+
+    expect(normalizeData(persisted).tasks[0].timelineRecords?.[0]).toMatchObject({
+      id: "all-day-record",
+      scheduledDate: "2026-07-28",
+      scheduledStart: "",
+      scheduledEnd: "",
+    });
+  });
+
   it("normalizes recurrence rules and bounded AI message metadata", () => {
     const malformed = fallbackData() as any;
     malformed.tasks[0].recurrence = {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
-import { expandTaskTimelineSlices } from "./taskTimelineSlices";
+import { expandTaskAllDayRecords, expandTaskTimelineSlices } from "./taskTimelineSlices";
 
 const task: Task = {
   id: "task-1",
@@ -76,5 +76,40 @@ describe("expandTaskTimelineSlices", () => {
 
     expect(result.tasks).toHaveLength(1);
     expect(result.resizeEdges.get("record-1")).toEqual({ start: true, end: true });
+  });
+});
+
+describe("expandTaskAllDayRecords", () => {
+  it("keeps a record-based all-day task visible under its record id", () => {
+    const allDayTask = {
+      ...task,
+      timelineRecords: [{
+        ...task.timelineRecords![0],
+        scheduledDate: "2026-07-02",
+        scheduledStart: "",
+        scheduledEnd: "",
+      }],
+    };
+
+    expect(expandTaskAllDayRecords([allDayTask], ["2026-07-02"])).toMatchObject([{
+      id: "record-1",
+      scheduledDate: "2026-07-02",
+      scheduledStart: undefined,
+      scheduledEnd: undefined,
+      title: task.title,
+    }]);
+  });
+
+  it("excludes timed, cancelled, and out-of-range records", () => {
+    const mixed = {
+      ...task,
+      timelineRecords: [
+        task.timelineRecords![0],
+        { ...task.timelineRecords![0], id: "cancelled", scheduledStart: "", scheduledEnd: "", executionStatus: "cancelled" as const },
+        { ...task.timelineRecords![0], id: "other-day", scheduledDate: "2026-07-03", scheduledStart: "", scheduledEnd: "" },
+      ],
+    };
+
+    expect(expandTaskAllDayRecords([mixed], ["2026-07-01"])).toEqual([]);
   });
 });
