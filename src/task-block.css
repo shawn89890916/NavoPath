@@ -1689,8 +1689,10 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 }
 .df-app .df-time-block[data-drag-state="source-placeholder"].is-dragging,
 .df-app .df-event-blocks-layer .df-time-block[data-drag-state="source-placeholder"].is-dragging {
-  opacity: 1 !important;
+  opacity: 0 !important;
   pointer-events: auto !important;
+  border-color: transparent !important;
+  background: transparent !important;
 }
 .df-task-block[data-drag-state="source-placeholder"] > * {
   opacity: 0 !important;

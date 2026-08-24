@@ -1560,7 +1560,39 @@
     font-size: 14px !important;
   }
 
-  /* iOS-size switch: clear state, active-theme track, neutral thumb. */
+  #root .df-app .df-settings-action {
+    min-height: 44px !important;
+    padding: 0 14px !important;
+    border-radius: 12px !important;
+    background: var(--surface-raised) !important;
+    font-size: 13px !important;
+  }
+
+  #root .df-app .df-settings-action--primary {
+    color: var(--accent-on) !important;
+    border-color: var(--accent-active) !important;
+    background: var(--accent-active) !important;
+  }
+
+  #root .df-app .df-settings-detail-link,
+  #root .df-app .df-settings-disclosure-toggle {
+    min-height: 64px !important;
+    padding: 10px 0 !important;
+  }
+
+  #root .df-app .df-task-detail .df-detail-close {
+    position: absolute !important;
+    inset: 30px 8px auto auto !important;
+    float: none !important;
+    margin: 0 !important;
+    z-index: 4 !important;
+  }
+
+}
+
+/* Touch settings use the same system switch in portrait and landscape. */
+@media (max-width: 899.98px) and (orientation: portrait),
+       (max-width: 1180px) and (orientation: landscape) {
   #root .df-app .df-settings-toggle {
     width: 51px !important;
     min-width: 51px !important;
@@ -1600,35 +1632,6 @@
     background: #fff !important;
     border: 0 !important;
   }
-
-  #root .df-app .df-settings-action {
-    min-height: 44px !important;
-    padding: 0 14px !important;
-    border-radius: 12px !important;
-    background: var(--surface-raised) !important;
-    font-size: 13px !important;
-  }
-
-  #root .df-app .df-settings-action--primary {
-    color: var(--accent-on) !important;
-    border-color: var(--accent-active) !important;
-    background: var(--accent-active) !important;
-  }
-
-  #root .df-app .df-settings-detail-link,
-  #root .df-app .df-settings-disclosure-toggle {
-    min-height: 64px !important;
-    padding: 10px 0 !important;
-  }
-
-  #root .df-app .df-task-detail .df-detail-close {
-    position: absolute !important;
-    inset: 30px 8px auto auto !important;
-    float: none !important;
-    margin: 0 !important;
-    z-index: 4 !important;
-  }
-
 }
 
 #root .df-app .df-candidate-list .df-task-card {

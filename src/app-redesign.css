@@ -3887,11 +3887,7 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   }
 
   .df-command-results button {
-    grid-template-columns: 54px minmax(0, 1fr);
-  }
-
-  .df-command-jump {
-    display: none;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
   }
 }
 .df-app .df-floating-shelf-drag.candidate-target {

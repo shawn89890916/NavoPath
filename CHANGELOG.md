@@ -110,11 +110,13 @@
 
 ### 修复
 - 优化竖屏快速添加、时间轴和 AI 菜单：快速添加任务的“更多”现在打开与正常任务一致的详情式编辑页，并以起止时间选择替代完成等操作行；时间轴任务第一次单点选中并显示缩放点，第二次单点打开短栏，点按任务块外退出选中，标记未完成的时间块也可调整起止边界；AI 输入框“+”菜单移除硬件同步，并可点按菜单外任意位置关闭。
+- 横屏设置开关现在与竖屏使用同一套系统式尺寸、白色滑块和活动主题轨道。执行页从候选区、全天栏或时间轴拖动任务时，日、三日和周视图都会让真实任务块直接吸附到时间网格，不再用会被浮动任务遮住的白色目标框；移动已排程任务时原位置占位也会隐藏。
 
 ## 2026-08-24 · Portrait task and AI menu interactions
 
 ### Fixed
 - Refined portrait quick add, timeline, and AI menus. Quick Add More now opens a task-detail-style editor whose middle action rows are replaced by start/end time controls; a first timeline-task tap selects it and exposes resize handles, a second tap opens its short sheet, an outside tap clears selection, and returned-unfinished blocks can also be resized. The AI composer “+” menu no longer includes hardware sync and closes on any outside tap.
+- Landscape settings switches now use the same system sizing, white thumb, and active-theme track as portrait. When dragging a task from Candidates, All Day, or the timeline, Day, 3-Day, and Week views now snap the real task block directly into the time grid instead of showing a white target frame hidden beneath a floating task; moving a scheduled task also hides its old-position placeholder.
 
 ## 2026-08-23 · 全天任务拖放修复
 

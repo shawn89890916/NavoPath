@@ -7837,6 +7837,7 @@ function App() {
           })()
         : undefined)
     : undefined;
+  const timelineSnapActive = Boolean(draggedTask && hoverSlot && !drag?.outsideTimeline);
   const focusTask = timerTask || headerTask;
   const focusProject = timerProject || headerProject;
   const focusElapsed = timerTask ? timerElapsed : 0;
@@ -8731,7 +8732,7 @@ function App() {
                                   if (dayIndex === -1) return null;
                                   const gutter = compactLayout ? 1 : timelineView === "weekly" ? 5 : 8;
                                   return (
-                                    <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(tgtDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)}
+                                    <SnappedTimelineDragBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} projectName={draggedTask ? projectName(draggedTask) : ""} projects={projects} viewMode={timelineView} lang={lang}
                                       extraStyle={{ position: "absolute", left: dayIndex * multiColWidth + gutter, width: multiColWidth - gutter * 2, top: continuousTimelineEnabled ? continuousTimedTop(tgtDate, hoverSlot) : undefined }}
                                       dayStartHour={dayStartHour}
                                       hourHeight={timelineHourHeight}
@@ -9189,7 +9190,7 @@ function App() {
                             in non-continuous mode (via NowLine's internal timeBlockTop) and
                             the continuous absolute coordinate in continuous mode. */}
                         {continuousTimelineDates.includes(today) && (() => { const now = new Date(); return <NowLine lang={lang} dayStartHour={dayStartHour} hourHeight={timelineHourHeight} extraStyle={{ top: continuousTimelineEnabled ? continuousTimedTop(today, `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : undefined }} />; })()}
-                        {hoverSlot && drag && !drag.outsideTimeline && <PreviewBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} draggingBlock conflict={hasScheduleConflict(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot, addMinutes(hoverSlot, drag.duration), drag.taskId)} dayStartHour={dayStartHour} hourHeight={timelineHourHeight} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
+                        {hoverSlot && drag && !drag.outsideTimeline && <SnappedTimelineDragBlock task={draggedTask} startTime={hoverSlot} duration={drag.duration} projectName={draggedTask ? projectName(draggedTask) : ""} projects={projects} viewMode="daily" lang={lang} dayStartHour={dayStartHour} hourHeight={timelineHourHeight} extraStyle={continuousTimelineEnabled ? { top: continuousTimedTop(dragTargetDateRef.current || timelineWindowAnchorDate, hoverSlot) } : undefined} />}
                         {placementPreviewTask && placementPreview && continuousTimelineDates.includes(placementPreview.date) && (
                           <PreviewBlock
                             task={placementPreviewTask}
@@ -9364,7 +9365,7 @@ function App() {
           onClose={() => setScheduleTemplateOpen(false)}
         />
       )}
-      {drag?.kind === "block" && drag.pointer && draggedTask && (
+      {drag?.kind === "block" && drag.pointer && draggedTask && !timelineSnapActive && (
         <TaskDragLayer
           pointer={drag.pointer}
           sourceRect={{ width: Math.max(drag.sourceRect?.width || 220, drag.outsideTimeline ? 220 : 0), height: drag.sourceRect?.height || Math.max(timeBlockHeight(draggedTask.scheduledStart || "09:00", draggedTask.scheduledEnd || addMinutes(draggedTask.scheduledStart || "09:00", drag.duration)), SLOT_HEIGHT) }}
@@ -9395,7 +9396,7 @@ function App() {
         </TaskDragLayer>
       )}
       {drag?.source === "allDay" && drag.pointer && !hoverSlot && !allDayDragDate && !dragOverlay && <FloatingShelfDragPreview task={draggedTask} pointer={drag.pointer} candidateTarget={candidateDropActive} lang={lang} />}
-      {drag?.source === "candidate" && drag.pointer && draggedTask && (
+      {drag?.source === "candidate" && drag.pointer && draggedTask && !timelineSnapActive && (
         <TaskDragLayer pointer={drag.pointer} sourceRect={drag.sourceRect || { width: 360, height: 44 }} offset={drag.offset || { x: 24, y: 22 }}>
           <TaskCard
             task={draggedTask}
@@ -9424,7 +9425,7 @@ function App() {
           />
         </TaskDragLayer>
       )}
-      {dragOverlay && dragOverlayTask && drag?.source !== "candidate" && (
+      {dragOverlay && dragOverlayTask && drag?.source !== "candidate" && !timelineSnapActive && (
         <TaskDragLayer pointer={dragOverlayPointer} sourceRect={{ width: dragOverlay.sourceRect.width, height: dragOverlay.sourceRect.height }} offset={dragOverlay.offset}>
           <TaskCard
             task={activeDragItem?.taskSnapshot || dragOverlayTask.task}
@@ -11786,7 +11787,38 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   );
 }
 
-function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { task?: Task; startTime: string; duration: number; draggingBlock?: boolean; conflict?: boolean; extraStyle?: CSSProperties; dayStartHour?: number; hourHeight?: number }) {
+function SnappedTimelineDragBlock({ task, startTime, duration, projectName, projects, viewMode, lang, extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { task?: Task; startTime: string; duration: number; projectName: string; projects: Project[]; viewMode: "daily" | "3day" | "weekly"; lang: Language; extraStyle?: CSSProperties; dayStartHour?: number; hourHeight?: number }) {
+  if (!task) return null;
+  const snappedTask = { ...task, scheduledStart: startTime, scheduledEnd: addMinutes(startTime, duration) };
+  return (
+    <TimeBlock
+      task={snappedTask}
+      preview={null}
+      projectName={projectName}
+      projects={projects}
+      hovered={false}
+      projectInteractive={false}
+      onHover={() => {}}
+      onSelect={() => {}}
+      onEdit={() => {}}
+      onToggleDone={() => {}}
+      onTaskUpdate={() => {}}
+      onProjectChange={() => {}}
+      onProjectColorChange={() => {}}
+      onCreateProject={() => {}}
+      onDragStart={() => {}}
+      onResizeStart={() => {}}
+      extraStyle={{ ...extraStyle, position: "absolute", zIndex: 6, pointerEvents: "none", transition: "top var(--motion-instant) var(--motion-ease), left var(--motion-instant) var(--motion-ease)" }}
+      viewMode={viewMode}
+      lang={lang}
+      dayStartHour={dayStartHour}
+      hourHeight={hourHeight}
+      dragState="overlay"
+    />
+  );
+}
+
+function PreviewBlock({ task, startTime, duration, extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { task?: Task; startTime: string; duration: number; extraStyle?: CSSProperties; dayStartHour?: number; hourHeight?: number }) {
   if (!task) return null;
   const top = timeBlockTop(startTime, dayStartHour, hourHeight);
   const endTime = addMinutes(startTime, duration);
@@ -11794,7 +11826,7 @@ function PreviewBlock({ task, startTime, duration, draggingBlock, conflict, extr
   const color = categories[task.category]?.color || "#888";
   const isPlacementPreview = Boolean(extraStyle && (extraStyle as Record<string, unknown>)["--df-preview" as string]);
   const isEvent = isEventDisplayTask(task);
-  return <div className={`df-drop-preview ${draggingBlock ? "moving-block" : ""} ${isPlacementPreview ? "placement-preview" : ""} ${isEvent ? "is-event" : ""}`} data-kind={isEvent ? "event" : "task"} style={{ top, height, "--cat": color, ...extraStyle } as CSSProperties}><strong>{task.title}</strong>{!draggingBlock && <span>{startTime} · {Math.round(duration)}min</span>}</div>;
+  return <div className={`df-drop-preview ${isPlacementPreview ? "placement-preview" : ""} ${isEvent ? "is-event" : ""}`} data-kind={isEvent ? "event" : "task"} style={{ top, height, "--cat": color, ...extraStyle } as CSSProperties}><strong>{task.title}</strong><span>{startTime} · {Math.round(duration)}min</span></div>;
 }
 
 function ProjectColorPicker({ value, onChange, compact = false, presets = PROJECT_COLOR_PRESETS }: { value: string; onChange: (color: string) => void; compact?: boolean; presets?: string[] }) {

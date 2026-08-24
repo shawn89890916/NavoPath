@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const main = readFileSync(resolve(__dirname, "main.tsx"), "utf8");
+const mobileCss = readFileSync(resolve(__dirname, "mobile.css"), "utf8");
 
 describe("portrait interaction contracts", () => {
   it("opens the task short sheet on the second tap after selection", () => {
@@ -27,5 +28,19 @@ describe("portrait interaction contracts", () => {
     expect(main).toContain('document.addEventListener("pointerdown", closeComposerMenu)');
     expect(main).not.toContain("同步硬件");
     expect(main).not.toContain("Sync hardware");
+  });
+
+  it("uses the portrait settings switch style in narrow landscape mode", () => {
+    expect(mobileCss).toContain("(max-width: 899.98px) and (orientation: portrait),");
+    expect(mobileCss).toContain("(max-width: 1180px) and (orientation: landscape)");
+    expect(mobileCss).toContain("/* Touch settings use the same system switch in portrait and landscape. */");
+  });
+
+  it("snaps the real task block into timeline slots instead of covering a white target preview", () => {
+    expect(main).toContain("function SnappedTimelineDragBlock");
+    expect(main).toContain("const timelineSnapActive = Boolean(draggedTask && hoverSlot && !drag?.outsideTimeline);");
+    expect(main).toContain("drag.pointer && draggedTask && !timelineSnapActive");
+    expect(main).toContain("dragOverlayTask && drag?.source !== \"candidate\" && !timelineSnapActive");
+    expect(main).not.toContain("draggingBlock conflict=");
   });
 });
