@@ -106,6 +106,16 @@
 - Sped up website sign-in by removing the duplicate blocking cloud-profile query after password authentication. Workspace bootstrap now owns profile loading and can present the local cache sooner.
 - Improved initial-load performance by loading landing-page and desktop-widget resources only when needed, so the main workspace no longer downloads those interfaces up front, with a tighter production build reducing initial script and style weight.
 
+## 2026-08-24 · 竖屏任务与 AI 菜单交互
+
+### 修复
+- 优化竖屏快速添加、时间轴和 AI 菜单：快速添加任务的“更多”现在打开与正常任务一致的详情式编辑页，并以起止时间选择替代完成等操作行；时间轴任务第一次单点选中并显示缩放点，第二次单点打开短栏，点按任务块外退出选中，标记未完成的时间块也可调整起止边界；AI 输入框“+”菜单移除硬件同步，并可点按菜单外任意位置关闭。
+
+## 2026-08-24 · Portrait task and AI menu interactions
+
+### Fixed
+- Refined portrait quick add, timeline, and AI menus. Quick Add More now opens a task-detail-style editor whose middle action rows are replaced by start/end time controls; a first timeline-task tap selects it and exposes resize handles, a second tap opens its short sheet, an outside tap clears selection, and returned-unfinished blocks can also be resized. The AI composer “+” menu no longer includes hardware sync and closes on any outside tap.
+
 ## 2026-08-23 · 全天任务拖放修复
 
 ### 修复

@@ -1259,6 +1259,7 @@ function App() {
   const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 899.98px) and (orientation: portrait)").matches);
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddDetailOpen, setQuickAddDetailOpen] = useState(false);
   const [mobileQuickAddKind, setMobileQuickAddKind] = useState<MobileShortSheetKind>("task");
   const [mobileQuickHabitMinutes, setMobileQuickHabitMinutes] = useState(20);
   const [selectedDate, setSelectedDate] = useState(todayIso());
@@ -2653,6 +2654,18 @@ function App() {
     document.addEventListener("mousedown", cancelQuickSchedule);
     return () => document.removeEventListener("mousedown", cancelQuickSchedule);
   }, [quickSchedule]);
+
+  useEffect(() => {
+    if (!compactLayout || !resizeHintTaskId) return;
+    const clearSelectedTimelineTask = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".df-time-block, .df-mobile-task-summary")) return;
+      setResizeHintTaskId("");
+      if (drawerOpen && mobileTaskSummary) closeTaskDrawer({ autoSave: true });
+    };
+    document.addEventListener("pointerdown", clearSelectedTimelineTask);
+    return () => document.removeEventListener("pointerdown", clearSelectedTimelineTask);
+  }, [compactLayout, resizeHintTaskId, drawerOpen, mobileTaskSummary]);
 
   // Dismiss timeline quick-add when its coordinate system changes.
   useEffect(() => {
@@ -4187,7 +4200,7 @@ function App() {
     setQuickTitle("");
     setQuickAddOpen(false);
     if (more && mobileQuickAddKind !== "habit") {
-      openAdd(mobileQuickAddKind === "project" ? "project" : "task");
+      openAdd(mobileQuickAddKind === "project" ? "project" : "task", { quickAddDetail: mobileQuickAddKind === "task" });
       setForm((current) => ({ ...current, title, ...(mobileQuickAddKind === "project" ? { projectColor: quickProjectColor } : { projectId: quickProjectId }) }));
     } else if (mobileQuickAddKind === "project") {
       const project = makeProject({ ...defaultForm("project"), title, projectColor: quickProjectColor });
@@ -6020,13 +6033,14 @@ function App() {
     if (layerExitHandlesRef.current.has(key)) layerExitHandlesRef.current.set(key, handle);
   }
 
-  function openAdd(type: AddType = "task") {
+  function openAdd(type: AddType = "task", options?: { quickAddDetail?: boolean }) {
     rememberLayerTrigger("drawer");
     setAddType(type);
     setEditingId("");
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
     setMobileTaskSummary(false);
+    setQuickAddDetailOpen(Boolean(options?.quickAddDetail && type === "task"));
     setForm(defaultForm(type));
     setDrawerOpen(true);
   }
@@ -6080,6 +6094,20 @@ function App() {
     setResizeHintTaskId("");
     if (drawerOpen && mobileTaskSummary) closeTaskDrawer({ autoSave: true });
     return true;
+  }
+
+  function selectTimelineTask(task: Task) {
+    if (suppressBlockClickRef.current) return;
+    if (!compactLayout) {
+      openTaskEdit(task);
+      return;
+    }
+    const taskId = resolveTimelineRecordId(task.id);
+    if (resizeHintTaskId === taskId) {
+      openTaskEdit(task);
+      return;
+    }
+    revealResizeHandles(taskId);
   }
 
   function openProjectEdit(project: Project) {
@@ -6158,6 +6186,7 @@ function App() {
       setForm(defaultForm("task"));
       setAddType("task");
       setMobileTaskSummary(false);
+      setQuickAddDetailOpen(false);
       setDrawerOpen(false);
     });
   }
@@ -6196,6 +6225,7 @@ function App() {
       setForm(defaultForm("task"));
       setAddType("task");
       setMobileTaskSummary(false);
+      setQuickAddDetailOpen(false);
     });
   }
 
@@ -8677,11 +8707,7 @@ function App() {
                                   }
                                   const isPreview = previewIdByClonedId.has(task.id);
                                   return (
-                                    <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} projectInteractive={!compactLayout} onHover={setHoveredBlock} onSelect={() => {
-                                      if (suppressBlockClickRef.current) return;
-                                      if (compactLayout) revealResizeHandles(resolveTimelineRecordId(task.id));
-                                      else openTaskEdit(task);
-                                    }} onEdit={() => {
+                                    <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} projectInteractive={!compactLayout} onHover={setHoveredBlock} onSelect={() => selectTimelineTask(task)} onEdit={() => {
                                       if (!suppressBlockClickRef.current) openTaskEdit(task);
                                     }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                                       createProjectForTask(task.id, title);
@@ -9192,11 +9218,7 @@ function App() {
 
                           const isPreview = previewIdByClonedId.has(task.id);
                           return (
-                            <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} projectInteractive={!compactLayout} onHover={setHoveredBlock} onSelect={() => {
-                              if (suppressBlockClickRef.current) return;
-                              if (compactLayout) revealResizeHandles(resolveTimelineRecordId(task.id));
-                              else openTaskEdit(task);
-                            }} onEdit={() => {
+                            <TimeBlock key={task.id} task={task} preview={resizePreview?.taskId === task.id ? resizePreview : null} projectName={projectName(task)} projects={projects} hovered={hoveredBlock === task.id || resizePreview?.taskId === task.id} showResizeHint={resizeHintTaskId === resolveTimelineRecordId(task.id)} projectInteractive={!compactLayout} onHover={setHoveredBlock} onSelect={() => selectTimelineTask(task)} onEdit={() => {
                               if (!suppressBlockClickRef.current) openTaskEdit(task);
                             }} onToggleDone={() => toggleTaskDone(task.id)} onTaskUpdate={(patch) => updateTask(resolveOwningTask(task.id)?.id || task.id, patch)} onProjectChange={(projectId) => updateTask(resolveOwningTask(task.id)?.id || task.id, { projectId: projectId || undefined })} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onCreateProject={(title) => {
                               createProjectForTask(task.id, title);
@@ -9292,7 +9314,7 @@ function App() {
       ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>}
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); setQuickAddDetailOpen(false); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} quickAddDetail={quickAddDetailOpen} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} safetyLevel={settings.aiSafetyLevel || "standard"} onSafetyLevelChange={(aiSafetyLevel) => void saveSettings({ aiSafetyLevel })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => { setAiAuditOpen(false); setAiConversationListOpen((open) => !open); }} auditOpen={aiAuditOpen} auditRuns={aiAuditRuns} auditLoading={aiAuditLoading} auditError={aiAuditError} onToggleAudit={() => void toggleAiAuditHistory()} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
@@ -11688,7 +11710,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   );
   const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
-  const canResize = !isExternalEvent && !isReturnedUnfinished && (isEvent || !recurringLocked);
+  const canResize = !isExternalEvent && (isEvent || !recurringLocked);
   const eventId = task.id;
   const sizeClass = height < 56 ? "short" : height >= 120 ? "tall" : "normal";
   const originalStart = task.scheduledStart || "09:00";
@@ -11943,7 +11965,7 @@ function NowLine({ extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { e
 
 function EditDrawer(props: {
   type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; clarifyLoading?: boolean; onCreateProject: (title: string) => string;
-  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language; compactSummary?: boolean; onShowMore?: () => void;
+  editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language; compactSummary?: boolean; onShowMore?: () => void; quickAddDetail?: boolean;
 }) {
   const dialog = useInAppDialog(props.lang);
   const [newProjectTitle, setNewProjectTitle] = useState("");
@@ -12031,7 +12053,11 @@ function EditDrawer(props: {
   }
   function setDurationMinutes(minutes: number) {
     const safeMinutes = Math.max(minutes, SLOT_MINUTES);
-    set("estimatedHours", safeMinutes / 60);
+    props.setForm((current) => ({
+      ...current,
+      estimatedHours: safeMinutes / 60,
+      ...(props.quickAddDetail && current.dueTime ? { endTime: addMinutes(current.dueTime, safeMinutes) } : {}),
+    }));
     if (!props.editing || props.type !== "task" || !props.task) return;
     const patch: Partial<Task> = { estimatedHours: safeMinutes / 60 };
     if (props.editingRecordId && props.task.timelineRecords?.length) {
@@ -12136,6 +12162,27 @@ function EditDrawer(props: {
     if (!props.editing || props.type !== "task" || !props.task) return;
     props.onTaskUpdate(props.task.id, taskMetaPatch(kind, value));
   }
+  function taskLevelSelector(kind: "importance" | "urgency", options: Array<{ value: TaskLevel; zh: string; en: string }>) {
+    const selectedValue = (f[kind] ?? "unset") as TaskLevel;
+    return <div className={`df-level-selector df-level-${kind}`} role="group" aria-label={kind === "importance" ? (props.lang === "zh" ? "重要程度" : "Importance") : (props.lang === "zh" ? "紧急程度" : "Urgency")}>
+      {options.map((option) => <button
+        key={`${kind}-${option.value}`}
+        type="button"
+        className={`df-level-option df-level-${option.value}`}
+        data-selected={selectedValue === option.value ? "true" : "false"}
+        aria-pressed={selectedValue === option.value}
+        onClick={() => commitTaskMeta(kind, option.value)}
+        title={props.lang === "zh" ? option.zh : option.en}
+        style={{ "--option-color": levelColors[option.value] } as React.CSSProperties}
+      >
+        {kind === "importance"
+          ? option.value === "unset"
+            ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          : <span className={`df-urgency-mark${option.value === "unset" ? " df-urgency-dash" : ""}`}>{option.value === "high" ? "!!!" : option.value === "medium" ? "!!" : option.value === "low" ? "!" : "—"}</span>}
+      </button>)}
+    </div>;
+  }
   const eventDurationMinutes = f.dueTime
     ? Math.max(clockTimeSpanMinutes(f.dueTime, f.endTime || addMinutes(f.dueTime, f.recurrence?.durationMinutes || 60)), SLOT_MINUTES)
     : 0;
@@ -12225,6 +12272,72 @@ function EditDrawer(props: {
           )}
         </section>
       </aside>
+    );
+  }
+  if (props.quickAddDetail && !props.editing && props.type === "task") {
+    const selectedProject = props.projects.find((project) => String(project.id) === String(f.projectId));
+    const quickAddDuration = f.dueTime && f.endTime ? Math.max(clockTimeSpanMinutes(f.dueTime, f.endTime), SLOT_MINUTES) : Math.max(Math.round((f.estimatedHours || 0.5) * 60), SLOT_MINUTES);
+    const setQuickAddStart = (startTime: string) => props.setForm((current) => ({
+      ...current,
+      dueTime: startTime,
+      endTime: startTime ? addMinutes(startTime, Math.max(Math.round((current.estimatedHours || 0.5) * 60), SLOT_MINUTES)) : "",
+    }));
+    const setQuickAddEnd = (endTime: string) => props.setForm((current) => ({
+      ...current,
+      endTime,
+      estimatedHours: current.dueTime && endTime ? Math.max(clockTimeSpanMinutes(current.dueTime, endTime), SLOT_MINUTES) / 60 : current.estimatedHours,
+    }));
+    return (
+      <>
+        <aside className="df-drawer df-task-detail df-quick-add-detail" onMouseDown={(event) => event.stopPropagation()}>
+          <button className="df-detail-close df-icon-action i-close" type="button" aria-label={t(props.lang, "form.close")} onClick={props.onClose} />
+          <section className="df-detail-hero-trevor">
+            <textarea ref={titleRef} className="df-detail-title-trevor" autoFocus value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.titlePlaceholder")} spellCheck={false} />
+          </section>
+
+          <section className="df-detail-tag-row">
+            <button ref={projectTriggerRef} className={`df-detail-pill-trevor ${projectPickerOpen ? "active" : ""}`} onClick={toggleProjectPicker}>
+              <span className="df-detail-project-dot" style={{ background: selectedProject?.color || "#888" }} />
+              <span># {selectedProject?.title || t(props.lang, "candidate.unassigned")}</span>
+              <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l3 3 3-3" /></svg>
+            </button>
+            <button ref={durationTriggerRef} className={`df-detail-pill-trevor ${durationPickerOpen ? "active" : ""}`} onClick={toggleDurationPicker}>
+              <span>◷ {formatMinutes(quickAddDuration)}</span>
+              <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l3 3 3-3" /></svg>
+            </button>
+          </section>
+
+          <section className="df-detail-meta-settings" aria-label={props.lang === "zh" ? "任务程度设置" : "Task level settings"}>
+            <div className="df-detail-meta-setting"><span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>{taskLevelSelector("importance", importanceOptions)}</div>
+            <div className="df-detail-meta-setting"><span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>{taskLevelSelector("urgency", urgencyOptions)}</div>
+          </section>
+
+          <section className="df-detail-time-range" aria-label={props.lang === "zh" ? "起止时间" : "Start and end time"}>
+            <label><span>{t(props.lang, "drawer.startTime")}</span><input type="time" step={SLOT_MINUTES * 60} value={f.dueTime} onChange={(event) => setQuickAddStart(event.target.value)} /></label>
+            <span className="df-detail-time-arrow" aria-hidden="true">→</span>
+            <label><span>{t(props.lang, "drawer.endTime")}</span><input type="time" step={SLOT_MINUTES * 60} value={f.endTime} disabled={!f.dueTime} onChange={(event) => setQuickAddEnd(event.target.value)} /></label>
+          </section>
+
+          {projectPickerOpen && <section className="df-detail-project-pick df-quick-add-detail-picker">
+            <div className="df-drawer-project-list">
+              <button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "drawer.unassigned")}</button>
+              {props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}
+              <div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "drawer.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div>
+            </div>
+          </section>}
+
+          {durationPickerOpen && <section className="df-detail-project-pick df-quick-add-detail-picker"><div className="df-detail-duration-options">
+            {DURATION_OPTIONS.map((minutes) => <button key={minutes} className={quickAddDuration === minutes ? "active" : ""} onClick={() => { setDurationMinutes(minutes); setDurationPickerOpen(false); }}>{formatMinutes(minutes)}</button>)}
+          </div></section>}
+
+          <section className="df-detail-notes-new">
+            <div className="df-detail-section-head"><h3>{t(props.lang, "drawer.notes")}</h3></div>
+            <div className="df-notes-editor"><textarea rows={4} value={f.details} onChange={(event) => set("details", event.target.value)} placeholder={t(props.lang, "drawer.addNotePlaceholder")} /></div>
+          </section>
+
+          <div className="df-quick-add-detail-actions"><button className="primary" disabled={!f.title.trim()} onClick={props.onSave}>{t(props.lang, "form.add")}</button></div>
+        </aside>
+      </>
     );
   }
   if (props.editing && props.type === "task" && props.task) {
@@ -12605,9 +12718,21 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const tasks = taskList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
+  const composerMenuRef = useRef<HTMLDivElement>(null);
+  const composerMenuButtonRef = useRef<HTMLButtonElement>(null);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!composerMenuOpen) return;
+    const closeComposerMenu = (event: PointerEvent) => {
+      const target = event.target instanceof Node ? event.target : null;
+      if (target && (composerMenuRef.current?.contains(target) || composerMenuButtonRef.current?.contains(target))) return;
+      setComposerMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeComposerMenu);
+    return () => document.removeEventListener("pointerdown", closeComposerMenu);
+  }, [composerMenuOpen]);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !followLatestRef.current) return;
@@ -12844,8 +12969,8 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
       <div className="df-ai-composer-row">
         <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
-        <button type="button" className={`df-ai-attach-btn${composerMenuOpen ? " active" : ""}`} title={lang === "zh" ? "模型、安全与附件" : "Model, safety, and attachments"} aria-label={lang === "zh" ? "打开更多选项" : "Open more options"} aria-expanded={composerMenuOpen} onClick={() => setComposerMenuOpen((open) => !open)}>＋</button>
-        {composerMenuOpen && <div className="df-ai-attach-menu df-ai-composer-menu">
+        <button ref={composerMenuButtonRef} type="button" className={`df-ai-attach-btn${composerMenuOpen ? " active" : ""}`} title={lang === "zh" ? "模型、安全与附件" : "Model, safety, and attachments"} aria-label={lang === "zh" ? "打开更多选项" : "Open more options"} aria-expanded={composerMenuOpen} onClick={() => setComposerMenuOpen((open) => !open)}>＋</button>
+        {composerMenuOpen && <div ref={composerMenuRef} className="df-ai-attach-menu df-ai-composer-menu">
           <label className="df-ai-composer-setting"><span>{lang === "zh" ? "模型" : "Model"}</span><select aria-label={lang === "zh" ? "选择模型" : "Choose model"} value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
           <label className="df-ai-composer-setting"><span>{lang === "zh" ? "安全等级" : "Safety level"}</span><select aria-label={lang === "zh" ? "选择安全等级" : "Choose safety level"} value={safetyLevel} onChange={(event) => onSafetyLevelChange(event.target.value as Settings["aiSafetyLevel"])}><option value="standard">{lang === "zh" ? "标准 · 低风险自动执行" : "Standard · Auto low-risk"}</option><option value="strict">{lang === "zh" ? "严格 · 所有写入确认" : "Strict · Confirm all writes"}</option><option value="readonly">{lang === "zh" ? "只读 · 禁止写入" : "Read only · Block writes"}</option></select></label>
           <div className="df-ai-composer-menu-rule" />
@@ -12853,7 +12978,6 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           [lang === "zh" ? "相机" : "Camera", "image/*", "environment"],
           [lang === "zh" ? "照片" : "Photos", "image/*", ""],
           [lang === "zh" ? "文件" : "Files", ATTACHMENT_ACCEPT, ""],
-          [lang === "zh" ? "同步硬件" : "Sync hardware", ATTACHMENT_ACCEPT, ""],
         ].map(([label, accept, capture]) => <label className="df-ai-composer-upload" key={label}>{label}<input type="file" accept={accept} capture={capture === "environment" ? "environment" : undefined} onChange={acceptAttachment} /></label>)}</div>}
         <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")}>{busy ? "■" : "↑"}</button>
       </div>
