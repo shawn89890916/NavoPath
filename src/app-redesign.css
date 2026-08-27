@@ -150,6 +150,13 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 .df-brand > div { display: grid; gap: 0; }
 .df-brand strong { font-family: var(--paper-display); font-size: 16px !important; font-weight: 600 !important; letter-spacing: -.035em; }
 .df-app .dayflow-icon { box-shadow: none !important; filter: none !important; }
+.df-app .dayflow-icon img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain;
+}
 .df-tabs {
   gap: 18px !important; padding: 0 !important; border: 0 !important;
   border-radius: 0 !important; background: transparent !important; box-shadow: none !important;

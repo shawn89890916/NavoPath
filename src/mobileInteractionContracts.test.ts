@@ -45,7 +45,8 @@ describe("portrait interaction contracts", () => {
 
   it("resolves the product mark from the Vite base path", () => {
     expect(main).toContain("const PRODUCT_ICON_SRC = `${import.meta.env.BASE_URL}navopath-icon.png`;");
-    expect(main).toContain("<img src={PRODUCT_ICON_SRC} alt=\"\" />");
+    expect(main).toContain("const size = compact ? 32 : 36;");
+    expect(main).toContain("<img src={PRODUCT_ICON_SRC} alt=\"\" width={size} height={size} />");
   });
 
   it("snaps the real task block into timeline slots instead of covering a white target preview", () => {

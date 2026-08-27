@@ -4,13 +4,13 @@
 
 ### 修复
 - 修复横屏工作区中今日候选列表在触摸设备上无法纵向滚动的问题；列表、候选行和候选卡现在明确保留原生纵向触摸滚动与惯性滚动。
-- 修复相对部署路径下左上角箭头 N 品牌贴图可能消失的问题；工作区现在会按应用 base 路径加载真实 Logo 贴图。
+- 修复相对部署路径下左上角箭头 N 品牌贴图可能消失或按原图尺寸异常放大的问题；工作区现在会按应用 base 路径加载真实 Logo 贴图，并将其稳定约束在紧凑品牌位内。
 
 ## 2026-08-27 · Landscape candidate scrolling and brand asset fixes
 
 ### Fixed
 - Fixed Today's Candidates refusing to scroll vertically on touch devices in landscape workspaces; the list, candidate rows, and cards now explicitly preserve native vertical and momentum scrolling.
-- Fixed the top-left arrow-N brand asset disappearing under relative deployment paths; the workspace now loads the real logo asset through the app base path.
+- Fixed the top-left arrow-N brand asset disappearing or expanding to its source-image size under relative deployment paths; the workspace now loads the real logo through the app base path and keeps it constrained to the compact brand slot.
 
 ## 本轮补充 / Current update
 
