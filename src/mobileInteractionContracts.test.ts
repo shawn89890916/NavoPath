@@ -36,6 +36,18 @@ describe("portrait interaction contracts", () => {
     expect(mobileCss).toContain("/* Touch settings use the same system switch in portrait and landscape. */");
   });
 
+  it("keeps the landscape candidate list as the native vertical touch scroller", () => {
+    expect(mobileCss).toContain("#root .df-app .df-candidate-list {");
+    expect(mobileCss).toContain("touch-action: pan-y !important;");
+    expect(mobileCss).toContain("overscroll-behavior-y: contain !important;");
+    expect(mobileCss).toContain("#root .df-app .df-candidate-list .df-candidate-task-row {");
+  });
+
+  it("resolves the product mark from the Vite base path", () => {
+    expect(main).toContain("const PRODUCT_ICON_SRC = `${import.meta.env.BASE_URL}navopath-icon.png`;");
+    expect(main).toContain("<img src={PRODUCT_ICON_SRC} alt=\"\" />");
+  });
+
   it("snaps the real task block into timeline slots instead of covering a white target preview", () => {
     expect(main).toContain("function SnappedTimelineDragBlock");
     expect(main).toContain("const timelineSnapActive = Boolean(draggedTask && hoverSlot && !drag?.outsideTimeline);");

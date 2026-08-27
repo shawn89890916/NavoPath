@@ -950,10 +950,12 @@ function buildTaskFromEvent(event: CalendarEvent): Task {
   };
 }
 
+const PRODUCT_ICON_SRC = `${import.meta.env.BASE_URL}navopath-icon.png`;
+
 export function ProductIcon({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`dayflow-icon ${compact ? "compact" : ""}`} aria-hidden="true">
-      <img src="/navopath-icon.png" alt="" />
+      <img src={PRODUCT_ICON_SRC} alt="" />
     </div>
   );
 }
