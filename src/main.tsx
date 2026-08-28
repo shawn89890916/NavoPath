@@ -127,6 +127,7 @@ import type { MobileShortSheetKind } from "./MobileTaskSummary";
 installBrowserFallback();
 
 const ChangelogPage = lazy(() => import("./ChangelogPage"));
+const PluginGuidePageLazy = lazy(() => import("./PluginGuidePage"));
 const MobileTaskSummary = lazy(() => import("./MobileTaskSummary"));
 const MobileQuickAddSheet = lazy(() => import("./MobileTaskSummary").then((module) => ({ default: module.MobileQuickAddSheet })));
 const MobileTimelineDraftSheet = lazy(() => import("./MobileTaskSummary").then((module) => ({ default: module.MobileTimelineDraftSheet })));
@@ -14792,81 +14793,6 @@ function ThemeColorSetting({ label, presets, value, onChange }: { label: string;
   );
 }
 
-function PluginGuidePage() {
-  registerBuiltinPlugins();
-  const [language, setLanguage] = useState<Language>(detectSystemLanguage());
-  const zh = language === "zh";
-  const labels = {
-    back: zh ? "返回工作区" : "Back to app",
-    tag: zh ? "官方插件 / MCP" : "OFFICIAL PLUGINS / MCP",
-    title: zh ? "Plugins 和 MCP 使用说明" : "Plugins and MCP guide",
-    intro: zh
-      ? "随 NavoPath 发布的官方内置插件可提供直接使用的工具；桌面设置也可展示经过校验的本地 manifest 和配置，但不会加载或执行本地目录或远程脚本。"
-      : "Official built-in plugins shipped with NavoPath can provide usable tools. Desktop settings may also display validated local manifests and configuration, but local directory scripts and remote scripts are not loaded or executed.",
-    mcp: zh ? "MCP 快速配置" : "MCP quickstart",
-    plugins: zh ? "官方插件作用" : "Official plugin roles",
-    security: zh ? "安全边界" : "Security boundary",
-    host: zh ? "宿主能力" : "Host capabilities",
-  };
-  const config = `[mcp_servers.navopath]\nurl = "${MCP_ENDPOINT}"\nhttp_headers = { Authorization = "Bearer nvp_YOUR_TOKEN" }`;
-  return (
-    <main className="df-doc-page changelog-like">
-      <nav className="df-doc-sidebar" aria-label={zh ? "文档导航" : "Documentation navigation"}>
-        <a href="/app">← {labels.back}</a>
-        <div className="df-doc-language" aria-label={zh ? "文档语言" : "Guide language"}>
-          <button type="button" className={zh ? "active" : ""} onClick={() => setLanguage("zh")}>中文</button>
-          <button type="button" className={!zh ? "active" : ""} onClick={() => setLanguage("en")}>EN</button>
-        </div>
-      </nav>
-      <article className="df-doc-content">
-        <header className="df-doc-hero">
-          <span>{labels.tag}</span>
-          <h1>{labels.title}</h1>
-          <p>{labels.intro}</p>
-        </header>
-        <section id="mcp" className="df-doc-section">
-          <h2>{labels.mcp}</h2>
-          <p>{zh ? "打开 Settings → MCP，生成个人 Bearer Token，然后把下面的 Streamable HTTP 配置写入支持 MCP 的客户端。原始令牌只显示一次。" : "Open Settings → MCP, create a personal Bearer token, then paste the Streamable HTTP configuration below into an MCP-capable client. The raw token is shown once."}</p>
-          <pre>{config}</pre>
-          <dl>
-            <div><dt>{zh ? "服务地址" : "Endpoint"}</dt><dd><code>{MCP_ENDPOINT}</code></dd></div>
-            <div><dt>{zh ? "传输方式" : "Transport"}</dt><dd>Streamable HTTP</dd></div>
-            <div><dt>{zh ? "认证" : "Authentication"}</dt><dd><code>Authorization: Bearer nvp_...</code></dd></div>
-          </dl>
-        </section>
-        <section id="plugins" className="df-doc-section">
-          <h2>{labels.plugins}</h2>
-          <div className="df-doc-grid">
-            {listRegisteredPlugins().map((plugin) => (
-              <article key={plugin.id}>
-                <h3>{localizedPluginName(plugin, language)}</h3>
-                <p>{localizedPluginDescription(plugin, language)}</p>
-                <small>{localizedPluginEnabledSummary(plugin, language)}</small>
-              </article>
-            ))}
-          </div>
-        </section>
-        <section id="security" className="df-doc-section">
-          <h2>{labels.security}</h2>
-          <p>{zh ? "内置插件代码随 NavoPath 一起发布。桌面端本地插件只会把经过大小与结构校验的 manifest 元数据和配置登记到界面，不读取或执行目录脚本；网页版同样不会加载任意本地或远程插件代码。" : "Built-in plugin code ships with NavoPath. Desktop local plugins contribute only manifest metadata and configuration that pass size and structure validation; directory scripts are not read or executed, and the web build likewise loads no arbitrary local or remote plugin code."}</p>
-        </section>
-        <section id="host" className="df-doc-section">
-          <h2>{labels.host}</h2>
-          <table>
-            <tbody>
-              <tr><th><code>getData()</code></th><td>{zh ? "读取当前规划快照。" : "Read the current planner snapshot."}</td></tr>
-              <tr><th><code>savePluginConfig(id, patch)</code></th><td>{zh ? "保存插件自己的设置。" : "Persist plugin-owned settings."}</td></tr>
-              <tr><th><code>emit(event, payload)</code></th><td>{zh ? "广播 NavoPath 插件事件。" : "Broadcast a NavoPath plugin event."}</td></tr>
-              <tr><th><code>toast(message)</code></th><td>{zh ? "显示短暂的应用内状态提示。" : "Show a transient in-app status message."}</td></tr>
-            </tbody>
-          </table>
-        </section>
-      </article>
-    </main>
-  );
-}
-
-
 // ── Shared layout shells: imported from ./components/ExecutionSharedLayout ──
 // The six shared components (ExecutionSplitLayout, CandidatePanelShell,
 // CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock)
@@ -14923,6 +14849,6 @@ root.render(
     : window.location.pathname === "/changelog"
       ? <Suspense fallback={<div className="df-loading-inline">Loading changelog...</div>}><ChangelogPage /></Suspense>
       : window.location.pathname === "/plugin-guide"
-        ? <PluginGuidePage />
+        ? <Suspense fallback={<div className="df-loading-inline">Loading guide...</div>}><PluginGuidePageLazy /></Suspense>
       : <AppErrorBoundary><App /></AppErrorBoundary>,
 );
