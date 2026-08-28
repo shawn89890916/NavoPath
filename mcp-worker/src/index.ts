@@ -2,8 +2,23 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 import { buildCalendarFeed } from "./calendarFeed";
+import {
+  batchUpdateTasks,
+  confirmChange,
+  configureCloudAssistant,
+  getActivityHistory,
+  getChangesSince,
+  ingestWorkspaceEvent,
+  processAssistantMessage,
+  scheduleCloudRuns,
+  sendNotification,
+  undoChange,
+  verifyWebhookSignature,
+  type AssistantMessage,
+  type CloudAssistantEnv,
+} from "./cloudAssistant";
 
-interface Env {
+interface Env extends CloudAssistantEnv {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   MCP_SERVER_NAME: string;
@@ -40,7 +55,7 @@ async function authenticate(request: Request, env: Env) {
   const match = (await query.json() as Array<{ id: string; user_id: string }>)[0];
   if (!match) return null;
   void db(env, `navopath_mcp_tokens?id=eq.${match.id}`, { method: "PATCH", body: JSON.stringify({ last_used_at: now() }) });
-  return match.user_id;
+  return { userId: match.user_id, token };
 }
 
 async function authenticateCalendarToken(token: string, env: Env, ctx: ExecutionContext) {
@@ -137,7 +152,7 @@ export class NavoPathMCP extends McpAgent<Env, unknown, AgentProps> {
       return result(item);
     });
 
-    this.server.registerTool("update_task", { description: "Update safe task fields.", inputSchema: { taskId: z.string(), patch: z.object({ title: z.string().trim().min(1).max(300).optional(), projectId: z.string().nullable().optional(), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), notes: z.string().max(10000).optional(), completed: z.boolean().optional() }) } }, async ({ taskId, patch }) => {
+    this.server.registerTool("update_task", { description: "Update safe task fields, including user-controlled cloud schedule and hard-deadline locks.", inputSchema: { taskId: z.string(), patch: z.object({ title: z.string().trim().min(1).max(300).optional(), projectId: z.string().nullable().optional(), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), notes: z.string().max(10000).optional(), completed: z.boolean().optional(), scheduleLocked: z.boolean().optional(), hardDeadline: z.boolean().optional() }) } }, async ({ taskId, patch }) => {
       const profile = await getProfile(this.env, this.userId());
       const tasks = profile.data.tasks || [];
       const index = tasks.findIndex((task: Json) => task.id === taskId);
@@ -145,6 +160,50 @@ export class NavoPathMCP extends McpAgent<Env, unknown, AgentProps> {
       const next = { ...tasks[index], ...patch, projectId: patch.projectId === null ? undefined : patch.projectId ?? tasks[index].projectId, updatedAt: now() };
       await saveProfile(this.env, this.userId(), profile, { data: { ...profile.data, tasks: tasks.map((task: Json, i: number) => i === index ? next : task), events: [] } });
       return result(next);
+    });
+
+    this.server.registerTool("get_changes_since", { description: "Return audited NavoPath changes after a monotonic cursor.", inputSchema: { cursor: z.number().int().nonnegative().default(0) } }, async ({ cursor }) => {
+      return result(await getChangesSince(this.env, this.userId(), cursor));
+    });
+
+    this.server.registerTool("reschedule_task", { description: "Move or create the active schedule block for a task with conflict checks, audit, idempotency, and undo.", inputSchema: { taskId: z.string().regex(/^[A-Za-z0-9._:-]{1,200}$/), startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), durationMinutes: z.number().int().min(15).max(1440), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), idempotency_key: z.string().min(8).max(240), reason: z.string().max(500).optional() } }, async ({ taskId, startTime, durationMinutes, date, idempotency_key, reason }) => {
+      return result(await batchUpdateTasks(this.env, this.userId(), { operations: [{ type: "reschedule_task", taskId, startTime, durationMinutes, date, reason }], dryRun: false, commit: true, idempotencyKey: idempotency_key, source: "mcp", summary: "Rescheduled task", reason }));
+    });
+
+    this.server.registerTool("upsert_schedule_block", { description: "Create or update one schedule block with conflict checks, audit, idempotency, and undo.", inputSchema: { taskId: z.string().regex(/^[A-Za-z0-9._:-]{1,200}$/), blockId: z.string().regex(/^[A-Za-z0-9._:-]{1,200}$/).optional(), startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), durationMinutes: z.number().int().min(15).max(1440), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), idempotency_key: z.string().min(8).max(240), reason: z.string().max(500).optional() } }, async ({ taskId, blockId, startTime, durationMinutes, date, idempotency_key, reason }) => {
+      return result(await batchUpdateTasks(this.env, this.userId(), { operations: [{ type: "upsert_schedule_block", taskId, blockId, startTime, durationMinutes, date, reason }], dryRun: false, commit: true, idempotencyKey: idempotency_key, source: "mcp", summary: "Upserted schedule block", reason }));
+    });
+
+    const batchOperation = z.object({
+      type: z.enum(["create_task", "update_task", "split_task", "reschedule_task", "upsert_schedule_block"]),
+      taskId: z.string().optional(), blockId: z.string().optional(), title: z.string().optional(), projectId: z.string().nullable().optional(), dueDate: z.string().optional(), startTime: z.string().optional(), durationMinutes: z.number().optional(), notes: z.string().optional(), patch: z.record(z.string(), z.unknown()).optional(), subtasks: z.array(z.object({ title: z.string(), estimateMinutes: z.number().optional() })).optional(), reason: z.string().optional(),
+    });
+    this.server.registerTool("batch_update_tasks", { description: "Preview or atomically commit a validated batch of task changes. Every committed batch is idempotent, audited, and undoable.", inputSchema: { operations: z.array(batchOperation).min(1).max(30), dry_run: z.boolean(), commit: z.boolean(), idempotency_key: z.string().min(8).max(240), summary: z.string().max(1200).optional(), reason: z.string().max(1200).optional() } }, async ({ operations, dry_run, commit, idempotency_key, summary, reason }) => {
+      return result(await batchUpdateTasks(this.env, this.userId(), { operations, dryRun: dry_run, commit, idempotencyKey: idempotency_key, source: "mcp", summary, reason }));
+    });
+
+    this.server.registerTool("get_activity_history", { description: "Return recent audited cloud and MCP change sets.", inputSchema: { limit: z.number().int().min(1).max(100).default(30) } }, async ({ limit }) => {
+      return result(await getActivityHistory(this.env, this.userId(), limit));
+    });
+
+    this.server.registerTool("undo_change", { description: "Undo an eligible change set if no later workspace revision has superseded it.", inputSchema: { changeSetId: z.string().uuid() } }, async ({ changeSetId }) => {
+      return result(await undoChange(this.env, this.userId(), changeSetId));
+    });
+
+    this.server.registerTool("confirm_change", { description: "Explicitly approve one pending protected schedule or hard-deadline change. Confirmation fails if the workspace changed after the proposal.", inputSchema: { changeSetId: z.string().uuid() } }, async ({ changeSetId }) => {
+      return result(await confirmChange(this.env, this.userId(), changeSetId));
+    });
+
+    this.server.registerTool("ingest_workspace_event", { description: "Ingest an incremental workspace change event. Duplicate dedupe_key values are ignored and only bounded excerpts are accepted.", inputSchema: { changed_files: z.array(z.union([z.string().max(500), z.object({ path: z.string().max(500), change_type: z.string().max(32).optional(), content_hash: z.string().max(128).optional() })])).max(100), fragments: z.array(z.object({ path: z.string().max(500), excerpt: z.string().max(4000), content_hash: z.string().max(128).optional() })).max(20).optional(), summary: z.string().max(4000), schedule_impact: z.string().max(2000), timestamp: z.string().max(64), dedupe_key: z.string().min(8).max(200) } }, async (payload) => {
+      return result(await ingestWorkspaceEvent(this.env, this.userId(), payload));
+    });
+
+    this.server.registerTool("send_notification", { description: "Queue an in-app notification and optional email, respecting quiet hours except urgent deadline risk.", inputSchema: { kind: z.enum(["summary", "material_change", "deadline_risk", "weather", "needs_input"]), title: z.string().min(1).max(160), body: z.string().min(1).max(2000), urgency: z.enum(["normal", "urgent"]).default("normal"), idempotency_key: z.string().min(8).max(240) } }, async (payload) => {
+      return result(await sendNotification(this.env, this.userId(), payload));
+    });
+
+    this.server.registerTool("configure_cloud_assistant", { description: "Opt the current account into or out of the 08:30/20:30 Asia/Shanghai cloud assistant and optional email delivery.", inputSchema: { enabled: z.boolean(), email_enabled: z.boolean().default(false) } }, async ({ enabled, email_enabled }) => {
+      return result(await configureCloudAssistant(this.env, this.userId(), enabled, email_enabled));
     });
 
     this.server.registerTool("delete_task", { description: "Delete a task.", inputSchema: { taskId: z.string() } }, async ({ taskId }) => {
@@ -182,10 +241,48 @@ export default {
       if (request.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
       return new Response(request.method === "HEAD" ? null : buildCalendarFeed(profile.data), { headers });
     }
+    if (url.pathname === "/api/workspace-events") {
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: { allow: "POST" } });
+      const contentLength = Number(request.headers.get("content-length") || 0);
+      if (contentLength > 64_000) return new Response(JSON.stringify({ error: "Payload too large" }), { status: 413, headers: { "content-type": "application/json" } });
+      const auth = await authenticate(request, env);
+      if (!auth) return new Response(JSON.stringify({ error: "Invalid or revoked bearer token" }), { status: 401, headers: { "content-type": "application/json" } });
+      const rawBody = await request.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 64_000) return new Response(JSON.stringify({ error: "Payload too large" }), { status: 413, headers: { "content-type": "application/json" } });
+      if (!await verifyWebhookSignature(request.headers.get("x-navopath-timestamp") || "", request.headers.get("x-navopath-signature") || "", rawBody, auth.token)) return new Response(JSON.stringify({ error: "Invalid or stale webhook signature" }), { status: 401, headers: { "content-type": "application/json" } });
+      try {
+        return new Response(JSON.stringify(await ingestWorkspaceEvent(env, auth.userId, JSON.parse(rawBody))), { status: 202, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid workspace event" }), { status: 400, headers: { "content-type": "application/json" } });
+      }
+    }
+    if (url.pathname === "/api/notifications") {
+      if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { allow: "GET" } });
+      const auth = await authenticate(request, env);
+      if (!auth) return new Response(JSON.stringify({ error: "Invalid or revoked bearer token" }), { status: 401, headers: { "content-type": "application/json" } });
+      const response = await db(env, `navopath_notifications?select=id,kind,title,body,urgency,status,deliver_after,sent_at,read_at,metadata,created_at&user_id=eq.${auth.userId}&deliver_after=lte.${encodeURIComponent(now())}&order=created_at.desc&limit=50`);
+      return new Response(await response.text(), { status: response.status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    }
     if (url.pathname !== "/mcp") return new Response("Not found", { status: 404 });
-    const userId = await authenticate(request, env);
-    if (!userId) return new Response(JSON.stringify({ error: "Invalid or revoked bearer token" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
-    (ctx as ExecutionContext & { props?: AgentProps }).props = { userId };
+    const auth = await authenticate(request, env);
+    if (!auth) return new Response(JSON.stringify({ error: "Invalid or revoked bearer token" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
+    (ctx as ExecutionContext & { props?: AgentProps }).props = { userId: auth.userId };
     return mcpHandler.fetch(request, env, ctx);
+  },
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const trigger = controller.cron === "30 0 * * *" ? "morning" : controller.cron === "30 12 * * *" ? "evening" : null;
+    if (!trigger) return;
+    ctx.waitUntil(scheduleCloudRuns(env, trigger).then((count) => console.log("Scheduled NavoPath cloud assistants", { trigger, count })));
+  },
+  async queue(batch: MessageBatch<AssistantMessage>, env: Env) {
+    for (const message of batch.messages) {
+      try {
+        await processAssistantMessage(env, message.body);
+        message.ack();
+      } catch (error) {
+        console.error("Cloud assistant job failed", { trigger: message.body.trigger, error: error instanceof Error ? error.message : "unknown" });
+        message.retry({ delaySeconds: 60 });
+      }
+    }
   },
 };

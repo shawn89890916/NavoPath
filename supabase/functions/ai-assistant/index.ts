@@ -23,6 +23,7 @@ function validIsoDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 import { buildConversationContinuation } from "./conversation.ts";
+import { runCloudDecision } from "./cloudDecision.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -628,6 +629,8 @@ serve(async (req: Request) => {
       attachmentText?: string;
       attachmentName?: string;
       runId?: string;
+      cloudContext?: Record<string, unknown>;
+      cloudTool?: Record<string, unknown>;
     };
 
     if (!mode) {
@@ -637,6 +640,20 @@ serve(async (req: Request) => {
     const apiKey = Deno.env.get("SILICONFLOW_API_KEY");
     const deepSeekKey = Deno.env.get("DEEPSEEK_API_KEY");
     const configuredProviders = [apiKey ? "siliconflow" : "", deepSeekKey ? "deepseek" : ""].filter(Boolean);
+
+    if (mode === "cloud_decision") {
+      const keys = supabaseKeys();
+      const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+      if (!keys.serviceKey || bearer !== keys.serviceKey) return new Response(JSON.stringify({ error: "AI_AUTH" }), { status: 401, headers: corsHeaders });
+      if (!apiKey) return new Response(JSON.stringify({ error: "AI_NOT_CONFIGURED" }), { status: 503, headers: corsHeaders });
+      try {
+        const decision = await runCloudDecision(apiKey, Deno.env.get("SILICONFLOW_BASE_URL") || "https://api.siliconflow.cn/v1", STABLE_MODEL, { context: body.cloudContext, tool: body.cloudTool });
+        return new Response(JSON.stringify({ ok: true, ...decision, version: AI_GATEWAY_VERSION }), { headers: corsHeaders });
+      } catch (error) {
+        console.error("Cloud decision failed", { error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+        return new Response(JSON.stringify({ ok: false, error: "CLOUD_DECISION_FAILED" }), { status: 503, headers: corsHeaders });
+      }
+    }
 
     if (mode === "health") {
       return new Response(JSON.stringify({

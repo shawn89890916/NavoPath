@@ -138,6 +138,14 @@ describe("browser fallback preview mode", () => {
     expect(matchingTasks[0].subtasks?.[0].title).toBe("Keep");
   });
 
+  it("preserves explicit cloud schedule and hard-deadline locks", () => {
+    const persisted = fallbackData();
+    persisted.tasks[0].scheduleLocked = true;
+    persisted.tasks[0].hardDeadline = true;
+
+    expect(normalizeData(persisted).tasks[0]).toMatchObject({ scheduleLocked: true, hardDeadline: true });
+  });
+
   it("bounds excessively deep persisted subtask trees", () => {
     const malformed = fallbackData() as any;
     let nested = { id: "subtask-99", title: "Level 99", completed: false };

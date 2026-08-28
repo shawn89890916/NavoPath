@@ -167,6 +167,10 @@ export interface Task {
   importance?: NullablePriority;
   urgency?: NullablePriority;
   estimatedHours?: number;
+  /** Prevent cloud assistants from moving this task's schedule without confirmation. */
+  scheduleLocked?: boolean;
+  /** Treat dueDate as a hard deadline that cloud assistants cannot move automatically. */
+  hardDeadline?: boolean;
   aiInference?: TaskAiInference;
   order?: number;
   subtasks?: Subtask[];

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "test": "node --test src/*.node-test.ts",
     "typecheck": "node ../node_modules/typescript/lib/tsc.js --noEmit -p tsconfig.json"
   },
   "dependencies": {

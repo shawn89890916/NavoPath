@@ -856,6 +856,8 @@ export function normalizeData(data: PlannerData): PlannerData {
       dueDate: persistedDate(task.dueDate) || "",
       completed,
       estimatedHours,
+      ...(typeof task.scheduleLocked === "boolean" ? { scheduleLocked: task.scheduleLocked } : {}),
+      ...(typeof task.hardDeadline === "boolean" ? { hardDeadline: task.hardDeadline } : {}),
       projectId: projectId && projectIds.has(projectId) ? projectId : undefined,
       goalId: goalId && goalIds.has(goalId) ? goalId : "",
       parentTaskId: parentTaskId && parentTaskId !== task.id && taskIds.has(parentTaskId)

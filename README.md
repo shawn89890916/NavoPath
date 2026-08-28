@@ -28,6 +28,7 @@ NavoPath includes AI-assisted daily planning to help suggest schedules based on 
 - Tree-based planning for long-term projects and multi-step goals
 - Timeline-based execution for scheduling a realistic day
 - AI-assisted daily planning
+- Always-online cloud scheduling at 08:30 and 20:30 Asia/Shanghai, plus signed incremental workspace events
 - Optional cloud sync with Supabase for the public web app
 - Local preview mode for offline or single-browser use
 - Desktop packaging with Electron
@@ -142,6 +143,8 @@ Supabase setup:
 4. Copy the project URL and anon public key into the environment variables above.
 
 For more deployment detail, see [`docs/dayflow-web-deploy.md`](./docs/dayflow-web-deploy.md).
+
+The cloud worker, incremental workspace event API, DeepSeek safety boundary, notifications, and deployment steps are documented in [`docs/cloud-proactive-assistant.md`](./docs/cloud-proactive-assistant.md).
 
 ## Project Structure
 
