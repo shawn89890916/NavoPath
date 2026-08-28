@@ -10,6 +10,9 @@
 ### 改进
 - 重写 MCP 配置说明：应用内教程现在按新电脑的完整连接路径组织，提供 Codex 与 Claude Desktop 的 Windows、macOS 和 Linux 配置、真实服务地址、独立设备令牌建议、验证步骤与集中排错，并以 NavoPath 纸面编辑风格适配明暗主题和手机阅读。
 
+### 修复
+- 修复 Navo AI 仍根据旧版界面模式和应用内简报开关判断自身能力、错误声称没有定时后台自动化的问题；询问自动化能力时现在会准确说明全天在线的早晚检查、资料事件触发、离线快照、通知、审计、确认与撤销边界，并且不会把能力可用性与当前账户启用状态混为一谈。
+
 ## 2026-08-28 · Cross-device MCP setup guide
 
 ### Added
@@ -19,6 +22,9 @@
 
 ### Improved
 - Reworked the MCP setup guide around a complete new-computer connection path, with Codex and Claude Desktop instructions for Windows, macOS, and Linux, the production endpoint, per-device token guidance, verification steps, and focused troubleshooting in a responsive NavoPath paper-editorial layout for light and dark themes.
+
+### Fixed
+- Fixed Navo AI inferring its capabilities from legacy interface-mode and in-app brief settings and incorrectly claiming that scheduled background automation did not exist. When asked about automation, it now accurately describes the always-online morning/evening checks, workspace-event triggers, offline snapshot, notification, audit, confirmation, and undo boundaries without confusing capability availability with the current account's activation status.
 
 ## 2026-08-27 · 横屏候选滚动与品牌贴图修复
 

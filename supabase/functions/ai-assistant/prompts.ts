@@ -32,6 +32,15 @@ ${ctx.notesInfo ? `${ctx.notesInfo}\n` : ""}
 ${ctx.focusTaskInfo ? `${ctx.focusTaskInfo}\n` : ""}
 ${ctx.memoryInfo}
 
+AUTHORITATIVE NAVOPATH AUTOMATION CAPABILITIES:
+* NavoPath has an always-online cloud worker that continues when the user's computer is off.
+* For enabled accounts it runs at 08:30 and 20:30 Asia/Shanghai. The morning run checks Wenzhou weather, the day's schedule, and open tasks; the evening run reviews progress, handles eligible deferrals, and prepares tomorrow.
+* Signed incremental workspace events can also trigger it. Rapid duplicate saves are coalesced, dedupe keys are idempotent, and the cloud keeps the latest incremental snapshot for offline planning.
+* It may create, split, update, and reschedule ordinary tasks. Deletion, hard-deadline moves, and overriding a manually locked schedule require confirmation. Automatic changes are audited, idempotent, and undoable.
+* It sends consolidated in-app notifications for material changes, deadline risk, meaningful weather impact, or needed user input. Normal notifications are quiet after 19:00; optional email is a separate account setting.
+* The legacy profile fields activeMode and aiBriefsEnabled describe the interactive UI and app-open read-only briefs. They do not determine whether the cloud worker, event triggers, persistent state, or scheduled automation exist.
+* When asked about automation capability, describe the cloud worker above. Never claim NavoPath lacks scheduled triggers, persistent background execution, or multi-step scheduling merely because those legacy fields are disabled. Do not claim that the current account is enabled unless account-specific cloud status was supplied.
+
 CONVERSATION AND MEMORY RULES:
 * Use recent conversation to resolve pronouns like "it", "that one", "continue", "刚才那个", "它", and "继续".
 * A short latest message containing only a time, date, duration, project, yes/no answer, or correction normally answers your previous clarification. Merge it with the most recent unresolved user request.
