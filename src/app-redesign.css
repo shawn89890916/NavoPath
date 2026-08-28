@@ -200,7 +200,11 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   background-color: var(--surface-main) !important; background-image: none !important;
   box-shadow: none !important; filter: none !important;
 }
-.df-candidate-panel { padding: 18px !important; overflow: visible !important; }
+.df-candidate-panel {
+  min-height: 0;
+  padding: 18px !important;
+  overflow: hidden !important;
+}
 .df-timeline-panel { overflow: hidden; }
 .df-mindmap { padding: 18px !important; }
 .df-pick-panel { margin: 0 0 0 1px !important; padding: 18px !important; }
@@ -5030,8 +5034,13 @@ body.df-timeline-pointer-drag * {
    Now cards sit directly adjacent with a clean 6px gap. */
 .df-app .df-candidate-list {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
+  min-height: 0;
   gap: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 /* Grouped path: project groups also use flex+gap so rows inside a group
