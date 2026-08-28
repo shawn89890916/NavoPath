@@ -1,0 +1,9 @@
+{
+  "id": "navopath-bridge",
+  "name": "NavoPath Bridge",
+  "version": "1.0.0",
+  "minAppVersion": "1.11.0",
+  "description": "Send privacy-bounded incremental admissions-workspace changes to NavoPath for cloud planning.",
+  "author": "NavoPath",
+  "isDesktopOnly": false
+}

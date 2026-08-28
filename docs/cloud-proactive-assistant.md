@@ -68,6 +68,30 @@ node scripts/navopath-workspace-event.mjs .\workspace-event.json
 
 令牌只放在环境变量中，不要写入 iCloud Drive、payload、日志或 Git。
 
+## Obsidian Bridge
+
+仓库内的 `integrations/navopath-obsidian-bridge` 可在桌面端和移动端 Obsidian 中监听 Vault 相对目录 `升学/资料`。它使用 Obsidian Vault 事件接收新建、修改、重命名和删除，连续保存默认合并 45 秒，并在插件重新启动时通过本地哈希清单补发离线期间遗漏的变化。
+
+隐私边界：
+
+- 首次启动只为现有文件建立哈希基线，不上传当前资料。
+- Markdown、文本、CSV、YAML、HTML 和 Python 文件只提取 frontmatter、日期、截止、未完成清单、考试、面试和提交相关行；图片等二进制文件只上传路径、变更类型与本地哈希。
+- 上传成功后才推进基线；网络或鉴权失败会保留变化并自动重试。
+- 设备令牌通过 Obsidian SecretStorage 选择。插件同步数据只保存 SecretStorage 名称和文件哈希，不保存 `nvp_...` 令牌或资料正文。
+- 插件使用 Vault 内相对路径，不写死 Windows `C:\` 路径，因此同一个 iCloud Vault 可在 Windows、macOS、iPhone、iPad 和 Android 上安装。移动设备只有在 Obsidian 运行时才能发送；下次打开时会补扫 iCloud 已同步的变化。
+
+构建并安装：
+
+```powershell
+cd integrations/navopath-obsidian-bridge
+npm install
+npm test
+npm run typecheck
+npm run build
+```
+
+将 `main.js`、`manifest.json` 和 `versions.json` 复制到 Vault 的 `.obsidian/plugins/navopath-bridge/`，在社区插件中启用，然后到插件设置中创建或选择一个仅供该设备使用的 NavoPath MCP 令牌。
+
 ## DeepSeek 决策边界
 
 - 默认模型固定为 `deepseek-ai/DeepSeek-V4-Flash`。Worker 通过仅 Service Role 可访问的内部模式复用现有 Supabase AI Edge Function 与其 SiliconFlow 凭据，不复制第二份模型密钥。
