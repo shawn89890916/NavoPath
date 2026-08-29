@@ -1609,6 +1609,49 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   border-top: 1px solid var(--paper-rule) !important;
 }
 
+/* Candidate and timeline share one uninterrupted paper surface. The quick-add
+   strip stays opaque so scrolling task rows never show through the composer. */
+.df-app .df-candidate-panel,
+.df-app .df-timeline-panel {
+  background: var(--surface-main) !important;
+}
+.df-app .df-quick-add,
+.df-app .df-quick-add:focus-within {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  padding: 8px 0 9px !important;
+  border-top: 1px solid var(--paper-rule) !important;
+  background: var(--surface-main) !important;
+}
+.df-app .df-quick-add:focus-within { border-top-color: var(--paper-accent-rule) !important; }
+
+/* Floating actions read as compact editorial marks, not raised circular FABs. */
+.df-app .df-add-fab,
+.df-app .df-ai-fab {
+  width: 38px !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule-strong) !important;
+  border-radius: 0 !important;
+  background: var(--surface-main) !important;
+  box-shadow: none !important;
+}
+.df-app .df-add-fab {
+  color: var(--accent-active) !important;
+  border-bottom-color: var(--accent-active) !important;
+}
+.df-app .df-ai-fab { color: var(--text-muted) !important; }
+.df-app .df-add-fab:hover,
+.df-app .df-ai-fab:hover,
+.df-app .df-add-fab:focus-visible,
+.df-app .df-ai-fab:focus-visible {
+  color: var(--text-main) !important;
+  border-bottom-color: var(--paper-accent-rule) !important;
+  background: var(--paper-note) !important;
+  box-shadow: none !important;
+}
+
 .df-execute-skeleton {
   --accent-active: #584d3d;
   --text-main: #383631;

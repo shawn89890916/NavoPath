@@ -12869,6 +12869,7 @@ function MobileSheetDismissHandle({ onDismiss, onCollapse, onExpand, collapsed =
 function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, auditOpen, auditRuns, auditLoading, auditError, onToggleAudit, onNewConversation, onSelectConversation, onRenameConversation, onToggleConversationPinned, onDeleteConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, safetyLevel, onSafetyLevelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; auditOpen: boolean; auditRuns: AgentAuditEntry[]; auditLoading: boolean; auditError: string; onToggleAudit: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; onRenameConversation: (conversationId: string, title: string) => void; onToggleConversationPinned: (conversationId: string) => void; onDeleteConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; safetyLevel: Settings["aiSafetyLevel"]; onSafetyLevelChange: (level: Settings["aiSafetyLevel"]) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
   const projects = projectList || [];
   const tasks = taskList || [];
+  const panelRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
@@ -12880,6 +12881,56 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const [conversationMenuId, setConversationMenuId] = useState<string | null>(null);
   const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
   const [conversationDraftTitle, setConversationDraftTitle] = useState("");
+  const [desktopBounds, setDesktopBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const desktopInteractionRef = useRef<{
+    kind: "move" | "resize";
+    pointerId: number;
+    startX: number;
+    startY: number;
+    bounds: { left: number; top: number; width: number; height: number };
+  } | null>(null);
+  const isLandscapePanel = () => window.matchMedia("(min-width: 701px) and (orientation: landscape)").matches;
+  const beginDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>, kind: "move" | "resize") => {
+    if (!isLandscapePanel()) return;
+    if (kind === "move" && (event.target as HTMLElement).closest("button, summary, input, select, textarea, label")) return;
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    event.preventDefault();
+    desktopInteractionRef.current = {
+      kind,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      bounds: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const updateDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>) => {
+    const interaction = desktopInteractionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - interaction.startX;
+    const deltaY = event.clientY - interaction.startY;
+    const maxWidth = Math.max(420, window.innerWidth - 16);
+    const maxHeight = Math.max(360, window.innerHeight - 16);
+    const width = interaction.kind === "resize"
+      ? Math.min(Math.max(interaction.bounds.width + deltaX, 420), maxWidth - interaction.bounds.left)
+      : interaction.bounds.width;
+    const height = interaction.kind === "resize"
+      ? Math.min(Math.max(interaction.bounds.height + deltaY, 360), maxHeight - interaction.bounds.top)
+      : interaction.bounds.height;
+    const left = interaction.kind === "move"
+      ? Math.min(Math.max(interaction.bounds.left + deltaX, 8), window.innerWidth - interaction.bounds.width - 8)
+      : interaction.bounds.left;
+    const top = interaction.kind === "move"
+      ? Math.min(Math.max(interaction.bounds.top + deltaY, 8), window.innerHeight - interaction.bounds.height - 8)
+      : interaction.bounds.top;
+    setDesktopBounds({ left, top, width, height });
+  };
+  const endDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>) => {
+    if (desktopInteractionRef.current?.pointerId !== event.pointerId) return;
+    desktopInteractionRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
   useEffect(() => {
     if (!conversationListOpen) return;
     setMobileCollapsed(false);
@@ -13000,9 +13051,9 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     event.currentTarget.value = "";
     setComposerMenuOpen(false);
   };
-  return <aside className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}${conversationListOpen ? " is-history-open" : ""}`}>
+  return <aside ref={panelRef} className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}${conversationListOpen ? " is-history-open" : ""}${desktopBounds ? " is-desktop-positioned" : ""}`} style={desktopBounds ? { "--ai-panel-left": `${desktopBounds.left}px`, "--ai-panel-top": `${desktopBounds.top}px`, "--ai-panel-width": `${desktopBounds.width}px`, "--ai-panel-height": `${desktopBounds.height}px` } as CSSProperties : undefined}>
     <MobileSheetDismissHandle onDismiss={onClose} onCollapse={() => setMobileCollapsed(true)} onExpand={() => setMobileCollapsed(false)} collapsed={mobileCollapsed} lang={lang} />
-    <div className="df-ai-panel-head">
+    <div className="df-ai-panel-head" onPointerDown={(event) => beginDesktopPanelInteraction(event, "move")} onPointerMove={updateDesktopPanelInteraction} onPointerUp={endDesktopPanelInteraction} onPointerCancel={endDesktopPanelInteraction}>
       <div className="df-ai-panel-title">
         <strong>{conversationListOpen ? text.historyTitle : (activeConversationTitle || "NavoPath AI")}</strong>
         <small>{conversationListOpen ? `${sortedConversations.length} ${text.chatUnit}` : (lang === "zh" ? "当前工作区" : "Current workspace")}</small>
@@ -13110,19 +13161,9 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           {message.attachment && <AttachmentCard attachment={message.attachment} referenced />}
         </> : <>
           <div className="df-ai-assistant-label"><span>N</span><small>NavoPath AI</small></div>
-          {message.steps && message.steps.length > 0 && <details className={`df-ai-progress ${message.status || "done"}`} open={message.status === "thinking" ? true : undefined}>
-            <summary><span className="df-ai-progress-icon" aria-hidden="true">{message.status === "thinking" ? "●" : message.status === "error" ? "✕" : "✓"}</span><span>{message.status === "thinking" ? text.thinking : message.status === "error" ? (lang === "zh" ? "处理失败" : "Failed") : (lang === "zh" ? `已完成 · ${message.steps.length} 步` : `Completed · ${message.steps.length} steps`)}</span>{message.status !== "thinking" && <small>{lang === "zh" ? "查看详情" : "Details"}</small>}</summary>
-            {message.status !== "thinking" && <div className="df-ai-progress-detail">{message.steps.map((step, index) => <div key={index} className={`df-ai-step ${step.status}`}><span>{step.status === "done" ? "✓" : step.status === "error" ? "✕" : "○"}</span><span>{step.label}</span></div>)}</div>}
-          </details>}
+          {message.steps && message.steps.length > 0 && message.status === "thinking" && <div className="df-ai-progress thinking"><span className="df-ai-progress-icon" aria-hidden="true">●</span><span>{text.thinking}</span></div>}
           {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}><Suspense fallback={<p>{lang === "zh" ? "正在排版答案…" : "Formatting answer…"}</p>}><AiMarkdownLazy>{message.content}</AiMarkdownLazy></Suspense></div>}
           {message.agent && <div className="df-agent-run-card">
-            <details className="df-agent-advanced">
-              <summary>{lang === "zh" ? "高级详情" : "Advanced details"}</summary>
-              <small>{lang === "zh" ? "审计 ID" : "Audit ID"} · <code>{message.agent.runId}</code>{message.agent.undoExpiresAt ? ` · ${lang === "zh" ? "撤销截止" : "Undo until"} ${new Date(message.agent.undoExpiresAt).toLocaleString()}` : ""}</small>
-              {message.agent.trace && message.agent.trace.length > 0 && <div className="df-agent-trace">
-                {message.agent.trace.map((step) => <div key={step.id} className={step.status}><span>{step.status === "done" ? "✓" : "✕"}</span><code>{step.name}</code></div>)}
-              </div>}
-            </details>
             {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied">
               <strong>{lang === "zh" ? `已自动执行 ${message.agent.applied.length} 项` : `${message.agent.applied.length} action(s) applied`}</strong>
               {message.agent.applied.map((action) => <span key={action.commandId}>{action.title} · {action.operation}</span>)}
@@ -13255,6 +13296,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")} aria-label={busy ? (lang === "zh" ? "停止生成" : "Stop generating") : t(lang, "aiPanel.send")}>{busy ? <span className="df-ai-stop-icon" aria-hidden="true" /> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5" /></svg>}</button>
       </div>
     </div>
+    <div className="df-ai-panel-resize-handle" aria-hidden="true" onPointerDown={(event) => beginDesktopPanelInteraction(event, "resize")} onPointerMove={updateDesktopPanelInteraction} onPointerUp={endDesktopPanelInteraction} onPointerCancel={endDesktopPanelInteraction} />
   </aside>;
 }
 

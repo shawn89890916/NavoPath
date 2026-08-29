@@ -25,7 +25,7 @@
   gap: 16px !important;
   padding: 8px 12px 8px 22px !important;
   border-bottom: 1px solid var(--paper-rule) !important;
-  background: color-mix(in srgb, var(--surface-main) 96%, var(--text-main) 4%) !important;
+  background: var(--surface-main) !important;
 }
 
 .df-ai-panel-title {
@@ -357,6 +357,7 @@
 .df-ai-progress > summary small { margin-left: auto; color: var(--text-muted); font-size: 10px; }
 .df-ai-progress-icon { color: var(--accent-active); font-size: 9px; }
 .df-ai-progress.thinking .df-ai-progress-icon { animation: navo-ai-pulse 1.2s ease-in-out infinite; }
+.df-ai-progress.thinking { min-height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 12px; font: 560 12px/1.4 var(--paper-sans); }
 .df-ai-progress-detail { display: grid; gap: 8px; padding: 0 12px 12px 30px; border-top: 1px solid var(--paper-rule); }
 .df-ai-progress-detail .df-ai-step { display: flex; gap: 8px; padding-top: 9px; color: var(--text-muted); font-size: 11px; }
 
@@ -612,4 +613,45 @@
 @media (prefers-reduced-motion: reduce) {
   .df-ai-progress.thinking .df-ai-progress-icon { animation: none; }
   .df-ai-reference-suggestions button { transition: none !important; }
+}
+
+@media (min-width: 701px) and (orientation: landscape) {
+  #root .df-app .df-ai-panel-reference.is-desktop-positioned {
+    top: var(--ai-panel-top) !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: var(--ai-panel-left) !important;
+    width: var(--ai-panel-width) !important;
+    height: var(--ai-panel-height) !important;
+  }
+
+  #root .df-app .df-ai-panel-reference .df-ai-panel-head {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  #root .df-app .df-ai-panel-reference .df-ai-panel-head:active { cursor: grabbing; }
+  #root .df-app .df-ai-panel-reference .df-ai-panel-head :is(button, summary, input, select, textarea, label) { cursor: pointer; }
+
+  .df-ai-panel-resize-handle {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    height: 24px;
+    cursor: nwse-resize;
+    touch-action: none;
+  }
+
+  .df-ai-panel-resize-handle::before {
+    content: "";
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 8px;
+    height: 8px;
+    border-right: 1px solid var(--paper-rule-strong);
+    border-bottom: 1px solid var(--paper-rule-strong);
+  }
 }

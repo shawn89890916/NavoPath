@@ -9,6 +9,7 @@
 - 今日候选与时间轴桌面外框改用同一条跟随活动主题的细强调线；候选任务恢复与时间轴完全一致的纸面任务块、项目色左边条和拖动外观，让次级任务纸张与主要执行画布保持统一而清晰的层级。
 - 时间轴在拖入、移动任务或改变排程状态时会保留当前滚动锚点，不再突然跳到其他时间段；首次加载 Execute 后自动将当前时间对准视口中央，非今日日期则对准上午 9 点。
 - 重复任务不再在标题下方常驻显示“每天”等周期文字，候选、时间轴、全天与拖动任务块统一在右上角显示安静的循环符号，悬停或键盘聚焦时再显示完整循环周期。
+- 今日候选、时间轴与底部快速添加栏现在共用连续的主题纸面背景，输入栏保持不透明，滚动任务不会透到输入区域；右下角的添加与 AI 入口改为细规则的编辑式工具。AI 对话顶部融入同一纸面层，完成回复不再显示步骤计数或高级调试详情，横屏时可从标题栏拖动窗口并从右下角缩放。
 
 ## 2026-08-29 · AI composer and Execute workspace visual refinements
 
@@ -19,6 +20,7 @@
 - Unified the desktop boundaries of Today's Candidates and the timeline with the same fine active-theme accent rule. Candidate tasks now use the same paper task surface, project-color rail, and drag appearance as timeline blocks, keeping the secondary task sheet and primary execution canvas visually related and clearly separated.
 - Preserved the timeline scroll anchor when tasks are dropped, moved, or rescheduled so state changes no longer jump to another time range. The Execute timeline now aligns the current time to the center after its initial load, falling back to 09:00 when viewing a different date.
 - Replaced persistent recurrence text beneath task titles with a quiet upper-right loop mark across candidate, timeline, all-day, and dragged task blocks; the full cadence appears only on hover or keyboard focus.
+- Today's Candidates, the timeline, and the bottom quick-add row now share one continuous theme-aware paper surface. The opaque input row prevents scrolling tasks from showing through, while the lower-right Add and AI entry points now use fine editorial rules. The AI header now blends into the same paper surface, completed replies omit step counts and advanced debug details, and landscape chat windows can be dragged from the header and resized from the lower-right corner.
 
 ## 2026-08-28 · MCP 跨设备配置说明
 
