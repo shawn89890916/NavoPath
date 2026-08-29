@@ -35339,24 +35339,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 }
 
-.df-ai-conversation-list {
-
-  display: grid;
-
-  gap: 2px;
-
-  max-height: 210px;
-
-  overflow: auto;
-
-  padding: 8px 16px;
-
-  border-bottom: 1px solid color-mix(in srgb, var(--mode-primary) 14%, var(--border-soft));
-
-}
-
-
-
 /* ===== Data Export Buttons ===== */
 
 .df-settings-export {
@@ -35438,68 +35420,6 @@ body:has(:active)::-webkit-scrollbar-thumb {
   margin: 14px 0;
 
 }
-
-.df-ai-conversation-list p {
-
-  margin: 6px 0;
-
-  color: var(--text-muted);
-
-  font-size: 11px;
-
-}
-
-.df-ai-conversation-list button {
-
-  display: grid;
-
-  gap: 2px;
-
-  width: 100%;
-
-  min-height: 42px;
-
-  padding: 7px 0;
-
-  text-align: left;
-
-  color: var(--text-muted);
-
-  background: transparent;
-
-  border: 0;
-
-  border-bottom: 1px solid var(--paper-rule);
-
-  border-radius: 0;
-
-}
-
-.df-ai-conversation-list button.active,
-
-.df-ai-conversation-list button:hover {
-
-  color: var(--mode-primary);
-
-  background: color-mix(in srgb, var(--mode-primary) 5%, transparent);
-
-}
-
-.df-ai-conversation-list strong {
-
-  color: var(--text-main) !important;
-
-  font-size: 12px;
-
-  overflow: hidden;
-
-  text-overflow: ellipsis;
-
-  white-space: nowrap;
-
-}
-
-.df-ai-conversation-list small { color: var(--text-muted); font-size: 10px; }
 
 .df-ai-presence {
 

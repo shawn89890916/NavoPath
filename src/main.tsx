@@ -123,6 +123,7 @@ import "./navopath-buttons.css";
 import "./mobile.css";
 import "./task-block.css";
 import "./ai-chat.css";
+void import("./ai-history-actions.css");
 import "./workspace-v0.css";
 import type { MobileShortSheetKind } from "./MobileTaskSummary";
 
@@ -878,6 +879,13 @@ function aiConversationTitle(message: string) {
 function makeAiConversation(title = "新对话"): AiConversation {
   const now = new Date().toISOString();
   return { id: uid("conversation"), title, messages: [], createdAt: now, updatedAt: now };
+}
+
+function sortAiConversations(conversations: AiConversation[]) {
+  return [...conversations].sort((a, b) => {
+    if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+    return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
+  });
 }
 
 function buildEventFromTask(task: Task, activeRecord?: TimelineRecord): CalendarEvent {
@@ -1649,7 +1657,32 @@ function App() {
   const dialog = useInAppDialog(lang);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null);
+  const timelineMutationScrollRef = useRef<{ top: number; left: number } | null>(null);
   const [nowInTimelineViewport, setNowInTimelineViewport] = useState(true);
+  const preserveTimelineViewportOnNextDataChange = useCallback(() => {
+    const element = timelineRef.current;
+    if (!element) return;
+    timelineMutationScrollRef.current = { top: element.scrollTop, left: element.scrollLeft };
+  }, []);
+  useLayoutEffect(() => {
+    const anchor = timelineMutationScrollRef.current;
+    const element = timelineRef.current;
+    if (!anchor) return;
+    if (!element || mode !== "execute" || timelineView === "month") {
+      timelineMutationScrollRef.current = null;
+      return;
+    }
+    continuousPrependLockRef.current = true;
+    element.scrollTop = anchor.top;
+    element.scrollLeft = anchor.left;
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTop = anchor.top;
+      element.scrollLeft = anchor.left;
+      if (timelineMutationScrollRef.current === anchor) timelineMutationScrollRef.current = null;
+      continuousPrependLockRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [data, mode, timelineView]);
   const suppressBlockClickRef = useRef(false);
   const suppressBlockClickTimerRef = useRef<number | null>(null);
   const suppressClickAfterDrag = useCallback(() => {
@@ -2477,39 +2510,48 @@ function App() {
     return h + m / 60;
   }, [settings?.dayStartTime]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (pendingTimelineFocus) return;
-    if (mode !== "execute" || !data || !timelineRef.current) return;
+    if (mode !== "execute" || !data || timelineView === "month") return;
     const autoScrollKey = `${timelineView}:${selectedDate}`;
     if (lastTimelineAutoScrollKeyRef.current === autoScrollKey) return;
-    lastTimelineAutoScrollKeyRef.current = autoScrollKey;
-
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const fallbackMinutes = 9 * 60;
-    const targetMinutes = selectedDate === todayIso() && currentMinutes >= 0 && currentMinutes <= 24 * 60
-      ? currentMinutes
-      : fallbackMinutes;
-    const container = timelineRef.current;
-    const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
-    const effectEnabled = settings?.continuousCrossDayScroll !== false && timelineView !== "month";
-    const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
-    const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, continuousTimelineDayCount(effectColumnCount))[0] || selectedDate;
-    const effectTop = (date: string, time: string) => {
-      const offset = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
+    let observer: ResizeObserver | null = null;
+    let settled = false;
+    const alignTimeline = () => {
+      const container = timelineRef.current;
+      if (!container || container.clientHeight <= 0 || container.scrollHeight <= container.clientHeight) return false;
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const targetMinutes = selectedDate === todayIso() ? currentMinutes : 9 * 60;
+      const effectColumnCount = timelineView === "weekly" ? 7 : timelineView === "3day" ? 3 : 1;
+      const effectEnabled = settings?.continuousCrossDayScroll !== false;
+      const effectAnchorDate = timelineView === "weekly" ? getVisibleDays("weekly", selectedDate)[0] : selectedDate;
+      const effectStartDate = buildDailyContinuousDates(effectAnchorDate, effectEnabled, continuousTimelineDayCount(effectColumnCount))[0] || selectedDate;
+      const offset = Math.round((new Date(`${selectedDate}T00:00:00`).getTime() - new Date(`${effectStartDate}T00:00:00`).getTime()) / 86400000);
       const bandIndex = Math.floor(offset / effectColumnCount);
-      let minutesFromDayStart = timeToMinutes(time) - dayStartHour * 60;
+      let minutesFromDayStart = targetMinutes - dayStartHour * 60;
       if (minutesFromDayStart < 0) minutesFromDayStart += 24 * 60;
-      return bandIndex * ((24 * 60 / SLOT_MINUTES) * timelineSlotHeight) + (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight;
+      const targetTop = effectEnabled
+        ? bandIndex * ((24 * 60 / SLOT_MINUTES) * timelineSlotHeight) + (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight
+        : (minutesFromDayStart / SLOT_MINUTES) * timelineSlotHeight;
+      container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
+      lastTimelineAutoScrollKeyRef.current = autoScrollKey;
+      settled = true;
+      observer?.disconnect();
+      return true;
     };
-    const targetTop = effectEnabled
-      ? effectTop(selectedDate, minutesToTime(targetMinutes))
-      : (() => {
-          let diff = targetMinutes - dayStartHour * 60;
-          if (diff < 0) diff += 24 * 60;
-          return (diff / SLOT_MINUTES) * timelineSlotHeight;
-        })();
-    container.scrollTop = Math.max(0, targetTop - container.clientHeight * 0.5);
+    const frame = window.requestAnimationFrame(() => {
+      if (alignTimeline()) return;
+      const container = timelineRef.current;
+      if (!container) return;
+      observer = new ResizeObserver(() => { if (!settled) alignTimeline(); });
+      observer.observe(container);
+      if (timelineCanvasRef.current) observer.observe(timelineCanvasRef.current);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
   }, [mode, data, selectedDate, timelineView, pendingTimelineFocus, dayStartHour, settings?.continuousCrossDayScroll, timelineSlotHeight]);
 
   // Scroll timeline to day start time when the setting changes
@@ -5305,7 +5347,7 @@ function App() {
     showToast(t(lang, "toast.futureRecurringCleared"));
   }
 
-  function applyCandidateTimeSettings(taskId: string, settings: CandidateTimeSettings) {
+  function applyCandidateTimeSettings(taskId: string, settings: CandidateTimeSettings, options: { focusTimeline?: boolean } = {}) {
     const task = data?.tasks.find((item) => item.id === taskId);
     if (!task || !data) return;
     const now = new Date().toISOString();
@@ -5340,7 +5382,7 @@ function App() {
       ...data,
       tasks: data.tasks.map((item) => item.id === taskId ? updatedTask : item),
     });
-    if (!settings.clearSchedule && !settings.allDay) {
+    if (!settings.clearSchedule && !settings.allDay && options.focusTimeline !== false) {
       requestTimelineFocus({
         date: settings.date,
         startTime: settings.startTime,
@@ -5352,9 +5394,10 @@ function App() {
   }
 
   function scheduleTask(taskId: string, startTime: string) {
+    preserveTimelineViewportOnNextDataChange();
     const targetDate = dragTargetDateRef.current || timelineDate;
     if (taskId.startsWith("habit:")) {
-      scheduleHabitAt(taskId.slice("habit:".length), targetDate, startTime);
+      scheduleHabitAt(taskId.slice("habit:".length), targetDate, startTime, false);
       setHoverSlot("");
       setDrag(null);
       dragTargetDateRef.current = "";
@@ -5371,7 +5414,6 @@ function App() {
     const allDayOwner = recordToTaskMap.get(taskId);
     if (allDayRecord && allDayOwner && !allDayRecord.scheduledStart && !allDayRecord.scheduledEnd) {
       moveTimelineRecord(taskId, startTime, targetDate, taskDuration(allDayOwner));
-      requestTimelineFocus({ date: targetDate, startTime, taskId, source: "schedule" });
       setHoverSlot("");
       setDrag(null);
       dragTargetDateRef.current = "";
@@ -5384,7 +5426,7 @@ function App() {
       startTime,
       durationMinutes: taskDuration(task),
       allDay: false,
-    });
+    }, { focusTimeline: false });
     if ((settings?.onboardingVersion ?? 0) < 2 && (settings?.onboardingStep === "drag" || settings?.onboardingStep === "schedule")) {
       void saveSettings({ onboardingStep: "calendar" });
     }
@@ -5405,12 +5447,13 @@ function App() {
     void saveData(toggleHabitCompletion(current, habitId, date, completed));
   }
 
-  function scheduleHabitAt(habitId: string, date: string, startTime: string) {
+  function scheduleHabitAt(habitId: string, date: string, startTime: string, focusTimeline = true) {
     const current = dataRef.current;
     if (!current) return;
+    if (!focusTimeline) preserveTimelineViewportOnNextDataChange();
     const result = scheduleHabitRecord(current, habitId, date, startTime);
     void saveData(result.data);
-    requestTimelineFocus({ date, startTime, taskId: result.recordId, source: "schedule" });
+    if (focusTimeline) requestTimelineFocus({ date, startTime, taskId: result.recordId, source: "schedule" });
     showToast(lang === "zh" ? "习惯已安排" : "Habit scheduled");
   }
 
@@ -5512,7 +5555,7 @@ function App() {
     if (!settings || settings.featureHabitsEnabled === false) return;
     beginShelfDrag(event, habitDragTask(habit, timelineDate), "candidate", {
       allowCandidateReorder: false,
-      onSchedule: (date, startTime) => scheduleHabitAt(habit.id, date, startTime),
+      onSchedule: (date, startTime) => scheduleHabitAt(habit.id, date, startTime, false),
     });
   }
 
@@ -5774,6 +5817,7 @@ function App() {
     const up = (upEvent: PointerEvent) => {
       if (upEvent.pointerId !== pointerId) return;
       if (active) {
+        preserveTimelineViewportOnNextDataChange();
         // Check if dropped on all-day bar first
         const alldayEl = document.querySelector<HTMLElement>(".df-timeline-allday, .df-timeline-3day-allday");
         if (alldayEl) {
@@ -6628,27 +6672,89 @@ function App() {
   }
 
   async function startNewAiConversation() {
-    if (!data) return;
+    const current = dataRef.current || data;
+    if (!current) return;
     const conversation = makeAiConversation();
-    const nextConversations = [conversation, ...(data.aiConversations || [])];
+    const nextConversations = [conversation, ...(current.aiConversations || [])];
     setActiveAiConversationId(conversation.id);
     setAiMessages([]);
     setAiConversationListOpen(false);
     setAiMemoryNotice("");
     setAiActionPatches({});
-    await saveData({ ...data, aiConversations: nextConversations, activeAiConversationId: conversation.id, chat: [] });
+    await saveData({ ...current, aiConversations: nextConversations, activeAiConversationId: conversation.id, chat: [] });
   }
 
   function selectAiConversation(conversationId: string) {
-    if (!data) return;
-    const conversation = (data.aiConversations || []).find((item) => item.id === conversationId);
+    const current = dataRef.current || data;
+    if (!current) return;
+    const conversation = (current.aiConversations || []).find((item) => item.id === conversationId);
     if (!conversation) return;
     setActiveAiConversationId(conversation.id);
     setAiMessages(chatToSessionMessages(conversation.messages || []));
     setAiConversationListOpen(false);
     setAiMemoryNotice("");
     setAiActionPatches({});
-    void saveData({ ...data, activeAiConversationId: conversation.id, chat: (conversation.messages || []).slice(-40) });
+    void saveData({ ...current, activeAiConversationId: conversation.id, chat: (conversation.messages || []).slice(-40) });
+  }
+
+  async function renameAiConversation(conversationId: string, title: string) {
+    const current = dataRef.current || data;
+    const nextTitle = title.trim();
+    if (!current || !nextTitle) return;
+    const conversations = current.aiConversations || [];
+    if (!conversations.some((conversation) => conversation.id === conversationId)) return;
+    await saveData({
+      ...current,
+      aiConversations: conversations.map((conversation) => conversation.id === conversationId
+        ? { ...conversation, title: nextTitle }
+        : conversation),
+    });
+  }
+
+  async function toggleAiConversationPinned(conversationId: string) {
+    const current = dataRef.current || data;
+    if (!current) return;
+    const conversations = current.aiConversations || [];
+    if (!conversations.some((conversation) => conversation.id === conversationId)) return;
+    await saveData({
+      ...current,
+      aiConversations: conversations.map((conversation) => conversation.id === conversationId
+        ? { ...conversation, pinned: !conversation.pinned }
+        : conversation),
+    });
+  }
+
+  async function deleteAiConversation(conversationId: string) {
+    const beforeConfirm = dataRef.current || data;
+    const target = beforeConfirm?.aiConversations?.find((conversation) => conversation.id === conversationId);
+    if (!beforeConfirm || !target) return;
+    const confirmed = await dialog.confirm(lang === "zh"
+      ? `删除“${target.title || "未命名对话"}”？此操作无法撤销。`
+      : `Delete “${target.title || "Untitled"}”? This cannot be undone.`);
+    if (!confirmed) return;
+
+    const current = dataRef.current || beforeConfirm;
+    const remaining = (current.aiConversations || []).filter((conversation) => conversation.id !== conversationId);
+    const currentActiveId = activeAiConversationId || current.activeAiConversationId || "";
+    const deletingActive = currentActiveId === conversationId;
+    const nextActive = deletingActive
+      ? sortAiConversations(remaining)[0]
+      : remaining.find((conversation) => conversation.id === currentActiveId) || sortAiConversations(remaining)[0];
+    const nextActiveId = nextActive?.id || "";
+    const nextChat = (nextActive?.messages || []).slice(-40);
+
+    if (deletingActive || !nextActiveId) {
+      setActiveAiConversationId(nextActiveId);
+      setAiMessages(chatToSessionMessages(nextChat));
+      setAiMemoryNotice("");
+      setAiActionPatches({});
+    }
+    await saveData({
+      ...current,
+      aiConversations: remaining,
+      activeAiConversationId: nextActiveId || undefined,
+      chat: nextChat,
+    });
   }
 
   async function adoptSelectedAiActions(messageId: string) {
@@ -8528,9 +8634,9 @@ function App() {
                                     hourHeight: timelineHourHeight,
                                   });
                                   dragTargetDateRef.current = target.date;
+                                  preserveTimelineViewportOnNextDataChange();
                                   if (drag?.kind === "block" && recordByIdMap.has(taskId)) {
                                     moveTimelineRecord(taskId, target.startTime, target.date);
-                                    requestTimelineFocus({ date: target.date, startTime: target.startTime, taskId, source: "schedule" });
                                     showToast(t(lang, "timeline.timeAdjusted"));
                                   } else {
                                     const sourceTask = tasks.find((item) => item.id === taskId);
@@ -8539,7 +8645,7 @@ function App() {
                                       startTime: target.startTime,
                                       durationMinutes: drag?.duration || (sourceTask ? taskDuration(sourceTask) : 60),
                                       allDay: false,
-                                    });
+                                    }, { focusTimeline: false });
                                   }
                                   setHoverSlot("");
                                   setDrag(null);
@@ -9310,7 +9416,7 @@ function App() {
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
       {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); setQuickAddDetailOpen(false); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} quickAddDetail={quickAddDetailOpen} />}
-      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} safetyLevel={settings.aiSafetyLevel || "standard"} onSafetyLevelChange={(aiSafetyLevel) => void saveSettings({ aiSafetyLevel })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => { setAiAuditOpen(false); setAiConversationListOpen((open) => !open); }} auditOpen={aiAuditOpen} auditRuns={aiAuditRuns} auditLoading={aiAuditLoading} auditError={aiAuditError} onToggleAudit={() => void toggleAiAuditHistory()} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
+      {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} safetyLevel={settings.aiSafetyLevel || "standard"} onSafetyLevelChange={(aiSafetyLevel) => void saveSettings({ aiSafetyLevel })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => { setAiAuditOpen(false); setAiConversationListOpen((open) => !open); }} auditOpen={aiAuditOpen} auditRuns={aiAuditRuns} auditLoading={aiAuditLoading} auditError={aiAuditError} onToggleAudit={() => void toggleAiAuditHistory()} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} onRenameConversation={(conversationId, title) => void renameAiConversation(conversationId, title)} onToggleConversationPinned={(conversationId) => void toggleAiConversationPinned(conversationId)} onDeleteConversation={(conversationId) => void deleteAiConversation(conversationId)} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
       {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
@@ -10776,9 +10882,30 @@ function HabitDetailBody(props: {
   );
 }
 
-function recurrenceLabel(recurrence?: TaskRecurrence) {
+function recurrenceLabel(recurrence?: TaskRecurrence, lang: Language = "zh") {
   if (!recurrence || recurrence.frequency === "none") return "";
+  if (lang === "en") {
+    const englishLabels: Record<Exclude<RecurrenceFrequency, "none">, string> = {
+      daily: "Daily",
+      weekdays: "Weekdays",
+      weekends: "Weekends",
+      weekly: "Weekly",
+      biweekly: "Every 2 weeks",
+      monthly: "Monthly",
+      quarterly: "Every 3 months",
+    };
+    return englishLabels[recurrence.frequency as Exclude<RecurrenceFrequency, "none">] || "Recurring";
+  }
   return RECURRENCE_OPTIONS.find((item) => item.value === recurrence.frequency)?.label || "重复";
+}
+
+function TaskRecurrenceIndicator({ recurrence, lang }: { recurrence?: TaskRecurrence; lang: Language }) {
+  const repeatText = recurrenceLabel(recurrence, lang);
+  if (!repeatText) return null;
+  const label = lang === "zh" ? `循环周期：${repeatText}` : `Repeats: ${repeatText}`;
+  return <span className="df-task-recurrence-indicator" tabIndex={0} role="img" aria-label={label} title={label}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5" /><path d="M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.7-2L20 12M4 12l2.2 5a7 7 0 0 0 11.7-2" /></svg>
+  </span>;
 }
 
 function TaskMetaIconBar({ task, lang, onUpdate }: { task: Task; lang: Language; onUpdate?: (patch: Partial<Task>) => void }) {
@@ -11033,7 +11160,6 @@ function TaskCard({
   }, [focusDate, task]);
 
   const stop = (event: React.MouseEvent) => event.stopPropagation();
-  const repeatText = recurrenceLabel(task.recurrence);
   const isMoreOpen = openPanel === "more";
 
   return (
@@ -11058,6 +11184,7 @@ function TaskCard({
             ? (lang === "zh" ? "长按后拖到时间轴排程" : "Long press, then drag to schedule")
             : t(lang, "taskCard.dragHint")}
       >
+        <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
         {!isMoreOpen && <TaskBlockRow className="df-candidate-row">
           {!isEvent && <TaskCheckbox
             checked={task.completed}
@@ -11078,7 +11205,6 @@ function TaskCard({
             title={displayTitle}
           >
             {isEvent ? <span className="df-candidate-kind">EVENT</span> : null}
-            {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
             {!isEvent && (task.subtasks || []).length > 0 && <span className="df-candidate-subtask-count" title={lang === "zh" ? "子任务进度" : "Subtask progress"}>{countDoneSubtasks(task.subtasks)}/{countSubtasks(task.subtasks)}</span>}
           </TaskBlockContent>
           {suggestedProject && <button
@@ -11214,7 +11340,6 @@ function TaskCard({
             <div className="df-task-card-more-head">
               <div className="df-candidate-main">
                 <strong className="df-candidate-title" title={displayTitle}>{displayTitle}</strong>
-                {repeatText ? <span className="df-candidate-repeat-badge" title={`${t(lang, "taskCard.recurring")}：${repeatText}`}>↻ {repeatText}</span> : null}
               </div>
               <div className="df-task-card-more-actions">
                 {onMoveToPlanning && (
@@ -11720,6 +11845,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
       onHover("");
     }} onPointerDown={isExternalEvent || isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
+      <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
       {canResize && (hovered || showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
       <div className="df-time-card-shell">
       <TaskBlockRow className="df-time-card-row" align="start">
@@ -11930,6 +12056,7 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
   }, [hovered]);
   return (
     <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", readonly: isExternalEvent ? "true" : undefined }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+      <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
       <TaskBlockRow className="df-all-day-row">
         {!isEvent && <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} returned={isReturnedUnfinished} onClick={(event) => {
           event.stopPropagation();
@@ -12739,7 +12866,7 @@ function MobileSheetDismissHandle({ onDismiss, onCollapse, onExpand, collapsed =
   />;
 }
 
-function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, auditOpen, auditRuns, auditLoading, auditError, onToggleAudit, onNewConversation, onSelectConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, safetyLevel, onSafetyLevelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; auditOpen: boolean; auditRuns: AgentAuditEntry[]; auditLoading: boolean; auditError: string; onToggleAudit: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; safetyLevel: Settings["aiSafetyLevel"]; onSafetyLevelChange: (level: Settings["aiSafetyLevel"]) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
+function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, auditOpen, auditRuns, auditLoading, auditError, onToggleAudit, onNewConversation, onSelectConversation, onRenameConversation, onToggleConversationPinned, onDeleteConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, safetyLevel, onSafetyLevelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; auditOpen: boolean; auditRuns: AgentAuditEntry[]; auditLoading: boolean; auditError: string; onToggleAudit: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; onRenameConversation: (conversationId: string, title: string) => void; onToggleConversationPinned: (conversationId: string) => void; onDeleteConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; safetyLevel: Settings["aiSafetyLevel"]; onSafetyLevelChange: (level: Settings["aiSafetyLevel"]) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
   const projects = projectList || [];
   const tasks = taskList || [];
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -12750,6 +12877,9 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
+  const [conversationMenuId, setConversationMenuId] = useState<string | null>(null);
+  const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
+  const [conversationDraftTitle, setConversationDraftTitle] = useState("");
   useEffect(() => {
     if (!conversationListOpen) return;
     setMobileCollapsed(false);
@@ -12765,6 +12895,21 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     document.addEventListener("pointerdown", closeComposerMenu);
     return () => document.removeEventListener("pointerdown", closeComposerMenu);
   }, [composerMenuOpen]);
+  useEffect(() => {
+    if (!conversationMenuId) return;
+    const closeConversationMenu = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".df-ai-conversation-actions")) return;
+      setConversationMenuId(null);
+    };
+    document.addEventListener("pointerdown", closeConversationMenu);
+    return () => document.removeEventListener("pointerdown", closeConversationMenu);
+  }, [conversationMenuId]);
+  useEffect(() => {
+    if (conversationListOpen) return;
+    setConversationMenuId(null);
+    setRenamingConversationId(null);
+  }, [conversationListOpen]);
   useLayoutEffect(() => {
     const textarea = composerTextareaRef.current;
     if (!textarea) return;
@@ -12776,7 +12921,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     if (!body || !followLatestRef.current) return;
     body.scrollTo({ top: body.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, attachmentStatus]);
-  const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+  const sortedConversations = sortAiConversations(conversations);
   const activeConversationTitle = conversations.find((conversation) => conversation.id === activeConversationId)?.title;
   const conversationPreview = (conversation: AiConversation) => {
     const preview = conversation.messages.find((message) => message.role === "user")?.content
@@ -12802,6 +12947,14 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     currentChat: lang === "zh" ? "当前" : "Current",
     chatUnit: lang === "zh" ? "个会话" : "conversations",
     untitled: lang === "zh" ? "未命名对话" : "Untitled",
+    rename: lang === "zh" ? "重命名" : "Rename",
+    pin: lang === "zh" ? "置顶" : "Pin",
+    unpin: lang === "zh" ? "取消置顶" : "Unpin",
+    pinned: lang === "zh" ? "已置顶" : "Pinned",
+    delete: lang === "zh" ? "删除" : "Delete",
+    save: lang === "zh" ? "保存" : "Save",
+    cancel: lang === "zh" ? "取消" : "Cancel",
+    more: lang === "zh" ? "更多会话操作" : "More conversation actions",
     parsed: lang === "zh" ? "建议操作" : "Suggested actions",
     selectAll: lang === "zh" ? "全选" : "All",
     selectNone: lang === "zh" ? "全不选" : "None",
@@ -12874,16 +13027,55 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       </header>
       <div className="df-ai-conversation-items">
         {sortedConversations.length === 0 && <div className="df-ai-history-empty"><strong>{text.noChats}</strong><small>{lang === "zh" ? "开始一段新对话后，会在这里继续。" : "Start a new conversation and return to it here."}</small></div>}
-        {sortedConversations.map((conversation) => {
+        {sortedConversations.map((conversation, conversationIndex) => {
           const active = conversation.id === activeConversationId;
-          return <button key={conversation.id} className={active ? "active" : ""} onClick={() => onSelectConversation(conversation.id)}>
-            <span className="df-ai-conversation-copy">
-              <strong>{conversation.title || text.untitled}</strong>
-              <span>{conversationPreview(conversation)}</span>
-              <small>{conversationDate(conversation)} · {conversation.messages.length} {lang === "zh" ? "条消息" : "messages"}</small>
-            </span>
-            <span className="df-ai-conversation-state" aria-hidden="true">{active ? text.currentChat : "→"}</span>
-          </button>;
+          const renaming = renamingConversationId === conversation.id;
+          const menuOpen = conversationMenuId === conversation.id;
+          return <article key={conversation.id} className={`df-ai-conversation-row${active ? " active" : ""}${conversation.pinned ? " pinned" : ""}`}>
+            {renaming ? <form className="df-ai-conversation-rename" onSubmit={(event) => {
+              event.preventDefault();
+              const title = conversationDraftTitle.trim();
+              if (!title) return;
+              onRenameConversation(conversation.id, title);
+              setRenamingConversationId(null);
+            }}>
+              <input autoFocus maxLength={80} value={conversationDraftTitle} onChange={(event) => setConversationDraftTitle(event.target.value)} onKeyDown={(event) => {
+                if (event.key === "Escape") setRenamingConversationId(null);
+              }} aria-label={text.rename} />
+              <button type="submit" disabled={!conversationDraftTitle.trim()}>{text.save}</button>
+              <button type="button" onClick={() => setRenamingConversationId(null)}>{text.cancel}</button>
+            </form> : <>
+              <button type="button" className="df-ai-conversation-main" onClick={() => onSelectConversation(conversation.id)}>
+                <span className="df-ai-conversation-copy">
+                  <span className="df-ai-conversation-title-line">
+                    {conversation.pinned && <svg className="df-ai-conversation-pin" viewBox="0 0 24 24" aria-label={text.pinned}><path d="M9 3h6l-.8 5.1 3.3 3.3v1.1h-11v-1.1l3.3-3.3L9 3Z" /><path d="M12 12.5V21" /></svg>}
+                    <strong>{conversation.title || text.untitled}</strong>
+                    {active && <small className="df-ai-conversation-current">{text.currentChat}</small>}
+                  </span>
+                  <span className="df-ai-conversation-preview">{conversationPreview(conversation)}</span>
+                  <small>{conversationDate(conversation)} · {conversation.messages.length} {lang === "zh" ? "条消息" : "messages"}</small>
+                </span>
+              </button>
+              <div className={`df-ai-conversation-actions${menuOpen ? " open" : ""}${sortedConversations.length > 2 && conversationIndex >= sortedConversations.length - 2 ? " opens-up" : ""}`}>
+                <button type="button" className="df-ai-conversation-more" aria-label={text.more} title={text.more} aria-expanded={menuOpen} onClick={() => setConversationMenuId((current) => current === conversation.id ? null : conversation.id)}>•••</button>
+                {menuOpen && <div className="df-ai-conversation-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={() => {
+                    setConversationDraftTitle(conversation.title || "");
+                    setRenamingConversationId(conversation.id);
+                    setConversationMenuId(null);
+                  }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11-11-4-4L4 16Z" /><path d="m13.5 6.5 4 4" /></svg><span>{text.rename}</span></button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    onToggleConversationPinned(conversation.id);
+                    setConversationMenuId(null);
+                  }}><svg className={conversation.pinned ? "is-unpin" : ""} viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-.8 5.1 3.3 3.3v1.1h-11v-1.1l3.3-3.3L9 3Z" /><path d="M12 12.5V21" />{conversation.pinned && <path className="pin-slash" d="M4 4l16 16" />}</svg><span>{conversation.pinned ? text.unpin : text.pin}</span></button>
+                  <button type="button" role="menuitem" className="danger" onClick={() => {
+                    onDeleteConversation(conversation.id);
+                    setConversationMenuId(null);
+                  }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" /></svg><span>{text.delete}</span></button>
+                </div>}
+              </div>
+            </>}
+          </article>;
         })}
       </div>
     </section>}

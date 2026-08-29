@@ -4,15 +4,19 @@
 
 ### 改进
 - 细化 Navo AI 输入区：提示语改为“随心输入，或上传文件读取日程”，移除底部冗余提示，发送键改为轻量圆形纸面动作；桌面与横屏在“+”旁以无边框、无底色文字控件独立显示模型选择，竖屏仍将模型、安全等级与附件完整收纳在菜单中。暗色浮层改用低透明黑色阴影，竖屏菜单与表单也会贴合输入框并跟随当前纸面主题。
-- 历史对话改为独立的连续选择页，清楚展示会话标题、首条提问、日期、消息数和当前状态；竖屏打开历史时会自动展开到完整会话页，普通折叠则稳定贴住屏幕底部且不再裁掉上方内容。
-- 今日候选与时间轴桌面外框改用同一条跟随活动主题的细强调线，让次级任务纸张与主要执行画布保持统一边界，同时不增加厚重卡片感。
+- 历史对话改为独立的连续选择页，清楚展示会话标题、首条提问、日期、消息数和当前状态；每条会话右侧统一为三点菜单，可就地重命名、置顶/取消置顶或确认删除，置顶会话优先排列并用独立图标标记。竖屏打开历史时会自动展开到完整会话页，普通折叠则稳定贴住屏幕底部且不再裁掉上方内容。
+- 今日候选与时间轴桌面外框改用同一条跟随活动主题的细强调线；候选任务恢复与时间轴完全一致的纸面任务块、项目色左边条和拖动外观，让次级任务纸张与主要执行画布保持统一而清晰的层级。
+- 时间轴在拖入、移动任务或改变排程状态时会保留当前滚动锚点，不再突然跳到其他时间段；首次加载 Execute 后自动将当前时间对准视口中央，非今日日期则对准上午 9 点。
+- 重复任务不再在标题下方常驻显示“每天”等周期文字，候选、时间轴、全天与拖动任务块统一在右上角显示安静的循环符号，悬停或键盘聚焦时再显示完整循环周期。
 
 ## 2026-08-29 · AI composer and Execute workspace visual refinements
 
 ### Improved
 - Refined the Navo AI composer with a “Type freely, or upload a file to read its schedule” prompt, removed the redundant footer notice, and replaced the send control with a lighter circular paper action. Desktop and landscape now expose model selection beside “+” as a borderless, background-free text control, while portrait keeps model, safety, and attachments together in the menu. Dark floating surfaces use low-opacity black shadows, and the portrait menu and form controls now fit the composer and follow the active paper theme.
-- Rebuilt conversation history as a dedicated continuous selection page that clearly shows the title, first prompt, date, message count, and current state. Opening history in portrait now expands to the full conversation page, while an ordinarily collapsed chat remains anchored to the bottom and no longer clips content above.
-- Unified the desktop boundaries of Today's Candidates and the timeline with the same fine active-theme accent rule, keeping the secondary task sheet and primary execution canvas visually related without adding heavy card treatment.
+- Rebuilt conversation history as a dedicated continuous selection page that clearly shows the title, first prompt, date, message count, and current state. Each conversation now has a three-dot menu for inline rename, pin/unpin, and confirmed deletion; pinned conversations sort first and carry a distinct icon. Opening history in portrait expands to the full conversation page, while an ordinarily collapsed chat remains anchored to the bottom and no longer clips content above.
+- Unified the desktop boundaries of Today's Candidates and the timeline with the same fine active-theme accent rule. Candidate tasks now use the same paper task surface, project-color rail, and drag appearance as timeline blocks, keeping the secondary task sheet and primary execution canvas visually related and clearly separated.
+- Preserved the timeline scroll anchor when tasks are dropped, moved, or rescheduled so state changes no longer jump to another time range. The Execute timeline now aligns the current time to the center after its initial load, falling back to 09:00 when viewing a different date.
+- Replaced persistent recurrence text beneath task titles with a quiet upper-right loop mark across candidate, timeline, all-day, and dragged task blocks; the full cadence appears only on hover or keyboard focus.
 
 ## 2026-08-28 · MCP 跨设备配置说明
 

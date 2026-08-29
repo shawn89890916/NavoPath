@@ -1,0 +1,88 @@
+.df-ai-conversation-actions { position: relative; z-index: 4; display: grid; place-items: center; align-self: stretch; }
+#root .df-app .df-ai-conversation-more {
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 0 5px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: 650 14px/1 var(--paper-sans) !important;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+#root .df-app .df-ai-conversation-more:hover,
+#root .df-app .df-ai-conversation-more:focus-visible,
+#root .df-app .df-ai-conversation-actions.open .df-ai-conversation-more { color: var(--text-main) !important; background: var(--paper-note) !important; }
+.df-ai-conversation-menu {
+  position: absolute;
+  z-index: 12;
+  top: calc(50% + 19px);
+  right: 0;
+  width: 170px;
+  padding: 5px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--paper-radius-soft);
+  background: var(--surface-raised);
+  box-shadow: var(--paper-float-shadow);
+}
+.df-ai-conversation-actions.opens-up .df-ai-conversation-menu { top: auto; bottom: calc(50% + 19px); }
+#root .df-app .df-ai-conversation-menu > button {
+  width: 100% !important;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  color: var(--text-main) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: 560 12px/1.2 var(--paper-sans);
+  text-align: left;
+  cursor: pointer;
+}
+#root .df-app .df-ai-conversation-menu > button:hover,
+#root .df-app .df-ai-conversation-menu > button:focus-visible { background: var(--paper-note) !important; }
+#root .df-app .df-ai-conversation-menu > button.danger { color: var(--danger, #B6423C) !important; }
+.df-ai-conversation-menu svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.df-ai-conversation-menu svg.is-unpin .pin-slash { stroke-width: 2; }
+.df-ai-conversation-rename {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 18px 2px;
+}
+#root .df-app .df-ai-conversation-rename input {
+  min-width: 0;
+  height: 38px;
+  padding: 0 2px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--accent-active) !important;
+  border-radius: 0 !important;
+  color: var(--text-main) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: 600 14px/1.2 var(--paper-sans);
+}
+#root .df-app .df-ai-conversation-rename button {
+  min-height: 38px;
+  padding: 0 2px !important;
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: 600 11px/1 var(--paper-sans);
+}
+#root .df-app .df-ai-conversation-rename button[type="submit"] { color: var(--accent-active) !important; }
+#root .df-app .df-ai-conversation-rename button:hover,
+#root .df-app .df-ai-conversation-rename button:focus-visible { border-bottom-color: currentColor !important; }
+.df-app.theme-dark .df-ai-conversation-menu { box-shadow: 0 14px 34px rgba(0, 0, 0, .42); }

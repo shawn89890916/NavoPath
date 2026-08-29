@@ -98,7 +98,7 @@ describe("browser fallback preview mode", () => {
     malformed.events = [null];
     malformed.notes.push(null);
     malformed.chat = [null, { role: "user", content: "Keep me" }];
-    malformed.aiConversations = [{ id: "conversation", title: "Valid", messages: [null] }];
+    malformed.aiConversations = [{ id: "conversation", title: "Valid", pinned: true, messages: [null] }];
     malformed.aiMemories = [{ id: "memory", content: "Valid", tags: [null, "keep"], sourceMessages: [null] }];
     malformed.scheduleTemplates = [{ id: "template", title: "Valid", slots: [null] }];
     malformed.tasks[0].subtasks = [null, { id: "subtask", title: "Keep", subtasks: [null] }];
@@ -112,6 +112,7 @@ describe("browser fallback preview mode", () => {
     expect(normalized.notes).not.toContain(null);
     expect(normalized.chat).toHaveLength(1);
     expect(normalized.aiConversations?.[0].messages).toEqual([]);
+    expect(normalized.aiConversations?.[0].pinned).toBe(true);
     expect(normalized.aiMemories[0].tags).toEqual(["keep"]);
     expect(normalized.scheduleTemplates?.[0].slots).toEqual([]);
     expect(damagedTask?.subtasks).toHaveLength(1);

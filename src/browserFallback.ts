@@ -740,6 +740,7 @@ export function normalizeData(data: PlannerData): PlannerData {
       ...conversation,
       id: persistedId(conversation.id) || uid("conversation"),
       title: boundedPersistedString(conversation.title, MAX_PERSISTED_TITLE_LENGTH) || "AI 对话",
+      pinned: conversation.pinned === true,
       messages: normalizeChatMessages(conversation.messages),
       createdAt: conversation.createdAt || now(),
       updatedAt: conversation.updatedAt || conversation.createdAt || now(),

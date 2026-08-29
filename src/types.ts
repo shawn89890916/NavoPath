@@ -314,6 +314,7 @@ export interface AgentAuditEntry {
 export interface AiConversation {
   id: string;
   title: string;
+  pinned?: boolean;
   messages: ChatMessage[];
   createdAt: string;
   updatedAt: string;

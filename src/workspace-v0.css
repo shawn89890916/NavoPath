@@ -68,7 +68,8 @@
 
 #root .df-app.mode-execute .df-candidate-task-row {
   position: relative;
-  border-bottom: 1px solid var(--paper-rule) !important;
+  padding: 3px 0;
+  border: 0 !important;
   background: transparent !important;
 }
 
@@ -77,26 +78,16 @@
   min-height: 56px !important;
   margin: 0 !important;
   padding-block: 7px !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
+  border: 1px solid var(--task-border) !important;
+  border-left-width: var(--task-project-accent-size, 2px) !important;
+  border-left-color: var(--task-project-color, var(--accent-active)) !important;
+  border-radius: var(--task-radius) !important;
+  background: var(--task-bg) !important;
   box-shadow: none !important;
 }
 
-#root .df-app.mode-execute .df-candidate-task-row:hover,
-#root .df-app.mode-execute .df-candidate-task-row[data-active="true"] {
-  background: var(--paper-note) !important;
-}
-
 #root .df-app.mode-execute .df-candidate-task-row::before {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  top: 10px;
-  bottom: 10px;
-  left: 0;
-  width: 2px;
-  background: var(--task-project-color, var(--cat, var(--paper-rule-strong)));
+  content: none;
 }
 
 #root .df-app.mode-execute .df-quick-add {

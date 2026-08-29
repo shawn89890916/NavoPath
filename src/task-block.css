@@ -400,6 +400,39 @@
   font-weight: 550;
 }
 
+/* Recurrence is metadata, not a second title line. Keep one quiet mark in the
+ * upper-right corner and reveal the actual cadence only on hover/focus. */
+:is(.df-app, .navo-demo-app) .df-task-block[data-task-appearance] > .df-task-recurrence-indicator {
+  position: absolute;
+  z-index: 8;
+  top: 6px;
+  right: 7px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--task-project-color) 68%, var(--task-meta-color));
+}
+
+:is(.df-app, .navo-demo-app) .df-task-block[data-task-appearance][data-task-variant="candidate"] > .df-task-recurrence-indicator {
+  right: 43px;
+}
+
+.df-task-recurrence-indicator > svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.df-task-recurrence-indicator:focus-visible {
+  outline: 1px solid var(--task-project-color);
+  outline-offset: 2px;
+}
+
 /* ============================================================
  * Checkbox — priority is shown by checkbox color.
  * ============================================================ */
@@ -1662,8 +1695,9 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
    glow, no scale. */
 .df-task-block[data-drag-state="overlay"] {
   background: var(--task-bg) !important;
-  border-color: var(--accent-active) !important;
-  box-shadow: var(--task-drag-shadow) !important;
+  border-color: var(--task-border) !important;
+  border-left-color: var(--task-project-color, var(--accent-active)) !important;
+  box-shadow: none !important;
   opacity: 1 !important;
   transform: none !important;
   pointer-events: none !important;
