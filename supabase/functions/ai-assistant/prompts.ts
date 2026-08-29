@@ -135,7 +135,7 @@ Useful arguments: query, types, projectId, completed, from, to, limit. Use list_
 
 FINAL PROTOCOL
 When ready, output only:
-{"kind":"final","reply":"plain natural-language result","steps":[{"label":"short factual step","status":"done"}],"commands":[],"memories":[]}
+{"kind":"final","reply":"Markdown result","format":"markdown","steps":[{"label":"short factual step","status":"done"}],"commands":[],"memories":[]}
 
 Each command is:
 {"id":"unique-id","entity":"task|project|habit|note|memory|template|settings|integration|app|timer","operation":"create|update|schedule|unschedule|complete|checkin|append_subtasks|archive|delete|update_settings|navigate|start|pause","targetId":"required for existing records","values":{},"reason":"brief explanation"}
@@ -148,6 +148,8 @@ Rules:
 * Do not split high-risk work into smaller commands to evade confirmation.
 * If the user only asks a question or requests a brief/review, return no commands.
 * If information is missing, ask one concise question in reply and return no commands.
+* Use readable Markdown in reply: short headings, paragraphs, lists, tables, quotes, and fenced code only when they improve clarity. Never include raw HTML.
+* Always set format to "markdown" in the final object.
 * Keep stable preference memories optional and limited to four. Commands never write credentials.${contextSuffix(ctx)}`;
 
 // Router prompt: classify user intent. Returns lightweight JSON for routing decisions.

@@ -31,3 +31,9 @@ test("regular chat receives the same authoritative automation capability invento
   assert.match(prompt, /audited, idempotent, and undoable/);
   assert.match(prompt, /Do not claim that the current account is enabled/);
 });
+
+test("global agent final responses declare Markdown format", () => {
+  const prompt = globalAgentPrompt(context);
+  assert.match(prompt, /"format":"markdown"/);
+  assert.match(prompt, /Never include raw HTML/);
+});

@@ -8,6 +8,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { chatPrompt, globalAgentPrompt, importSchedulePrompt, suggestSubtasksPrompt, summarizeMemoryPrompt, type PromptContext } from "./prompts.ts";
 import { AiGatewayError, callAiGateway, type AiProviderConfig } from "./gateway.ts";
 import { applyAgentSafetyLevel, classifyAgentCommands, executeAgentCommands, executeReadTool, normalizeAgentCommands, normalizeToolCalls, type AgentCommand, type AgentToolCall } from "./agent.ts";
+import { unwrapReplyLayers } from "./response.ts";
 
 function localDateForTimeZone(timeZone: string) {
   try {
@@ -105,38 +106,6 @@ function extractJsonObject(text: string): unknown {
   }
 
   throw new Error("No complete JSON object found");
-}
-
-function looksLikeCodeOrJson(value: string): boolean {
-  const text = value.trim();
-  return text.startsWith("{") || text.startsWith("[") || text.startsWith("```") || /\"(?:reply|actions|steps)\"\s*:/.test(text);
-}
-
-/**
- * Strip any number of nested JSON layers from the `reply` field. This is the
- * canonical fix for the bug where AI replies show raw JSON in the UI: models
- * occasionally wrap their `reply` in another full JSON object, sometimes
- * multiple layers deep. We always return the deepest plain-text `reply` while
- * preserving the top-level `steps / actions / memories`.
- */
-function unwrapReplyLayers(reply: string): string {
-  let current = reply;
-  // Hard cap to avoid pathological loops.
-  for (let i = 0; i < 8; i += 1) {
-    const trimmed = current.trim();
-    if (!looksLikeCodeOrJson(trimmed)) return current;
-    try {
-      const parsed = extractJsonObject(trimmed) as Record<string, unknown>;
-      if (typeof parsed.reply === "string" && parsed.reply !== trimmed) {
-        current = parsed.reply;
-        continue;
-      }
-    } catch {
-      // not parseable -> done
-    }
-    return "已生成结果，请查看下方可执行操作。";
-  }
-  return looksLikeCodeOrJson(current) ? "已生成结果，请查看下方可执行操作。" : current;
 }
 
 function normalizeAssistantPayload(value: unknown) {
@@ -443,7 +412,7 @@ async function runGlobalAgent(req: Request, params: {
       }
       const reply = unwrapReplyLayers(content);
       const runId = await recordReadOnlyFailure(reply);
-      return { reply, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
+      return { reply, format: "markdown" as const, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
     }
 
     if (parsed.kind === "tool_calls") {
@@ -451,7 +420,7 @@ async function runGlobalAgent(req: Request, params: {
       if (!calls.length || toolCallCount + calls.length > AGENT_MAX_TOOL_CALLS) {
         const reply = ctx.language === "zh" ? "本次查询已达到安全上限，请缩小范围后重试。" : "This request reached the safe tool limit. Narrow the scope and try again.";
         const runId = await recordReadOnlyFailure(reply);
-        return { reply, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
+        return { reply, format: "markdown" as const, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
       }
       toolCallCount += calls.length;
       const results = calls.map((call: AgentToolCall) => {
@@ -503,6 +472,7 @@ async function runGlobalAgent(req: Request, params: {
     }
     return {
       reply,
+      format: "markdown" as const,
       steps: Array.isArray(parsed.steps) ? parsed.steps : trace.map((item) => ({ label: item.name, status: item.status })),
       actions: [],
       memories: [],
@@ -524,7 +494,7 @@ async function runGlobalAgent(req: Request, params: {
   }
   const reply = ctx.language === "zh" ? "本次分析未能在安全轮次内完成，请缩小范围后重试。" : "The agent could not finish within the safe round limit. Narrow the request and try again.";
   const runId = await recordReadOnlyFailure(reply);
-  return { reply, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
+  return { reply, format: "markdown" as const, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
   } catch (error) {
     try {
       if (recordedRunId) {

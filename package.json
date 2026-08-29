@@ -39,11 +39,16 @@
       "name": "Deferred app scripts",
       "path": [
         "dist/assets/PlanningView-*.js",
-          "dist/assets/LandingPage-*.js",
-          "dist/assets/WidgetApp-*.js",
-          "dist/assets/MobileTaskSummary-*.js"
+        "dist/assets/LandingPage-*.js",
+        "dist/assets/WidgetApp-*.js",
+        "dist/assets/MobileTaskSummary-*.js"
       ],
       "limit": "38 KB"
+    },
+    {
+      "name": "AI Markdown scripts",
+      "path": "dist/assets/AiMarkdown-*.js",
+      "limit": "40 KB"
     },
     {
       "name": "Total app scripts",
@@ -52,12 +57,13 @@
         "dist/assets/react-vendor-*.js",
         "dist/assets/supabase-vendor-*.js",
         "dist/assets/supabasePlannerApi-*.js",
+        "dist/assets/AiMarkdown-*.js",
         "dist/assets/PlanningView-*.js",
-          "dist/assets/LandingPage-*.js",
-          "dist/assets/WidgetApp-*.js",
-          "dist/assets/MobileTaskSummary-*.js"
+        "dist/assets/LandingPage-*.js",
+        "dist/assets/WidgetApp-*.js",
+        "dist/assets/MobileTaskSummary-*.js"
       ],
-      "limit": "280 KB"
+      "limit": "320 KB"
     },
     {
       "name": "Document parsing scripts",
@@ -70,14 +76,14 @@
     {
       "name": "Core styles",
       "path": "dist/assets/index-*.css",
-      "limit": "88 KB"
+      "limit": "89 KB"
     },
     {
       "name": "Deferred styles",
       "path": [
-          "dist/assets/LandingPage-*.css",
-          "dist/assets/WidgetApp-*.css",
-          "dist/assets/MobileTaskSummary-*.css"
+        "dist/assets/LandingPage-*.css",
+        "dist/assets/WidgetApp-*.css",
+        "dist/assets/MobileTaskSummary-*.css"
       ],
       "limit": "12 KB"
     },
@@ -141,6 +147,8 @@
     "@capacitor/status-bar": "^8.0.1",
     "electron-updater": "^6.8.9",
     "lucide-react": "^1.24.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "three": "^0.185.0"
   },
   "devDependencies": {

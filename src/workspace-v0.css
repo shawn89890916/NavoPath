@@ -1,0 +1,154 @@
+/* v0 workspace hierarchy: application paper → primary work paper → floating tools. */
+#root .df-app .df-header {
+  border-bottom: 1px solid var(--paper-rule) !important;
+  background: color-mix(in srgb, var(--surface-main) 97%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px);
+}
+
+#root .df-app .df-header-fade { display: none !important; }
+#root .df-app .df-brand { opacity: .78; }
+#root .df-app .df-tabs button { min-height: 38px; }
+#root .df-app .df-tabs button.active { font-weight: 680 !important; }
+#root .df-app .df-month-year-selector,
+#root .df-app .df-header-current-task,
+#root .df-app .df-header-timer-task { color: var(--text-main) !important; }
+
+@media (min-width: 981px) {
+  #root .df-app.mode-execute .df-execute {
+    grid-template-columns: clamp(300px, 29vw, 390px) minmax(0, 1fr) !important;
+    gap: 12px !important;
+    padding: 12px 16px 16px !important;
+    background: color-mix(in srgb, var(--surface-main) 94%, var(--text-main) 6%) !important;
+  }
+
+  #root .df-app.mode-execute .df-candidate-panel {
+    padding: 17px 16px 12px !important;
+    border: 1px solid color-mix(in srgb, var(--accent-active) 28%, var(--paper-rule-strong)) !important;
+    border-radius: 6px !important;
+    background: color-mix(in srgb, var(--surface-main) 97%, var(--text-main) 3%) !important;
+    box-shadow: none !important;
+  }
+
+  #root .df-app.mode-execute .df-timeline-panel {
+    border: 1px solid color-mix(in srgb, var(--accent-active) 28%, var(--paper-rule-strong)) !important;
+    border-radius: 6px !important;
+    background: var(--surface-main) !important;
+    box-shadow: none !important;
+  }
+}
+
+#root .df-app.mode-execute .df-candidate-panel .df-panel-title {
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 2px 12px !important;
+  border-bottom: 1px solid var(--paper-rule-strong) !important;
+}
+
+#root .df-app.mode-execute .df-candidate-panel .df-panel-title h2 {
+  color: var(--text-main) !important;
+  font: 700 17px/1.25 var(--paper-display) !important;
+}
+
+#root .df-app.mode-execute .df-candidate-list {
+  padding: 0 0 12px !important;
+  scrollbar-gutter: stable;
+}
+
+#root .df-app.mode-execute .df-project-group-header {
+  min-height: 40px;
+  display: flex;
+  align-items: end;
+  padding: 14px 4px 7px !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  color: var(--text-muted) !important;
+  font: 650 10px/1.2 var(--paper-mono) !important;
+  letter-spacing: .09em !important;
+}
+
+#root .df-app.mode-execute .df-candidate-task-row {
+  position: relative;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+}
+
+#root .df-app.mode-execute .df-candidate-list .df-candidate-task-row .df-task-block[data-task-variant="candidate"],
+#root .df-app.mode-execute .df-candidate-list .df-candidate-task-row .df-task-card {
+  min-height: 56px !important;
+  margin: 0 !important;
+  padding-block: 7px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#root .df-app.mode-execute .df-candidate-task-row:hover,
+#root .df-app.mode-execute .df-candidate-task-row[data-active="true"] {
+  background: var(--paper-note) !important;
+}
+
+#root .df-app.mode-execute .df-candidate-task-row::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 2px;
+  background: var(--task-project-color, var(--cat, var(--paper-rule-strong)));
+}
+
+#root .df-app.mode-execute .df-quick-add {
+  min-height: 48px !important;
+  margin-top: auto !important;
+  border-top: 1px solid var(--paper-rule-strong) !important;
+}
+
+#root .df-app.mode-execute .df-timeline-head,
+#root .df-app.mode-execute .df-timeline-3day-top {
+  border-bottom-color: var(--paper-rule-strong) !important;
+}
+
+#root .df-app.mode-execute .df-timeline-body,
+#root .df-app.mode-execute .df-timeline-content,
+#root .df-app.mode-execute .df-timeline-scroll,
+#root .df-app.mode-execute .df-timeline-3day-scroll {
+  background: var(--surface-main) !important;
+}
+
+@media (max-width: 980px) {
+  html,
+  body,
+  #root,
+  #root .df-app { max-width: 100%; overflow-x: hidden !important; }
+
+  #root .df-app.mode-execute .df-execute {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 8px 8px calc(78px + env(safe-area-inset-bottom)) !important;
+    gap: 0 !important;
+    background: var(--surface-main) !important;
+  }
+
+  #root .df-app.mode-execute :is(.df-candidate-panel, .df-timeline-panel) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--surface-main) !important;
+    box-shadow: none !important;
+  }
+
+  #root .df-app.mode-execute .df-candidate-panel { padding: 10px 10px 0 !important; }
+  #root .df-app.mode-execute button,
+  #root .df-app.mode-execute [role="button"],
+  #root .df-app .df-mobile-nav button { min-height: 44px; }
+  #root .df-app.mode-execute .df-candidate-list { overflow-x: hidden !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root .df-app.mode-execute *,
+  #root .df-app .df-header * { scroll-behavior: auto !important; }
+}

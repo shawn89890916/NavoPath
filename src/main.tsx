@@ -122,6 +122,8 @@ import "./app-redesign.css";
 import "./navopath-buttons.css";
 import "./mobile.css";
 import "./task-block.css";
+import "./ai-chat.css";
+import "./workspace-v0.css";
 import type { MobileShortSheetKind } from "./MobileTaskSummary";
 
 installBrowserFallback();
@@ -541,6 +543,7 @@ type FormState = {
 
 const PlanningViewLazy = lazy(() => import("./PlanningView"));
 const LandingPageLazy = lazy(() => import("./LandingPage"));
+const AiMarkdownLazy = lazy(() => import("./components/AiMarkdown"));
 const LOCAL_BOOTSTRAP_PREFIX = "navopath-bootstrap";
 
 function uid(prefix: string) {
@@ -6412,11 +6415,7 @@ function App() {
     const assistantId = uid("ai_assistant");
     const assistantMessage: AiSessionMessage = {
       id: assistantId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "thinking",
-      steps: [
-        { label: aiAttachment ? (lang === "zh" ? "读取引用文件" : "Reading attachment") : (lang === "zh" ? "理解请求" : "Understanding request"), status: "running" },
-        { label: lang === "zh" ? "核对当前计划" : "Checking current plan", status: "pending" },
-        { label: lang === "zh" ? "整理任务安排" : "Preparing task schedule", status: "pending" },
-      ],
+      steps: [{ label: aiAttachment ? (lang === "zh" ? "正在读取附件" : "Reading attachment") : (lang === "zh" ? "正在处理" : "Working"), status: "running" }],
     };
     setAiMessages((current) => [...current, userMessage, assistantMessage]);
     setAiInput("");
@@ -6429,17 +6428,9 @@ function App() {
     const conversationId = activeAiConversationId || dataForHistory.activeAiConversationId || conversationsBefore[0]?.id || uid("conversation");
     if (!activeAiConversationId) setActiveAiConversationId(conversationId);
 
-    let thinkingStage = 0;
     const requestController = new AbortController();
     aiAbortRef.current?.abort();
     aiAbortRef.current = requestController;
-    const thinkingTimer = window.setInterval(() => {
-      thinkingStage = Math.min(thinkingStage + 1, 2);
-      setAiMessages((current) => current.map((message) => message.id === assistantId ? {
-        ...message,
-        steps: (message.steps || []).map((step, index) => ({ ...step, status: index < thinkingStage ? "done" : index === thinkingStage ? "running" : "pending" })),
-      } : message));
-    }, 1800);
     try {
       await flushPendingSave({ urgent: true });
       await flushPendingSettings({ urgent: true });
@@ -6493,7 +6484,7 @@ function App() {
         actionState: validActions.length ? "pending" : undefined,
         intent: result.intent,
         plan: result.plan,
-        format: result.format || "text",
+        format: result.format || "markdown",
         agent,
       } : message));
       const currentData = dataRef.current;
@@ -6511,7 +6502,7 @@ function App() {
           actionState: validActions.length ? "pending" as const : undefined,
           intent: result.intent,
           plan: result.plan,
-          format: result.format || "text" as const,
+          format: result.format || "markdown" as const,
           agent,
         };
         const userChat = { id: userMessage.id, role: "user" as const, content: msg, createdAt: userMessage.createdAt, saved: true };
@@ -6555,7 +6546,6 @@ function App() {
       } : message));
       return false;
     } finally {
-      window.clearInterval(thinkingTimer);
       if (aiAbortRef.current === requestController) aiAbortRef.current = null;
       setAiBusy(false);
     }
@@ -12756,6 +12746,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const followLatestRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const composerMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [editMenu, setEditMenu] = useState<{ messageId: string; index: number; kind: "time" | "duration" | "project" | "type" } | null>(null);
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
@@ -12769,22 +12760,29 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     document.addEventListener("pointerdown", closeComposerMenu);
     return () => document.removeEventListener("pointerdown", closeComposerMenu);
   }, [composerMenuOpen]);
+  useLayoutEffect(() => {
+    const textarea = composerTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "38px";
+    if (input) textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 38), 150)}px`;
+  }, [input]);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !followLatestRef.current) return;
     body.scrollTo({ top: body.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, attachmentStatus]);
   const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+  const activeConversationTitle = conversations.find((conversation) => conversation.id === activeConversationId)?.title;
   const promptSuggestions = lang === "zh"
-    ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天", "从今日候选里制定计划", "查看我的下一个时间任务", "你能帮我做什么？"]
-    : ["Plan my three priorities for today", "Schedule 90 minutes of focused study", "Move unfinished tasks to tomorrow", "Build a plan from today's candidates", "Show my next scheduled task", "What can you help me do?"];
+    ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天"]
+    : ["Plan my three priorities for today", "Schedule 90 minutes of focused study", "Move unfinished tasks to tomorrow"];
   const text = {
     thinking: lang === "zh" ? "正在思考" : "Thinking",
     chats: lang === "zh" ? "对话" : "Chats",
     newChat: lang === "zh" ? "新对话" : "New",
     noChats: lang === "zh" ? "暂无对话" : "No conversations",
     untitled: lang === "zh" ? "未命名对话" : "Untitled",
-    parsed: lang === "zh" ? "解析结果" : "Parsed results",
+    parsed: lang === "zh" ? "建议操作" : "Suggested actions",
     selectAll: lang === "zh" ? "全选" : "All",
     selectNone: lang === "zh" ? "全不选" : "None",
     itemUnit: lang === "zh" ? "项" : "items",
@@ -12832,11 +12830,20 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   return <aside className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}`}>
     <MobileSheetDismissHandle onDismiss={onClose} onCollapse={() => setMobileCollapsed(true)} onExpand={() => setMobileCollapsed(false)} collapsed={mobileCollapsed} lang={lang} />
     <div className="df-ai-panel-head">
+      <div className="df-ai-panel-title">
+        <strong>{activeConversationTitle || (lang === "zh" ? "NavoPath AI" : "NavoPath AI")}</strong>
+        <small>{lang === "zh" ? "当前工作区" : "Current workspace"}</small>
+      </div>
       <div className="df-ai-head-actions">
         <button className="df-ai-reference-tool new-chat" onClick={onNewConversation} aria-label={text.newChat} title={text.newChat}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" /><path d="m16.5 3.5 4 4L12 16l-4.5 1 1-4.5Z" /></svg></button>
         <button className={`df-ai-reference-tool history ${conversationListOpen ? "active" : ""}`} onClick={onToggleConversationList} aria-label={text.chats} title={text.chats}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5l3.5 2" /></svg></button>
-        <button className={`df-ai-reference-tool audit ${auditOpen ? "active" : ""}`} onClick={onToggleAudit} aria-label={lang === "zh" ? "Agent 审计" : "Agent audit"} title={lang === "zh" ? "Agent 审计" : "Agent audit"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.6 2.8 8 7 10 4.2-2 7-5.4 7-10V6Z"/><path d="m9 12 2 2 4-5"/></svg></button>
-        <button className="df-ai-reference-tool settings" onClick={onOpenMemorySettings} aria-label={lang === "zh" ? "AI 设置" : "AI settings"} title={lang === "zh" ? "AI 设置" : "AI settings"}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 13.5v-3l-2.1-.7a7.2 7.2 0 0 0-.7-1.7l1-2-2.1-2.1-2 1a7.2 7.2 0 0 0-1.7-.7L10.5 2h-3l-.7 2.1a7.2 7.2 0 0 0-1.7.7l-2-1L1 5.9l1 2a7.2 7.2 0 0 0-.7 1.7L0 10.5v3l2.1.7a7.2 7.2 0 0 0 .7 1.7l-1 2L3.9 20l2-1a7.2 7.2 0 0 0 1.7.7l.9 2.3h3l.7-2.1a7.2 7.2 0 0 0 1.7-.7l2 1 2.1-2.1-1-2a7.2 7.2 0 0 0 .7-1.7Z" transform="translate(1.5 0) scale(.875)" /></svg></button>
+        <details className="df-ai-head-more">
+          <summary className="df-ai-reference-tool" aria-label={lang === "zh" ? "更多选项" : "More options"} title={lang === "zh" ? "更多选项" : "More options"}>•••</summary>
+          <div className="df-ai-head-menu">
+            <button className={auditOpen ? "active" : ""} onClick={onToggleAudit}>{lang === "zh" ? "Agent 审计" : "Agent audit"}</button>
+            <button onClick={onOpenMemorySettings}>{lang === "zh" ? "AI 设置" : "AI settings"}</button>
+          </div>
+        </details>
         <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
       </div>
     </div>
@@ -12865,13 +12872,13 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       followLatestRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 72;
     }}>
       {messages.length === 0 && <div className="df-ai-reference-empty">
-        <div className={`df-ai-capability-state ${globalAgentAvailable ? "ready" : "locked"}`}>
-          <strong>{globalAgentAvailable ? (lang === "zh" ? "全局 Agent 已连接" : "Global Agent connected") : (lang === "zh" ? "登录后启用全局 Agent" : "Sign in to enable the Global Agent")}</strong>
-          <span>{globalAgentAvailable ? (lang === "zh" ? "可按需查询完整工作区；高风险操作会先请求确认。" : "Can query the full workspace on demand; high-risk actions require confirmation.") : (lang === "zh" ? "本地估时、分类和规则排程仍可使用。" : "Local estimates, categorization, and rule-based scheduling remain available.")}</span>
-        </div>
-        <div className="df-ai-reference-prompt">{lang === "zh" ? "需要我帮什么？直接问吧……" : "How can I help? Just ask…"}</div>
+        <div className="df-ai-reference-prompt">{lang === "zh" ? "今天想先推进什么？" : "What would you like to move forward today?"}</div>
         <div className="df-ai-reference-suggestions">
           {promptSuggestions.map((suggestion) => <button key={suggestion} onClick={() => setInput(suggestion)}>{suggestion}</button>)}
+        </div>
+        <div className={`df-ai-capability-state ${globalAgentAvailable ? "ready" : "locked"}`}>
+          <span aria-hidden="true">{globalAgentAvailable ? "●" : "○"}</span>
+          <small>{globalAgentAvailable ? (lang === "zh" ? "已连接工作区 · 写入前按安全等级确认" : "Workspace connected · writes follow your safety level") : (lang === "zh" ? "登录后可读取完整工作区" : "Sign in to access the full workspace")}</small>
         </div>
       </div>}
       {messages.map((message) => <section key={message.id} className={`df-ai-turn ${message.role}`}>
@@ -12880,16 +12887,19 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           {message.attachment && <AttachmentCard attachment={message.attachment} referenced />}
         </> : <>
           <div className="df-ai-assistant-label"><span>N</span><small>NavoPath AI</small></div>
-          {message.steps && message.steps.length > 0 && <div className="df-ai-steps">
-            {message.steps.map((step, index) => <div key={index} className={`df-ai-step ${step.status}`}><span className="df-ai-step-icon">{step.status === "done" ? "✓" : step.status === "error" ? "✕" : step.status === "running" ? "●" : "○"}</span><span>{step.label}</span></div>)}
-          </div>}
-          {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.content}</div>}
+          {message.steps && message.steps.length > 0 && <details className={`df-ai-progress ${message.status || "done"}`} open={message.status === "thinking" ? true : undefined}>
+            <summary><span className="df-ai-progress-icon" aria-hidden="true">{message.status === "thinking" ? "●" : message.status === "error" ? "✕" : "✓"}</span><span>{message.status === "thinking" ? text.thinking : message.status === "error" ? (lang === "zh" ? "处理失败" : "Failed") : (lang === "zh" ? `已完成 · ${message.steps.length} 步` : `Completed · ${message.steps.length} steps`)}</span>{message.status !== "thinking" && <small>{lang === "zh" ? "查看详情" : "Details"}</small>}</summary>
+            {message.status !== "thinking" && <div className="df-ai-progress-detail">{message.steps.map((step, index) => <div key={index} className={`df-ai-step ${step.status}`}><span>{step.status === "done" ? "✓" : step.status === "error" ? "✕" : "○"}</span><span>{step.label}</span></div>)}</div>}
+          </details>}
+          {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}><Suspense fallback={<p>{lang === "zh" ? "正在排版答案…" : "Formatting answer…"}</p>}><AiMarkdownLazy>{message.content}</AiMarkdownLazy></Suspense></div>}
           {message.agent && <div className="df-agent-run-card">
-            <small>{lang === "zh" ? "审计 ID" : "Audit ID"} · <code>{message.agent.runId}</code>{message.agent.undoExpiresAt ? ` · ${lang === "zh" ? "撤销截止" : "Undo until"} ${new Date(message.agent.undoExpiresAt).toLocaleString()}` : ""}</small>
-            {message.agent.trace && message.agent.trace.length > 0 && <details className="df-agent-trace">
-              <summary>{lang === "zh" ? `实际查询步骤（${message.agent.trace.length}）` : `Queries performed (${message.agent.trace.length})`}</summary>
-              {message.agent.trace.map((step) => <div key={step.id} className={step.status}><span>{step.status === "done" ? "✓" : "✕"}</span><code>{step.name}</code></div>)}
-            </details>}
+            <details className="df-agent-advanced">
+              <summary>{lang === "zh" ? "高级详情" : "Advanced details"}</summary>
+              <small>{lang === "zh" ? "审计 ID" : "Audit ID"} · <code>{message.agent.runId}</code>{message.agent.undoExpiresAt ? ` · ${lang === "zh" ? "撤销截止" : "Undo until"} ${new Date(message.agent.undoExpiresAt).toLocaleString()}` : ""}</small>
+              {message.agent.trace && message.agent.trace.length > 0 && <div className="df-agent-trace">
+                {message.agent.trace.map((step) => <div key={step.id} className={step.status}><span>{step.status === "done" ? "✓" : "✕"}</span><code>{step.name}</code></div>)}
+              </div>}
+            </details>
             {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied">
               <strong>{lang === "zh" ? `已自动执行 ${message.agent.applied.length} 项` : `${message.agent.applied.length} action(s) applied`}</strong>
               {message.agent.applied.map((action) => <span key={action.commandId}>{action.title} · {action.operation}</span>)}
@@ -13004,10 +13014,14 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
       {memoryNotice && <button className="df-ai-memory-notice" onClick={onOpenMemorySettings}>{memoryNotice} · {text.viewMemory}</button>}
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
       <div className="df-ai-composer-row">
-        <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
+        <textarea ref={composerTextareaRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder={t(lang, "aiPanel.thinkPlaceholder")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} />
         <button ref={composerMenuButtonRef} type="button" className={`df-ai-attach-btn${composerMenuOpen ? " active" : ""}`} title={lang === "zh" ? "模型、安全与附件" : "Model, safety, and attachments"} aria-label={lang === "zh" ? "打开更多选项" : "Open more options"} aria-expanded={composerMenuOpen} onClick={() => setComposerMenuOpen((open) => !open)}>＋</button>
+        <label className="df-ai-inline-model">
+          <span className="df-visually-hidden">{lang === "zh" ? "选择模型" : "Choose model"}</span>
+          <select aria-label={lang === "zh" ? "选择模型" : "Choose model"} value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select>
+        </label>
         {composerMenuOpen && <div ref={composerMenuRef} className="df-ai-attach-menu df-ai-composer-menu">
-          <label className="df-ai-composer-setting"><span>{lang === "zh" ? "模型" : "Model"}</span><select aria-label={lang === "zh" ? "选择模型" : "Choose model"} value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
+          <label className="df-ai-composer-setting df-ai-composer-menu-model"><span>{lang === "zh" ? "模型" : "Model"}</span><select aria-label={lang === "zh" ? "选择模型" : "Choose model"} value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
           <label className="df-ai-composer-setting"><span>{lang === "zh" ? "安全等级" : "Safety level"}</span><select aria-label={lang === "zh" ? "选择安全等级" : "Choose safety level"} value={safetyLevel} onChange={(event) => onSafetyLevelChange(event.target.value as Settings["aiSafetyLevel"])}><option value="standard">{lang === "zh" ? "标准 · 低风险自动执行" : "Standard · Auto low-risk"}</option><option value="strict">{lang === "zh" ? "严格 · 所有写入确认" : "Strict · Confirm all writes"}</option><option value="readonly">{lang === "zh" ? "只读 · 禁止写入" : "Read only · Block writes"}</option></select></label>
           <div className="df-ai-composer-menu-rule" />
           {[
@@ -13015,9 +13029,8 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           [lang === "zh" ? "照片" : "Photos", "image/*", ""],
           [lang === "zh" ? "文件" : "Files", ATTACHMENT_ACCEPT, ""],
         ].map(([label, accept, capture]) => <label className="df-ai-composer-upload" key={label}>{label}<input type="file" accept={accept} capture={capture === "environment" ? "environment" : undefined} onChange={acceptAttachment} /></label>)}</div>}
-        <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")}>{busy ? "■" : "↑"}</button>
+        <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")} aria-label={busy ? (lang === "zh" ? "停止生成" : "Stop generating") : t(lang, "aiPanel.send")}>{busy ? <span className="df-ai-stop-icon" aria-hidden="true" /> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5" /></svg>}</button>
       </div>
-      <small className="df-ai-reference-disclaimer">{lang === "zh" ? "AI 生成内容可能有误，请核对重要安排。" : "AI can make mistakes. Check important schedule changes."}</small>
     </div>
   </aside>;
 }

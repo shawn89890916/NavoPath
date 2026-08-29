@@ -1,5 +1,17 @@
 # NavoPath 更新日志
 
+## 2026-08-29 · AI 输入区与执行工作区视觉细化
+
+### 改进
+- 细化 Navo AI 输入区：提示语改为“今天在想些什么？”，移除底部冗余提示，发送键改为轻量圆形纸面动作；桌面与横屏在“+”旁独立显示模型选择，竖屏仍将模型、安全等级与附件完整收纳在菜单中。暗色浮层改用低透明黑色阴影，竖屏菜单与表单也会贴合输入框并跟随当前纸面主题。
+- 今日候选与时间轴桌面外框改用同一条跟随活动主题的细强调线，让次级任务纸张与主要执行画布保持统一边界，同时不增加厚重卡片感。
+
+## 2026-08-29 · AI composer and Execute workspace visual refinements
+
+### Improved
+- Refined the Navo AI composer with a natural “What's on your mind today?” prompt, removed the redundant footer notice, and replaced the send control with a lighter circular paper action. Desktop and landscape now expose model selection beside “+”, while portrait keeps model, safety, and attachments together in the menu. Dark floating surfaces use low-opacity black shadows, and the portrait menu and form controls now fit the composer and follow the active paper theme.
+- Unified the desktop boundaries of Today's Candidates and the timeline with the same fine active-theme accent rule, keeping the secondary task sheet and primary execution canvas visually related without adding heavy card treatment.
+
 ## 2026-08-28 · MCP 跨设备配置说明
 
 ### 新增
@@ -10,6 +22,7 @@
 
 ### 改进
 - 重写 MCP 配置说明：应用内教程现在按新电脑的完整连接路径组织，提供 Codex 与 Claude Desktop 的 Windows、macOS 和 Linux 配置、真实服务地址、独立设备令牌建议、验证步骤与集中排错，并以 NavoPath 纸面编辑风格适配明暗主题和手机阅读。
+- 完成 Navo AI 对话与 Execute 工作区的第一阶段视觉改造：桌面 AI 抽屉调整为 600–640px 上下文面板，移动端使用近全屏会话；空状态精简为三个自然入口，请求期间只显示单一真实状态框，完成步骤默认折叠，最终答案支持安全的 GFM Markdown。输入区改用自然提问提示和轻量发送控件，桌面与横屏独立显示模型选择，竖屏仍收纳在“+”菜单，暗色浮层仅使用低透明黑色阴影。Execute 将时间轴提升为主要画布，候选区改为连续任务纸张，并用跟随主题的细强调线统一两块工作区边界。
 
 ### 修复
 - 修复今日候选较多时，候选面板会被内容撑出工作区、列表本身因没有形成受限高度而无法滚动的问题；桌面、横屏与触摸布局现在都由候选列表独立滚动，底部快速添加栏保持固定可用。
@@ -25,6 +38,7 @@
 
 ### Improved
 - Reworked the MCP setup guide around a complete new-computer connection path, with Codex and Claude Desktop instructions for Windows, macOS, and Linux, the production endpoint, per-device token guidance, verification steps, and focused troubleshooting in a responsive NavoPath paper-editorial layout for light and dark themes.
+- Completed the first visual phase for Navo AI chat and the Execute workspace: the desktop AI drawer is now a 600–640px contextual panel, mobile uses a near-full-screen conversation, the empty state offers three natural starting points, requests show one truthful status box, completed steps collapse by default, and final answers render safe GFM Markdown. The composer now uses a natural prompt and a lighter send control, desktop and landscape expose model selection beside the attachment menu while portrait keeps it inside the “+” menu, and dark floating surfaces use low-opacity black shadows only. Execute now treats the timeline as the primary canvas, presents candidates as a continuous secondary task sheet, and unifies both workspace boundaries with a fine theme-aware accent rule.
 
 ### Fixed
 - Fixed long candidate lists expanding the candidate panel beyond the workspace and leaving the list without a bounded scroll area. Desktop, landscape, and touch layouts now scroll the candidate list independently while keeping the bottom quick-add row available.
