@@ -120,6 +120,109 @@
 .df-ai-head-menu button:hover,
 .df-ai-head-menu button.active { background: var(--paper-note); }
 
+#root .df-app .df-ai-panel-reference.is-history-open .df-ai-panel-body,
+#root .df-app .df-ai-panel-reference.is-history-open .df-ai-panel-foot {
+  display: none !important;
+}
+
+#root .df-app .df-ai-panel-reference .df-ai-conversation-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  padding: 0 clamp(22px, 5vw, 46px) 24px !important;
+  border: 0 !important;
+  color: var(--text-main) !important;
+  background: var(--surface-main) !important;
+  box-shadow: none !important;
+}
+
+.df-ai-history-head {
+  flex: 0 0 auto;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--paper-rule-strong);
+}
+
+.df-ai-history-head > div { min-width: 0; display: grid; gap: 3px; }
+.df-ai-history-head strong { overflow: visible !important; color: var(--text-main); font: 650 17px/1.25 var(--paper-serif) !important; text-overflow: clip !important; white-space: normal !important; }
+.df-ai-history-head small { color: var(--text-muted); font: 500 10px/1.25 var(--paper-mono); letter-spacing: .03em; }
+#root .df-app .df-ai-history-head > button {
+  flex: 0 0 auto;
+  width: auto !important;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: 600 12px/1 var(--paper-sans);
+  cursor: pointer;
+}
+#root .df-app .df-ai-history-head > button:hover,
+#root .df-app .df-ai-history-head > button:focus-visible { color: var(--text-main) !important; border-bottom-color: var(--paper-accent-rule) !important; }
+.df-ai-history-head > button span { color: var(--accent-active); font-size: 17px; font-weight: 400; }
+
+.df-ai-conversation-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#root .df-app .df-ai-conversation-items > button {
+  position: relative;
+  width: 100%;
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 2px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  border-radius: 0 !important;
+  color: var(--text-main) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: left;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+#root .df-app .df-ai-conversation-items > button:hover,
+#root .df-app .df-ai-conversation-items > button:focus-visible { background: color-mix(in srgb, var(--paper-note) 72%, transparent) !important; }
+#root .df-app .df-ai-conversation-items > button.active::before {
+  content: "";
+  position: absolute;
+  top: 17px;
+  bottom: 17px;
+  left: -10px;
+  width: 2px;
+  background: var(--accent-active);
+}
+.df-ai-conversation-copy { min-width: 0; display: grid; gap: 4px; }
+.df-ai-conversation-copy strong { overflow: hidden; color: var(--text-main) !important; font: 630 14px/1.3 var(--paper-sans) !important; text-overflow: ellipsis; white-space: nowrap; }
+.df-ai-conversation-copy > span { overflow: hidden; color: var(--text-muted); font: 450 12px/1.4 var(--paper-sans); text-overflow: ellipsis; white-space: nowrap; }
+.df-ai-conversation-copy small { color: color-mix(in srgb, var(--text-muted) 82%, transparent) !important; font: 500 10px/1.3 var(--paper-mono) !important; }
+.df-ai-conversation-state { color: var(--text-muted); font: 600 10px/1 var(--paper-mono); white-space: nowrap; }
+.df-ai-conversation-items > button.active .df-ai-conversation-state { color: var(--accent-active); }
+.df-ai-history-empty { min-height: 240px; display: grid; align-content: center; justify-items: center; gap: 7px; padding: 32px 12px; text-align: center; }
+.df-ai-history-empty strong { color: var(--text-main); font: 650 18px/1.3 var(--paper-serif); }
+.df-ai-history-empty small { max-width: 250px; color: var(--text-muted); font: 450 12px/1.55 var(--paper-sans); }
+
 #root .df-app .df-ai-panel-reference .df-ai-panel-body {
   padding: 26px clamp(22px, 5vw, 54px) 34px !important;
   background: var(--surface-main) !important;
@@ -366,23 +469,35 @@
   pointer-events: none;
   transform: translateY(-55%);
 }
-.df-ai-inline-model select {
+#root .df-app .df-ai-panel-reference .df-ai-inline-model select {
   width: min(190px, 22vw);
   min-width: 118px;
   height: 34px;
-  padding: 0 22px 0 8px;
-  appearance: none;
+  padding: 0 22px 0 0;
+  appearance: none !important;
+  -webkit-appearance: none !important;
   border: 0 !important;
-  border-bottom: 1px solid var(--paper-rule) !important;
   border-radius: 0 !important;
   color: var(--text-muted) !important;
   background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
   box-shadow: none !important;
+  outline: 0 !important;
   font: 560 11px/1 var(--paper-mono);
   cursor: pointer;
 }
-.df-ai-inline-model select:hover,
-.df-ai-inline-model select:focus-visible { color: var(--text-main); border-bottom-color: var(--paper-accent-rule); }
+#root .df-app .df-ai-panel-reference .df-ai-inline-model select:hover,
+#root .df-app .df-ai-panel-reference .df-ai-inline-model select:focus-visible { color: var(--text-main) !important; }
+.df-ai-inline-model:focus-within::before {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: 2px;
+  left: 0;
+  height: 1px;
+  background: var(--paper-accent-rule);
+}
 #root .df-app .df-ai-panel-reference .df-ai-send-btn {
   grid-column: 4 !important;
   grid-row: 2 !important;
@@ -424,6 +539,7 @@
 .df-ai-composer-menu-model { display: none; }
 .df-ai-composer-setting > span { color: var(--text-muted); font-size: 11px; }
 .df-ai-composer-setting select { min-width: 0; width: 100%; min-height: 34px; border: 0 !important; border-bottom: 1px solid var(--paper-rule) !important; border-radius: 0 !important; color: var(--text-main) !important; background: transparent !important; box-shadow: none !important; }
+#root .df-app .df-ai-panel-reference .df-ai-composer-menu-model select { appearance: none !important; -webkit-appearance: none !important; border: 0 !important; background: transparent !important; background-color: transparent !important; background-image: none !important; box-shadow: none !important; }
 .df-ai-composer-menu-rule { height: 1px; margin: 4px 8px; background: var(--paper-rule); }
 .df-ai-composer-upload { min-height: 42px; display: flex; align-items: center; padding: 0 10px; color: var(--text-main); cursor: pointer; }
 .df-ai-composer-upload:hover { background: var(--paper-note); }
@@ -445,11 +561,20 @@
     flex-direction: column !important;
     transition: height 180ms ease, transform 180ms ease !important;
   }
-  #root .df-app .df-ai-panel-reference.is-mobile-collapsed { height: min(52dvh, 440px) !important; }
+  #root .df-app .df-ai-panel-reference.is-mobile-collapsed {
+    top: auto !important;
+    bottom: 0 !important;
+    height: min(52dvh, 440px) !important;
+  }
+  #root .df-app .df-ai-panel-reference.is-mobile-collapsed .df-ai-panel-body { padding-top: 12px !important; }
+  #root .df-app .df-ai-panel-reference.is-mobile-collapsed .df-ai-reference-empty { align-content: start !important; padding-top: 10px !important; }
   #root .df-app .df-ai-panel-reference .df-ai-panel-head { min-height: 60px !important; padding: 8px 8px 8px 16px !important; }
   #root .df-app .df-ai-panel-reference .df-ai-reference-tool { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
   #root .df-app .df-ai-panel-reference .df-ai-panel-body { flex: 1 1 auto !important; min-height: 0 !important; padding: 22px 18px 30px !important; overflow-x: hidden !important; overflow-y: auto !important; }
-  #root .df-app .df-ai-panel-reference .df-ai-conversation-list { position: absolute !important; z-index: 70 !important; top: 60px !important; right: 0 !important; bottom: 0 !important; width: min(86vw, 340px) !important; max-height: none !important; overflow-y: auto !important; border-left: 1px solid var(--paper-rule) !important; background: var(--surface-raised) !important; box-shadow: -14px 0 28px color-mix(in srgb, var(--text-main) 12%, transparent) !important; }
+  #root .df-app .df-ai-panel-reference .df-ai-conversation-list { width: 100% !important; padding: 0 18px max(18px, env(safe-area-inset-bottom)) !important; background: var(--surface-main) !important; }
+  .df-ai-history-head { min-height: 68px; }
+  #root .df-app .df-ai-history-head > button { min-height: 44px; }
+  #root .df-app .df-ai-conversation-items > button { min-height: 88px; padding-block: 13px; }
   .df-ai-panel-title small { display: none; }
   .df-ai-reference-empty { padding-bottom: 36px !important; }
   .df-ai-reference-prompt { font-size: 25px !important; }

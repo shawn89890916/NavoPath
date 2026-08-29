@@ -570,7 +570,7 @@ export const TR = {
   aiPanel: {
     zh: {
       close: "关闭",
-      thinkPlaceholder: "今天在想些什么？",
+      thinkPlaceholder: "随心输入，或上传文件读取日程",
       thinking: "思考中",
       send: "发送",
       createScheduled: "Create scheduled tasks",
@@ -580,7 +580,7 @@ export const TR = {
     },
     en: {
       close: "Close",
-      thinkPlaceholder: "What's on your mind today?",
+      thinkPlaceholder: "Type freely, or upload a file to read its schedule",
       thinking: "Thinking...",
       send: "Send",
       createScheduled: "Create scheduled tasks",

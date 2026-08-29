@@ -3,13 +3,15 @@
 ## 2026-08-29 · AI 输入区与执行工作区视觉细化
 
 ### 改进
-- 细化 Navo AI 输入区：提示语改为“今天在想些什么？”，移除底部冗余提示，发送键改为轻量圆形纸面动作；桌面与横屏在“+”旁独立显示模型选择，竖屏仍将模型、安全等级与附件完整收纳在菜单中。暗色浮层改用低透明黑色阴影，竖屏菜单与表单也会贴合输入框并跟随当前纸面主题。
+- 细化 Navo AI 输入区：提示语改为“随心输入，或上传文件读取日程”，移除底部冗余提示，发送键改为轻量圆形纸面动作；桌面与横屏在“+”旁以无边框、无底色文字控件独立显示模型选择，竖屏仍将模型、安全等级与附件完整收纳在菜单中。暗色浮层改用低透明黑色阴影，竖屏菜单与表单也会贴合输入框并跟随当前纸面主题。
+- 历史对话改为独立的连续选择页，清楚展示会话标题、首条提问、日期、消息数和当前状态；竖屏打开历史时会自动展开到完整会话页，普通折叠则稳定贴住屏幕底部且不再裁掉上方内容。
 - 今日候选与时间轴桌面外框改用同一条跟随活动主题的细强调线，让次级任务纸张与主要执行画布保持统一边界，同时不增加厚重卡片感。
 
 ## 2026-08-29 · AI composer and Execute workspace visual refinements
 
 ### Improved
-- Refined the Navo AI composer with a natural “What's on your mind today?” prompt, removed the redundant footer notice, and replaced the send control with a lighter circular paper action. Desktop and landscape now expose model selection beside “+”, while portrait keeps model, safety, and attachments together in the menu. Dark floating surfaces use low-opacity black shadows, and the portrait menu and form controls now fit the composer and follow the active paper theme.
+- Refined the Navo AI composer with a “Type freely, or upload a file to read its schedule” prompt, removed the redundant footer notice, and replaced the send control with a lighter circular paper action. Desktop and landscape now expose model selection beside “+” as a borderless, background-free text control, while portrait keeps model, safety, and attachments together in the menu. Dark floating surfaces use low-opacity black shadows, and the portrait menu and form controls now fit the composer and follow the active paper theme.
+- Rebuilt conversation history as a dedicated continuous selection page that clearly shows the title, first prompt, date, message count, and current state. Opening history in portrait now expands to the full conversation page, while an ordinarily collapsed chat remains anchored to the bottom and no longer clips content above.
 - Unified the desktop boundaries of Today's Candidates and the timeline with the same fine active-theme accent rule, keeping the secondary task sheet and primary execution canvas visually related without adding heavy card treatment.
 
 ## 2026-08-28 · MCP 跨设备配置说明

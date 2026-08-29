@@ -12751,6 +12751,11 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   useEffect(() => {
+    if (!conversationListOpen) return;
+    setMobileCollapsed(false);
+    setComposerMenuOpen(false);
+  }, [conversationListOpen]);
+  useEffect(() => {
     if (!composerMenuOpen) return;
     const closeComposerMenu = (event: PointerEvent) => {
       const target = event.target instanceof Node ? event.target : null;
@@ -12773,6 +12778,17 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   }, [messages, attachmentStatus]);
   const sortedConversations = [...conversations].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
   const activeConversationTitle = conversations.find((conversation) => conversation.id === activeConversationId)?.title;
+  const conversationPreview = (conversation: AiConversation) => {
+    const preview = conversation.messages.find((message) => message.role === "user")?.content
+      || conversation.messages[0]?.content
+      || (lang === "zh" ? "尚无消息" : "No messages yet");
+    return preview.replace(/\s+/g, " ").trim();
+  };
+  const conversationDate = (conversation: AiConversation) => new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+    year: new Date(conversation.updatedAt || conversation.createdAt).getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  }).format(new Date(conversation.updatedAt || conversation.createdAt));
   const promptSuggestions = lang === "zh"
     ? ["把今天最重要的三件事排好", "安排 90 分钟专注学习", "把今天没完成的任务移到明天"]
     : ["Plan my three priorities for today", "Schedule 90 minutes of focused study", "Move unfinished tasks to tomorrow"];
@@ -12781,6 +12797,10 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     chats: lang === "zh" ? "对话" : "Chats",
     newChat: lang === "zh" ? "新对话" : "New",
     noChats: lang === "zh" ? "暂无对话" : "No conversations",
+    historyTitle: lang === "zh" ? "历史对话" : "Conversation history",
+    recentChats: lang === "zh" ? "最近的对话" : "Recent conversations",
+    currentChat: lang === "zh" ? "当前" : "Current",
+    chatUnit: lang === "zh" ? "个会话" : "conversations",
     untitled: lang === "zh" ? "未命名对话" : "Untitled",
     parsed: lang === "zh" ? "建议操作" : "Suggested actions",
     selectAll: lang === "zh" ? "全选" : "All",
@@ -12827,12 +12847,12 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     event.currentTarget.value = "";
     setComposerMenuOpen(false);
   };
-  return <aside className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}`}>
+  return <aside className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}${conversationListOpen ? " is-history-open" : ""}`}>
     <MobileSheetDismissHandle onDismiss={onClose} onCollapse={() => setMobileCollapsed(true)} onExpand={() => setMobileCollapsed(false)} collapsed={mobileCollapsed} lang={lang} />
     <div className="df-ai-panel-head">
       <div className="df-ai-panel-title">
-        <strong>{activeConversationTitle || (lang === "zh" ? "NavoPath AI" : "NavoPath AI")}</strong>
-        <small>{lang === "zh" ? "当前工作区" : "Current workspace"}</small>
+        <strong>{conversationListOpen ? text.historyTitle : (activeConversationTitle || "NavoPath AI")}</strong>
+        <small>{conversationListOpen ? `${sortedConversations.length} ${text.chatUnit}` : (lang === "zh" ? "当前工作区" : "Current workspace")}</small>
       </div>
       <div className="df-ai-head-actions">
         <button className="df-ai-reference-tool new-chat" onClick={onNewConversation} aria-label={text.newChat} title={text.newChat}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" /><path d="m16.5 3.5 4 4L12 16l-4.5 1 1-4.5Z" /></svg></button>
@@ -12847,15 +12867,26 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         <button className="df-ai-reference-tool close" onClick={onClose} aria-label={t(lang, "aiPanel.close")} title={t(lang, "aiPanel.close")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
       </div>
     </div>
-    {conversationListOpen && <div className="df-ai-conversation-list">
-      {sortedConversations.length === 0 && <p>{text.noChats}</p>}
-      {sortedConversations.map((conversation) => (
-        <button key={conversation.id} className={conversation.id === activeConversationId ? "active" : ""} onClick={() => onSelectConversation(conversation.id)}>
-          <strong>{conversation.title || text.untitled}</strong>
-          <small>{conversation.messages.length} {lang === "zh" ? "条" : "messages"} · {(conversation.updatedAt || conversation.createdAt).slice(0, 10)}</small>
-        </button>
-      ))}
-    </div>}
+    {conversationListOpen && <section className="df-ai-conversation-list" aria-label={text.historyTitle}>
+      <header className="df-ai-history-head">
+        <div><strong>{text.recentChats}</strong><small>{sortedConversations.length} {text.chatUnit}</small></div>
+        <button type="button" onClick={onNewConversation}>{text.newChat}<span aria-hidden="true">＋</span></button>
+      </header>
+      <div className="df-ai-conversation-items">
+        {sortedConversations.length === 0 && <div className="df-ai-history-empty"><strong>{text.noChats}</strong><small>{lang === "zh" ? "开始一段新对话后，会在这里继续。" : "Start a new conversation and return to it here."}</small></div>}
+        {sortedConversations.map((conversation) => {
+          const active = conversation.id === activeConversationId;
+          return <button key={conversation.id} className={active ? "active" : ""} onClick={() => onSelectConversation(conversation.id)}>
+            <span className="df-ai-conversation-copy">
+              <strong>{conversation.title || text.untitled}</strong>
+              <span>{conversationPreview(conversation)}</span>
+              <small>{conversationDate(conversation)} · {conversation.messages.length} {lang === "zh" ? "条消息" : "messages"}</small>
+            </span>
+            <span className="df-ai-conversation-state" aria-hidden="true">{active ? text.currentChat : "→"}</span>
+          </button>;
+        })}
+      </div>
+    </section>}
     {auditOpen && <div className="df-agent-audit-list">
       <header><strong>{lang === "zh" ? "Agent 审计记录" : "Agent audit history"}</strong><small>{lang === "zh" ? "保留最近 30 天，最多显示 50 条" : "Last 30 days, up to 50 runs"}</small></header>
       {auditLoading && <p>{lang === "zh" ? "正在读取…" : "Loading…"}</p>}
