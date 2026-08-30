@@ -1,0 +1,184 @@
+/* Final Execute refinements are imported after the legacy workspace sheets. */
+#root .df-app:not(.theme-dark).mode-execute .df-execute { background: rgb(250, 249, 245) !important; }
+#root .df-app:not(.theme-dark).mode-execute .df-candidate-panel,
+#root .df-app:not(.theme-dark).mode-execute .df-timeline-panel { background: #fff !important; }
+
+/* Keep the composer rule flush with the candidate sheet while retaining its readable inset. */
+@media (min-width: 900px) {
+  #root .df-app .df-candidate-panel .df-quick-add {
+    margin: 0 -17px -12px !important;
+    padding: 8px 17px 9px !important;
+  }
+}
+
+/* Candidate cards read as a compact, continuous work list. */
+#root .df-app .df-candidate-list,
+#root .df-app .df-candidate-list .df-project-group { gap: 4px; }
+#root .df-app.mode-execute .df-candidate-list {
+  padding-right: 0 !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#root .df-app.mode-execute .df-candidate-list::-webkit-scrollbar { display: none; }
+
+/* The recurrence glyph is a transparent stamp, not a square paper tab. */
+#root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator {
+  top: -16px;
+  right: -11px;
+  width: 26px;
+  height: 26px;
+  z-index: 4;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--task-project-color) 62%, #fff) !important;
+}
+#root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator > svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Repetition settings are a self-contained edit state rather than loose fields. */
+#root .df-app .df-detail-project-pick.df-recurrence-editor {
+  margin: -3px 0 16px !important;
+  padding: 14px 16px 12px !important;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: var(--paper-radius-soft) !important;
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--accent-active) 6%) !important;
+}
+#root .df-app .df-recurrence-editor .df-repeat-form { padding-top: 0 !important; }
+#root .df-app .df-recurrence-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--paper-rule);
+}
+#root .df-app .df-recurrence-editor-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--paper-radius);
+  color: var(--text-main);
+  background: var(--surface-main);
+  font: 600 12px var(--paper-sans);
+  cursor: pointer;
+}
+#root .df-app .df-recurrence-editor-actions button.primary {
+  color: var(--accent-on);
+  border-color: var(--accent-active);
+  background: var(--accent-active);
+}
+#root .df-app .df-recurrence-editor-actions button:hover { border-color: var(--accent-active); color: var(--accent-active); }
+#root .df-app .df-recurrence-editor-actions button.primary:hover { color: var(--accent-on); }
+
+/* Desktop add exposes the same task/project/habit choice available on portrait screens. */
+#root .df-desktop-add-menu {
+  position: fixed;
+  z-index: 36;
+  right: 18px;
+  bottom: 108px;
+  display: grid;
+  min-width: 124px;
+  padding: 5px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--paper-radius-soft);
+  background: var(--surface-raised);
+  box-shadow: var(--paper-float-shadow);
+}
+#root .df-desktop-add-menu button {
+  min-height: 32px;
+  padding: 0 9px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--text-main);
+  background: transparent;
+  font: 600 12px var(--paper-sans);
+  text-align: left;
+  cursor: pointer;
+}
+#root .df-desktop-add-menu button:hover,
+#root .df-desktop-add-menu button:focus-visible { color: var(--accent-active); outline: 0; }
+
+/* The two utility controls need a dependable paper backing in both themes. */
+#root .df-app .df-add-fab,
+#root .df-app .df-ai-fab {
+  display: grid !important;
+  place-items: center !important;
+  width: 46px !important;
+  height: 46px !important;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: var(--paper-radius) !important;
+  background: var(--surface-raised) !important;
+  box-shadow: 0 5px 15px color-mix(in srgb, var(--text-main) 10%, transparent) !important;
+}
+#root .df-app .df-add-fab.i-plus::before {
+  display: block;
+  font-size: 29px !important;
+  line-height: 1 !important;
+  transform: translateY(-1px);
+}
+#root .df-app .df-ai-fab.i-ai::before { font-size: 15px !important; letter-spacing: -.04em; }
+#root .df-app:not(.theme-dark) .df-add-fab,
+#root .df-app:not(.theme-dark) .df-ai-fab { background: #fff !important; }
+#root .df-app .df-add-fab { color: var(--text-muted) !important; }
+#root .df-app .df-ai-fab { color: var(--text-muted) !important; }
+#root .df-app .df-add-fab:hover,
+#root .df-app .df-ai-fab:hover,
+#root .df-app .df-add-fab:focus-visible,
+#root .df-app .df-ai-fab:focus-visible {
+  background: var(--surface-raised) !important;
+  border-color: var(--paper-rule-strong) !important;
+}
+#root .df-app:not(.theme-dark) .df-add-fab:hover,
+#root .df-app:not(.theme-dark) .df-ai-fab:hover,
+#root .df-app:not(.theme-dark) .df-add-fab:focus-visible,
+#root .df-app:not(.theme-dark) .df-ai-fab:focus-visible { background: #fff !important; }
+
+/* Desktop Execute reads as one enclosed timeline canvas, with candidates nested inside it. */
+#root .df-app:not(.theme-dark) .df-header {
+  position: relative;
+  z-index: 2;
+  margin: 0 8px;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-top: 0 !important;
+  border-radius: 0 0 18px 18px !important;
+  background: rgb(245, 242, 232) !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--text-main) 5%, transparent) !important;
+}
+@media (min-width: 981px) {
+  #root .df-app:not(.theme-dark).mode-execute .df-execute {
+    grid-template-columns: clamp(348px, 30vw, 410px) minmax(0, 1fr) !important;
+    gap: 6px !important;
+    margin: 0 8px 8px !important;
+    padding: 5px 6px 6px !important;
+    border: 1px solid var(--paper-rule-strong) !important;
+    border-top: 0 !important;
+    border-radius: 0 0 var(--paper-radius-soft) var(--paper-radius-soft) !important;
+    background: rgb(245, 242, 232) !important;
+  }
+  #root .df-app.mode-execute .df-candidate-panel {
+    padding: 17px 14px 12px !important;
+    border: 1px solid var(--paper-rule-strong) !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--text-main) 12%, transparent) !important;
+    z-index: 1;
+  }
+  #root .df-app.mode-execute .df-timeline-panel {
+    border: 0 !important;
+    border-radius: 0 var(--paper-radius-soft) var(--paper-radius-soft) 0 !important;
+    background: #fff !important;
+  }
+  #root .df-app.mode-execute .df-timeline-daily { --df-daily-time-gutter: 58px; }
+  #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday { margin-right: 12px !important; }
+}
+
+/* Let project accents keep their identity without overpowering the paper blocks. */
+#root .df-app.mode-execute .df-task-block[data-task-appearance] {
+  --task-checkbox-color: color-mix(in srgb, var(--task-project-color) 68%, #fff);
+}
+#root .df-app.mode-execute .df-candidate-list .df-candidate-task-row .df-task-block[data-task-appearance],
+#root .df-app.mode-execute .df-timeline-panel .df-task-block[data-task-appearance] {
+  border-left-color: color-mix(in srgb, var(--task-project-color) 54%, #fff) !important;
+}

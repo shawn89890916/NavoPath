@@ -7,14 +7,15 @@ type AuthIntent = "signin" | "signup";
 type Lang = "en" | "zh";
 
 const DONATION_URL = "https://afdian.com/a/233cxy/plan";
+const GITHUB_URL = "https://github.com/shawn89890916/NavoPath-planner";
 
 const copy = {
   en: {
-    nav: [["How it works", "#how-it-works"]],
+    nav: [["How it works", "#how-it-works"], ["Support", DONATION_URL], ["GitHub", GITHUB_URL]],
     login: "Log in", donate: "Support",
     productName: "NavoPath",
     title: "See what to do today — and when to do it.",
-    scroll: "Explore the day", start: "Start planning", download: "Download for Windows",
+    scroll: "Scroll to explore", start: "Start planning", download: "Download for Windows",
     productKicker: "Execute / Today", productLabel: "Candidates · Timeline",
     stepsKicker: "Plan the day", stepsTitle: "Turn one list into a timeline you can follow.",
     steps: [
@@ -22,18 +23,18 @@ const copy = {
       ["02", "See the open time", "Place a task beside the commitments that already shape your day."],
       ["03", "Follow the next step", "A clear timeline makes the next useful action easier to begin."],
     ],
-    planningKicker: "Planning view", planningTitle: "Keep work and learning on one path.",
-    planningBody: "Use projects to hold the longer story, then turn a small part of it into an ordinary day.",
-    planningProject: "After-work learning", planningTasks: [["Read one chapter", "45m"], ["Write commute notes", "20m"], ["Practice one problem", "15m"]],
+    planningKicker: "Work plan", planningTitle: "Keep work moving without losing the day.",
+    planningBody: "Keep related work together, then make room for it in a real week.",
+    planningProject: "Client launch", planningTasks: [["Prepare project update", "45m"], ["Review campaign brief", "30m"], ["Send follow-up", "15m"]],
     ctaTitle: "Give the next useful task a time and a place.", ctaBody: "Open a calm workspace for the day ahead.",
     footer: "NavoPath / Plan the path. Execute today.", ctaDonate: "Support ongoing development",
   },
   zh: {
-    nav: [["如何使用", "#how-it-works"]],
+    nav: [["如何使用", "#how-it-works"], ["支持", DONATION_URL], ["GitHub", GITHUB_URL]],
     login: "登录", donate: "支持",
     productName: "NavoPath",
     title: "今天做什么，什么时候做，一眼看清。",
-    scroll: "查看今天", start: "开始规划", download: "下载 Windows 版",
+    scroll: "继续探索", start: "开始规划", download: "下载 Windows 版",
     productKicker: "执行 / 今天", productLabel: "候选任务 · 时间轴",
     stepsKicker: "安排今天", stepsTitle: "一张清单，变成一条可以照着走的时间线。",
     steps: [
@@ -41,9 +42,9 @@ const copy = {
       ["02", "再看见空档", "把任务放在已经存在的安排旁边，先看清取舍。"],
       ["03", "然后开始下一步", "清楚的时间轴，让下一件有用的事更容易开始。"],
     ],
-    planningKicker: "长期规划", planningTitle: "把工作与学习，放进同一条路径。",
-    planningBody: "项目承载更长的故事，再从中挑出一小段，安放进平常的一天。",
-    planningProject: "下班后的学习", planningTasks: [["读完一个章节", "45 分钟"], ["整理通勤笔记", "20 分钟"], ["练一道题", "15 分钟"]],
+    planningKicker: "工作计划", planningTitle: "让工作推进，也让今天清楚。",
+    planningBody: "把关联工作放在一起，再为它们留出真实的一周。",
+    planningProject: "客户发布准备", planningTasks: [["整理项目进度", "45 分钟"], ["审核活动简报", "30 分钟"], ["发送跟进邮件", "15 分钟"]],
     ctaTitle: "给下一件重要的事，留出发生的位置。", ctaBody: "打开一个安静、清楚的工作区，开始安排今天。",
     footer: "NavoPath / 规划路径，执行今天。", ctaDonate: "支持后续开发",
   },
@@ -52,6 +53,7 @@ const copy = {
 function ProductPreview({ lang }: { lang: Lang }) {
   const c = copy[lang];
   return <section className="landing-product-rise" aria-label={c.productKicker}>
+    <span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span>
     <img className="landing-product-shot" src={`${import.meta.env.BASE_URL}navo-execute-latest.png`} alt={lang === "zh" ? "NavoPath 最新 Execute 工作区，显示候选任务与时间轴" : "The latest NavoPath Execute workspace with candidates and a timeline"} />
   </section>;
 }
@@ -143,12 +145,12 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 
   return <div className="landing" lang={lang}>
     <nav className="landing-nav" aria-label="NavoPath">
-      <a className="landing-brand" href="#top"><ProductIcon compact /><span>NavoPath</span></a>
-      <div className="landing-nav-links">{c.nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</div>
-      <div className="landing-nav-actions"><a className="landing-donation-link" href={DONATION_URL} target="_blank" rel="noreferrer">{c.donate}</a><button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button><button className="landing-button quiet small" onClick={() => setShowAuth(true)}>{c.login}</button></div>
+      <a className="landing-brand" href="#top" aria-label="NavoPath"><ProductIcon compact /><span>NavoPath</span></a>
+      <div className="landing-nav-links">{c.nav.map(([label, href]) => <a key={href} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined}>{label}</a>)}</div>
+      <div className="landing-nav-actions"><button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button><button className="landing-button quiet small" onClick={() => setShowAuth(true)}>{c.login}</button></div>
     </nav>
     <main>
-      <section className="landing-cover" id="top"><div className="landing-cover-content"><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1><span className="landing-scroll-cue">{c.scroll}</span></div></section>
+      <section className="landing-cover" id="top"><div className="landing-cover-content"><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1></div></section>
       <ProductPreview lang={lang} />
       <section className="landing-steps" id="how-it-works"><div className="landing-steps-intro"><span>01 / {c.stepsKicker}</span><h2>{c.stepsTitle}</h2></div><ol>{c.steps.map(([number, title, body]) => <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></li>)}</ol></section>
       <section className="landing-planning" id="planning"><div className="landing-planning-copy"><span>02 / {c.planningKicker}</span><h2>{c.planningTitle}</h2><p>{c.planningBody}</p></div><PlanningPreview lang={lang} /></section>

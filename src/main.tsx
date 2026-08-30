@@ -125,6 +125,7 @@ import "./task-block.css";
 import "./ai-chat.css";
 void import("./ai-history-actions.css");
 import "./workspace-v0.css";
+import "./execute-review.css";
 import type { MobileShortSheetKind } from "./MobileTaskSummary";
 
 installBrowserFallback();
@@ -216,7 +217,7 @@ function loadWidgetTimerRuntime(): WidgetTimerRuntime {
   const now = Date.now();
   return { ...DEFAULT_WIDGET_RUNTIME, phaseStartedAt: now, pausedAt: now };
 }
-type AddType = "task" | "project" | "event";
+type AddType = "task" | "project" | "event" | "habit";
 type CompactExecuteView = "tasks" | "schedule";
 type TimelineView = "daily" | "3day" | "weekly" | "month";
 type AiPlanPrefs = { source: "today" | "all"; scope: "day" | "3day" | "week"; strategy: "random" | "byProject" | "alternativeProject" | "longShort" };
@@ -1275,6 +1276,7 @@ function App() {
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddDetailOpen, setQuickAddDetailOpen] = useState(false);
+  const [desktopAddMenuOpen, setDesktopAddMenuOpen] = useState(false);
   const [mobileQuickAddKind, setMobileQuickAddKind] = useState<MobileShortSheetKind>("task");
   const [mobileQuickHabitMinutes, setMobileQuickHabitMinutes] = useState(20);
   const [selectedDate, setSelectedDate] = useState(todayIso());
@@ -1298,7 +1300,6 @@ function App() {
   const [editingId, setEditingId] = useState("");
   const [editingRecordId, setEditingRecordId] = useState<string | undefined>(undefined);
   const [form, setForm] = useState<FormState>(defaultForm());
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [referencedTaskId, setReferencedTaskId] = useState("");
   const [aiInput, setAiInput] = useState("");
@@ -2072,7 +2073,6 @@ function App() {
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
     setForm(defaultForm());
-    setAdvancedOpen(false);
     setAiOpen(false);
     setAiMessages([]);
     setActiveAiConversationId("");
@@ -2145,7 +2145,6 @@ function App() {
       setSettings(cached.settings);
       if (cached.settings.language) setLang(cached.settings.language);
       setModeState((cached.settings.activeMode as Mode) || "execute");
-      setAdvancedOpen(Boolean(cached.settings.addAdvancedOpen));
       if (cached.settings.defaultTimelineView) setTimelineView(cached.settings.defaultTimelineView);
     }
     const bootstrap = api.getBootstrap
@@ -2213,7 +2212,6 @@ function App() {
     setSettings(nextSettings);
     if (nextSettings.language) setLang(nextSettings.language);
     setModeState((nextSettings.activeMode as Mode) || "execute");
-    setAdvancedOpen(Boolean(nextSettings.addAdvancedOpen));
     if (nextSettings.defaultTimelineView) setTimelineView(nextSettings.defaultTimelineView);
     if ((shouldPushCachedData || shouldPersistHabitMigration) && nextData) void saveData(nextData);
     if (shouldPushCachedSettings) void saveSettings(nextSettings);
@@ -4687,7 +4685,6 @@ function App() {
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
     setForm({ ...defaultForm("task"), projectId, dueDate: today });
-    setAdvancedOpen(false);
     setDrawerOpen(true);
   }
 
@@ -6227,6 +6224,19 @@ function App() {
       void enrichTaskInBackground(createdTask);
     } else if (addType === "project") {
       void saveData({ ...data, projects: [...data.projects, makeProject(form)] });
+    } else if (addType === "habit") {
+      const now = new Date().toISOString();
+      const habit: Habit = {
+        id: uid("habit"),
+        title: form.title.trim(),
+        defaultDurationMinutes: Math.max(Math.round((form.estimatedHours || 0.5) * 60), SLOT_MINUTES),
+        frequencyRule: "daily",
+        activeWeekdays: [1, 2, 3, 4, 5],
+        order: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      void saveData({ ...data, habits: [...(data.habits || []), habit] });
     } else {
       void saveData({ ...data, events: [...data.events, makeEvent(form)] });
     }
@@ -9404,7 +9414,14 @@ function App() {
         </nav>
       )}
 
-      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />}
+      {!compactLayout && desktopAddMenuOpen && (
+        <div className="df-desktop-add-menu" role="menu" aria-label={lang === "zh" ? "新建内容" : "Create new"}>
+          <button type="button" role="menuitem" onClick={() => { setDesktopAddMenuOpen(false); openAdd("task"); }}>{lang === "zh" ? "新任务" : "New task"}</button>
+          <button type="button" role="menuitem" onClick={() => { setDesktopAddMenuOpen(false); openAdd("project"); }}>{lang === "zh" ? "新项目" : "New project"}</button>
+          {settings.featureHabitsEnabled !== false && <button type="button" role="menuitem" onClick={() => { setDesktopAddMenuOpen(false); openAdd("habit"); }}>{lang === "zh" ? "新习惯" : "New habit"}</button>}
+        </div>
+      )}
+      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} aria-expanded={desktopAddMenuOpen} onClick={() => setDesktopAddMenuOpen((open) => !open)} />}
       {!compactLayout && !settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
       {compactLayout && !drawerOpen && <button
         type="button"
@@ -9415,7 +9432,7 @@ function App() {
       ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>}
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); setQuickAddDetailOpen(false); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} advancedOpen={advancedOpen} setAdvancedOpen={(open) => { setAdvancedOpen(open); void saveSettings({ addAdvancedOpen: open }); }} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onNextAction={() => void generateNextAction()} clarifyLoading={clarifyLoading} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} quickAddDetail={quickAddDetailOpen} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); setQuickAddDetailOpen(false); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} quickAddDetail={quickAddDetailOpen} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} safetyLevel={settings.aiSafetyLevel || "standard"} onSafetyLevelChange={(aiSafetyLevel) => void saveSettings({ aiSafetyLevel })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => { setAiAuditOpen(false); setAiConversationListOpen((open) => !open); }} auditOpen={aiAuditOpen} auditRuns={aiAuditRuns} auditLoading={aiAuditLoading} auditError={aiAuditError} onToggleAudit={() => void toggleAiAuditHistory()} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} onRenameConversation={(conversationId, title) => void renameAiConversation(conversationId, title)} onToggleConversationPinned={(conversationId) => void toggleAiConversationPinned(conversationId)} onDeleteConversation={(conversationId) => void deleteAiConversation(conversationId)} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
@@ -12117,7 +12134,7 @@ function NowLine({ extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { e
 }
 
 function EditDrawer(props: {
-  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; advancedOpen: boolean; setAdvancedOpen: (open: boolean) => void; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onNextAction: () => void; clarifyLoading?: boolean; onCreateProject: (title: string) => string;
+  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onCreateProject: (title: string) => string;
   editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language; compactSummary?: boolean; onShowMore?: () => void; quickAddDetail?: boolean;
 }) {
   const dialog = useInAppDialog(props.lang);
@@ -12132,6 +12149,7 @@ function EditDrawer(props: {
   const [notesEditing, setNotesEditing] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
+  const [recurrenceDraft, setRecurrenceDraft] = useState<TaskRecurrence | null>(null);
   const [cancelAllConfirm, setCancelAllConfirm] = useState(false);
   const f = props.form;
   const set = (key: keyof FormState, value: FormState[keyof FormState]) => props.setForm((current) => ({ ...current, [key]: value }));
@@ -12140,11 +12158,14 @@ function EditDrawer(props: {
     task: props.lang === "zh" ? "Task：需要完成的行动，可以安排到时间轴并标记完成。" : "Task: an action to complete, schedulable on the timeline and markable as done.",
     project: props.lang === "zh" ? "Project：一组任务的长期目标，用颜色和重要度组织计划。" : "Project: a longer-term goal that groups tasks with color and priority context.",
     event: props.lang === "zh" ? "Event：固定发生的日程，不作为可完成任务处理。" : "Event: a fixed calendar item, not treated as a completable task.",
+    habit: props.lang === "zh" ? "习惯：每天或每周重复的固定练习。" : "Habit: a recurring practice you want to keep on the day.",
   };
   useEffect(() => {
     setNoteDraft(props.task?.notes || "");
     setNotesOpen(true);
     setNotesEditing(false);
+    setRecurrenceOpen(false);
+    setRecurrenceDraft(null);
     setCancelAllConfirm(false);
   }, [props.task?.id, props.task?.notes, props.editingOccurrence?.scheduledDate, props.editingRecordId]);
   useLayoutEffect(() => {
@@ -12560,6 +12581,7 @@ function EditDrawer(props: {
       startTime: activeOccurrence?.scheduledStart || props.task.scheduledStart || "09:00",
       durationMinutes: Math.max(Math.round((f.estimatedHours || 0.5) * 60), 30),
     };
+    const recurrenceEditor = recurrenceDraft || fixedRecurrence;
     if (props.compactSummary) {
       return (
         <>
@@ -12676,7 +12698,15 @@ function EditDrawer(props: {
 
         {/* ── Recurrence + Copy ── */}
         <section className="df-detail-schedule-row">
-          <button className={`df-detail-pill-trevor action ${recurrenceOpen ? "active" : ""}`} onClick={() => setRecurrenceOpen((open) => !open)}>
+          <button className={`df-detail-pill-trevor action ${recurrenceOpen ? "active" : ""}`} onClick={() => {
+            if (recurrenceOpen) {
+              setRecurrenceOpen(false);
+              setRecurrenceDraft(null);
+            } else {
+              setRecurrenceDraft({ ...fixedRecurrence, mode: "scheduled" });
+              setRecurrenceOpen(true);
+            }
+          }}>
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8"/></svg>
             <span>{t(props.lang, "drawer.setRepeat")}</span>
           </button>
@@ -12725,12 +12755,16 @@ function EditDrawer(props: {
 
         {/* ── Dropdown: Recurrence Form ── */}
         {recurrenceOpen && (
-          <section className="df-detail-project-pick">
+          <section className="df-detail-project-pick df-recurrence-editor">
             <div className="df-repeat-form">
-              <label><span>{t(props.lang, "drawer.startDate")}</span><input type="date" value={fixedRecurrence.startDate || props.today} onChange={(event) => props.onSaveRecurrence(props.task!.id, { ...fixedRecurrence, mode: "scheduled", startDate: event.target.value })} /></label>
-              <label><span>{t(props.lang, "drawer.startTime")}</span><input type="time" value={fixedRecurrence.startTime || "09:00"} onChange={(event) => props.onSaveRecurrence(props.task!.id, { ...fixedRecurrence, mode: "scheduled", startTime: event.target.value })} /></label>
-              <label><span>{t(props.lang, "drawer.frequency")}</span><select value={fixedRecurrence.frequency} onChange={(event) => props.onSaveRecurrence(props.task!.id, { ...fixedRecurrence, mode: "scheduled", frequency: event.target.value as RecurrenceFrequency })}>{RECURRENCE_OPTIONS.filter((option) => option.value !== "none").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-              <label><span>时长</span><select value={fixedRecurrence.durationMinutes || Math.max(Math.round((f.estimatedHours || 0.5) * 60), 30)} onChange={(event) => props.onSaveRecurrence(props.task!.id, { ...fixedRecurrence, mode: "scheduled", durationMinutes: Number(event.target.value) })}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>
+              <label><span>{t(props.lang, "drawer.startDate")}</span><input type="date" value={recurrenceEditor.startDate || props.today} onChange={(event) => setRecurrenceDraft((current) => ({ ...(current || recurrenceEditor), startDate: event.target.value }))} /></label>
+              <label><span>{t(props.lang, "drawer.startTime")}</span><input type="time" value={recurrenceEditor.startTime || "09:00"} onChange={(event) => setRecurrenceDraft((current) => ({ ...(current || recurrenceEditor), startTime: event.target.value }))} /></label>
+              <label><span>{t(props.lang, "drawer.frequency")}</span><select value={recurrenceEditor.frequency} onChange={(event) => setRecurrenceDraft((current) => ({ ...(current || recurrenceEditor), frequency: event.target.value as RecurrenceFrequency }))}>{RECURRENCE_OPTIONS.filter((option) => option.value !== "none").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <label><span>{props.lang === "zh" ? "时长" : "Duration"}</span><select value={recurrenceEditor.durationMinutes || Math.max(Math.round((f.estimatedHours || 0.5) * 60), 30)} onChange={(event) => setRecurrenceDraft((current) => ({ ...(current || recurrenceEditor), durationMinutes: Number(event.target.value) }))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label>
+            </div>
+            <div className="df-recurrence-editor-actions">
+              <button type="button" className="primary" onClick={() => { props.onSaveRecurrence(props.task!.id, { ...recurrenceEditor, mode: "scheduled" }); setRecurrenceOpen(false); setRecurrenceDraft(null); }}>{props.lang === "zh" ? "确认" : "Confirm"}</button>
+              <button type="button" onClick={() => { setRecurrenceOpen(false); setRecurrenceDraft(null); }}>{props.lang === "zh" ? "取消" : "Cancel"}</button>
             </div>
           </section>
         )}
@@ -12795,7 +12829,7 @@ function EditDrawer(props: {
   return (
     <aside className="df-drawer">
       <div className="df-drawer-head"><h2>{props.editing ? t(props.lang, "form.edit") : t(props.lang, "form.add")}</h2><button className="df-icon-action i-close" data-tip={t(props.lang, "form.close")} aria-label={t(props.lang, "form.close")} onClick={props.onClose} /></div>
-      <div className="df-segment">{(["task", "project"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} title={addTypeHints[type]} aria-label={addTypeHints[type]} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : t(props.lang, "form.project")}</button>)}</div>
+      <div className="df-segment">{(["task", "project", "habit"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} title={addTypeHints[type]} aria-label={addTypeHints[type]} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : (props.lang === "zh" ? "习惯" : "Habit")}</button>)}</div>
       {props.editing && props.type === "task" && <label className="df-check"><input type="checkbox" checked={Boolean(props.task?.completed)} onChange={props.onToggleDone} />{t(props.lang, "form.completed")}</label>}
       <label>{t(props.lang, "form.name")}<input autoFocus={!props.editing} value={f.title} onChange={(event) => set("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onSave(); } }} /></label>
       {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label></>}
@@ -12804,10 +12838,8 @@ function EditDrawer(props: {
         const frequency = event.target.value as RecurrenceFrequency;
         set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max(clockTimeSpanMinutes(f.dueTime, f.endTime || addMinutes(f.dueTime, 60)), 15) : undefined, endDate: f.endDate || undefined });
       }}>{RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>}
-      {props.type === "task" && <button className={`df-clarify-action${props.clarifyLoading ? " loading" : ""}`} onClick={props.onNextAction} disabled={props.clarifyLoading}><span aria-hidden="true" />{props.clarifyLoading ? (props.lang === "zh" ? "生成中…" : "Generating…") : t(props.lang, "form.clarifyNext")}</button>}
-      <button className="df-link" onClick={() => props.setAdvancedOpen(!props.advancedOpen)}>{props.advancedOpen ? t(props.lang, "form.collapseAdvanced") : t(props.lang, "form.expandAdvanced")}</button>
-      {props.advancedOpen && <div className="df-advanced">{props.type === "task" && <><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><div className="df-grid2"><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div><label>{t(props.lang, "form.estimatedTime")}<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label></>}<label>{t(props.lang, "form.notes")}<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>}
-      <div className={`df-drawer-actions ${props.type === "task" ? "stacked" : ""}`}>{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}<div className="df-drawer-primary-flow"><button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : t(props.lang, "form.add")}</button></div></div>
+      <div className="df-advanced">{props.type === "task" && <><label>{t(props.lang, "form.date")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><div className="df-grid2"><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label></div></>}<label>{props.type === "habit" ? (props.lang === "zh" ? "每次时长" : "Duration") : t(props.lang, "form.estimatedTime")}<select value={Math.max(Math.round((f.estimatedHours || 0.25) * 60), SLOT_MINUTES)} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>)}</select></label><label>{t(props.lang, "form.notes")}<textarea rows={6} value={f.details} onChange={(event) => set("details", event.target.value)} /></label></div>
+      <div className={`df-drawer-actions ${props.type === "task" ? "stacked" : ""}`}>{props.editing && <button className="df-icon-action i-trash danger-lite" data-tip={t(props.lang, "form.delete")} aria-label={t(props.lang, "form.delete")} onClick={props.onDelete} />}<div className="df-drawer-primary-flow"><button className="primary" onClick={props.onSave}>{props.editing ? t(props.lang, "form.saveChanges") : props.type === "habit" ? (props.lang === "zh" ? "创建习惯" : "Create habit") : t(props.lang, "form.add")}</button></div></div>
     </aside>
   );
 }

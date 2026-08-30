@@ -76,7 +76,7 @@
     {
       "name": "Core styles",
       "path": "dist/assets/index-*.css",
-      "limit": "89.25 KB"
+      "limit": "90 KB"
     },
     {
       "name": "Deferred styles",
