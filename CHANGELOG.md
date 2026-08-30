@@ -4,11 +4,13 @@
 
 ### 改进
 - AI 对话窗口的标题栏压缩为单行并移除“当前工作区”提示；横屏窗口现在可从四条边和四个角调整尺寸。
+- 主页改为居中的品牌封面：使用冷灰白背景，让产品名成为唯一主标题，并将“今天做什么，什么时候做，一眼看清。”降为更安静的说明层级，移除多余首屏文字。最新 Execute 工作区以完整比例从首屏底部上推并覆盖封面内容；桌面、竖屏和低高度横屏均保持截图可读，不再裁切或叠压，后续内容用连续的三步说明与长期规划视图衔接。
 
 ## 2026-08-30 · AI conversation window adjustments
 
 ### Improved
 - Compressed the AI chat header into a single title row and removed the “Current workspace” hint; landscape windows can now be resized from all four edges and corners.
+- Reframed the homepage as a centered brand cover with a cool gray-white background. The product name is now the only headline, while “See what to do today — and when to do it.” becomes a quieter supporting line and surplus first-screen copy is removed. The current Execute workspace now rises from the bottom at its full aspect ratio to cover the intro; desktop, portrait, and low-height landscape layouts keep the product image readable without clipping or overlap, then continue into a continuous three-step explanation and Planning view.
 
 ## 2026-08-29 · AI 输入区与执行工作区视觉细化
 

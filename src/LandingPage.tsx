@@ -10,16 +10,13 @@ const DONATION_URL = "https://afdian.com/a/233cxy/plan";
 
 const copy = {
   en: {
-    nav: [["How it works", "#how-it-works"], ["Planning", "#planning"]],
-    login: "Log in", donate: "Support", kicker: "A daily planner for real life",
-    title: "Make space for what needs to happen today.",
-    intro: "NavoPath turns scattered commitments into a short list, then helps you give each one a real place in the day.",
-    start: "Start planning", demo: "See how it works", download: "Download for Windows",
-    previewLabel: "A plan you can follow", previewDate: "Today · Saturday",
-    candidates: "Today's candidates", timeline: "A place in the day",
-    candidateTasks: [["Read two pages", "10m"], ["Reply to one message", "15m"], ["Pick up dinner ingredients", "20m"]],
-    schedule: [["08:20", "Commute · Read two pages", "coral"], ["12:40", "Lunch gap · Reply", "sage"], ["17:30", "After work · Groceries", "ink"]],
-    stepsKicker: "How it works", stepsTitle: "A quieter way to decide what comes next.",
+    nav: [["How it works", "#how-it-works"]],
+    login: "Log in", donate: "Support",
+    productName: "NavoPath",
+    title: "See what to do today — and when to do it.",
+    scroll: "Explore the day", start: "Start planning", download: "Download for Windows",
+    productKicker: "Execute / Today", productLabel: "Candidates · Timeline",
+    stepsKicker: "Plan the day", stepsTitle: "Turn one list into a timeline you can follow.",
     steps: [
       ["01", "Keep the list small", "Bring only the tasks that might genuinely fit today into view."],
       ["02", "See the open time", "Place a task beside the commitments that already shape your day."],
@@ -32,16 +29,13 @@ const copy = {
     footer: "NavoPath / Plan the path. Execute today.", ctaDonate: "Support ongoing development",
   },
   zh: {
-    nav: [["如何使用", "#how-it-works"], ["长期规划", "#planning"]],
-    login: "登录", donate: "支持", kicker: "为真实生活设计的每日计划器",
-    title: "给今天真正要做的事，留出发生的位置。",
-    intro: "NavoPath 把零散的安排收成一份精简候选清单，再帮你把每件事放进真实的一天。",
-    start: "开始规划", demo: "看看如何使用", download: "下载 Windows 版",
-    previewLabel: "一份能跟着做的安排", previewDate: "今天 · 星期六",
-    candidates: "今日候选", timeline: "今天的时间位置",
-    candidateTasks: [["读两页书", "10 分钟"], ["回复一条消息", "15 分钟"], ["买晚饭食材", "20 分钟"]],
-    schedule: [["08:20", "通勤 · 读两页书", "coral"], ["12:40", "午休 · 回复消息", "sage"], ["17:30", "下班后 · 买食材", "ink"]],
-    stepsKicker: "如何使用", stepsTitle: "用更安静的方式，决定下一步。",
+    nav: [["如何使用", "#how-it-works"]],
+    login: "登录", donate: "支持",
+    productName: "NavoPath",
+    title: "今天做什么，什么时候做，一眼看清。",
+    scroll: "查看今天", start: "开始规划", download: "下载 Windows 版",
+    productKicker: "执行 / 今天", productLabel: "候选任务 · 时间轴",
+    stepsKicker: "安排今天", stepsTitle: "一张清单，变成一条可以照着走的时间线。",
     steps: [
       ["01", "先让清单变小", "只把今天可能真的做完的事，留在眼前。"],
       ["02", "再看见空档", "把任务放在已经存在的安排旁边，先看清取舍。"],
@@ -57,17 +51,10 @@ const copy = {
 
 function ProductPreview({ lang }: { lang: Lang }) {
   const c = copy[lang];
-  return <aside className="landing-preview" aria-label={c.previewLabel}>
-    <header className="landing-preview-head"><span>01 / {c.previewLabel}</span><strong>{c.previewDate}</strong></header>
-    <div className="landing-preview-body">
-      <section className="landing-preview-list" aria-label={c.candidates}><h2>{c.candidates}</h2><div className="landing-preview-rows">
-        {c.candidateTasks.map(([task, duration]) => <div className="landing-preview-task" key={task}><i aria-hidden="true" /><strong>{task}</strong><small>{duration}</small></div>)}
-      </div></section>
-      <section className="landing-preview-timeline" aria-label={c.timeline}><h2>{c.timeline}</h2><ol>
-        {c.schedule.map(([time, task, tone]) => <li className={"tone-" + tone} key={time}><time>{time}</time><span>{task}</span></li>)}
-      </ol></section>
-    </div>
-  </aside>;
+  return <section className="landing-product-rise" aria-label={c.productKicker}>
+    <p className="landing-product-kicker"><span>{c.productKicker}</span><strong>{c.productLabel}</strong></p>
+    <img className="landing-product-shot" src={`${import.meta.env.BASE_URL}navo-execute-current.png`} alt={lang === "zh" ? "NavoPath 最新执行工作区，显示候选任务与时间轴" : "The current NavoPath Execute workspace with candidates and a timeline"} />
+  </section>;
 }
 
 function PlanningPreview({ lang }: { lang: Lang }) {
@@ -157,10 +144,11 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
       <div className="landing-nav-actions"><a className="landing-donation-link" href={DONATION_URL} target="_blank" rel="noreferrer">{c.donate}</a><button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button><button className="landing-button quiet small" onClick={() => setShowAuth(true)}>{c.login}</button></div>
     </nav>
     <main>
-      <section className="landing-hero" id="top"><div className="landing-hero-copy"><p className="landing-kicker"><i />{c.kicker}</p><h1>{c.title}</h1><p className="landing-intro">{c.intro}</p><div className="landing-hero-actions"><button className="landing-button primary" onClick={() => setShowAuth(true)}>{c.start}<span>→</span></button><a className="landing-button quiet" href="#how-it-works">{c.demo}</a></div></div><ProductPreview lang={lang} /></section>
-      <section className="landing-steps" id="how-it-works"><header className="landing-section-heading"><span>02 / {c.stepsKicker}</span><h2>{c.stepsTitle}</h2></header><ol>{c.steps.map(([number, title, body]) => <li key={number}><span>{number}</span><h3>{title}</h3><p>{body}</p></li>)}</ol></section>
-      <section className="landing-planning" id="planning"><div className="landing-planning-copy"><span>03 / {c.planningKicker}</span><h2>{c.planningTitle}</h2><p>{c.planningBody}</p></div><PlanningPreview lang={lang} /></section>
-      <section className="landing-cta"><span>04 / NAVOPATH</span><h2>{c.ctaTitle}</h2><p>{c.ctaBody}</p><div className="landing-actions"><button className="landing-button primary" onClick={() => setShowAuth(true)}>{c.start}<span>→</span></button><a className="landing-button quiet" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">{c.download}<span>→</span></a></div></section>
+      <section className="landing-cover" id="top"><div className="landing-cover-content"><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1><span className="landing-scroll-cue">{c.scroll}</span></div></section>
+      <ProductPreview lang={lang} />
+      <section className="landing-steps" id="how-it-works"><div className="landing-steps-intro"><span>01 / {c.stepsKicker}</span><h2>{c.stepsTitle}</h2></div><ol>{c.steps.map(([number, title, body]) => <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></li>)}</ol></section>
+      <section className="landing-planning" id="planning"><div className="landing-planning-copy"><span>02 / {c.planningKicker}</span><h2>{c.planningTitle}</h2><p>{c.planningBody}</p></div><PlanningPreview lang={lang} /></section>
+      <section className="landing-cta"><span>03 / NAVOPATH</span><h2>{c.ctaTitle}</h2><p>{c.ctaBody}</p><div className="landing-actions"><button className="landing-button primary" onClick={() => setShowAuth(true)}>{c.start}<span>→</span></button><a className="landing-button quiet" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">{c.download}<span>→</span></a></div></section>
     </main>
     <footer className="landing-footer"><span>{c.footer}</span><a href={DONATION_URL} target="_blank" rel="noreferrer">{c.ctaDonate}</a><span>© 2026 Xiaoyang Chen</span></footer>
     {showAuth && <AuthDialog lang={lang} onClose={() => setShowAuth(false)} onLogin={onLogin} onResend={onResend} onContinueAfterConfirm={onContinueAfterConfirm} onForgotPassword={onForgotPassword} busy={busy} error={error} notice={notice} />}
