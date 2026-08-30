@@ -6834,7 +6834,7 @@ function App() {
         const date = a.date || today;
         const task: Task = {
           ...makeSmartTask({ ...defaultForm("task"), title: action.title, projectId: projectId || "", dueDate: date, estimatedHours: duration / 60 }),
-          importance: "medium", urgency: "medium", notes: a.reason || "", goalId: "",
+          importance: null, urgency: null, notes: a.reason || "", goalId: "",
           scheduledDate: date, scheduledStart: startTime,
           scheduledEnd: a.end || addMinutes(startTime, duration), subtasks: [], order: Date.now(),
           createdAt: now, updatedAt: now,
@@ -7302,8 +7302,8 @@ function App() {
         title: action.title,
         category: "personal",
         priority: "medium",
-        importance: "medium",
-        urgency: "medium",
+        importance: null,
+        urgency: null,
         notes: (a.reason as string) || "",
         goalId: "",
         completed: false,
@@ -8140,6 +8140,26 @@ function App() {
           <CandidatePanelShell
             className={`${compactExecuteView === "tasks" ? "compact-active" : "compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`}
             ariaHidden={compactLayout && compactExecuteView !== "tasks"}
+            onPointerDown={(event) => {
+              if (compactLayout || candidatePanelCollapsed || event.button) return;
+              const panel = event.currentTarget;
+              if (panel.getBoundingClientRect().right - event.clientX > 10) return;
+              event.preventDefault();
+              const shell = document.querySelector<HTMLElement>(".df-execute:not(.df-template-shell)");
+              if (!shell) return;
+              const startX = event.clientX;
+              const startWidth = panel.getBoundingClientRect().width;
+              const maxWidth = Math.max(360, Math.min(560, shell.getBoundingClientRect().width - 390));
+              const move = (pointerEvent: PointerEvent) => setCandidatePanelWidth(Math.round(Math.min(maxWidth, Math.max(360, startWidth + pointerEvent.clientX - startX))));
+              const end = () => {
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", end);
+                window.removeEventListener("pointercancel", end);
+              };
+              window.addEventListener("pointermove", move);
+              window.addEventListener("pointerup", end, { once: true });
+              window.addEventListener("pointercancel", end, { once: true });
+            }}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
             event.preventDefault();
@@ -8415,32 +8435,6 @@ function App() {
               </>
             )}
           </CandidatePanelShell>
-          {!compactLayout && <button
-            type="button"
-            className="df-candidate-resize-handle"
-            aria-label={lang === "zh" ? "调整今日候选宽度" : "Resize Today's Candidates"}
-            title={lang === "zh" ? "拖动调整候选栏宽度" : "Drag to resize candidates"}
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              event.preventDefault();
-              const panel = document.querySelector<HTMLElement>(".df-candidate-panel");
-              const shell = document.querySelector<HTMLElement>(".df-execute:not(.df-template-shell)");
-              if (!panel || !shell) return;
-              const startX = event.clientX;
-              const startWidth = panel.getBoundingClientRect().width;
-              const maxWidth = Math.max(360, Math.min(560, shell.getBoundingClientRect().width - 390));
-              const move = (pointerEvent: PointerEvent) => setCandidatePanelWidth(Math.round(Math.min(maxWidth, Math.max(360, startWidth + pointerEvent.clientX - startX))));
-              const end = () => {
-                window.removeEventListener("pointermove", move);
-                window.removeEventListener("pointerup", end);
-                window.removeEventListener("pointercancel", end);
-              };
-              window.addEventListener("pointermove", move);
-              window.addEventListener("pointerup", end, { once: true });
-              window.addEventListener("pointercancel", end, { once: true });
-            }}
-          ><span aria-hidden="true" /></button>}
-
           <section
             className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`}
             aria-hidden={compactLayout && compactExecuteView !== "schedule"}
@@ -11215,17 +11209,14 @@ function TaskCard({
         checked={task.completed && !isEvent}
         selected={Boolean(openPanel || isPlacementArmed)}
         dragState={dragState}
-        disabled={!isEvent && recurringLocked}
         projectColor={cardAccentColor}
         className={`df-task-card ${overdue > 0 && !isEvent ? "overdue" : ""} ${task.completed && !isEvent ? "completed" : ""} ${openPanel ? "expanded" : ""} ${isMoreOpen ? "more-open" : ""} ${isPlacementArmed ? "placement-armed" : ""} ${recurringLocked && !isEvent ? "recurring-locked" : ""} ${isEvent ? "is-event" : ""}`}
         dataAttrs={{ "placement-card": task.id, kind: isEvent ? "event" : "task" }}
         onPointerDown={!isEvent && recurringLocked ? undefined : onPointerDragStart}
         onClick={onClick}
-        title={!isEvent && recurringLocked
-          ? t(lang, "taskCard.recurringHint")
-          : compact
-            ? (lang === "zh" ? "长按后拖到时间轴排程" : "Long press, then drag to schedule")
-            : t(lang, "taskCard.dragHint")}
+        title={compact
+          ? (lang === "zh" ? "长按后拖到时间轴排程" : "Long press, then drag to schedule")
+          : t(lang, "taskCard.dragHint")}
       >
         <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
         {!isMoreOpen && <TaskBlockRow className="df-candidate-row">

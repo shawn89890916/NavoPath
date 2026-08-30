@@ -75,6 +75,7 @@ export function CandidatePanelShell({
   ariaLabel,
   onDragOver,
   onDrop,
+  onPointerDown,
   children,
 }: {
   className?: string;
@@ -82,6 +83,7 @@ export function CandidatePanelShell({
   ariaLabel?: string;
   onDragOver?: React.DragEventHandler<HTMLElement>;
   onDrop?: React.DragEventHandler<HTMLElement>;
+  onPointerDown?: React.PointerEventHandler<HTMLElement>;
   children: React.ReactNode;
 }) {
   return (
@@ -91,6 +93,7 @@ export function CandidatePanelShell({
       aria-label={ariaLabel}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onPointerDown={onPointerDown}
       data-reuse="candidate-panel-shell"
     >
       {children}

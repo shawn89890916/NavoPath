@@ -140,7 +140,24 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 
   useEffect(() => {
     document.documentElement.classList.add("landing-document");
-    return () => document.documentElement.classList.remove("landing-document");
+    const nodes = [document.documentElement, document.body, document.getElementById("root")].filter(Boolean) as HTMLElement[];
+    const previous = nodes.map((node) => node.getAttribute("style"));
+    nodes.forEach((node) => {
+      node.style.setProperty("height", "auto", "important");
+      node.style.setProperty("min-height", "100%", "important");
+      node.style.setProperty("overflow-y", "auto", "important");
+      node.style.setProperty("overflow-x", "clip", "important");
+      node.style.setProperty("touch-action", "pan-y", "important");
+      node.style.setProperty("overscroll-behavior-y", "auto", "important");
+    });
+    return () => {
+      document.documentElement.classList.remove("landing-document");
+      nodes.forEach((node, index) => {
+        const style = previous[index];
+        if (style === null) node.removeAttribute("style");
+        else node.setAttribute("style", style);
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -148,7 +165,8 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
     const update = () => {
       frame = 0;
       const viewport = Math.max(window.innerHeight, 1);
-      const progress = Math.min(1, Math.max(0, (window.scrollY - viewport * .12) / (viewport * .62)));
+      const distance = Math.min(1, Math.max(0, (window.scrollY - viewport * .12) / (viewport * 1.15)));
+      const progress = Math.sqrt(distance);
       setCoverRecede((current) => Math.abs(current - progress) < .01 ? current : progress);
     };
     const requestUpdate = () => { if (!frame) frame = window.requestAnimationFrame(update); };
@@ -163,10 +181,10 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   }, []);
 
   const coverStyle = {
-    "--landing-cover-scale": String(1 - coverRecede * .06),
-    "--landing-cover-gray": String(coverRecede * .9),
-    "--landing-cover-brightness": String(1 - coverRecede * .1),
-    "--landing-cover-opacity": String(1 - coverRecede * .3),
+    "--landing-cover-scale": String(1 - coverRecede * .1),
+    "--landing-cover-gray": String(coverRecede * .98),
+    "--landing-cover-brightness": String(1 - coverRecede * .15),
+    "--landing-cover-opacity": String(1 - coverRecede * .42),
   } as CSSProperties;
 
   return <div className="landing" lang={lang}>
