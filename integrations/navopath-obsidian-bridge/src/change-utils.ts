@@ -19,6 +19,10 @@ export function normalizeVaultPath(path: string) {
   return path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
 }
 
+export function isValidDeviceToken(value: string) {
+  return /^nvp_[a-f0-9]{64}$/i.test(value);
+}
+
 export function isPathWatched(path: string, watchedRoot: string) {
   const normalizedPath = normalizeVaultPath(path);
   const normalizedRoot = normalizeVaultPath(watchedRoot);

@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectManifestChanges, eventDedupeKey, isPathWatched, schedulingExcerpt, type BridgeManifest } from "./change-utils.ts";
+import { detectManifestChanges, eventDedupeKey, isPathWatched, isValidDeviceToken, schedulingExcerpt, type BridgeManifest } from "./change-utils.ts";
+
+test("accepts only complete NavoPath device tokens", () => {
+  assert.equal(isValidDeviceToken(`nvp_${"a".repeat(64)}`), true);
+  assert.equal(isValidDeviceToken(`nvp_${"a".repeat(63)}`), false);
+  assert.equal(isValidDeviceToken("nvp_not-a-token"), false);
+});
 
 test("watches only the configured admissions folder", () => {
   assert.equal(isPathWatched("升学/资料/申请.md", "升学/资料"), true);

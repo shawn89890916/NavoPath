@@ -1,5 +1,5 @@
-import { Notice, Plugin, PluginSettingTab, requestUrl, SecretComponent, Setting, TFile } from "obsidian";
-import { detectManifestChanges, eventDedupeKey, isPathWatched, normalizeVaultPath, schedulingExcerpt, sha256Hex, type BridgeManifest, type DetectedChange, type ManifestEntry } from "./change-utils.ts";
+import { Notice, Platform, Plugin, PluginSettingTab, requestUrl, SecretComponent, Setting, TFile } from "obsidian";
+import { detectManifestChanges, eventDedupeKey, isPathWatched, isValidDeviceToken, normalizeVaultPath, schedulingExcerpt, sha256Hex, type BridgeManifest, type DetectedChange, type ManifestEntry } from "./change-utils.ts";
 
 type BridgeSettings = {
   watchedRoot: string;
@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS: BridgeSettings = {
 
 const TEXT_EXTENSIONS = new Set(["md", "txt", "csv", "json", "yaml", "yml", "html", "htm", "py"]);
 const MAX_HASH_BYTES = 16 * 1024 * 1024;
+const DEVICE_SECRET_NAME = "navopath-obsidian-bridge-device-token";
+const DESKTOP_BOOTSTRAP_FILENAME = "navopath-obsidian-bridge.token";
 
 function hex(bytes: ArrayBuffer) {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -46,6 +48,7 @@ export default class NavoPathBridgePlugin extends Plugin {
       settings: { ...DEFAULT_SETTINGS, ...(stored?.settings || {}) },
       manifest: stored?.manifest && typeof stored.manifest === "object" ? stored.manifest : {},
     };
+    await this.importDesktopBootstrapSecret();
     this.statusEl = this.addStatusBarItem();
     this.setStatus("等待初始化");
     this.addSettingTab(new NavoPathBridgeSettingTab(this));
@@ -74,6 +77,28 @@ export default class NavoPathBridgePlugin extends Plugin {
   async updateSettings(patch: Partial<BridgeSettings>) {
     this.data.settings = { ...this.data.settings, ...patch };
     await this.saveData(this.data);
+  }
+
+  private async importDesktopBootstrapSecret() {
+    if (!Platform.isDesktopApp || !process.env.LOCALAPPDATA) return;
+    const fs = require("fs") as typeof import("fs");
+    const path = require("path") as typeof import("path");
+    const bootstrapPath = path.join(process.env.LOCALAPPDATA, "NavoPath", DESKTOP_BOOTSTRAP_FILENAME);
+    if (!fs.existsSync(bootstrapPath)) return;
+
+    try {
+      const token = fs.readFileSync(bootstrapPath, "utf8").trim();
+      if (!isValidDeviceToken(token)) {
+        new Notice("NavoPath Bridge 的一次性设备令牌无效，未导入。");
+        return;
+      }
+      this.app.secretStorage.setSecret(DEVICE_SECRET_NAME, token);
+      this.data.settings.secretName = DEVICE_SECRET_NAME;
+      await this.saveData(this.data);
+      new Notice("NavoPath Bridge 已安全导入设备令牌。");
+    } finally {
+      fs.rmSync(bootstrapPath, { force: true });
+    }
   }
 
   private setStatus(value: string) {

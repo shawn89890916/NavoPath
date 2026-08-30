@@ -78,6 +78,7 @@ node scripts/navopath-workspace-event.mjs .\workspace-event.json
 - Markdown、文本、CSV、YAML、HTML 和 Python 文件只提取 frontmatter、日期、截止、未完成清单、考试、面试和提交相关行；图片等二进制文件只上传路径、变更类型与本地哈希。
 - 上传成功后才推进基线；网络或鉴权失败会保留变化并自动重试。
 - 设备令牌通过 Obsidian SecretStorage 选择。插件同步数据只保存 SecretStorage 名称和文件哈希，不保存 `nvp_...` 令牌或资料正文。
+- Windows 桌面端也支持一次性本机配置：把仅当前 Windows 用户可读的令牌文件放在 `%LOCALAPPDATA%\NavoPath\navopath-obsidian-bridge.token`。插件启动后会先校验完整令牌，再导入 SecretStorage 并立即删除该文件；该文件不会进入 Vault、iCloud 或 Git。
 - 插件使用 Vault 内相对路径，不写死 Windows `C:\` 路径，因此同一个 iCloud Vault 可在 Windows、macOS、iPhone、iPad 和 Android 上安装。移动设备只有在 Obsidian 运行时才能发送；下次打开时会补扫 iCloud 已同步的变化。
 
 构建并安装：
