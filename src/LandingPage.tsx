@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { ProductIcon } from "./main";
 import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 import "./landing.css";
@@ -135,12 +135,39 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
 }) {
   const [lang, setLang] = useState<Lang>("en");
   const [showAuth, setShowAuth] = useState(false);
+  const [coverRecede, setCoverRecede] = useState(0);
   const c = copy[lang];
 
   useEffect(() => {
     document.documentElement.classList.add("landing-document");
     return () => document.documentElement.classList.remove("landing-document");
   }, []);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const viewport = Math.max(window.innerHeight, 1);
+      const progress = Math.min(1, Math.max(0, (window.scrollY - viewport * .12) / (viewport * .62)));
+      setCoverRecede((current) => Math.abs(current - progress) < .01 ? current : progress);
+    };
+    const requestUpdate = () => { if (!frame) frame = window.requestAnimationFrame(update); };
+    requestUpdate();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+    };
+  }, []);
+
+  const coverStyle = {
+    "--landing-cover-scale": String(1 - coverRecede * .06),
+    "--landing-cover-gray": String(coverRecede * .9),
+    "--landing-cover-brightness": String(1 - coverRecede * .1),
+    "--landing-cover-opacity": String(1 - coverRecede * .3),
+  } as CSSProperties;
 
   return <div className="landing" lang={lang}>
     <nav className="landing-nav" aria-label="NavoPath">
@@ -149,7 +176,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
       <div className="landing-nav-actions"><button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button><button className="landing-button quiet small" onClick={() => setShowAuth(true)}>{c.login}</button></div>
     </nav>
     <main>
-      <section className="landing-cover" id="top"><div className="landing-cover-content"><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1><span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span></div></section>
+      <section className="landing-cover" id="top"><div className="landing-cover-content" style={coverStyle}><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1><span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span></div></section>
       <ProductPreview lang={lang} />
       <section className="landing-steps" id="how-it-works"><div className="landing-steps-intro"><span>01 / {c.stepsKicker}</span><h2>{c.stepsTitle}</h2></div><ol>{c.steps.map(([number, title, body]) => <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></li>)}</ol></section>
       <section className="landing-planning" id="planning"><div className="landing-planning-copy"><span>02 / {c.planningKicker}</span><h2>{c.planningTitle}</h2><p>{c.planningBody}</p></div><PlanningPreview lang={lang} /></section>

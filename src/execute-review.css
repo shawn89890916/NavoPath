@@ -23,11 +23,11 @@
 
 /* The recurrence glyph is a transparent stamp, not a square paper tab. */
 #root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator {
-  top: -22px;
-  right: -6px;
-  width: 26px;
-  height: 26px;
-  z-index: 4;
+  top: -12px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  z-index: 20;
   background: transparent !important;
   color: color-mix(in srgb, var(--task-project-color) 62%, #fff) !important;
   pointer-events: none !important;
@@ -141,8 +141,9 @@
 #root .df-app:not(.theme-dark).mode-execute {
   min-height: 100vh;
   border: 1px solid var(--paper-rule-strong) !important;
-  border-radius: 0 0 14px 14px !important;
-  background: #fff !important;
+  border-radius: 0 0 24px 24px !important;
+  background: rgb(245, 241, 232) !important;
+  overflow: hidden !important;
 }
 #root .df-app:not(.theme-dark) .df-header {
   position: relative;
@@ -150,20 +151,31 @@
   margin: 0 !important;
   border: 0 !important;
   border-bottom: 1px solid var(--paper-rule-strong) !important;
-  border-radius: 0 !important;
-  background: rgb(245, 242, 232) !important;
+  border-radius: 0 0 22px 22px !important;
+  background: rgb(245, 241, 232) !important;
   backdrop-filter: none !important;
   box-shadow: none !important;
 }
 @media (min-width: 981px) {
   #root .df-app:not(.theme-dark).mode-execute > .df-execute:not(.df-template-shell) {
+    position: relative;
+    isolation: isolate;
     grid-template-columns: var(--df-candidate-width, clamp(380px, 32vw, 440px)) 12px minmax(0, 1fr) !important;
     gap: 0 !important;
     margin: 0 !important;
     padding: 8px !important;
     border: 0 !important;
-    border-radius: 0 0 13px 13px !important;
-    background: #fff !important;
+    border-radius: 0 0 23px 23px !important;
+    background: rgb(245, 241, 232) !important;
+    overflow: hidden !important;
+  }
+  #root .df-app:not(.theme-dark).mode-execute > .df-execute:not(.df-template-shell)::before {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    inset: 0 0 0;
+    border-radius: 0 0 22px 22px;
+    background: rgb(250, 249, 245);
   }
   #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-candidate-panel {
     grid-column: 1;
@@ -179,11 +191,13 @@
     grid-column: 3;
     border: 0 !important;
     border-radius: 0 !important;
-    background: #fff !important;
+    background: transparent !important;
+    z-index: 1;
   }
   #root .df-app.mode-execute .df-candidate-resize-handle {
     display: grid;
     grid-column: 2;
+    z-index: 1;
     place-items: center;
     min-width: 12px;
     padding: 0;
@@ -222,6 +236,10 @@
 #root .df-app.mode-execute .df-candidate-list .df-candidate-task-row .df-task-block[data-task-appearance],
 #root .df-app.mode-execute .df-timeline-panel .df-task-block[data-task-appearance] {
   border-left-color: color-mix(in srgb, var(--task-project-color) 54%, #fff) !important;
+  background: #fff !important;
+}
+#root .df-app.mode-execute .df-habit-candidate-card,
+#root .df-app.mode-execute .df-habit-candidate-card .df-task-block[data-task-appearance] {
   background: #fff !important;
 }
 #root .df-app.mode-execute .df-quick-add-submit,

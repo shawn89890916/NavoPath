@@ -3,6 +3,8 @@
 ## 2026-08-30 · AI 对话窗口调整
 
 ### 改进
+- Execute 的时间轴现在是一张延伸到候选栏下方的连续底层纸面；今日候选作为其上的纯白浮层。顶栏改用 `rgb(245, 241, 232)`，下缘圆角与外壳共同包住时间轴；习惯组恢复为纯白，循环标记回到任务块的右上角。
+- 首屏的“Scroll to explore”提示明显下移；品牌主体改为由实际滚动位置驱动的缩小、灰化和淡出，不再依赖浏览器是否支持 CSS 滚动时间线。
 - 主页将“Scroll to explore”提示移入品牌首屏层，随 N 标志与 slogan 一起在产品页上推时退居幕后并被覆盖；产品预览减小顶部空白并统一边距，首屏同步轻微缩小、去色。中间导航链接扩大等距，登录入口提高字号与字重；竖屏也明确恢复页面纵向滚动。
 - AI 对话窗口的标题栏压缩为单行并移除“当前工作区”提示；横屏窗口现在可从四条边和四个角调整尺寸。
 - 主页改为居中的品牌封面：使用冷灰白背景，让产品名成为唯一主标题，并将“今天做什么，什么时候做，一眼看清。”降为更安静的说明层级，移除多余首屏文字。N 与 slogan 现在会在视觉中心固定，底部露出一小段时间轴引导下滑，产品工作区再从下方完整上推并覆盖封面；所有屏幕比例都可稳定滚动，顶栏始终可见，并将使用说明、支持和 GitHub 集中在中间导航。长期规划示例同步改为普通职场工作场景。
@@ -20,6 +22,8 @@
 ## 2026-08-30 · AI conversation window adjustments
 
 ### Improved
+- Execute now uses one continuous timeline paper layer beneath Today’s Candidates, which remains a pure-white floating panel. The header uses `rgb(245, 241, 232)` and its lower rounding joins the shell around the timeline; habits are pure white again and recurrence marks sit at each task’s upper-right corner.
+- The homepage “Scroll to explore” cue sits substantially lower, while the brand cover now shrinks, desaturates, and fades from the actual scroll position instead of relying on browser support for CSS scroll timelines.
 - Moved the homepage “Scroll to explore” cue into the brand-cover layer so it recedes and is covered with the N mark and slogan as the product rises. The product preview has tighter, even padding, the cover subtly scales and desaturates during that transition, center navigation spacing is wider, Log in is larger and bolder, and portrait scrolling is explicitly restored.
 - Compressed the AI chat header into a single title row and removed the “Current workspace” hint; landscape windows can now be resized from all four edges and corners.
 - Reframed the homepage as a centered brand cover with a cool gray-white background. The product name is now the only headline, while “See what to do today — and when to do it.” becomes a quieter supporting line and surplus first-screen copy is removed. The N mark and slogan now hold in the visual center, with a small timeline edge exposed at the bottom to invite scrolling before the workspace rises intact to cover the intro; every viewport can scroll reliably, the top navigation stays visible, and How it works, Support, and GitHub are grouped in the center. The Planning example now reflects ordinary office work.

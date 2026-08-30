@@ -52,21 +52,16 @@ html.landing-document #root {
 .landing-lang:hover { color: var(--l-ink); border-bottom-color: var(--l-rule-strong); }
 
 .landing-cover { position: relative; z-index: 1; min-height: calc(200svh - var(--l-nav-height)); width: min(1348px, calc(100% - 56px)); margin: 0 auto; }
-.landing-cover-content { position: fixed; z-index: 1; inset: 0; display: grid; align-content: center; justify-items: center; min-height: 100svh; margin: auto; padding: clamp(104px, 12vh, 144px) 20px 12vh; width: min(650px, calc(100% - 40px)); text-align: center; pointer-events: none; transform-origin: center; }
+.landing-cover-content { --landing-cover-scale: 1; --landing-cover-gray: 0; --landing-cover-brightness: 1; --landing-cover-opacity: 1; position: fixed; z-index: 1; inset: 0; display: grid; align-content: center; justify-items: center; min-height: 100svh; margin: auto; padding: clamp(104px, 12vh, 144px) 20px 12vh; width: min(650px, calc(100% - 40px)); color: inherit; text-align: center; pointer-events: none; transform: scale(var(--landing-cover-scale)); transform-origin: center; filter: grayscale(var(--landing-cover-gray)) brightness(var(--landing-cover-brightness)); opacity: var(--landing-cover-opacity); transition: transform 120ms linear, filter 120ms linear, opacity 120ms linear; will-change: transform, filter, opacity; }
 .landing-cover-logo { display: grid; place-items: center; width: clamp(132px, 12vw, 180px); height: clamp(132px, 12vw, 180px); margin-bottom: clamp(18px, 2vw, 30px); }
 .landing-cover-logo .dayflow-icon, .landing-cover-logo .dayflow-icon img { width: 100%; height: 100%; }
 .landing-cover-logo .dayflow-icon img { object-fit: contain; filter: drop-shadow(0 11px 15px rgba(22, 27, 33, .13)); }
 .landing-product-name { margin: 0; color: #2f3742; font-size: clamp(45px, 5vw, 76px); font-weight: 760; letter-spacing: -.06em; line-height: .96; }
 .landing-slogan { max-width: 520px; margin: 34px 0 0; color: #59636f; font-family: var(--l-body); font-size: clamp(19px, 1.65vw, 26px); font-weight: 560; letter-spacing: -.035em; line-height: 1.35; text-wrap: balance; }
 .landing-product-rise { position: relative; z-index: 10; width: min(1440px, calc(100% - 24px)); margin: calc(-100svh + var(--l-nav-height) - var(--l-product-peek)) auto 0; padding: clamp(8px, 1vw, 14px); border: 1px solid rgba(39, 35, 30, .16); border-radius: 26px; background: var(--l-paper); box-shadow: 0 -18px 42px rgba(25, 35, 43, .11); }
-.landing-product-scroll-cue { display: grid; justify-items: center; gap: 2px; margin: 30px 0 0; color: #7b8490; font: 10px var(--l-mono); letter-spacing: .15em; text-transform: uppercase; }
+.landing-product-scroll-cue { display: grid; justify-items: center; gap: 2px; margin: clamp(164px, 19vh, 214px) 0 0; color: #7b8490; font: 10px var(--l-mono); letter-spacing: .15em; text-transform: uppercase; transform: translateY(clamp(64px, 8vh, 92px)); }
 .landing-product-scroll-cue i { color: #59636f; font: 16px/1 var(--l-body); font-style: normal; letter-spacing: 0; }
 .landing-product-shot { display: block; width: 100%; height: auto; border: 1px solid rgba(39, 35, 30, .18); border-radius: 12px; background: #fff; }
-
-@supports (animation-timeline: scroll()) {
-  .landing-cover-content { animation: landing-cover-recede linear both; animation-timeline: scroll(root); animation-range: 0 74vh; }
-  @keyframes landing-cover-recede { 0%, 42% { filter: grayscale(0); opacity: 1; transform: scale(1); } 100% { filter: grayscale(.72); opacity: .72; transform: scale(.972); } }
-}
 
 .landing-steps, .landing-planning, .landing-cta { position: relative; z-index: 4; width: 100%; background: var(--l-paper); }
 .landing-steps { display: grid; grid-template-columns: minmax(0, .92fr) minmax(340px, 1.08fr); gap: clamp(54px, 11vw, 170px); align-items: start; padding: clamp(104px, 15vw, 214px) max(28px, calc((100vw - 1180px) / 2)) clamp(96px, 12vw, 180px); }
@@ -160,7 +155,7 @@ html.landing-document #root {
   .landing-product-name { font-size: 50px; }
   .landing-slogan { max-width: 305px; margin-top: 28px; font-size: 20px; }
   .landing-product-rise { width: calc(100% - 12px); margin-top: calc(-100svh + var(--l-nav-height) - var(--l-product-peek)); padding: 7px; border-radius: 18px; }
-  .landing-product-scroll-cue { margin-bottom: 7px; font-size: 9px; }
+  .landing-product-scroll-cue { margin: 64px 0 7px; font-size: 9px; transform: translateY(18px); }
   .landing-product-shot { border-radius: 6px 6px 0 0; }
   .landing-steps { gap: 44px; padding: 86px 24px 112px; }
   .landing-steps h2, .landing-planning-copy h2, .landing-cta h2 { font-size: 43px; }
