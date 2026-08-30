@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProductIcon } from "./main";
 import { DESKTOP_DOWNLOAD_URL } from "./downloads";
 import "./landing.css";
@@ -52,8 +52,7 @@ const copy = {
 function ProductPreview({ lang }: { lang: Lang }) {
   const c = copy[lang];
   return <section className="landing-product-rise" aria-label={c.productKicker}>
-    <p className="landing-product-kicker"><span>{c.productKicker}</span><strong>{c.productLabel}</strong></p>
-    <img className="landing-product-shot" src={`${import.meta.env.BASE_URL}navo-execute-current.png`} alt={lang === "zh" ? "NavoPath 最新执行工作区，显示候选任务与时间轴" : "The current NavoPath Execute workspace with candidates and a timeline"} />
+    <img className="landing-product-shot" src={`${import.meta.env.BASE_URL}navo-execute-latest.png`} alt={lang === "zh" ? "NavoPath 最新 Execute 工作区，显示候选任务与时间轴" : "The latest NavoPath Execute workspace with candidates and a timeline"} />
   </section>;
 }
 
@@ -136,6 +135,11 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   const [lang, setLang] = useState<Lang>("en");
   const [showAuth, setShowAuth] = useState(false);
   const c = copy[lang];
+
+  useEffect(() => {
+    document.documentElement.classList.add("landing-document");
+    return () => document.documentElement.classList.remove("landing-document");
+  }, []);
 
   return <div className="landing" lang={lang}>
     <nav className="landing-nav" aria-label="NavoPath">
