@@ -153,7 +153,7 @@
   z-index: 2;
   margin: 0 !important;
   border: 0 !important;
-  border-bottom: 1px solid var(--paper-rule-strong) !important;
+  border-bottom: 0 !important;
   border-radius: 0 !important;
   background: rgb(245, 241, 232) !important;
   backdrop-filter: none !important;
@@ -166,7 +166,7 @@
     grid-template-columns: var(--df-candidate-width, clamp(400px, 32vw, 470px)) minmax(0, 1fr) !important;
     gap: 0 !important;
     margin: 0 !important;
-    padding: clamp(38px, 5vh, 62px) 16px 16px !important;
+    padding: 12px !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: rgb(245, 241, 232) !important;
@@ -176,9 +176,10 @@
     content: "";
     position: absolute;
     z-index: 0;
-    inset: clamp(28px, 4vh, 48px) 16px 16px;
+    inset: 0 12px 12px;
     border: 1px solid var(--paper-rule);
-    border-radius: 24px;
+    border-top: 0;
+    border-radius: 0 0 20px 20px;
     background: rgb(250, 249, 245);
   }
   #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-candidate-panel {
@@ -196,10 +197,29 @@
     grid-column: 2;
     position: relative;
     border: 0 !important;
-    border-radius: 0 !important;
+    min-width: 0;
+    border-radius: 0 0 20px 0 !important;
     background: transparent !important;
     z-index: 1;
+    overflow: hidden !important;
   }
+  #root .df-app.mode-execute .df-view-switch-vertical {
+    top: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    left: 0 !important;
+    height: auto !important;
+    max-height: 100% !important;
+    overflow: hidden;
+  }
+  #root .df-app.mode-execute .df-timeline-panel .df-date-arrow.right {
+    right: 40px !important;
+    left: auto !important;
+  }
+  #root .df-app.mode-execute .df-add-fab,
+  #root .df-app.mode-execute .df-ai-fab { right: 24px !important; }
+  #root .df-app.mode-execute .df-ai-fab { bottom: 22px !important; }
+  #root .df-app.mode-execute .df-add-fab { bottom: 72px !important; }
   #root .df-app.mode-execute .df-timeline-daily { --df-daily-time-gutter: 58px; }
   #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday {
     width: 100% !important;

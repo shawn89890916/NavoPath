@@ -3,9 +3,9 @@
 ## 2026-08-30 · AI 对话窗口调整
 
 ### 改进
-- Execute 重组为清晰的三层纸面：`rgb(245, 241, 232)` 的顶栏与外层底纸、稍微内收且带圆角的时间轴卡片，以及叠在其上的纯白今日候选栏。候选栏默认更宽，可直接拖动右边缘调整，不再显示中间分隔线；习惯组和任务块保持纯白。
+- Execute 的三层纸面进一步收齐：顶栏与时间轴底卡无分隔线相接，时间轴底卡从顶栏下缘开始，并在左右和下方保留统一 12px 留白。今日候选也遵循一致的上左下节奏；日程切换、日期箭头与右下 Add / AI 工具全部收进圆角边界内，不再越界。
 - 循环标记现固定在完整任务块的右上内角，悬停使用普通指针且不会被候选框遮挡；新建任务（包括 AI 创建）默认不预设紧急度或重要性。
-- 主页首屏进一步放大并减轻 N 标志阴影，整体品牌组下移到更平衡的视觉中心；上滑时会以更慢、更明显的缩小、灰化和淡出退居幕后。顶栏改为更矮的全宽条，竖屏明确恢复原生纵向滚动；引导箭头加入轻微上下跳动。
+- 主页首屏进一步放大并减轻 N 标志阴影，整体品牌组下移到更平衡的视觉中心；产品上推时会以更长、更强的缩小、灰化和淡出退居幕后，同时产品纸面以更清晰的上缘阴影压过首屏。顶栏改为更矮的全宽条，竖屏明确恢复原生纵向滚动；引导箭头加入轻微上下跳动。
 - AI 对话窗口的标题栏压缩为单行并移除“当前工作区”提示；横屏窗口现在可从四条边和四个角调整尺寸。
 - 主页改为居中的品牌封面：使用冷灰白背景，让产品名成为唯一主标题，并将“今天做什么，什么时候做，一眼看清。”降为更安静的说明层级，移除多余首屏文字。N 与 slogan 现在会在视觉中心固定，底部露出一小段时间轴引导下滑，产品工作区再从下方完整上推并覆盖封面；所有屏幕比例都可稳定滚动，顶栏始终可见，并将使用说明、支持和 GitHub 集中在中间导航。长期规划示例同步改为普通职场工作场景。
 - Execute 工作区改为暖白底纸面与纯白候选/时间轴画布；候选任务间距更紧凑，底部快速添加栏的顶线与候选纸面边缘对齐。桌面右下角的添加菜单现在也可新建习惯，并为添加与 AI 工具提供适配明暗主题的清楚纸面背景。
@@ -22,9 +22,9 @@
 ## 2026-08-30 · AI conversation window adjustments
 
 ### Improved
-- Execute is now organized as three clear paper layers: an `rgb(245, 241, 232)` header and outer ground, a slightly inset rounded timeline card, and a pure-white Today’s Candidates panel above it. Candidates are wider by default and resize directly from their right edge without a visible divider; habits and task blocks remain true white.
+- Execute’s three paper layers are now aligned precisely: the header joins the timeline ground without a separating rule, the timeline ground begins at the header edge and retains a consistent 12px inset on the left, right, and bottom. Today’s Candidates follows the same top-left-bottom rhythm, while view controls, date arrows, and the lower-right Add / AI tools stay within the rounded boundary without overflow.
 - The recurrence mark now sits inside the upper-right corner of the complete task block, keeps a normal pointer on hover, and is never obscured by the candidate panel. New tasks, including AI-created tasks, start with no preset urgency or importance.
-- The homepage now doubles the N mark while softening its shadow and lowers the complete brand group to a more balanced visual center. As the page rises, that group retreats with slower, stronger scaling, grayscale, and fading. The header is a shorter full-width bar, portrait restores native vertical scrolling explicitly, and the cue arrow has a restrained vertical bounce.
+- The homepage now doubles the N mark while softening its shadow and lowers the complete brand group to a more balanced visual center. As the page rises, that group retreats through a longer, stronger scaling, grayscale, and fading transition, while the rising product paper adds a clearer upper shadow over the cover. The header is a shorter full-width bar, portrait restores native vertical scrolling explicitly, and the cue arrow has a restrained vertical bounce.
 - Compressed the AI chat header into a single title row and removed the “Current workspace” hint; landscape windows can now be resized from all four edges and corners.
 - Reframed the homepage as a centered brand cover with a cool gray-white background. The product name is now the only headline, while “See what to do today — and when to do it.” becomes a quieter supporting line and surplus first-screen copy is removed. The N mark and slogan now hold in the visual center, with a small timeline edge exposed at the bottom to invite scrolling before the workspace rises intact to cover the intro; every viewport can scroll reliably, the top navigation stays visible, and How it works, Support, and GitHub are grouped in the center. The Planning example now reflects ordinary office work.
 - Updated Execute with a warm-white paper ground and true-white candidate and timeline canvases. Candidate spacing is tighter, the quick-add rule is flush with the candidate sheet, the desktop Add menu now includes a habit entry, and both Add and AI have clear theme-aware paper backings.

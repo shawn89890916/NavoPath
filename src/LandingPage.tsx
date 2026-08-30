@@ -165,8 +165,8 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
     const update = () => {
       frame = 0;
       const viewport = Math.max(window.innerHeight, 1);
-      const distance = Math.min(1, Math.max(0, (window.scrollY - viewport * .12) / (viewport * 1.15)));
-      const progress = Math.sqrt(distance);
+      const distance = Math.min(1, Math.max(0, (window.scrollY - viewport * .1) / (viewport * 1.4)));
+      const progress = distance ** .34;
       setCoverRecede((current) => Math.abs(current - progress) < .01 ? current : progress);
     };
     const requestUpdate = () => { if (!frame) frame = window.requestAnimationFrame(update); };
@@ -181,10 +181,10 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
   }, []);
 
   const coverStyle = {
-    "--landing-cover-scale": String(1 - coverRecede * .1),
+    "--landing-cover-scale": String(1 - coverRecede * .16),
     "--landing-cover-gray": String(coverRecede * .98),
-    "--landing-cover-brightness": String(1 - coverRecede * .15),
-    "--landing-cover-opacity": String(1 - coverRecede * .42),
+    "--landing-cover-brightness": String(1 - coverRecede * .22),
+    "--landing-cover-opacity": String(1 - coverRecede * .56),
   } as CSSProperties;
 
   return <div className="landing" lang={lang}>
