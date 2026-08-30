@@ -633,37 +633,4 @@
   #root .df-app .df-ai-panel-reference .df-ai-panel-head:active { cursor: grabbing; }
   #root .df-app .df-ai-panel-reference .df-ai-panel-head :is(button, summary, input, select, textarea, label) { cursor: pointer; }
 
-  .df-ai-panel-resize-handle {
-    position: absolute;
-    z-index: 20;
-    touch-action: none;
-  }
-
-  .df-ai-panel-resize-handle.is-n,
-  .df-ai-panel-resize-handle.is-s { right: 14px; left: 14px; height: 8px; }
-  .df-ai-panel-resize-handle.is-n { top: 0; cursor: n-resize; }
-  .df-ai-panel-resize-handle.is-s { bottom: 0; cursor: s-resize; }
-  .df-ai-panel-resize-handle.is-e,
-  .df-ai-panel-resize-handle.is-w { top: 14px; bottom: 14px; width: 8px; }
-  .df-ai-panel-resize-handle.is-e { right: 0; cursor: e-resize; }
-  .df-ai-panel-resize-handle.is-w { left: 0; cursor: w-resize; }
-  .df-ai-panel-resize-handle.is-ne,
-  .df-ai-panel-resize-handle.is-se,
-  .df-ai-panel-resize-handle.is-sw,
-  .df-ai-panel-resize-handle.is-nw { width: 14px; height: 14px; }
-  .df-ai-panel-resize-handle.is-ne { top: 0; right: 0; cursor: ne-resize; }
-  .df-ai-panel-resize-handle.is-se { right: 0; bottom: 0; cursor: se-resize; }
-  .df-ai-panel-resize-handle.is-sw { bottom: 0; left: 0; cursor: sw-resize; }
-  .df-ai-panel-resize-handle.is-nw { top: 0; left: 0; cursor: nw-resize; }
-
-  .df-ai-panel-resize-handle.is-se::before {
-    content: "";
-    position: absolute;
-    right: 6px;
-    bottom: 6px;
-    width: 8px;
-    height: 8px;
-    border-right: 1px solid var(--paper-rule-strong);
-    border-bottom: 1px solid var(--paper-rule-strong);
-  }
 }

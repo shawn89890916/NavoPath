@@ -12882,16 +12882,15 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
   const [conversationDraftTitle, setConversationDraftTitle] = useState("");
   const [desktopBounds, setDesktopBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
-  const resizeDirections = ["n", "ne", "e", "se", "s", "sw", "w", "nw"] as const;
   const desktopInteractionRef = useRef<{
-    kind: "move" | typeof resizeDirections[number];
+    kind: "move" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
     pointerId: number;
     startX: number;
     startY: number;
     bounds: { left: number; top: number; width: number; height: number };
   } | null>(null);
   const isLandscapePanel = () => window.matchMedia("(min-width: 701px) and (orientation: landscape)").matches;
-  const beginDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>, kind: "move" | typeof resizeDirections[number]) => {
+  const beginDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>, kind: "move" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw") => {
     if (!isLandscapePanel()) return;
     if (kind === "move" && (event.target as HTMLElement).closest("button, summary, input, select, textarea, label")) return;
     const rect = panelRef.current?.getBoundingClientRect();
@@ -12910,15 +12909,11 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     if (!isLandscapePanel()) return;
     const rect = panelRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const edge = 16;
-    const north = event.clientY - rect.top <= edge;
-    const south = rect.bottom - event.clientY <= edge;
-    const west = event.clientX - rect.left <= edge;
-    const east = rect.right - event.clientX <= edge;
-    const direction = north && west ? "nw" : north && east ? "ne" : south && west ? "sw" : south && east ? "se" : north ? "n" : south ? "s" : west ? "w" : east ? "e" : null;
-    if (!direction) return;
+    const vertical = event.clientY - rect.top <= 16 ? "n" : rect.bottom - event.clientY <= 16 ? "s" : "";
+    const horizontal = event.clientX - rect.left <= 16 ? "w" : rect.right - event.clientX <= 16 ? "e" : "";
+    if (!vertical && !horizontal) return;
     event.stopPropagation();
-    beginDesktopPanelInteraction(event, direction);
+    beginDesktopPanelInteraction(event, `${vertical}${horizontal}` as "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw");
   };
   const updateDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>) => {
     const interaction = desktopInteractionRef.current;
@@ -13325,7 +13320,6 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         <button className="df-ai-send-btn" onClick={busy ? onCancel : onSend} disabled={!busy && !input.trim() && !attachment} title={busy ? (lang === "zh" ? "取消请求" : "Cancel request") : t(lang, "aiPanel.send")} aria-label={busy ? (lang === "zh" ? "停止生成" : "Stop generating") : t(lang, "aiPanel.send")}>{busy ? <span className="df-ai-stop-icon" aria-hidden="true" /> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5" /></svg>}</button>
       </div>
     </div>
-    {resizeDirections.map((direction) => <div key={direction} className={`df-ai-panel-resize-handle is-${direction}`} aria-hidden="true" onPointerDown={(event) => beginDesktopPanelInteraction(event, direction)} onPointerMove={updateDesktopPanelInteraction} onPointerUp={endDesktopPanelInteraction} onPointerCancel={endDesktopPanelInteraction} />)}
   </aside>;
 }
 
