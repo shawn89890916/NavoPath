@@ -12882,15 +12882,16 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
   const [conversationDraftTitle, setConversationDraftTitle] = useState("");
   const [desktopBounds, setDesktopBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const resizeCursors = { n: "n-resize", ne: "ne-resize", e: "e-resize", se: "se-resize", s: "s-resize", sw: "sw-resize", w: "w-resize", nw: "nw-resize" } as const;
   const desktopInteractionRef = useRef<{
-    kind: "move" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
+    kind: "move" | keyof typeof resizeCursors;
     pointerId: number;
     startX: number;
     startY: number;
     bounds: { left: number; top: number; width: number; height: number };
   } | null>(null);
   const isLandscapePanel = () => window.matchMedia("(min-width: 701px) and (orientation: landscape)").matches;
-  const beginDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>, kind: "move" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw") => {
+  const beginDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>, kind: "move" | keyof typeof resizeCursors) => {
     if (!isLandscapePanel()) return;
     if (kind === "move" && (event.target as HTMLElement).closest("button, summary, input, select, textarea, label")) return;
     const rect = panelRef.current?.getBoundingClientRect();
@@ -12905,15 +12906,27 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
-  const beginDesktopResizeFromPanel = (event: React.PointerEvent<HTMLElement>) => {
-    if (!isLandscapePanel()) return;
+  const getDesktopResizeDirection = (event: React.PointerEvent<HTMLElement>): keyof typeof resizeCursors | null => {
+    if (!isLandscapePanel()) return null;
     const rect = panelRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) return null;
     const vertical = event.clientY - rect.top <= 16 ? "n" : rect.bottom - event.clientY <= 16 ? "s" : "";
     const horizontal = event.clientX - rect.left <= 16 ? "w" : rect.right - event.clientX <= 16 ? "e" : "";
-    if (!vertical && !horizontal) return;
+    if (!vertical && !horizontal) return null;
+    return `${vertical}${horizontal}` as keyof typeof resizeCursors;
+  };
+  const beginDesktopResizeFromPanel = (event: React.PointerEvent<HTMLElement>) => {
+    const direction = getDesktopResizeDirection(event);
+    if (!direction) return;
     event.stopPropagation();
-    beginDesktopPanelInteraction(event, `${vertical}${horizontal}` as "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw");
+    beginDesktopPanelInteraction(event, direction);
+  };
+  const updateDesktopResizeCursor = (event: React.PointerEvent<HTMLElement>) => {
+    if (desktopInteractionRef.current) return;
+    const direction = getDesktopResizeDirection(event);
+    const cursor = direction ? resizeCursors[direction] : "";
+    panelRef.current?.style.setProperty("cursor", cursor);
+    panelRef.current?.querySelector<HTMLElement>(".df-ai-panel-head")?.style.setProperty("cursor", cursor);
   };
   const updateDesktopPanelInteraction = (event: React.PointerEvent<HTMLElement>) => {
     const interaction = desktopInteractionRef.current;
@@ -13076,7 +13089,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
     event.currentTarget.value = "";
     setComposerMenuOpen(false);
   };
-  return <aside ref={panelRef} className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}${conversationListOpen ? " is-history-open" : ""}${desktopBounds ? " is-desktop-positioned" : ""}`} style={desktopBounds ? { "--ai-panel-left": `${desktopBounds.left}px`, "--ai-panel-top": `${desktopBounds.top}px`, "--ai-panel-width": `${desktopBounds.width}px`, "--ai-panel-height": `${desktopBounds.height}px` } as CSSProperties : undefined} onPointerDown={beginDesktopResizeFromPanel} onPointerMove={updateDesktopPanelInteraction} onPointerUp={endDesktopPanelInteraction} onPointerCancel={endDesktopPanelInteraction}>
+  return <aside ref={panelRef} className={`df-ai-panel df-ai-panel-reference${mobileCollapsed ? " is-mobile-collapsed" : ""}${conversationListOpen ? " is-history-open" : ""}${desktopBounds ? " is-desktop-positioned" : ""}`} style={desktopBounds ? { "--ai-panel-left": `${desktopBounds.left}px`, "--ai-panel-top": `${desktopBounds.top}px`, "--ai-panel-width": `${desktopBounds.width}px`, "--ai-panel-height": `${desktopBounds.height}px` } as CSSProperties : undefined} onPointerDown={beginDesktopResizeFromPanel} onPointerMove={(event) => { updateDesktopPanelInteraction(event); updateDesktopResizeCursor(event); }} onPointerUp={endDesktopPanelInteraction} onPointerCancel={endDesktopPanelInteraction} onPointerLeave={() => { panelRef.current?.style.removeProperty("cursor"); panelRef.current?.querySelector<HTMLElement>(".df-ai-panel-head")?.style.removeProperty("cursor"); }}>
     <MobileSheetDismissHandle onDismiss={onClose} onCollapse={() => setMobileCollapsed(true)} onExpand={() => setMobileCollapsed(false)} collapsed={mobileCollapsed} lang={lang} />
     <div className="df-ai-panel-head" onPointerDown={(event) => beginDesktopPanelInteraction(event, "move")} onPointerMove={updateDesktopPanelInteraction} onPointerUp={endDesktopPanelInteraction} onPointerCancel={endDesktopPanelInteraction}>
       <div className="df-ai-panel-title">

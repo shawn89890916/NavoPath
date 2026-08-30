@@ -8,6 +8,8 @@
 
 ### 修复
 - 修复横屏 AI 对话窗口在多条边和角落调整尺寸时产生的重复命中区域；所有边缘与角落仍可直接拖动调整。
+- 横屏时移到 AI 对话窗口的任一边缘或角落会显示相应的缩放光标，让可拖动区域明确可见。
+- 重复任务在时间轴与今日候选中统一为悬出右上角的纸面方签与循环图标，候选列表会保留对应留白，标记不会被裁掉。
 
 ## 2026-08-30 · AI conversation window adjustments
 
@@ -17,6 +19,8 @@
 
 ### Fixed
 - Fixed overlapping resize hit zones on the landscape AI panel; every edge and corner remains directly draggable.
+- In landscape, hovering any AI panel edge or corner now shows its matching resize cursor so draggable areas are discoverable.
+- Unified recurring tasks in the timeline and Today's Candidates with an upper-right paper tab and repeat icon; the candidate list now preserves enough gutter so those markers are not clipped.
 
 ## 2026-08-29 · AI 输入区与执行工作区视觉细化
 

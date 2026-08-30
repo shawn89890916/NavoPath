@@ -4664,11 +4664,12 @@ body.df-timeline-pointer-drag * {
   border-radius: 0;
   cursor: pointer;
   max-height: 280px;
-  overflow: clip;
+  overflow: visible;
   transition: background var(--motion-instant) var(--motion-ease), max-height var(--motion-base) var(--motion-ease), opacity var(--motion-fade) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
 }
 .df-app .df-candidate-task-row.is-completing {
   max-height: 0;
+  overflow: clip;
   opacity: 0;
   transform: translateY(-4px);
   pointer-events: none;
@@ -4852,6 +4853,8 @@ body.df-timeline-pointer-drag * {
   flex-direction: column;
   min-height: 0;
   gap: 6px;
+  padding-top: 18px;
+  padding-right: 18px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
