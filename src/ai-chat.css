@@ -19,11 +19,11 @@
 }
 
 #root .df-app .df-ai-panel-reference .df-ai-panel-head {
-  min-height: 62px !important;
+  min-height: 52px !important;
   display: flex !important;
   align-items: center !important;
   gap: 16px !important;
-  padding: 8px 12px 8px 22px !important;
+  padding: 6px 12px 6px 22px !important;
   border-bottom: 1px solid var(--paper-rule) !important;
   background: var(--surface-main) !important;
 }
@@ -58,10 +58,10 @@
 }
 
 #root .df-app .df-ai-panel-reference .df-ai-reference-tool {
-  width: 38px !important;
-  min-width: 38px !important;
-  height: 38px !important;
-  min-height: 38px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
   display: grid !important;
   place-items: center !important;
   padding: 0 !important;
@@ -635,16 +635,28 @@
 
   .df-ai-panel-resize-handle {
     position: absolute;
-    z-index: 2;
-    right: 0;
-    bottom: 0;
-    width: 24px;
-    height: 24px;
-    cursor: nwse-resize;
+    z-index: 20;
     touch-action: none;
   }
 
-  .df-ai-panel-resize-handle::before {
+  .df-ai-panel-resize-handle.is-n,
+  .df-ai-panel-resize-handle.is-s { right: 14px; left: 14px; height: 8px; }
+  .df-ai-panel-resize-handle.is-n { top: 0; cursor: n-resize; }
+  .df-ai-panel-resize-handle.is-s { bottom: 0; cursor: s-resize; }
+  .df-ai-panel-resize-handle.is-e,
+  .df-ai-panel-resize-handle.is-w { top: 14px; bottom: 14px; width: 8px; }
+  .df-ai-panel-resize-handle.is-e { right: 0; cursor: e-resize; }
+  .df-ai-panel-resize-handle.is-w { left: 0; cursor: w-resize; }
+  .df-ai-panel-resize-handle.is-ne,
+  .df-ai-panel-resize-handle.is-se,
+  .df-ai-panel-resize-handle.is-sw,
+  .df-ai-panel-resize-handle.is-nw { width: 14px; height: 14px; }
+  .df-ai-panel-resize-handle.is-ne { top: 0; right: 0; cursor: ne-resize; }
+  .df-ai-panel-resize-handle.is-se { right: 0; bottom: 0; cursor: se-resize; }
+  .df-ai-panel-resize-handle.is-sw { bottom: 0; left: 0; cursor: sw-resize; }
+  .df-ai-panel-resize-handle.is-nw { top: 0; left: 0; cursor: nw-resize; }
+
+  .df-ai-panel-resize-handle.is-se::before {
     content: "";
     position: absolute;
     right: 6px;

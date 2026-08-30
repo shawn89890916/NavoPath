@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 2026-08-30 · AI 对话窗口调整
+
+### 改进
+- AI 对话窗口的标题栏压缩为单行并移除“当前工作区”提示；横屏窗口现在可从四条边和四个角调整尺寸。
+
+## 2026-08-30 · AI conversation window adjustments
+
+### Improved
+- Compressed the AI chat header into a single title row and removed the “Current workspace” hint; landscape windows can now be resized from all four edges and corners.
+
 ## 2026-08-29 · AI 输入区与执行工作区视觉细化
 
 ### 改进
