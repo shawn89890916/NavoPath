@@ -23,13 +23,15 @@
 
 /* The recurrence glyph is a transparent stamp, not a square paper tab. */
 #root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator {
-  top: -16px;
-  right: -11px;
+  top: -22px;
+  right: -6px;
   width: 26px;
   height: 26px;
   z-index: 4;
   background: transparent !important;
   color: color-mix(in srgb, var(--task-project-color) 62%, #fff) !important;
+  pointer-events: none !important;
+  cursor: inherit !important;
 }
 #root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator > svg {
   width: 20px;
@@ -134,44 +136,83 @@
 #root .df-app:not(.theme-dark) .df-add-fab:focus-visible,
 #root .df-app:not(.theme-dark) .df-ai-fab:focus-visible { background: #fff !important; }
 
-/* Desktop Execute reads as one enclosed timeline canvas, with candidates nested inside it. */
+/* Desktop Execute is one continuous shell: header, candidates, and timeline share its rule. */
+#root .df-app.mode-execute .df-candidate-resize-handle { display: none; }
+#root .df-app:not(.theme-dark).mode-execute {
+  min-height: 100vh;
+  border: 1px solid var(--paper-rule-strong) !important;
+  border-radius: 0 0 14px 14px !important;
+  background: #fff !important;
+}
 #root .df-app:not(.theme-dark) .df-header {
   position: relative;
   z-index: 2;
-  margin: 0 8px;
-  border: 1px solid var(--paper-rule-strong) !important;
-  border-top: 0 !important;
-  border-radius: 0 0 18px 18px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--paper-rule-strong) !important;
+  border-radius: 0 !important;
   background: rgb(245, 242, 232) !important;
   backdrop-filter: none !important;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--text-main) 5%, transparent) !important;
+  box-shadow: none !important;
 }
 @media (min-width: 981px) {
-  #root .df-app:not(.theme-dark).mode-execute .df-execute {
-    grid-template-columns: clamp(348px, 30vw, 410px) minmax(0, 1fr) !important;
-    gap: 6px !important;
-    margin: 0 8px 8px !important;
-    padding: 5px 6px 6px !important;
-    border: 1px solid var(--paper-rule-strong) !important;
-    border-top: 0 !important;
-    border-radius: 0 0 var(--paper-radius-soft) var(--paper-radius-soft) !important;
-    background: rgb(245, 242, 232) !important;
+  #root .df-app:not(.theme-dark).mode-execute > .df-execute:not(.df-template-shell) {
+    grid-template-columns: var(--df-candidate-width, clamp(380px, 32vw, 440px)) 12px minmax(0, 1fr) !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 8px !important;
+    border: 0 !important;
+    border-radius: 0 0 13px 13px !important;
+    background: #fff !important;
   }
-  #root .df-app.mode-execute .df-candidate-panel {
+  #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-candidate-panel {
+    grid-column: 1;
     padding: 17px 14px 12px !important;
     border: 1px solid var(--paper-rule-strong) !important;
     border-radius: 10px !important;
     background: #fff !important;
-    box-shadow: 0 12px 28px color-mix(in srgb, var(--text-main) 12%, transparent) !important;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--text-main) 9%, transparent) !important;
     z-index: 1;
+    overflow: visible !important;
   }
-  #root .df-app.mode-execute .df-timeline-panel {
+  #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-timeline-panel {
+    grid-column: 3;
     border: 0 !important;
-    border-radius: 0 var(--paper-radius-soft) var(--paper-radius-soft) 0 !important;
+    border-radius: 0 !important;
     background: #fff !important;
   }
+  #root .df-app.mode-execute .df-candidate-resize-handle {
+    display: grid;
+    grid-column: 2;
+    place-items: center;
+    min-width: 12px;
+    padding: 0;
+    border: 0 !important;
+    background: transparent !important;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  #root .df-app.mode-execute .df-candidate-resize-handle > span {
+    width: 1px;
+    height: calc(100% - 36px);
+    background: var(--paper-rule);
+    transition: background-color var(--paper-motion);
+  }
+  #root .df-app.mode-execute .df-candidate-resize-handle:hover > span,
+  #root .df-app.mode-execute .df-candidate-resize-handle:focus-visible > span { background: var(--paper-rule-strong); }
   #root .df-app.mode-execute .df-timeline-daily { --df-daily-time-gutter: 58px; }
-  #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday { margin-right: 12px !important; }
+  #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday-label {
+    width: var(--df-daily-time-gutter) !important;
+    margin-left: max(0px, calc((100% - 500px) / 2));
+    padding-right: 10px !important;
+    text-align: right;
+  }
 }
 
 /* Let project accents keep their identity without overpowering the paper blocks. */
@@ -181,4 +222,10 @@
 #root .df-app.mode-execute .df-candidate-list .df-candidate-task-row .df-task-block[data-task-appearance],
 #root .df-app.mode-execute .df-timeline-panel .df-task-block[data-task-appearance] {
   border-left-color: color-mix(in srgb, var(--task-project-color) 54%, #fff) !important;
+  background: #fff !important;
+}
+#root .df-app.mode-execute .df-quick-add-submit,
+#root .df-app.mode-execute .df-quick-add-submit:disabled {
+  background: rgb(245, 241, 232) !important;
+  opacity: 1 !important;
 }

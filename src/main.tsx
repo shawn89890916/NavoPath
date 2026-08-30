@@ -1420,6 +1420,7 @@ function App() {
   const [quickProjectColor, setQuickProjectColor] = useState(PROJECT_COLOR_PRESETS[0]);
   const compactQuickInputRef = useRef<HTMLInputElement>(null);
   const [candidatePanelCollapsed, setCandidatePanelCollapsed] = useState(false);
+  const [candidatePanelWidth, setCandidatePanelWidth] = useState<number | null>(null);
   const [simpleView, setSimpleView] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [clarifyLoading, setClarifyLoading] = useState(false);
@@ -8059,7 +8060,7 @@ function App() {
       )}
 
       {mode === "execute" ? (
-        <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`}>
+        <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`} style={candidatePanelWidth ? { "--df-candidate-width": `${candidatePanelWidth}px` } as CSSProperties : undefined}>
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button
@@ -8414,6 +8415,31 @@ function App() {
               </>
             )}
           </CandidatePanelShell>
+          {!compactLayout && <button
+            type="button"
+            className="df-candidate-resize-handle"
+            aria-label={lang === "zh" ? "调整今日候选宽度" : "Resize Today's Candidates"}
+            title={lang === "zh" ? "拖动调整候选栏宽度" : "Drag to resize candidates"}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              const panel = document.querySelector<HTMLElement>(".df-candidate-panel");
+              const shell = document.querySelector<HTMLElement>(".df-execute:not(.df-template-shell)");
+              if (!panel || !shell) return;
+              const startX = event.clientX;
+              const startWidth = panel.getBoundingClientRect().width;
+              const maxWidth = Math.max(360, Math.min(560, shell.getBoundingClientRect().width - 390));
+              const move = (pointerEvent: PointerEvent) => setCandidatePanelWidth(Math.round(Math.min(maxWidth, Math.max(360, startWidth + pointerEvent.clientX - startX))));
+              const end = () => {
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", end);
+                window.removeEventListener("pointercancel", end);
+              };
+              window.addEventListener("pointermove", move);
+              window.addEventListener("pointerup", end, { once: true });
+              window.addEventListener("pointercancel", end, { once: true });
+            }}
+          ><span aria-hidden="true" /></button>}
 
           <section
             className={`df-timeline-panel${compactExecuteView === "schedule" ? " compact-active" : " compact-inactive"}`}

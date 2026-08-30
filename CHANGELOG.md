@@ -3,12 +3,14 @@
 ## 2026-08-30 · AI 对话窗口调整
 
 ### 改进
+- 主页将“Scroll to explore”提示移入品牌首屏层，随 N 标志与 slogan 一起在产品页上推时退居幕后并被覆盖；产品预览减小顶部空白并统一边距，首屏同步轻微缩小、去色。中间导航链接扩大等距，登录入口提高字号与字重；竖屏也明确恢复页面纵向滚动。
 - AI 对话窗口的标题栏压缩为单行并移除“当前工作区”提示；横屏窗口现在可从四条边和四个角调整尺寸。
 - 主页改为居中的品牌封面：使用冷灰白背景，让产品名成为唯一主标题，并将“今天做什么，什么时候做，一眼看清。”降为更安静的说明层级，移除多余首屏文字。N 与 slogan 现在会在视觉中心固定，底部露出一小段时间轴引导下滑，产品工作区再从下方完整上推并覆盖封面；所有屏幕比例都可稳定滚动，顶栏始终可见，并将使用说明、支持和 GitHub 集中在中间导航。长期规划示例同步改为普通职场工作场景。
 - Execute 工作区改为暖白底纸面与纯白候选/时间轴画布；候选任务间距更紧凑，底部快速添加栏的顶线与候选纸面边缘对齐。桌面右下角的添加菜单现在也可新建习惯，并为添加与 AI 工具提供适配明暗主题的清楚纸面背景。
 - Add 抽屉现在提供“任务 / 项目 / 习惯”三栏，表单字段默认完整展开，不再使用 Advanced 或创建前的 Clarify Next Step；子任务继续作为已创建任务详情中的独立模块。重复设置改为带描边的确认式编辑区，透明循环图标不再带白色底图。候选滚动条默认隐藏并回收右侧任务宽度，右下工具图标同步放大。
 - 首屏移除居中的“Explore the day”与下箭头，改在底部露出的产品页上方显示上箭头与“Scroll to explore”提示。
 - 桌面 Execute 现在以一张连续的时间轴纸面包裹今日候选：候选栏作为更宽、带圆角与阴影的内嵌纸张置于左侧，外围留白和时间刻度侧栏同步收窄；顶栏向下收口并与工作区外层统一为 `rgb(245, 242, 232)` 的暖纸底色。右下添加与 AI 入口改为同款描边纸面按钮、扩大点击留白并保持悬停底色稳定；任务项目色和重复标记也变得更轻，并确保循环符号位于任务块上方。
+- 调整 Execute 外壳层级：圆角移到完整工作区的外框，顶栏作为平直的 `rgb(245, 242, 232)` 暖纸页眉无缝接入；时间轴和候选栏下方统一为纯白纸面，候选任务块也统一使用纯白背景。今日候选默认加宽，并可通过右侧细线拖拽调整宽度；全天栏重新与时间刻度对齐，快速添加按钮改用 `rgb(245, 241, 232)`。
 
 ### 修复
 - 修复横屏 AI 对话窗口在多条边和角落调整尺寸时产生的重复命中区域；所有边缘与角落仍可直接拖动调整。
@@ -18,12 +20,14 @@
 ## 2026-08-30 · AI conversation window adjustments
 
 ### Improved
+- Moved the homepage “Scroll to explore” cue into the brand-cover layer so it recedes and is covered with the N mark and slogan as the product rises. The product preview has tighter, even padding, the cover subtly scales and desaturates during that transition, center navigation spacing is wider, Log in is larger and bolder, and portrait scrolling is explicitly restored.
 - Compressed the AI chat header into a single title row and removed the “Current workspace” hint; landscape windows can now be resized from all four edges and corners.
 - Reframed the homepage as a centered brand cover with a cool gray-white background. The product name is now the only headline, while “See what to do today — and when to do it.” becomes a quieter supporting line and surplus first-screen copy is removed. The N mark and slogan now hold in the visual center, with a small timeline edge exposed at the bottom to invite scrolling before the workspace rises intact to cover the intro; every viewport can scroll reliably, the top navigation stays visible, and How it works, Support, and GitHub are grouped in the center. The Planning example now reflects ordinary office work.
 - Updated Execute with a warm-white paper ground and true-white candidate and timeline canvases. Candidate spacing is tighter, the quick-add rule is flush with the candidate sheet, the desktop Add menu now includes a habit entry, and both Add and AI have clear theme-aware paper backings.
 - The Add drawer now offers Task, Project, and Habit tabs with the form fields open by default, removing both the Advanced concept and pre-creation Clarify Next Step. Subtasks remain a dedicated module in an existing task’s detail view. Repeat settings now use an outlined confirm-or-cancel edit state, the recurrence mark is transparent rather than backed by a white square, candidate scrollbars are hidden while reclaiming task width, and the lower-right tool icons are larger.
 - Removed the centered “Explore the day” and down-arrow cue from the cover, placing an up-arrow and “Scroll to explore” cue above the exposed product page instead.
 - On desktop, Execute now nests Today’s Candidates inside one continuous timeline sheet as a wider, rounded, shadowed inner paper panel. Outer padding and the time-scale gutter are tighter, while the header curves downward and shares the warm `rgb(245, 242, 232)` paper ground with the workspace surround. The lower-right Add and AI entries now use matching outlined paper buttons with larger hit areas and stable hover fills; task project accents and repeat marks are lighter, and the recurrence glyph stays above its task block.
+- Refined the Execute shell hierarchy: rounding now belongs to the complete workspace frame, while the header is a straight `rgb(245, 242, 232)` warm-paper strip joined seamlessly to it. The timeline and candidate surround are true white, as are candidate task rows. Today’s Candidates is wider by default and can be resized from its right-hand rule; the all-day row aligns with the time scale, and Quick Add uses `rgb(245, 241, 232)`.
 
 ### Fixed
 - Fixed overlapping resize hit zones on the landscape AI panel; every edge and corner remains directly draggable.

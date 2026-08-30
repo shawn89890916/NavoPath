@@ -53,7 +53,6 @@ const copy = {
 function ProductPreview({ lang }: { lang: Lang }) {
   const c = copy[lang];
   return <section className="landing-product-rise" aria-label={c.productKicker}>
-    <span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span>
     <img className="landing-product-shot" src={`${import.meta.env.BASE_URL}navo-execute-latest.png`} alt={lang === "zh" ? "NavoPath 最新 Execute 工作区，显示候选任务与时间轴" : "The latest NavoPath Execute workspace with candidates and a timeline"} />
   </section>;
 }
@@ -150,7 +149,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
       <div className="landing-nav-actions"><button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button><button className="landing-button quiet small" onClick={() => setShowAuth(true)}>{c.login}</button></div>
     </nav>
     <main>
-      <section className="landing-cover" id="top"><div className="landing-cover-content"><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1></div></section>
+      <section className="landing-cover" id="top"><div className="landing-cover-content"><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1><span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span></div></section>
       <ProductPreview lang={lang} />
       <section className="landing-steps" id="how-it-works"><div className="landing-steps-intro"><span>01 / {c.stepsKicker}</span><h2>{c.stepsTitle}</h2></div><ol>{c.steps.map(([number, title, body]) => <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></li>)}</ol></section>
       <section className="landing-planning" id="planning"><div className="landing-planning-copy"><span>02 / {c.planningKicker}</span><h2>{c.planningTitle}</h2><p>{c.planningBody}</p></div><PlanningPreview lang={lang} /></section>

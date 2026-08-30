@@ -37,16 +37,19 @@ export function ExecutionSplitLayout({
   left,
   right,
   className,
+  style,
   children,
 }: {
   left?: React.ReactNode;
   right?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
   return (
     <main
       className={`df-execute${className ? ` ${className}` : ""}`}
+      style={style}
       data-reuse="execution-split-layout"
     >
       {children ?? (
