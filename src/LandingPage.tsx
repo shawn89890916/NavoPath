@@ -17,6 +17,15 @@ const copy = {
     title: "See what to do today — and when to do it.",
     scroll: "Scroll to explore", start: "Start planning", download: "Download for Windows",
     productKicker: "Execute / Today", productLabel: "Candidates · Timeline",
+    preview: {
+      execute: "Execute", planning: "Planning", candidates: "Today's Candidates", allDay: "All Day", add: "Add task #project",
+      views: ["Day", "3-Day", "Week", "Month"], date: "31 · Mon",
+      candidateGroups: [
+        { title: "Client work", tasks: [["Prepare weekly update", "30m"], ["Review design handoff", "45m"]] },
+        { title: "Personal", tasks: [["Inbox & follow-ups", "30m"], ["Prepare team 1:1", "25m"], ["Book focus time", "15m"]] },
+      ],
+      timeline: [["09:00", "Team stand-up", "coral"], ["10:00", "Deep work: proposal", "sage"], ["13:30", "Client review", "blue"], ["15:00", "Follow-up block", "brown"]],
+    },
     stepsKicker: "Plan the day", stepsTitle: "Turn one list into a timeline you can follow.",
     steps: [
       ["01", "Keep the list small", "Bring only the tasks that might genuinely fit today into view."],
@@ -30,30 +39,66 @@ const copy = {
     footer: "NavoPath / Plan the path. Execute today.", ctaDonate: "Support ongoing development",
   },
   zh: {
-    nav: [["如何使用", "#how-it-works"], ["支持", DONATION_URL], ["GitHub", GITHUB_URL]],
+    nav: [["怎么用", "#how-it-works"], ["支持我们", DONATION_URL], ["GitHub", GITHUB_URL]],
     login: "登录", donate: "支持",
     productName: "NavoPath",
-    title: "今天做什么，什么时候做，一眼看清。",
-    scroll: "继续探索", start: "开始规划", download: "下载 Windows 版",
-    productKicker: "执行 / 今天", productLabel: "候选任务 · 时间轴",
-    stepsKicker: "安排今天", stepsTitle: "一张清单，变成一条可以照着走的时间线。",
+    title: "今天的事，先安排明白。",
+    scroll: "继续探索", start: "开始安排", download: "下载 Windows 版",
+    productKicker: "今天的安排", productLabel: "待办 · 日程",
+    preview: {
+      execute: "执行", planning: "规划", candidates: "今日候选", allDay: "全天", add: "添加任务 #项目",
+      views: ["日", "3 天", "周", "月"], date: "31 · 周一",
+      candidateGroups: [
+        { title: "客户项目", tasks: [["整理本周项目进度", "30 分钟"], ["审阅设计交接", "45 分钟"]] },
+        { title: "个人安排", tasks: [["处理邮件与跟进", "30 分钟"], ["准备团队一对一", "25 分钟"], ["预留专注时间", "15 分钟"]] },
+      ],
+      timeline: [["09:00", "团队站会", "coral"], ["10:00", "专注：客户方案", "sage"], ["13:30", "客户评审", "blue"], ["15:00", "集中跟进", "brown"]],
+    },
+    stepsKicker: "怎么用", stepsTitle: "别让待办，只是一长串。",
     steps: [
-      ["01", "先让清单变小", "只把今天可能真的做完的事，留在眼前。"],
-      ["02", "再看见空档", "把任务放在已经存在的安排旁边，先看清取舍。"],
-      ["03", "然后开始下一步", "清楚的时间轴，让下一件有用的事更容易开始。"],
+      ["01", "先挑最要紧的几件", "不用什么都塞进今天。今天该做什么，先挑出来。"],
+      ["02", "再看看怎么排", "打开日历，把它们挪进空档。忙不忙、赶不赶，一眼就知道。"],
+      ["03", "照着做下去", "几点做什么，都写在眼前。接下来该做哪件，不用再想。"],
     ],
-    planningKicker: "工作计划", planningTitle: "让工作推进，也让今天清楚。",
-    planningBody: "把关联工作放在一起，再为它们留出真实的一周。",
-    planningProject: "客户发布准备", planningTasks: [["整理项目进度", "45 分钟"], ["审核活动简报", "30 分钟"], ["发送跟进邮件", "15 分钟"]],
-    ctaTitle: "给下一件重要的事，留出发生的位置。", ctaBody: "打开一个安静、清楚的工作区，开始安排今天。",
-    footer: "NavoPath / 规划路径，执行今天。", ctaDonate: "支持后续开发",
+    planningKicker: "项目规划", planningTitle: "项目再大，也能一件件做下去。",
+    planningBody: "把相关的事放在一块儿，什么时候该推哪一件，就清楚了。",
+    planningProject: "客户发布", planningTasks: [["对一遍项目进度", "45 分钟"], ["看活动方案", "30 分钟"], ["发跟进邮件", "15 分钟"]],
+    ctaTitle: "今天，先把一件事做好。", ctaBody: "打开 NavoPath，把它排进日程，就开始。",
+    footer: "NavoPath / 今天的事，今天安排。", ctaDonate: "支持我们",
   },
 } as const;
 
 function ProductPreview({ lang }: { lang: Lang }) {
   const c = copy[lang];
+  const p = c.preview;
   return <section className="landing-product-rise" aria-label={c.productKicker}>
-    <img className="landing-product-shot" src={`${import.meta.env.BASE_URL}navo-execute-latest.png`} alt={lang === "zh" ? "NavoPath 最新 Execute 工作区，显示候选任务与时间轴" : "The latest NavoPath Execute workspace with candidates and a timeline"} />
+    <div className={`landing-execute-preview lang-${lang}`} role="img" aria-label={lang === "zh" ? "NavoPath 执行页面：日常职场任务和时间轴" : "NavoPath Execute view with an everyday professional schedule"}>
+      <header className="landing-execute-preview-header">
+        <div className="landing-execute-preview-brand"><ProductIcon compact /><strong>NavoPath</strong></div>
+        <nav><b>{p.execute}</b><span>{p.planning}</span></nav>
+        <div className="landing-execute-preview-actions" aria-hidden="true"><i>↻</i><i>⌕</i><i>⚙</i></div>
+      </header>
+      <div className="landing-execute-preview-body">
+        <aside className="landing-execute-candidates">
+          <header><h3>{p.candidates}</h3><span aria-hidden="true">⌘</span><span aria-hidden="true">◎</span><span aria-hidden="true">⌄</span></header>
+          <div className="landing-execute-candidate-list">
+            {p.candidateGroups.map((group) => <section key={group.title} className="landing-execute-group">
+              <div className="landing-execute-group-label"><i /><span>{group.title}</span><small>{group.tasks.length}</small></div>
+              {group.tasks.map(([title, duration]) => <article key={title} className="landing-execute-task"><i aria-hidden="true" /><strong>{title}</strong><small>{duration}</small><span aria-hidden="true">⌄</span></article>)}
+            </section>)}
+          </div>
+          <footer><span>{p.add}</span><i aria-hidden="true" /><button type="button" tabIndex={-1}>{lang === "zh" ? "添加" : "Add"}</button></footer>
+        </aside>
+        <section className="landing-execute-timeline">
+          <header className="landing-execute-timeline-header"><strong>{p.date}</strong><nav>{p.views.map((view, index) => <span key={view} className={index === 0 ? "active" : ""}>{view}</span>)}</nav></header>
+          <div className="landing-execute-all-day"><b>{p.allDay}</b><span /></div>
+          <div className="landing-execute-hours">
+            {p.timeline.map(([time, title, tone]) => <div className={`landing-execute-hour is-${tone}`} key={time}><time>{time}</time><span className="landing-execute-hour-rule" /><article><i aria-hidden="true" /><strong>{title}</strong></article></div>)}
+          </div>
+          <div className="landing-execute-preview-fabs" aria-hidden="true"><i>+</i><i>AI</i></div>
+        </section>
+      </div>
+    </div>
   </section>;
 }
 
@@ -86,7 +131,7 @@ function AuthDialog({ lang, onClose, onLogin, onResend, onContinueAfterConfirm, 
   const [showPassword, setShowPassword] = useState(false);
   const [preferredTheme, setPreferredTheme] = useState<"light" | "dark">("light");
   const text = lang === "zh" ? {
-    account: "NavoPath 账户", welcome: "欢迎回来。", begin: "开始你的路径。", signIn: "登录", signUp: "注册", name: "显示名称", email: "邮箱", password: "密码（至少 6 位）", confirm: "确认密码", show: "显示密码", inbox: "请检查邮箱", inboxBody: "确认发送到该邮箱的邮件，然后返回登录。", resend: "重新发送", continue: "继续登录", mismatch: "两次输入的密码不一致。", working: "处理中...", open: "打开工作区", create: "创建账户", theme: "进入工作区时使用", light: "浅色纸张", dark: "深色纸张", forgot: "忘记密码？", forgotTitle: "找回密码", forgotBody: "输入注册邮箱，我们会发送密码重置链接。", sendReset: "发送重置链接", sentTitle: "邮件已发送", sentBody: "请检查收件箱并点击链接设置新密码。", backToLogin: "返回登录", resendReset: "重新发送",
+    account: "NavoPath 账号", welcome: "欢迎回来。", begin: "今天，也可以从现在开始。", signIn: "登录", signUp: "注册", name: "怎么称呼你", email: "邮箱", password: "密码（至少 6 位）", confirm: "再输一次密码", show: "显示密码", inbox: "去收件箱看看", inboxBody: "确认邮件已经发到这个邮箱。点开链接确认后，再来登录。", resend: "再发一封", continue: "去登录", mismatch: "两次密码没有输一样。", working: "正在处理…", open: "打开 NavoPath", create: "注册 NavoPath", theme: "想用什么主题？", light: "浅色纸张", dark: "深色纸张", forgot: "想不起密码了？", forgotTitle: "重设密码", forgotBody: "填一下注册邮箱，我们把重置链接发给你。", sendReset: "把重置链接发给我", sentTitle: "重置链接已发出", sentBody: "去收件箱点开链接，设个新密码就好了。", backToLogin: "回到登录", resendReset: "再发一次",
   } : {
     account: "NavoPath account", welcome: "Welcome back.", begin: "Start your path.", signIn: "Sign in", signUp: "Sign up", name: "Display name", email: "Email", password: "Password (6+ characters)", confirm: "Confirm password", show: "Show password", inbox: "Check your inbox", inboxBody: "Confirm the email sent to this address, then return to sign in.", resend: "Resend email", continue: "Continue to sign in", mismatch: "Passwords do not match.", working: "Working...", open: "Open workspace", create: "Create account", theme: "Open workspace in", light: "Light paper", dark: "Dark paper", forgot: "Forgot password?", forgotTitle: "Reset password", forgotBody: "Enter your registered email and we will send a reset link.", sendReset: "Send reset link", sentTitle: "Email sent", sentBody: "Check your inbox and click the link to set a new password.", backToLogin: "Back to login", resendReset: "Resend",
   };
@@ -194,7 +239,7 @@ export default function LandingPage({ onLogin, onResend, onContinueAfterConfirm,
       <div className="landing-nav-actions"><button className="landing-lang" aria-label={lang === "en" ? "切换为中文" : "Switch to English"} onClick={() => setLang(lang === "en" ? "zh" : "en")}>{lang === "en" ? "中" : "EN"}</button><button className="landing-button quiet small" onClick={() => setShowAuth(true)}>{c.login}</button></div>
     </nav>
     <main>
-      <section className="landing-cover" id="top"><div className="landing-cover-content" style={coverStyle}><div className="landing-cover-logo"><ProductIcon /></div><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1><span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span></div></section>
+      <section className="landing-cover" id="top"><div className="landing-cover-content" style={coverStyle}><div className="landing-cover-logo"><ProductIcon /></div><div className="landing-brand-copy"><p className="landing-product-name">{c.productName}</p><h1 className="landing-slogan">{c.title}</h1></div></div><span className="landing-product-scroll-cue" aria-hidden="true"><i>↑</i>{c.scroll}</span></section>
       <ProductPreview lang={lang} />
       <section className="landing-steps" id="how-it-works"><div className="landing-steps-intro"><span>01 / {c.stepsKicker}</span><h2>{c.stepsTitle}</h2></div><ol>{c.steps.map(([number, title, body]) => <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></li>)}</ol></section>
       <section className="landing-planning" id="planning"><div className="landing-planning-copy"><span>02 / {c.planningKicker}</span><h2>{c.planningTitle}</h2><p>{c.planningBody}</p></div><PlanningPreview lang={lang} /></section>

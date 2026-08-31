@@ -7935,6 +7935,26 @@ function App() {
       ? (lang === "zh" ? `已专注 ${Math.floor(focusElapsed / 60)} 分钟，建议休息 ${flowBreakMinutes} 分钟` : `Focused ${Math.floor(focusElapsed / 60)}m, suggested break ${flowBreakMinutes}m`)
       : (lang === "zh" ? "正计时" : "Stopwatch");
 
+  const startCandidatePanelResize = (event: React.PointerEvent<HTMLElement>) => {
+    if (compactLayout || candidatePanelCollapsed || event.button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const panel = event.currentTarget.closest<HTMLElement>(".df-candidate-panel");
+    const shell = document.querySelector<HTMLElement>(".df-execute:not(.df-template-shell)");
+    if (!panel || !shell) return;
+    const startX = event.clientX;
+    const startWidth = panel.getBoundingClientRect().width;
+    const maxWidth = Math.max(360, Math.min(560, shell.getBoundingClientRect().width - 390));
+    const move = (pointerEvent: PointerEvent) => setCandidatePanelWidth(Math.round(Math.min(maxWidth, Math.max(360, startWidth + pointerEvent.clientX - startX))));
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end, { once: true });
+    window.addEventListener("pointercancel", end, { once: true });
+  };
   return (
     <div className={`df-app mode-${mode} theme-${settings.theme} type-${settings.typographyStyle || "editorial"}${fullscreen ? " is-timeline-fullscreen" : ""}${yearOverviewOpen ? " is-year-overview" : ""}${drag ? " is-dragging" : ""}${onboardingActive ? ` onboarding-active onboarding-step-${onboardingStep}` : ""}${settings.taskBlockFill ? " task-block-fill" : ""}${aiOpen || utilityPanel ? " is-mobile-sheet-open" : ""}${quickAddOpen ? " is-compact-quick-add-open" : ""}`} data-timeline-view={timelineView} data-task-block-fill={settings.taskBlockFill ? "true" : undefined} style={{ ...themeVars(settings, mode), "--timeline-slot-height": `${timelineSlotHeight}px`, "--timeline-hour-height": `${timelineHourHeight}px` } as CSSProperties}>
       <header className="df-header">
@@ -8116,24 +8136,9 @@ function App() {
             onPointerDown={(event) => {
               if (compactLayout || candidatePanelCollapsed || event.button) return;
               const panel = event.currentTarget;
-              if (panel.getBoundingClientRect().right - event.clientX > 10) return;
-              event.preventDefault();
-              const shell = document.querySelector<HTMLElement>(".df-execute:not(.df-template-shell)");
-              if (!shell) return;
-              const startX = event.clientX;
-              const startWidth = panel.getBoundingClientRect().width;
-              const maxWidth = Math.max(360, Math.min(560, shell.getBoundingClientRect().width - 390));
-              const move = (pointerEvent: PointerEvent) => setCandidatePanelWidth(Math.round(Math.min(maxWidth, Math.max(360, startWidth + pointerEvent.clientX - startX))));
-              const end = () => {
-                window.removeEventListener("pointermove", move);
-                window.removeEventListener("pointerup", end);
-                window.removeEventListener("pointercancel", end);
-              };
-              window.addEventListener("pointermove", move);
-              window.addEventListener("pointerup", end, { once: true });
-              window.addEventListener("pointercancel", end, { once: true });
-            }}
-            onDragOver={(event) => event.preventDefault()}
+              if (panel.getBoundingClientRect().right - event.clientX > 18) return;
+              startCandidatePanelResize(event);
+            }}            onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
@@ -8405,6 +8410,7 @@ function App() {
               />
               <button className="df-quick-add-submit" type="submit" disabled={!quickTitle.trim()}>{t(lang, "candidate.add")}</button>
             </form>
+            <span className="df-candidate-resize-zone" aria-hidden="true" onPointerDown={startCandidatePanelResize} />
               </>
             )}
           </CandidatePanelShell>

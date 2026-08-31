@@ -4,6 +4,7 @@
 
 ### 改进
 - 收紧候选快速添加栏的左右与底部内边距，并将全天分隔线收至略宽于时间轴内容；日程时段画布随时间轴扩展，项目分组使用统一的小型系统圆点标识。
+- 快速添加栏移除左侧竖线，输入底线延至项目选择区；今日候选右缘提供无可见把手的宽幅拖拽命中区域。主页产品预览更新为当前 Execute 工作区，并随语言切换展示中英文的日常职场任务与日程。
 
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px；右移日期箭头与 Day / 3-Day / Week / Month 的纵向控件列对齐。
@@ -12,6 +13,7 @@
 
 ### Improved
 - Tightened the quick-add bar's left, right, and bottom insets, shortened the all-day divider to just exceed the timeline content, expanded the daily schedule canvas with the timeline, and unified project-group markers as compact system-style dots.
+- Removed the quick-add bar's left rule and extended the input underline to the project picker. Today's Candidates now has a broad, handle-free resize target on its right edge. The homepage product preview now reflects the current Execute workspace and switches between everyday professional schedules in English and Chinese with the page language.
 
 ### Fixed
 - Restored all four rounded corners on the Execute timeline background and reduced its side and bottom margins. Today's Candidates keeps its width and horizontal position, moving slightly upward for matching 6px top, left, and bottom insets within the timeline card. The next-date arrow now aligns with the vertical Day / 3-Day / Week / Month controls.
