@@ -3680,33 +3680,6 @@ function App() {
     return style ? { left: style.left, width: style.width } : { left: state.left, width: state.width };
   };
 
-  // Debug: conflict layout info
-  useEffect(() => {
-    if (conflictLayout.size === 0) return;
-    const viewedDates = timelineView === "daily" ? [timelineDate] : getVisibleDays(timelineView === "weekly" ? "weekly" : "3day", timelineDate);
-    const info = tasks
-      .filter((t) => conflictLayout.has(t.id))
-      .map((t) => {
-        const cl = conflictLayout.get(t.id)!;
-        const top = timeBlockTop(t.scheduledStart || "09:00", dayStartHour);
-        const height = Math.max(timeBlockHeight(t.scheduledStart || "09:00", t.scheduledEnd || addMinutes(t.scheduledStart || "09:00", 30)), SLOT_HEIGHT);
-        return {
-          title: t.title,
-          viewMode: timelineView,
-          visibleDays: viewedDates.length,
-          start: t.scheduledStart,
-          end: t.scheduledEnd,
-          group: `g-${cl.index}-${cl.count}`,
-          column: cl.index,
-          columns: cl.count,
-          top: Math.round(top),
-          height: Math.round(height),
-          zIndex: 2 + cl.index,
-        };
-      });
-    console.table(info);
-  }, [conflictLayout, tasks, timelineView, timelineDate]);
-
   const visibleCandidates = (showCompletedCandidates ? [...todayEventCandidates, ...todayCandidates, ...completedCandidates] : [...todayEventCandidates, ...todayCandidates])
     .filter((task) => candidateProjectFilters.length === 0 || candidateProjectFilters.includes(String(task.projectId || "")));
   const candidateFilterActiveCount = candidateProjectFilters.length + (showCompletedCandidates ? 1 : 0);
