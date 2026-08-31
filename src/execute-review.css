@@ -166,7 +166,7 @@
     grid-template-columns: var(--df-candidate-width, clamp(400px, 32vw, 470px)) minmax(0, 1fr) !important;
     gap: 0 !important;
     margin: 0 !important;
-    padding: 12px !important;
+    padding: 6px 12px 12px !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: rgb(245, 241, 232) !important;
@@ -176,10 +176,10 @@
     content: "";
     position: absolute;
     z-index: 0;
-    inset: 0 12px 12px;
+    inset: 0 6px 6px;
     border: 1px solid var(--paper-rule);
     border-top: 0;
-    border-radius: 0 0 20px 20px;
+    border-radius: 20px;
     background: rgb(250, 249, 245);
   }
   #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-candidate-panel {
@@ -198,7 +198,7 @@
     position: relative;
     border: 0 !important;
     min-width: 0;
-    border-radius: 0 0 20px 0 !important;
+    border-radius: 0 14px 14px 0 !important;
     background: transparent !important;
     z-index: 1;
     overflow: hidden !important;

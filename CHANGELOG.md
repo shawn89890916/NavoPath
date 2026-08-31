@@ -1,5 +1,15 @@
 # NavoPath 更新日志
 
+## 2026-08-31 · 时间轴圆角与留白校准
+
+### 修复
+- 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px。
+
+## 2026-08-31 · Timeline corners and spacing
+
+### Fixed
+- Restored all four rounded corners on the Execute timeline background and reduced its side and bottom margins. Today's Candidates keeps its width and horizontal position, moving slightly upward for matching 6px top, left, and bottom insets within the timeline card.
+
 ## 2026-08-30 · AI 对话窗口调整
 
 ### 改进
