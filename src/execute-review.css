@@ -6,9 +6,12 @@
 /* Keep the composer rule flush with the candidate sheet while retaining its readable inset. */
 @media (min-width: 900px) {
   #root .df-app .df-candidate-panel .df-quick-add {
-    margin: 0 -17px -12px !important;
-    padding: 8px 17px 9px !important;
+    margin: 0 -14px -12px !important;
+    padding: 8px 14px 13px !important;
+    grid-template-columns: minmax(0, 1fr) 58px 78px !important;
   }
+  #root .df-app .df-candidate-panel .df-quick-add input { padding-left: 0 !important; }
+  #root .df-app .df-candidate-panel .df-quick-add-submit { margin-right: 0 !important; }
 }
 
 /* Candidate cards read as a compact, continuous work list. */
@@ -220,18 +223,45 @@
   #root .df-app.mode-execute .df-ai-fab { right: 24px !important; }
   #root .df-app.mode-execute .df-ai-fab { bottom: 22px !important; }
   #root .df-app.mode-execute .df-add-fab { bottom: 72px !important; }
-  #root .df-app.mode-execute .df-timeline-daily { --df-daily-time-gutter: 58px; }
+  #root .df-app.mode-execute .df-timeline-daily {
+    --df-daily-time-gutter: 58px;
+    --df-daily-scroll-width: calc(100% - 62px);
+  }
+  #root .df-app.mode-execute .df-timeline-daily .df-timeline-scroll {
+    width: var(--df-daily-scroll-width) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex-basis: var(--df-daily-scroll-width) !important;
+  }
   #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
     padding: 0 !important;
+    position: relative;
+    border-bottom: 0 !important;
+  }
+  #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: calc((100% - var(--df-daily-scroll-width)) / 2 - 8px);
+    width: calc(var(--df-daily-scroll-width) + 16px);
+    border-bottom: 1px solid var(--paper-rule);
+    pointer-events: none;
   }
   #root .df-app.mode-execute .df-timeline-daily .df-timeline-allday-label {
     width: var(--df-daily-time-gutter) !important;
-    margin-left: max(0px, calc((100% - 500px) / 2));
+    margin-left: max(0px, calc((100% - var(--df-daily-scroll-width)) / 2));
     padding-right: 10px !important;
     text-align: right;
+  }
+  #root .df-app.mode-execute .df-project-group-dot {
+    width: 7px;
+    height: 7px;
+    border: 1px solid color-mix(in srgb, var(--surface-raised) 72%, transparent);
+    border-radius: 999px;
+    box-shadow: 0 0 0 2px var(--surface-raised);
   }
 }
 

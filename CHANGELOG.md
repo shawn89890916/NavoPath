@@ -2,10 +2,16 @@
 
 ## 2026-08-31 · 时间轴圆角与留白校准
 
+### 改进
+- 收紧候选快速添加栏的左右与底部内边距，并将全天分隔线收至略宽于时间轴内容；日程时段画布随时间轴扩展，项目分组使用统一的小型系统圆点标识。
+
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px。
 
 ## 2026-08-31 · Timeline corners and spacing
+
+### Improved
+- Tightened the quick-add bar's left, right, and bottom insets, shortened the all-day divider to just exceed the timeline content, expanded the daily schedule canvas with the timeline, and unified project-group markers as compact system-style dots.
 
 ### Fixed
 - Restored all four rounded corners on the Execute timeline background and reduced its side and bottom margins. Today's Candidates keeps its width and horizontal position, moving slightly upward for matching 6px top, left, and bottom insets within the timeline card.
