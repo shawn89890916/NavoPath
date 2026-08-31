@@ -200,7 +200,7 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   background-color: var(--surface-main) !important; background-image: none !important;
   box-shadow: none !important; filter: none !important;
 }
-.df-candidate-panel {
+.df-candidate-panel:not(.collapsed) {
   min-height: 0;
   padding: 18px !important;
   overflow: hidden !important;

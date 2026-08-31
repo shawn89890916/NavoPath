@@ -211,7 +211,7 @@
     border-radius: 20px;
     background: rgb(250, 249, 245);
   }
-  #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-candidate-panel {
+  #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-candidate-panel:not(.collapsed) {
     grid-column: 1;
     position: relative;
     padding: 17px 14px 12px !important;
@@ -294,7 +294,7 @@
   #root .df-app.mode-execute .df-week-view .df-time-card-row {
     grid-template-columns: minmax(0, 1fr) !important;
   }
-  #root .df-app.mode-execute .df-week-view .df-task-block-check {
+  #root .df-app.mode-execute .df-week-view .df-task-checkbox-wrap {
     display: none !important;
   }
   #root .df-app.mode-execute .df-week-view .df-time-card-main {
@@ -306,10 +306,11 @@
     display: block !important;
     min-width: 0 !important;
     overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    overflow-wrap: normal !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
     word-break: normal !important;
+    text-wrap: pretty;
   }
   #root .df-app.mode-execute .df-project-group-dot {
     width: 7px;

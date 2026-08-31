@@ -8055,7 +8055,7 @@ function App() {
       )}
 
       {mode === "execute" ? (
-        <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`} style={candidatePanelWidth ? { "--df-candidate-width": `${candidatePanelWidth}px` } as CSSProperties : undefined}>
+        <ExecutionSplitLayout className={`${candidatePanelCollapsed ? "candidate-collapsed" : ""}${fullscreen ? " fullscreen" : ""}${simpleView ? " simple-view" : ""}`} style={candidatePanelCollapsed || candidatePanelWidth ? { "--df-candidate-width": candidatePanelCollapsed ? "44px" : `${candidatePanelWidth}px` } as CSSProperties : undefined}>
           <div className="df-compact-execute-controls">
             <nav className="df-compact-execute-tabs" aria-label={lang === "zh" ? "执行视图" : "Execute view"}>
               <button
@@ -8134,6 +8134,7 @@ function App() {
           )}
           <CandidatePanelShell
             className={`${compactExecuteView === "tasks" ? "compact-active" : "compact-inactive"}${candidatePanelCollapsed ? " collapsed" : ""}${fullscreen ? " hidden" : ""}${candidateDropActive ? " drop-active" : ""}`}
+            style={candidatePanelCollapsed ? { position: "relative", zIndex: 2, pointerEvents: "auto" } : undefined}
             ariaHidden={compactLayout && compactExecuteView !== "tasks"}
             onPointerDown={(event) => {
               if (compactLayout || candidatePanelCollapsed || event.button) return;
@@ -8175,7 +8176,7 @@ function App() {
                 <div className="df-candidate-view-toggles">
                   <button
                     type="button"
-                    className={`df-candidate-group-toggle${groupByProject ? " active" : ""}`}
+                    className={`df-icon-action df-candidate-group-toggle${groupByProject ? " active" : ""}`}
                     aria-pressed={groupByProject}
                     aria-label={lang === "zh" ? "按项目分类" : "Group by project"}
                     title={lang === "zh" ? "按项目分类" : "Group by project"}
@@ -8185,7 +8186,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    className={`df-candidate-completed-toggle${showCompletedCandidates ? " active" : ""}`}
+                    className={`df-icon-action df-candidate-completed-toggle${showCompletedCandidates ? " active" : ""}`}
                     aria-pressed={showCompletedCandidates}
                     aria-label={t(lang, "candidate.showCompleted")}
                     title={t(lang, "candidate.showCompleted")}

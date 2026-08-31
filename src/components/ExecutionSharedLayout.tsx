@@ -71,6 +71,7 @@ export function ExecutionSplitLayout({
  */
 export function CandidatePanelShell({
   className,
+  style,
   ariaHidden,
   ariaLabel,
   onDragOver,
@@ -79,6 +80,7 @@ export function CandidatePanelShell({
   children,
 }: {
   className?: string;
+  style?: CSSProperties;
   ariaHidden?: boolean;
   ariaLabel?: string;
   onDragOver?: React.DragEventHandler<HTMLElement>;
@@ -89,6 +91,7 @@ export function CandidatePanelShell({
   return (
     <section
       className={`df-candidate-panel${className ? ` ${className}` : ""}`}
+      style={style}
       aria-hidden={ariaHidden}
       aria-label={ariaLabel}
       onDragOver={onDragOver}
