@@ -216,7 +216,7 @@
     overflow: hidden;
   }
   #root .df-app.mode-execute .df-timeline-panel .df-date-arrow.right {
-    right: 40px !important;
+    right: 0 !important;
     left: auto !important;
   }
   #root .df-app.mode-execute .df-add-fab,
