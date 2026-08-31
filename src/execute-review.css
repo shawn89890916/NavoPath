@@ -189,7 +189,7 @@
   box-shadow: none !important;
 }
 @media (min-width: 981px) {
-  #root .df-app:not(.theme-dark).mode-execute > .df-execute:not(.df-template-shell) {
+  #root .df-app:not(.theme-dark).mode-execute > .df-execute:not(.df-template-shell):not(.fullscreen) {
     position: relative;
     isolation: isolate;
     grid-template-columns: var(--df-candidate-width, clamp(400px, 32vw, 470px)) minmax(0, 1fr) !important;
@@ -222,7 +222,7 @@
     z-index: 2;
     overflow: visible !important;
   }
-  #root .df-app.mode-execute > .df-execute:not(.df-template-shell) .df-timeline-panel {
+  #root .df-app.mode-execute > .df-execute:not(.df-template-shell):not(.fullscreen) .df-timeline-panel {
     grid-column: 2;
     position: relative;
     border: 0 !important;
@@ -310,7 +310,6 @@
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: normal !important;
-    text-wrap: pretty;
   }
   #root .df-app.mode-execute .df-project-group-dot {
     width: 7px;
@@ -329,6 +328,20 @@
 #root .df-app.mode-execute .df-timeline-panel .df-task-block[data-task-appearance] {
   border-left-color: color-mix(in srgb, var(--task-project-color) 54%, #fff) !important;
   background: #fff !important;
+}
+
+/* This stylesheet loads after the desktop workbench rules. Fullscreen must
+   collapse that two-column grid before the timeline is placed. */
+#root .df-app.is-timeline-fullscreen.mode-execute > .df-execute.fullscreen {
+  height: 100dvh !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+#root .df-app.is-timeline-fullscreen.mode-execute > :is(.df-add-fab, .df-ai-fab),
+#root .df-app.is-timeline-fullscreen.mode-execute .df-date-arrow,
+#root .df-app.is-timeline-fullscreen.mode-execute .df-view-switch-vertical {
+  display: none !important;
 }
 #root .df-app.mode-execute .df-habit-candidate-card,
 #root .df-app.mode-execute .df-habit-candidate-card .df-task-block[data-task-appearance] {

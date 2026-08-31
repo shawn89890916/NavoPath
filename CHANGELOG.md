@@ -15,6 +15,7 @@
 
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px；右移日期箭头与 Day / 3-Day / Week / Month 的纵向控件列对齐。
+- 修复三天和周视图的全屏模式仍继承候选栏窄列的问题；全屏现在只保留完整时间轴与退出入口，不会再出现被压缩或空白的画布。
 
 ## 2026-08-31 · Candidate grouping and timeline spacing
 
@@ -31,6 +32,7 @@
 
 ### Fixed
 - Restored all four rounded corners on the Execute timeline background and reduced its side and bottom margins. Today's Candidates keeps its width and horizontal position, moving slightly upward for matching 6px top, left, and bottom insets within the timeline card. The next-date arrow now aligns with the vertical Day / 3-Day / Week / Month controls.
+- Fixed fullscreen in 3-Day and Week views inheriting the narrow candidate column. Fullscreen now keeps only the complete timeline and its exit action, without a compressed or blank canvas.
 
 ## 2026-08-30 · AI 对话窗口调整
 
