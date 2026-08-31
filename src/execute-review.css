@@ -15,14 +15,12 @@
   #root .df-app .df-candidate-panel .df-quick-add input {
     width: calc(100% + 10px) !important;
     padding-left: 0 !important;
-    border: 0 !important;
     border-bottom: 1px solid var(--paper-rule-strong) !important;
   }
   #root .df-app .df-candidate-panel .df-quick-add input:focus { border-bottom-color: var(--paper-accent-rule) !important; }
   #root .df-app .df-candidate-panel .df-quick-add-submit { margin-right: 0 !important; }
 }
 
-#root .df-app.mode-execute .df-candidate-resize-zone { display: none; }
 @media (min-width: 981px) {
   #root .df-app.mode-execute .df-candidate-panel .df-candidate-resize-zone {
     display: block;
