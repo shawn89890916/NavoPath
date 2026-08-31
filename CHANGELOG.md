@@ -1,19 +1,31 @@
 # NavoPath 更新日志
 
-## 2026-08-31 · 时间轴圆角与留白校准
+## 2026-08-31 · 今日候选分组与时间轴留白
 
 ### 改进
+- 今日候选默认按项目分组，并提供仅图标的“按项目分类”按钮和固定勾选图标的“显示已完成”开关；是否显示仅用选中状态表示。未排程的未完成任务保留时长、排程与展开更多；已完成或已排程任务右侧统一显示日期、星期和开始时间，点击时间可定位到时间轴，点击任务其他区域仍打开详情。重复标记改为清晰的右上角悬挂图标，不再单独缩短重复任务行的右边宽度。暗色候选行同步修正纸面与文字对比度。
+- 习惯编辑页改为与任务设置一致的纸面字段节奏：可在点击计数与累积时长间切换，分别设置目标次数或 15 分钟粒度的时长；工作日拥有清晰选中反馈，启用状态改为开关，并通过保存按钮统一提交。顶部新增按周查看的单习惯完成图，可翻阅每一天的完成情况。
+- 重写主页与账号弹窗的中文文案，不再沿用英文句式，改用更自然、口语化的表达。
+- 主页首屏重新以导航底线与产品纸面之间的留白为视觉中心：NavoPath 与 slogan 上移、更靠近 N 标志，产品纸面以更克制的高度露出；恢复置于首屏底层、会被升起纸面遮住的上箭头和“继续探索”提示，并扩大顶栏左右两侧的品牌和账号操作留白。
+
 - 收紧候选快速添加栏的左右与底部内边距，并将全天分隔线收至略宽于时间轴内容；日程时段画布随时间轴扩展，项目分组使用统一的小型系统圆点标识。
 - 快速添加栏移除左侧竖线，输入底线延至项目选择区；今日候选右缘提供无可见把手的宽幅拖拽命中区域。主页产品预览更新为当前 Execute 工作区，并随语言切换展示中英文的日常职场任务与日程。
+- 日视图的时间轴改为更聚焦的窄阅读列；3 天和周视图共用更宽、左右等距的时间轴画布。
 
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px；右移日期箭头与 Day / 3-Day / Week / Month 的纵向控件列对齐。
 
-## 2026-08-31 · Timeline corners and spacing
+## 2026-08-31 · Candidate grouping and timeline spacing
 
 ### Improved
+- Today's Candidates groups tasks by project by default, with icon-only Group by project and a Show completed control that always uses a checked-square icon; selection alone indicates whether completed tasks are visible. Open, unscheduled tasks retain duration, scheduling, and expand actions; completed or scheduled tasks show an aligned date, weekday, and start time on the right. Clicking the time locates it on the timeline, while clicking elsewhere opens task details. Recurrence markers are now crisp upper-right hanging icons that no longer shorten recurring rows on their own. Dark candidate rows also regain readable paper-and-ink contrast.
+- Habit editing now follows the task editor’s paper-field rhythm: switch between Click Counter and Duration, then set a target count or a 15-minute duration. Weekdays have clear selected feedback, Enabled is a switch, and Save commits the settings together. A weekly, per-habit completion view at the top lets users review each day.
+- Rewrote the Chinese copy across the homepage and account dialog with natural, conversational phrasing rather than English sentence structures.
+- Rebalanced the homepage around the open space between the navigation and product paper: the NavoPath name and slogan sit higher and nearer the N mark while the product paper has a more restrained reveal. The upward “Continue exploring” cue remains beneath the rising paper so it is naturally covered on scroll, and the header’s outer brand and account margins are wider.
+
 - Tightened the quick-add bar's left, right, and bottom insets, shortened the all-day divider to just exceed the timeline content, expanded the daily schedule canvas with the timeline, and unified project-group markers as compact system-style dots.
-- Removed the quick-add bar's left rule and extended the input underline to the project picker. Today's Candidates now has a broad, handle-free resize target on its right edge. The homepage product preview now reflects the current Execute workspace and switches between everyday professional schedules in English and Chinese with the page language.
+- Removed the quick-add bar’s left rule and extended the input underline to the project picker. Today’s Candidates now has a broad, handle-free resize target on its right edge. The homepage product preview now reflects the current Execute workspace and switches between everyday professional schedules in English and Chinese with the page language.
+- The daily view now uses a more focused reading column, while 3-Day and Week share a wider timeline canvas with matching left and right insets.
 
 ### Fixed
 - Restored all four rounded corners on the Execute timeline background and reduced its side and bottom margins. Today's Candidates keeps its width and horizontal position, moving slightly upward for matching 6px top, left, and bottom insets within the timeline card. The next-date arrow now aligns with the vertical Day / 3-Day / Week / Month controls.

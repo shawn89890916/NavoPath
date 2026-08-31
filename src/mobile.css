@@ -570,7 +570,6 @@
   }
 
   #root .df-app .df-candidate-panel .df-candidate-collapse,
-  #root .df-app .df-candidate-panel .df-candidate-filter-anchor,
   #root .df-app .df-candidate-panel .df-icon-focus,
   #root .df-app .df-candidate-panel .df-icon-template,
   #root .df-app .df-candidate-panel .df-icon-widget,
@@ -578,7 +577,6 @@
     display: none !important;
   }
 
-  #root .df-app .df-candidate-panel .df-candidate-filter-anchor,
   #root .df-app .df-candidate-panel .df-ai-plan-title-tools {
     flex: 0 0 auto !important;
   }

@@ -553,6 +553,7 @@ describe("browser fallback preview mode", () => {
       title: "H".repeat(10_001),
       notes: "N".repeat(60_001),
       defaultDurationMinutes: 1_000_000,
+      trackingType: "duration",
       frequencyRule: "invalid",
       weeklyTarget: 1_000_000,
       targetCount: 1_000_000,
@@ -621,6 +622,7 @@ describe("browser fallback preview mode", () => {
     expect(habit?.title).toHaveLength(10_000);
     expect(habit?.notes).toHaveLength(60_000);
     expect(habit?.defaultDurationMinutes).toBe(480);
+    expect(habit?.trackingType).toBe("duration");
     expect(habit?.frequencyRule).toBe("daily");
     expect(habit?.weeklyTarget).toBe(1_000);
     expect(habit?.targetCount).toBe(1_000);

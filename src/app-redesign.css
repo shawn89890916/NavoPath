@@ -3539,6 +3539,7 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 .df-habit-archive-btn {
   border-color: color-mix(in srgb, var(--accent-active) 30%, var(--paper-rule));
 }
+
 @media (max-width: 520px) {
   .df-habit-stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -7337,13 +7338,6 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
   color: var(--accent-active);
   font-size: 9px;
 }
-.df-candidate-filter-anchor { position: relative; display: inline-flex; }
-.df-candidate-panel .df-filter-trigger { width: 30px !important; min-width: 30px !important; min-height: 30px !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
-.df-candidate-panel .df-filter-trigger:hover, .df-candidate-panel .df-filter-trigger.active { border: 0 !important; background: color-mix(in srgb, var(--surface-main) 94%, var(--accent-active) 6%) !important; }
-.df-candidate-filter-menu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; display: grid; grid-template-columns: 132px minmax(170px, 1fr); width: min(350px, calc(100vw - 28px)); max-height: min(300px, calc(100vh - 120px)); overflow: auto; border: 1px solid var(--paper-rule-strong); background: var(--surface-main); color: var(--text-main); box-shadow: var(--paper-float-shadow); }
-.df-candidate-filter-menu .df-filter-categories { border-right: 1px solid var(--paper-rule); }
-.df-candidate-filter-menu .df-filter-options-view { min-width: 0; }
-.df-candidate-filter-menu .df-filter-reset { grid-column: 1 / -1; }
 .df-filter-trigger:hover,
 .df-filter-trigger:focus-visible,
 .df-filter-trigger.active {

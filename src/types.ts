@@ -321,11 +321,13 @@ export interface AiConversation {
 }
 
 export type HabitFrequency = "daily" | "weekly" | "custom";
+export type HabitTrackingType = "click-counter" | "duration";
 
 export interface Habit {
   id: string;
   title: string;
   defaultDurationMinutes: number;
+  trackingType?: HabitTrackingType;
   notes?: string;
   frequencyRule?: HabitFrequency;
   weeklyTarget?: number;

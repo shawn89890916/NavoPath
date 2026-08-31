@@ -766,6 +766,7 @@ export function normalizeData(data: PlannerData): PlannerData {
         MAX_HABIT_DURATION_MINUTES,
         20,
       ),
+      trackingType: habit.trackingType === "duration" ? "duration" as const : "click-counter" as const,
       frequencyRule: ["daily", "weekly", "custom"].includes(String(habit.frequencyRule))
         ? habit.frequencyRule
         : "daily",

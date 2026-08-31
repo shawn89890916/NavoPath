@@ -34,6 +34,7 @@
     touch-action: none;
   }
 }
+
 /* Candidate cards read as a compact, continuous work list. */
 #root .df-app .df-candidate-list,
 #root .df-app .df-candidate-list .df-project-group { gap: 4px; }
@@ -44,17 +45,21 @@
 }
 #root .df-app.mode-execute .df-candidate-list::-webkit-scrollbar { display: none; }
 
-/* The recurrence glyph is a transparent stamp, not a square paper tab. */
+/* Hang the recurrence mark from the upper-right corner without singling out its row width. */
 #root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator {
-  top: 6px;
-  right: 6px;
+  top: -12px;
+  right: -12px;
   width: 24px;
   height: 24px;
-  z-index: 20;
+  z-index: 32;
   background: transparent !important;
-  color: color-mix(in srgb, var(--task-project-color) 62%, #fff) !important;
+  border: 0 !important;
+  color: color-mix(in srgb, var(--task-project-color) 74%, var(--text-main)) !important;
   pointer-events: none !important;
   cursor: inherit !important;
+}
+#root .df-app.mode-execute .df-candidate-list:has(.df-task-recurrence-indicator) {
+  padding-right: 18px !important;
 }
 #root .df-app.mode-execute .df-task-card.recurring-locked {
   cursor: pointer !important;
@@ -62,6 +67,7 @@
 #root .df-app .df-task-block[data-task-appearance] > .df-task-recurrence-indicator > svg {
   width: 20px;
   height: 20px;
+  stroke-width: 2.25;
 }
 
 /* Repetition settings are a self-contained edit state rather than loose fields. */
@@ -245,7 +251,9 @@
   #root .df-app.mode-execute .df-add-fab { bottom: 72px !important; }
   #root .df-app.mode-execute .df-timeline-daily {
     --df-daily-time-gutter: 58px;
-    --df-daily-scroll-width: calc(100% - 62px);
+    /* A single day reads best as a focused column.  Multi-day views below
+       deliberately use more of the same timeline card. */
+    --df-daily-scroll-width: min(470px, calc(100% - 86px));
   }
   #root .df-app.mode-execute .df-timeline-daily .df-timeline-scroll {
     width: var(--df-daily-scroll-width) !important;
@@ -275,6 +283,33 @@
     margin-left: max(0px, calc((100% - var(--df-daily-scroll-width)) / 2));
     padding-right: 10px !important;
     text-align: right;
+  }
+  #root .df-app.mode-execute .df-timeline-3day,
+  #root .df-app.mode-execute .df-week-view {
+    width: calc(100% - 16px) !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin-inline: auto !important;
+  }
+  #root .df-app.mode-execute .df-week-view .df-time-card-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  #root .df-app.mode-execute .df-week-view .df-task-block-check {
+    display: none !important;
+  }
+  #root .df-app.mode-execute .df-week-view .df-time-card-main {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  #root .df-app.mode-execute .df-week-view .df-task-block-title {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
   }
   #root .df-app.mode-execute .df-project-group-dot {
     width: 7px;
