@@ -60,6 +60,11 @@ export const defaultSettings: Settings = {
   aiBriefsEnabled: false,
   aiStartBriefTime: "08:00",
   aiEndBriefTime: "21:30",
+  proactiveAssistantEnabled: true,
+  proactiveAssistantIntroSeen: false,
+  proactiveAssistantAutoAdjust: true,
+  proactiveAssistantGapChecks: true,
+  proactiveAssistantGapThresholdMinutes: 30,
   addAdvancedOpen: false,
   uiStyle: "gradient",
   dayStartTime: "00:00",
@@ -309,6 +314,16 @@ export function normalizeSettings(value: unknown): Settings {
   normalized.aiEndBriefTime = typeof stored.aiEndBriefTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(stored.aiEndBriefTime)
     ? stored.aiEndBriefTime
     : defaults.aiEndBriefTime;
+  normalized.proactiveAssistantGapThresholdMinutes = typeof stored.proactiveAssistantGapThresholdMinutes === "number" && Number.isFinite(stored.proactiveAssistantGapThresholdMinutes)
+    ? Math.max(15, Math.min(180, Math.round(stored.proactiveAssistantGapThresholdMinutes / 15) * 15))
+    : defaults.proactiveAssistantGapThresholdMinutes;
+  const location = isRecord(stored.proactiveAssistantLocation) ? stored.proactiveAssistantLocation : null;
+  normalized.proactiveAssistantLocation = location
+    && typeof location.latitude === "number" && Number.isFinite(location.latitude) && Math.abs(location.latitude) <= 90
+    && typeof location.longitude === "number" && Number.isFinite(location.longitude) && Math.abs(location.longitude) <= 180
+    && typeof location.capturedAt === "string"
+    ? { latitude: location.latitude, longitude: location.longitude, capturedAt: location.capturedAt }
+    : undefined;
   if (typeof normalized.syncIntervalMinutes !== "number" || normalized.syncIntervalMinutes < 0) {
     normalized.syncIntervalMinutes = defaults.syncIntervalMinutes;
   }

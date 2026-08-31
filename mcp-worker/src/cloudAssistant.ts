@@ -10,7 +10,7 @@ export interface CloudAssistantEnv {
 
 export type AssistantMessage = {
   userId: string;
-  trigger: "morning" | "evening" | "workspace_event";
+  trigger: "morning" | "evening" | "workspace_event" | "gap_check";
   scheduledDate?: string;
 };
 
@@ -33,6 +33,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,200}$/;
 const EVENT_SETTLE_SECONDS = 30;
+export const CLOUD_ASSISTANT_POLICY_VERSION = "proactive-v2";
 
 export async function serviceDb(env: CloudAssistantEnv, path: string, init?: RequestInit) {
   return fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
@@ -129,6 +130,133 @@ function hardDeadline(task: Json) {
 
 function minutesFrom(date: string, time: string) {
   return Math.floor(Date.parse(`${date}T00:00:00Z`) / 60_000) + Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+}
+
+function clockMinutes(value: unknown, fallback: number) {
+  return typeof value === "string" && CLOCK.test(value)
+    ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3))
+    : fallback;
+}
+
+function clockLabel(value: number) {
+  const minute = Math.max(0, Math.min(1439, Math.round(value)));
+  return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+}
+
+function shanghaiDateTime(value: unknown) {
+  const date = new Date(typeof value === "string" ? value : "");
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const item = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return { date: `${item.year}-${item.month}-${item.day}`, minutes: Number(item.hour) * 60 + Number(item.minute) };
+}
+
+function median(values: number[]) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+/** Only promotes observed routines after three records across at least two days. */
+export function buildBehaviorProfile(data: Json, date = shanghaiDate()) {
+  const cutoff = addDays(date, -90);
+  const projectByTask = new Map<string, string>((data.tasks || []).map((task: Json): [string, string] => [String(task.id), typeof task.projectId === "string" ? task.projectId : "unassigned"]));
+  const startsByProject = new Map<string, Array<{ day: string; minute: number }>>();
+  const durationsByProject = new Map<string, number[]>();
+  const activitySamples: Array<{ day: string; minutes: number }> = [];
+  for (const entry of data.timeEntries || []) {
+    const start = shanghaiDateTime(entry.startAt);
+    if (!start || start.date < cutoff || start.date > date) continue;
+    const minutes = Math.round(Number(entry.durationMinutes) || 0);
+    if (minutes < 5 || minutes > 720) continue;
+    activitySamples.push({ day: start.date, minutes });
+    const projectId = projectByTask.get(entry.taskId) || "unassigned";
+    const starts = startsByProject.get(projectId) || [];
+    starts.push({ day: start.date, minute: start.minutes });
+    startsByProject.set(projectId, starts);
+    const durations = durationsByProject.get(projectId) || [];
+    durations.push(minutes);
+    durationsByProject.set(projectId, durations);
+  }
+  const projects: Json = {};
+  for (const [projectId, samples] of startsByProject) {
+    const distinctDays = new Set(samples.map((sample) => sample.day)).size;
+    const confidence = samples.length >= 3 && distinctDays >= 2 ? "high" : "low";
+    projects[projectId] = {
+      confidence,
+      sampleCount: samples.length,
+      distinctDays,
+      preferredStart: clockLabel(median(samples.map((sample) => sample.minute))),
+      durationMinutes: Math.max(15, Math.min(240, Math.round(median(durationsByProject.get(projectId) || [30]) / 15) * 15)),
+    };
+  }
+  const explicitPreferences = (data.aiMemories || [])
+    .filter((memory: Json) => !memory.archived && Array.isArray(memory.tags) && memory.tags.includes("user-preference"))
+    .slice(-12)
+    .map((memory: Json) => cleanText(memory.content, 280));
+  const activityDays = new Set(activitySamples.map((sample) => sample.day)).size;
+  const hasConfidentGapEvidence = activitySamples.length >= 3 && activityDays >= 2;
+  // A user's typical logged work chunk is a conservative proxy for how much
+  // unlogged time is worth interrupting them about. Never lower the 30-minute
+  // default automatically; explicit settings remain the first priority.
+  const gapThresholdMinutes = hasConfidentGapEvidence
+    ? Math.max(30, Math.min(90, Math.round(median(activitySamples.map((sample) => sample.minutes)) / 15) * 15))
+    : 30;
+  return {
+    version: 1,
+    policyVersion: CLOUD_ASSISTANT_POLICY_VERSION,
+    updatedAt: isoNow(),
+    projects,
+    explicitPreferences,
+    gapThresholdMinutes,
+    gapThresholdConfidence: hasConfidentGapEvidence ? "high" : "low",
+  };
+}
+
+/** Finds the latest unplanned past interval; scheduled blocks, calendar busy time, and actual logs close a gap. */
+export function findUnrecordedGap(data: Json, input: { date: string; nowMinutes: number; startMinutes: number; endMinutes: number; thresholdMinutes: number; busy?: Json[] }) {
+  const endLimit = Math.min(input.nowMinutes, input.endMinutes);
+  if (endLimit - input.startMinutes < input.thresholdMinutes) return null;
+  const intervals: Array<{ start: number; end: number }> = [];
+  for (const task of data.tasks || []) for (const record of task.timelineRecords || []) {
+    if (record.scheduledDate !== input.date || !CLOCK.test(record.scheduledStart || "") || !CLOCK.test(record.scheduledEnd || "")) continue;
+    const start = clockMinutes(record.scheduledStart, 0);
+    let end = clockMinutes(record.scheduledEnd, start);
+    if ((record.scheduledEndDate || input.date) > input.date) end = 1440;
+    if (end > start) intervals.push({ start, end });
+  }
+  for (const entry of data.timeEntries || []) {
+    const start = shanghaiDateTime(entry.startAt);
+    if (!start || start.date !== input.date) continue;
+    const duration = Math.max(0, Math.round(Number(entry.durationMinutes) || 0));
+    if (duration) intervals.push({ start: start.minutes, end: Math.min(1440, start.minutes + duration) });
+  }
+  for (const item of input.busy || []) {
+    const start = shanghaiDateTime(item.start_at);
+    const end = shanghaiDateTime(item.end_at);
+    if (start?.date === input.date && end) intervals.push({ start: start.minutes, end: end.date === input.date ? end.minutes : 1440 });
+  }
+  const merged = intervals
+    .map((item) => ({ start: Math.max(input.startMinutes, item.start), end: Math.min(endLimit, item.end) }))
+    .filter((item) => item.end > item.start)
+    .sort((a, b) => a.start - b.start)
+    .reduce<Array<{ start: number; end: number }>>((result, item) => {
+      const previous = result[result.length - 1];
+      if (previous && item.start <= previous.end) previous.end = Math.max(previous.end, item.end);
+      else result.push(item);
+      return result;
+    }, []);
+  let cursor = input.startMinutes;
+  let latest: { start: number; end: number } | null = null;
+  for (const interval of [...merged, { start: endLimit, end: endLimit }]) {
+    if (interval.start - cursor >= input.thresholdMinutes) latest = { start: cursor, end: interval.start };
+    cursor = Math.max(cursor, interval.end);
+  }
+  return latest ? { ...latest, startTime: clockLabel(latest.start), endTime: clockLabel(latest.end) } : null;
 }
 
 function scheduleConflict(data: Json, taskId: string, blockId: string | undefined, date: string, startTime: string, durationMinutes: number) {
@@ -383,8 +511,8 @@ export async function ingestWorkspaceEvent(env: CloudAssistantEnv, userId: strin
   }
 }
 
-export async function configureCloudAssistant(env: CloudAssistantEnv, userId: string, enabled: boolean, emailEnabled: boolean) {
-  const rows = await dbJson<Json[]>(env, "navopath_cloud_assistant_settings?on_conflict=user_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify({ user_id: userId, enabled, email_enabled: emailEnabled, timezone: "Asia/Shanghai", morning_time: "08:30", evening_time: "20:30", quiet_after: "19:00", quiet_until: "08:30", updated_at: isoNow() }) });
+export async function configureCloudAssistant(env: CloudAssistantEnv, userId: string, enabled: boolean, emailEnabled: boolean, preferences: Json = {}) {
+  const rows = await dbJson<Json[]>(env, "navopath_cloud_assistant_settings?on_conflict=user_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify({ user_id: userId, enabled, email_enabled: emailEnabled, timezone: "Asia/Shanghai", morning_time: "08:30", evening_time: "20:30", quiet_after: "19:00", quiet_until: "08:30", preferences: { policyVersion: CLOUD_ASSISTANT_POLICY_VERSION, ...preferences }, updated_at: isoNow() }) });
   return rows[0];
 }
 
@@ -395,7 +523,7 @@ function nextMorning() {
 }
 
 export async function sendNotification(env: CloudAssistantEnv, userId: string, input: Json) {
-  const kind = ["summary", "material_change", "deadline_risk", "weather", "needs_input"].includes(input.kind) ? input.kind : "summary";
+  const kind = ["summary", "material_change", "deadline_risk", "weather", "needs_input", "gap_check"].includes(input.kind) ? input.kind : "summary";
   const urgency = input.urgency === "urgent" ? "urgent" : "normal";
   const title = cleanText(input.title, 160);
   const body = cleanText(input.body, 2000);
@@ -429,12 +557,16 @@ async function deliverDueNotifications(env: CloudAssistantEnv, userId: string) {
   }
 }
 
-async function fetchWenzhouWeather() {
-  const url = "https://api.open-meteo.com/v1/forecast?latitude=27.9938&longitude=120.6994&current=temperature_2m,precipitation,rain,weather_code,wind_speed_10m&hourly=precipitation_probability,temperature_2m,weather_code&forecast_days=2&timezone=Asia%2FShanghai";
+async function fetchLocalWeather(preferences: Json) {
+  const location = preferences?.location;
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(String(latitude))}&longitude=${encodeURIComponent(String(longitude))}&current=temperature_2m,precipitation,rain,weather_code,wind_speed_10m&hourly=precipitation_probability,temperature_2m,weather_code&forecast_days=2&timezone=Asia%2FShanghai`;
   const response = await fetch(url, { headers: { "user-agent": "NavoPath-Cloud-Assistant/1.0" }, signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`Weather request failed (${response.status})`);
   const data = await response.json() as Json;
-  return { current: data.current || {}, next24Hours: (data.hourly?.time || []).slice(0, 24).map((time: string, index: number) => ({ time, precipitationProbability: data.hourly?.precipitation_probability?.[index], temperature: data.hourly?.temperature_2m?.[index], weatherCode: data.hourly?.weather_code?.[index] })) };
+  return { locationLabel: cleanText(location?.label, 120), current: data.current || {}, next24Hours: (data.hourly?.time || []).slice(0, 24).map((time: string, index: number) => ({ time, precipitationProbability: data.hourly?.precipitation_probability?.[index], temperature: data.hourly?.temperature_2m?.[index], weatherCode: data.hourly?.weather_code?.[index] })) };
 }
 
 function compactWorkspace(profile: Profile, date: string) {
@@ -509,6 +641,34 @@ async function updateJob(env: CloudAssistantEnv, jobId: string, patch: Json) {
   await serviceDb(env, `navopath_assistant_jobs?id=eq.${encodeURIComponent(jobId)}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
+async function processGapCheck(env: CloudAssistantEnv, userId: string, profile: Profile, settings: Json, state: Json, date: string) {
+  const preferences = settings.preferences || {};
+  if (preferences.gapCheck?.enabled === false || profile.settings.proactiveAssistantGapChecks === false) return { skipped: "gap_check_disabled" };
+  const nowMinutes = shanghaiClockMinutes();
+  const quietAfter = clockMinutes(settings.quiet_after?.slice?.(0, 5), 19 * 60);
+  if (nowMinutes >= quietAfter) return { skipped: "quiet_hours" };
+  const startMinutes = clockMinutes(preferences.workStart || profile.settings.scheduleDayStartTime, 8 * 60);
+  const endMinutes = Math.min(clockMinutes(preferences.workEnd || profile.settings.dayEndTime, 22 * 60), quietAfter);
+  const thresholdMinutes = Math.max(15, Math.min(180, Number(profile.settings.proactiveAssistantGapThresholdMinutes) || Number(preferences.gapCheck?.thresholdMinutes) || Number(state.behavior_profile?.gapThresholdMinutes) || 30));
+  const busy = await dbJson<Json[]>(env, `navopath_calendar_occurrences?select=start_at,end_at&user_id=eq.${encodeURIComponent(userId)}&status=neq.cancelled&start_date=lte.${date}&end_date=gte.${date}&limit=100`);
+  const gap = findUnrecordedGap(profile.data, { date, nowMinutes, startMinutes, endMinutes, thresholdMinutes, busy });
+  if (!gap) return { skipped: "no_unrecorded_gap" };
+  const key = `gap:${date}:${gap.startTime}:${gap.endTime}`;
+  const notification = await sendNotification(env, userId, {
+    kind: "gap_check",
+    title: "补记一段时间",
+    body: `${gap.startTime}–${gap.endTime} 没有安排或实际记录。你刚才做了什么？`,
+    urgency: "normal",
+    idempotency_key: key,
+    metadata: { action: "gap_check", date, startTime: gap.startTime, endTime: gap.endTime, thresholdMinutes },
+  });
+  await serviceDb(env, "navopath_cloud_assistant_state?on_conflict=user_id", {
+    method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ user_id: userId, last_gap_check_at: isoNow(), updated_at: isoNow() }),
+  });
+  return { gap, notification };
+}
+
 export async function processAssistantMessage(env: CloudAssistantEnv, message: AssistantMessage) {
   const date = message.scheduledDate || shanghaiDate();
   let events: Json[] = [];
@@ -518,7 +678,11 @@ export async function processAssistantMessage(env: CloudAssistantEnv, message: A
     if (!events.length) return { skipped: "no_new_events" };
   }
   const eventIds = events.map((event) => event.id).sort();
-  const key = message.trigger === "workspace_event" ? `event:${await sha256(eventIds.join(":"))}` : `schedule:${message.trigger}:${date}`;
+  const key = message.trigger === "workspace_event"
+    ? `event:${await sha256(eventIds.join(":"))}`
+    : message.trigger === "gap_check"
+      ? `gap-run:${date}:${Math.floor(shanghaiClockMinutes() / 30)}`
+      : `schedule:${message.trigger}:${date}`;
   const job = await claimJob(env, message, eventIds, key);
   if (!job?.claimed) return { skipped: "duplicate_job" };
   try {
@@ -529,23 +693,39 @@ export async function processAssistantMessage(env: CloudAssistantEnv, message: A
       dbJson<Json[]>(env, `navopath_cloud_assistant_state?select=*&user_id=eq.${encodeURIComponent(message.userId)}&limit=1`),
       dbJson<Json[]>(env, `navopath_cloud_change_sets?select=source,status,summary,reason,created_at&user_id=eq.${encodeURIComponent(message.userId)}&order=change_cursor.desc&limit=20`),
     ]);
-    if (message.trigger !== "workspace_event" && settingsRows[0]?.enabled !== true) {
+    const assistantSettings = settingsRows[0] || {};
+    if (message.trigger !== "workspace_event" && (assistantSettings.enabled !== true || profile.settings.proactiveAssistantEnabled === false)) {
       await updateJob(env, job.job_id, { status: "completed", result: { skipped: "disabled" }, finished_at: isoNow() });
       return { skipped: "disabled" };
     }
-    const weather = message.trigger === "morning" ? await fetchWenzhouWeather().catch(() => null) : null;
+    if (assistantSettings.intro_seen !== true && profile.settings.proactiveAssistantIntroSeen !== true) {
+      const notification = await sendNotification(env, message.userId, {
+        kind: "summary", title: "Navo AI 已准备好主动规划", body: "它会基于你的计划和实际时长主动安排普通任务；你可以随时在设置中关闭或调整。",
+        urgency: "normal", idempotency_key: `assistant-intro:${message.userId}`.slice(0, 240),
+      });
+      await updateJob(env, job.job_id, { status: "completed", result: { skipped: "intro_pending", notification }, finished_at: isoNow() });
+      return { skipped: "intro_pending", notification };
+    }
+    if (message.trigger === "gap_check") {
+      const result = await processGapCheck(env, message.userId, profile, assistantSettings, stateRows[0] || {}, date);
+      await updateJob(env, job.job_id, { status: "completed", result, finished_at: isoNow() });
+      return result;
+    }
+    const behaviorProfile = buildBehaviorProfile(profile.data, date);
+    const weatherPreferences = { ...(assistantSettings.preferences || {}), location: profile.settings.proactiveAssistantLocation || assistantSettings.preferences?.location };
+    const weather = message.trigger === "morning" ? await fetchLocalWeather(weatherPreferences).catch(() => null) : null;
     const eventContext = events.map((event) => ({ changed_files: event.changed_files, fragments: event.fragments, summary: event.summary, schedule_impact: event.schedule_impact, timestamp: event.source_timestamp }));
     const plannerSnapshot = compactWorkspace(profile, date);
     const fileSnapshot = mergeFileSnapshot(stateRows[0]?.last_snapshot, events);
-    const context = { trigger: message.trigger, timezone: "Asia/Shanghai", workspace: plannerSnapshot, weather, events: eventContext, workspaceSnapshot: fileSnapshot.slice(-40).map((file) => ({ ...file, excerpt: cleanText(file.excerpt, 800) })), persistentState: { preferences: settingsRows[0]?.preferences || {}, lastScanSummary: stateRows[0]?.last_scan_summary || "", eventCursor: stateRows[0]?.event_cursor || 0, recentActivity: activityRows } };
+    const context = { trigger: message.trigger, timezone: "Asia/Shanghai", workspace: plannerSnapshot, weather, events: eventContext, workspaceSnapshot: fileSnapshot.slice(-40).map((file) => ({ ...file, excerpt: cleanText(file.excerpt, 800) })), persistentState: { preferences: { ...(assistantSettings.preferences || {}), autoAdjust: profile.settings.proactiveAssistantAutoAdjust !== false }, behaviorProfile, lastScanSummary: stateRows[0]?.last_scan_summary || "", eventCursor: stateRows[0]?.event_cursor || 0, recentActivity: activityRows } };
     await updateJob(env, job.job_id, { model_called: true });
     const decision = await callDecisionModel(env, context);
-    const applied = await batchUpdateTasks(env, message.userId, { operations: decision.operations, dryRun: false, commit: true, idempotencyKey: key, source: message.trigger === "workspace_event" ? "workspace_event" : "cloud_assistant", summary: decision.summary, reason: decision.reason });
+    const applied = await batchUpdateTasks(env, message.userId, { operations: profile.settings.proactiveAssistantAutoAdjust === false ? [] : decision.operations, dryRun: false, commit: true, idempotencyKey: key, source: message.trigger === "workspace_event" ? "workspace_event" : "cloud_assistant", summary: decision.summary, reason: decision.reason });
     const notification = decision.notification && (applied.applied || applied.confirmationRequired?.length || decision.notification.kind === "material_change" || decision.notification.kind === "deadline_risk" || decision.notification.kind === "weather" || decision.notification.kind === "needs_input")
       ? await sendNotification(env, message.userId, { ...decision.notification, idempotency_key: `${key}:notification`.slice(0, 240), metadata: { changeSetId: applied.changeSet?.change_set_id || null } })
       : null;
     const maxCursor = events.reduce((max, event) => Math.max(max, Number(event.event_cursor) || 0), Number(stateRows[0]?.event_cursor) || 0);
-    await serviceDb(env, "navopath_cloud_assistant_state?on_conflict=user_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: message.userId, event_cursor: maxCursor, last_snapshot: { planner: plannerSnapshot, files: fileSnapshot }, last_scan_summary: decision.summary, last_model_call_at: isoNow(), ...(message.trigger === "morning" ? { last_morning_run_date: date } : {}), ...(message.trigger === "evening" ? { last_evening_run_date: date } : {}), updated_at: isoNow() }) });
+    await serviceDb(env, "navopath_cloud_assistant_state?on_conflict=user_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: message.userId, event_cursor: maxCursor, last_snapshot: { planner: plannerSnapshot, files: fileSnapshot }, behavior_profile: behaviorProfile, last_scan_summary: decision.summary, last_model_call_at: isoNow(), ...(message.trigger === "morning" ? { last_morning_run_date: date } : {}), ...(message.trigger === "evening" ? { last_evening_run_date: date } : {}), updated_at: isoNow() }) });
     if (events.length) await serviceDb(env, `navopath_workspace_events?id=in.(${events.map((event) => event.id).join(",")})`, { method: "PATCH", body: JSON.stringify({ status: "processed", processed_at: isoNow() }) });
     const result = { model: decision.model, summary: decision.summary, applied, notification };
     await updateJob(env, job.job_id, { status: "completed", result, finished_at: isoNow() });
@@ -558,7 +738,7 @@ export async function processAssistantMessage(env: CloudAssistantEnv, message: A
   }
 }
 
-export async function scheduleCloudRuns(env: CloudAssistantEnv, trigger: "morning" | "evening", date = shanghaiDate()) {
+export async function scheduleCloudRuns(env: CloudAssistantEnv, trigger: "morning" | "evening" | "gap_check", date = shanghaiDate()) {
   const rows = await dbJson<Array<{ user_id: string }>>(env, "navopath_cloud_assistant_settings?select=user_id&enabled=eq.true");
   await Promise.all(rows.map((row) => env.ASSISTANT_QUEUE.send({ userId: row.user_id, trigger, scheduledDate: date })));
   return rows.length;

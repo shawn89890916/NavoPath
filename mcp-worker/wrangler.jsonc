@@ -11,7 +11,7 @@
     "producers": [{ "binding": "ASSISTANT_QUEUE", "queue": "navopath-cloud-assistant" }],
     "consumers": [{ "queue": "navopath-cloud-assistant", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 5, "dead_letter_queue": "navopath-cloud-assistant-dead" }]
   },
-  "triggers": { "crons": ["30 0 * * *", "30 12 * * *"] },
+  "triggers": { "crons": ["*/30 * * * *"] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NavoPathMCP"] }],
   "vars": { "MCP_SERVER_NAME": "NavoPath" }
 }

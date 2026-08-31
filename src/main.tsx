@@ -138,6 +138,7 @@ const MobileQuickAddSheet = lazy(() => import("./MobileTaskSummary").then((modul
 const MobileTimelineDraftSheet = lazy(() => import("./MobileTaskSummary").then((module) => ({ default: module.MobileTimelineDraftSheet })));
 const WidgetAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetApp })));
 const WidgetPopoverAppLazy = lazy(() => import("./widget/WidgetApp").then((module) => ({ default: module.WidgetPopoverApp })));
+const ProactiveAssistantSettings = lazy(() => import("./components/ProactiveAssistantSettings").then((module) => ({ default: module.ProactiveAssistantSettings })));
 
 const todayIso = () => localIsoDate();
 const TIMELINE_START = 0;
@@ -1320,6 +1321,7 @@ function App() {
   const [aiAttachmentStatus, setAiAttachmentStatus] = useState("");
   const briefAutomationBusyRef = useRef(false);
   const briefAttemptedRef = useRef(new Set<string>());
+  const proactiveIntroShownRef = useRef(false);
   const [externalCalendarSources, setExternalCalendarSources] = useState<ExternalCalendarSource[]>([]);
   const [externalCalendarOccurrences, setExternalCalendarOccurrences] = useState<ExternalCalendarOccurrence[]>([]);
   const externalCalendarSyncRef = useRef<Promise<void> | null>(null);
@@ -6610,6 +6612,15 @@ function App() {
     const interval = window.setInterval(() => void check(), 60_000);
     return () => window.clearInterval(interval);
   }, [authState?.user?.id, aiBusy, lang, settings?.aiBriefsEnabled, settings?.aiStartBriefTime, settings?.aiEndBriefTime, settings?.aiLastStartBriefDate, settings?.aiLastEndReviewDate]);
+
+  useEffect(() => {
+    if (proactiveIntroShownRef.current || authState?.mode !== "cloud" || !authState.user || !settings || settings.proactiveAssistantIntroSeen) return;
+    proactiveIntroShownRef.current = true;
+    showToast(lang === "zh"
+      ? "Navo AI 主动助理已开启：会安排普通任务、提示补记，并保留撤销和确认边界。"
+      : "Navo AI Proactive Assistant is on: it can arrange ordinary tasks, prompt gap logging, and keeps undo and confirmation safeguards.");
+    void saveSettings({ proactiveAssistantIntroSeen: true });
+  }, [authState?.mode, authState?.user?.id, lang, settings?.proactiveAssistantIntroSeen]);
 
   function openDailyAiPrompt(kind: "start" | "review") {
     setAiInput(kind === "start"
@@ -14292,6 +14303,23 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
       alert(lang === "zh" ? "图片无效或像素尺寸过大。" : "The image is invalid or its pixel dimensions are too large.");
     }
   };
+  const requestProactiveLocation = () => {
+    if (!navigator.geolocation) {
+      alert(lang === "zh" ? "此设备不支持定位服务。" : "Location is not supported on this device.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => onSave({
+        proactiveAssistantLocation: {
+          latitude: Math.round(position.coords.latitude * 10_000) / 10_000,
+          longitude: Math.round(position.coords.longitude * 10_000) / 10_000,
+          capturedAt: new Date().toISOString(),
+        },
+      }),
+      () => alert(lang === "zh" ? "未获得定位权限；晨间简报会跳过天气建议。" : "Location permission was not granted; morning briefs will skip weather."),
+      { enableHighAccuracy: false, maximumAge: 24 * 60 * 60_000, timeout: 10_000 },
+    );
+  };
   return (
     <>
       <div className="df-utility-backdrop" onMouseDown={onClose} />
@@ -14842,6 +14870,7 @@ function UtilityPanel({ kind, settings, initialSection, data, authEmail, onClose
               <SettingRow anchor="ai-briefs" title={lang === "zh" ? "每日开工与收工简报" : "Daily start and end briefs"} description={cloudReady ? (lang === "zh" ? "应用运行时跨过时间点生成；当天错过后会在下次打开时补生成一次。简报只读。" : "Generated when the running app crosses each time; a missed brief is generated on the next open that day. Briefs are read-only.") : (lang === "zh" ? "登录云端账号后可启用。" : "Sign in to a cloud account to enable briefs.")} control={<SettingToggle checked={Boolean(settings.aiBriefsEnabled)} disabled={!cloudReady} ariaLabel={lang === "zh" ? "每日 AI 简报" : "Daily AI briefs"} onChange={(next) => onSave({ aiBriefsEnabled: next })} />} />
               <SettingRow title={lang === "zh" ? "开工时间" : "Start brief time"} control={<SettingTextInput type="time" value={settings.aiStartBriefTime || "08:00"} disabled={!settings.aiBriefsEnabled || !cloudReady} ariaLabel={lang === "zh" ? "开工简报时间" : "Start brief time"} onChange={(value) => onSave({ aiStartBriefTime: value })} />} />
               <SettingRow title={lang === "zh" ? "收工时间" : "End review time"} control={<SettingTextInput type="time" value={settings.aiEndBriefTime || "21:30"} disabled={!settings.aiBriefsEnabled || !cloudReady} ariaLabel={lang === "zh" ? "收工复盘时间" : "End review time"} onChange={(value) => onSave({ aiEndBriefTime: value })} />} />
+              <Suspense fallback={null}><ProactiveAssistantSettings settings={settings} data={data} lang={lang} cloudReady={Boolean(cloudReady)} onSave={onSave} onSaveData={onSaveData} onRequestLocation={requestProactiveLocation} /></Suspense>
               <SettingRow anchor="ai-memory" title={t(lang, "settings.allowAiContext")} description={lang === "zh" ? "启用后，下方才显示可参与上下文的记忆。" : "When enabled, memories available to context appear below."} control={<SettingToggle checked={Boolean(settings.aiMemoryEnabled)} ariaLabel={t(lang, "settings.allowAiContext")} onChange={(next) => onSave({ aiMemoryEnabled: next })} />} />
               <SettingRow anchor="hide-ai" title={t(lang, "settings.hideAllAi")} control={<SettingToggle checked={Boolean(settings.hideAi)} ariaLabel={t(lang, "settings.hideAllAi")} onChange={(next) => onSave({ hideAi: next })} />} />
               <SettingRow

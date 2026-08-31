@@ -3,6 +3,7 @@
 ## 2026-08-31 · 今日候选分组与时间轴留白
 
 ### 改进
+- Navo AI 现以主动日程助理方式默认启用：首次说明后可直接调整普通任务，并保留 24 小时撤销；锁定日程、硬截止和删除仍要求确认。助理会从实际计时持续学习可靠的项目时段与任务时长，并在工作时间发现未安排的过去空档时提醒补记。空档提醒可直接选择现有任务或新建已完成任务，将实际时长和低调的历史完成块写入时间轴。定位授权后，晨间简报会使用账户设备位置提供本地天气；这些行为均可在 Navo AI 设置中单独关闭或调整。
 - 今日候选默认按项目分组，并提供仅图标的“按项目分类”按钮和固定勾选图标的“显示已完成”开关；是否显示仅用选中状态表示。未排程的未完成任务保留时长、排程与展开更多；已完成或已排程任务右侧统一显示日期、星期和开始时间，点击时间可定位到时间轴，点击任务其他区域仍打开详情。重复标记改为清晰的右上角悬挂图标，不再单独缩短重复任务行的右边宽度。暗色候选行同步修正纸面与文字对比度。
 - 习惯编辑页改为与任务设置一致的纸面字段节奏：可在点击计数与累积时长间切换，分别设置目标次数或 15 分钟粒度的时长；工作日拥有清晰选中反馈，启用状态改为开关，并通过保存按钮统一提交。顶部新增按周查看的单习惯完成图，可翻阅每一天的完成情况。
 - 重写主页与账号弹窗的中文文案，不再沿用英文句式，改用更自然、口语化的表达。
@@ -20,6 +21,7 @@
 ## 2026-08-31 · Candidate grouping and timeline spacing
 
 ### Improved
+- Navo AI is now enabled by default as a proactive schedule assistant: after a first-run explanation it can directly adjust ordinary tasks with a 24-hour undo window, while locked schedules, hard deadlines, and deletion still require confirmation. It continuously learns reliable project timing and task durations from actual time records, and asks to log unplanned past gaps during working hours. Gap reminders let you choose an existing task or create a completed one, then write actual time and a quiet historical completion block to the timeline. With location permission, morning briefs use the account device location for local weather; each behavior can be adjusted or turned off in Navo AI settings.
 - Today's Candidates groups tasks by project by default, with icon-only Group by project and a Show completed control that always uses a checked-square icon; selection alone indicates whether completed tasks are visible. Open, unscheduled tasks retain duration, scheduling, and expand actions; completed or scheduled tasks show an aligned date, weekday, and start time on the right. Clicking the time locates it on the timeline, while clicking elsewhere opens task details. Recurrence markers are now crisp upper-right hanging icons that no longer shorten recurring rows on their own. Dark candidate rows also regain readable paper-and-ink contrast.
 - Habit editing now follows the task editor’s paper-field rhythm: switch between Click Counter and Duration, then set a target count or a 15-minute duration. Weekdays have clear selected feedback, Enabled is a switch, and Save commits the settings together. A weekly, per-habit completion view at the top lets users review each day.
 - Rewrote the Chinese copy across the homepage and account dialog with natural, conversational phrasing rather than English sentence structures.

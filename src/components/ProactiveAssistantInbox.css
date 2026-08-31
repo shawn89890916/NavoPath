@@ -1,0 +1,10 @@
+.df-proactive-inbox { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid var(--paper-rule); border-bottom: 1px solid var(--paper-rule); }
+.df-proactive-inbox-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.df-proactive-inbox-head small { color: var(--text-muted); font: 11px var(--paper-mono); }
+.df-proactive-notice { display: grid; gap: 7px; padding: 10px 0; border-bottom: 1px solid var(--paper-rule); }
+.df-proactive-notice:last-child { border-bottom: 0; }
+.df-proactive-notice p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.df-proactive-gap-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.df-proactive-gap-actions select { min-height: 34px; flex: 1 1 180px; border: 0; border-bottom: 1px solid var(--paper-rule); color: var(--text-main); background: transparent; }
+.df-proactive-gap-actions button, .df-proactive-dismiss { min-height: 34px; padding: 0 2px; border: 0; border-bottom: 1px solid var(--accent-active); color: var(--accent-active); background: transparent; cursor: pointer; font: 600 12px var(--paper-sans); }
+.df-proactive-dismiss { width: fit-content; border-bottom-color: var(--paper-rule); color: var(--text-muted); }

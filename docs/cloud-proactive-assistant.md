@@ -4,11 +4,12 @@
 
 主动助理运行在现有 `navopath-mcp` Cloudflare Worker 中，不依赖用户电脑：
 
-- Cloudflare Cron 在 `00:30 UTC` 和 `12:30 UTC` 触发，对应 `Asia/Shanghai` 的 `08:30` 和 `20:30`。
+- Cloudflare Cron 每 30 分钟触发一次；在 `Asia/Shanghai` 的 `08:30` 和 `20:30` 分别运行晨间与晚间助理，其他工作时段运行确定性的空档检查。
 - Cron 只为已启用的账户写入 Cloudflare Queue；Queue consumer 负责天气、工作区读取、DeepSeek 决策、写入、通知与失败重试。
 - 工作区事件通过 HTTPS API 入库后延迟 45 秒入队。消费者一次认领同一用户所有已经稳定 30 秒的事件，从而合并编辑器一次保存产生的多条事件。
 - Supabase 保存启用状态、用户偏好、事件游标、最后快照、上次扫描摘要、Agent job、通知和 change set。模型不承担记忆职责。
-- 每个定时 job 使用 `schedule:<morning|evening>:<date>`；每个事件 job 使用事件 ID 集合的 SHA-256 作为幂等键。重复队列消息不会再次调用模型。
+- 每个晨/晚 job 使用 `schedule:<morning|evening>:<date>`；空档 job 以 30 分钟桶为键，实际提醒以日期和空档范围为键；每个事件 job 使用事件 ID 集合的 SHA-256 作为幂等键。重复队列消息不会再次调用模型。
+- 新账户默认启用助理，但首次应用会话确认规则前只发送说明，不会自动改动任务。显式关闭的既有账户保持关闭。
 
 ## iCloud Drive 边界
 
@@ -97,7 +98,9 @@ npm run build
 
 - 默认模型固定为 `deepseek-ai/DeepSeek-V4-Flash`。Worker 通过仅 Service Role 可访问的内部模式复用现有 Supabase AI Edge Function 与其 SiliconFlow 凭据，不复制第二份模型密钥。
 - 模型只能调用一个带严格 JSON Schema 的 `batch_update_tasks` function。即使模型返回工具参数，Worker 仍会重新做类型、长度、ID、日期、时长、冲突、锁定和硬截止校验。
-- 模型上下文不含整份资料。它只得到未完成任务的必要元数据、今明两天时间块、温州天气、持久状态摘要，以及事件上传的有限片段。
+- 模型上下文不含整份资料。它只得到未完成任务的必要元数据、今明两天时间块、用户授权的设备定位天气、持久状态摘要、确定性习惯档案，以及事件上传的有限片段。
+- 习惯档案从最近 90 天实际计时中提取；同一模式至少出现 3 次且跨 2 天才会提升为可自动使用的高置信度习惯。用户明确偏好始终优先。
+- 空档检查不调用模型：只在工作时间内发现至少 30 分钟、没有任务块、外部忙碌事项或实际记录的过去时间段时产生一次应用内补记提醒；19:00 后不再发送普通空档追问。
 - 普通任务可创建、拆分、更新和重排；删除不在模型工具白名单。锁定日程和硬截止移动会落为 `pending_confirmation`，不会写入 profile。
 - 写入通过 profile revision 原子提交。每个 change set 保存原因、前后值、逆操作、幂等键和 24 小时撤销窗口。
 
@@ -143,4 +146,4 @@ npm run typecheck --prefix mcp-worker
 npm run deploy --prefix mcp-worker
 ```
 
-Cron Triggers 使用 UTC，配置中的 `30 0 * * *` 与 `30 12 * * *` 分别对应上海 08:30 与 20:30。Cloudflare 的运行方式见 [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/) 和 [Worker handlers](https://developers.cloudflare.com/workers/runtime-apis/handlers/)。
+Cron Trigger 使用 `*/30 * * * *`；Worker 按上海时间识别晨间、晚间与工作时段空档检查。Cloudflare 的运行方式见 [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/) 和 [Worker handlers](https://developers.cloudflare.com/workers/runtime-apis/handlers/)。

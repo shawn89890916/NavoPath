@@ -538,6 +538,13 @@ export interface Settings {
   aiEndBriefTime?: string;
   aiLastStartBriefDate?: string;
   aiLastEndReviewDate?: string;
+  /** Cloud proactive assistant preferences, stored with the user profile for offline-safe configuration. */
+  proactiveAssistantEnabled?: boolean;
+  proactiveAssistantIntroSeen?: boolean;
+  proactiveAssistantAutoAdjust?: boolean;
+  proactiveAssistantGapChecks?: boolean;
+  proactiveAssistantGapThresholdMinutes?: number;
+  proactiveAssistantLocation?: { latitude: number; longitude: number; capturedAt: string };
   addAdvancedOpen: boolean;
   uiStyle: "gradient" | "neumorphic";
   dayStartTime: string;

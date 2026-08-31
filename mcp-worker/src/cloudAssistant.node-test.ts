@@ -1,7 +1,7 @@
 // @ts-nocheck
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ingestWorkspaceEvent, normalizeTaskOperations, previewTaskOperations, processAssistantMessage, verifyWebhookSignature, type CloudAssistantEnv } from "./cloudAssistant.ts";
+import { buildBehaviorProfile, findUnrecordedGap, ingestWorkspaceEvent, normalizeTaskOperations, previewTaskOperations, processAssistantMessage, verifyWebhookSignature, type CloudAssistantEnv } from "./cloudAssistant.ts";
 
 function task(overrides: Record<string, unknown> = {}) {
   return {
@@ -130,4 +130,28 @@ test("accepts a fresh event signature and rejects replay or body tampering", asy
   assert.equal(await verifyWebhookSignature(timestamp, signature, body, token, now), true);
   assert.equal(await verifyWebhookSignature(timestamp, signature, `${body} `, token, now), false);
   assert.equal(await verifyWebhookSignature(timestamp, signature, body, token, now + 6 * 60 * 1000), false);
+});
+
+test("promotes a project routine only after repeated work across two days", () => {
+  const profile = buildBehaviorProfile({
+    tasks: [{ id: "task-1", projectId: "esat" }],
+    timeEntries: [
+      { taskId: "task-1", startAt: "2026-08-29T01:00:00.000Z", durationMinutes: 60 },
+      { taskId: "task-1", startAt: "2026-08-30T01:15:00.000Z", durationMinutes: 45 },
+      { taskId: "task-1", startAt: "2026-08-31T01:00:00.000Z", durationMinutes: 60 },
+    ], aiMemories: [{ content: "上午优先复习", tags: ["user-preference"] }],
+  }, "2026-08-31");
+  assert.equal(profile.projects.esat.confidence, "high");
+  assert.equal(profile.projects.esat.preferredStart, "09:00");
+  assert.equal(profile.gapThresholdConfidence, "high");
+  assert.equal(profile.gapThresholdMinutes, 60);
+  assert.deepEqual(profile.explicitPreferences, ["上午优先复习"]);
+});
+
+test("finds only a past unplanned interval and excludes task blocks and actual logs", () => {
+  const result = findUnrecordedGap({
+    tasks: [{ timelineRecords: [{ scheduledDate: "2026-08-31", scheduledStart: "09:00", scheduledEnd: "10:00", executionStatus: "scheduled" }] }],
+    timeEntries: [{ startAt: "2026-08-31T02:00:00.000Z", durationMinutes: 30 }],
+  }, { date: "2026-08-31", nowMinutes: 12 * 60, startMinutes: 9 * 60, endMinutes: 19 * 60, thresholdMinutes: 30 });
+  assert.deepEqual(result, { start: 630, end: 720, startTime: "10:30", endTime: "12:00" });
 });
