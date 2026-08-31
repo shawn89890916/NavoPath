@@ -8138,7 +8138,8 @@ function App() {
               const panel = event.currentTarget;
               if (panel.getBoundingClientRect().right - event.clientX > 18) return;
               startCandidatePanelResize(event);
-            }}            onDragOver={(event) => event.preventDefault()}
+            }}
+            onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
             event.preventDefault();
             const taskId = drag?.taskId || event.dataTransfer.getData("taskId");
