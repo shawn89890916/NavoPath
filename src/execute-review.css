@@ -11,7 +11,7 @@
     grid-template-columns: minmax(0, 1fr) 58px 78px !important;
     border-top: 0 !important;
   }
-  #root .df-app .df-candidate-panel .df-quick-add::before { content: none !important; display: none !important; }
+  #root .df-app .df-candidate-panel .df-quick-add::before { display: none !important; }
   #root .df-app .df-candidate-panel .df-quick-add input {
     width: calc(100% + 10px) !important;
     padding-left: 0 !important;
