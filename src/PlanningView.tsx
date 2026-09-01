@@ -1403,8 +1403,8 @@ export default function PlanningView(props: {
   // the workspace first opens and let the user dismiss it for this visit.
   const showLongRangeGuide = !guideDismissed;
 
-  const treeDropSlot = (kind: TreeNodeKind, id: string, position: TreeDropTarget["position"]) => {
-    if (!dropTarget || dropTarget.kind !== kind || dropTarget.id !== id || dropTarget.position !== position) return null;
+  const treeDropSlot = (kind: TreeNodeKind, id: string, position: TreeDropTarget["position"], suppress = false) => {
+    if (suppress || !dropTarget || dropTarget.kind !== kind || dropTarget.id !== id || dropTarget.position !== position) return null;
     return (
       <div
         className={`df-tree-drop-preview ${position}`}
@@ -1744,7 +1744,9 @@ export default function PlanningView(props: {
       if (!node) { setTreeDropTarget(null); return; }
       const rect = node.getBoundingClientRect();
       const ratio = (clientY - rect.top) / Math.max(rect.height, 1);
-      const position = ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
+      const position = node.dataset.emptyProjectDrop === "true"
+        ? "inside"
+        : ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
       setTreeDropTarget({
         kind: node.dataset.nodeType as TreeNodeKind,
         id: node.dataset.nodeId || "",
@@ -2807,9 +2809,19 @@ export default function PlanningView(props: {
                     onComplete={() => props.onProjectComplete?.(project.id)}
                     dragging={dragNode?.kind === "project" && dragNode.id === project.id}
                   />
-                  {treeDropSlot("project", project.id, "inside")}
+                  {treeDropSlot("project", project.id, "inside", tasks.length === 0)}
                   {!props.collapsed[project.id] && (
                     <div className="df-project-tasks">
+                      {dragNode && tasks.length === 0 && (
+                        <div
+                          className={`df-empty-project-drop-zone${dropTarget?.kind === "project" && dropTarget.id === project.id && dropTarget.position === "inside" ? " is-active" : ""}`}
+                          data-node-id={project.id}
+                          data-node-type="project"
+                          data-empty-project-drop="true"
+                          style={{ "--tree-drop-slot-height": `${dropTarget?.height || 54}px` } as React.CSSProperties}
+                          aria-hidden="true"
+                        />
+                      )}
                       {tasks.map((task) => (
                         <div className="df-task-branch" key={task.id}>
                           {treeDropSlot("task", task.id, "before")}
@@ -2880,9 +2892,19 @@ export default function PlanningView(props: {
                   onAddTask={() => props.onTaskCreate("")}
                   dragging={dragNode?.kind === "project" && dragNode.id === "__unassigned__"}
                 />
-                {treeDropSlot("project", "__unassigned__", "inside")}
+                {treeDropSlot("project", "__unassigned__", "inside", unassigned.length === 0)}
                 {!props.collapsed.unassigned && (
                   <div className="df-project-tasks">
+                    {dragNode && unassigned.length === 0 && (
+                      <div
+                        className={`df-empty-project-drop-zone${dropTarget?.kind === "project" && dropTarget.id === "__unassigned__" && dropTarget.position === "inside" ? " is-active" : ""}`}
+                        data-node-id="__unassigned__"
+                        data-node-type="project"
+                        data-empty-project-drop="true"
+                        style={{ "--tree-drop-slot-height": `${dropTarget?.height || 54}px` } as React.CSSProperties}
+                        aria-hidden="true"
+                      />
+                    )}
                     {unassigned.map((task) => (
                       <div className="df-task-branch" key={task.id}>
                         {treeDropSlot("task", task.id, "before")}

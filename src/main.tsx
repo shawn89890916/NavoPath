@@ -297,9 +297,13 @@ type ActiveDragItem = {
   taskSnapshot: Task;
 };
 type CandidateDropTarget = {
+  kind: "task";
   taskId: string;
   position: "before" | "after";
   intent: Extract<DropIntent, "reorder-before" | "reorder-after">;
+} | {
+  kind: "project";
+  projectId: string;
 } | null;
 type CandidateDragOptions = {
   allowCandidateReorder?: boolean;
@@ -3839,6 +3843,14 @@ function App() {
     });
   }
 
+  function moveCandidateToProject(dragId: string, targetProjectId: string) {
+    const task = dataRef.current?.tasks.find((item) => item.id === dragId);
+    if (!task || isEventDisplayTask(task)) return;
+    const projectId = targetProjectId === "__unassigned__" ? undefined : targetProjectId;
+    if ((task.projectId || "__unassigned__") === (projectId || "__unassigned__")) return;
+    updateTask(dragId, { projectId, order: Date.now() });
+  }
+
   function deleteSubtaskById(subtaskId: string) {
     const current = dataRef.current;
     if (!current) return;
@@ -6905,9 +6917,13 @@ function App() {
     let dropTime = "";
     let candidateTarget: CandidateDropTarget = null;
     const setCandidateReorderTarget = (nextTarget: CandidateDropTarget) => {
-      const unchanged = candidateTarget?.taskId === nextTarget?.taskId
-        && candidateTarget?.position === nextTarget?.position
-        && candidateTarget?.intent === nextTarget?.intent;
+      const unchanged = (candidateTarget === null && nextTarget === null)
+        || (candidateTarget?.kind === "task" && nextTarget?.kind === "task"
+          && candidateTarget.taskId === nextTarget.taskId
+          && candidateTarget.position === nextTarget.position
+          && candidateTarget.intent === nextTarget.intent)
+        || (candidateTarget?.kind === "project" && nextTarget?.kind === "project"
+          && candidateTarget.projectId === nextTarget.projectId);
       candidateTarget = nextTarget;
       if (!unchanged) setCandidateDropTarget(nextTarget);
     };
@@ -6962,6 +6978,7 @@ function App() {
           const rect = candidateRow.getBoundingClientRect();
           const position = (pointerEvent.clientY - rect.top) < rect.height / 2 ? "before" : "after";
           setCandidateReorderTarget({
+            kind: "task",
             taskId: targetTaskId,
             position,
             intent: position === "before" ? "reorder-before" : "reorder-after",
@@ -6969,6 +6986,20 @@ function App() {
         } else {
           setCandidateReorderTarget(null);
         }
+        setCandidateDropActive(false);
+        setAllDayDragOver(false);
+        setAllDayDragDate("");
+        dropTime = "";
+        setHoverSlot("");
+        dragTargetDateRef.current = "";
+        return;
+      }
+      const candidateProject = source === "candidate" && options.allowCandidateReorder !== false
+        ? pointedElement?.closest<HTMLElement>("[data-candidate-project-id]")
+        : null;
+      const targetProjectId = candidateProject?.dataset.candidateProjectId || "";
+      if (targetProjectId && targetProjectId !== "__events__") {
+        setCandidateReorderTarget({ kind: "project", projectId: targetProjectId });
         setCandidateDropActive(false);
         setAllDayDragOver(false);
         setAllDayDragDate("");
@@ -7087,15 +7118,25 @@ function App() {
         }
         const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
         const candidateRow = source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
-        if (candidateRow || candidateTarget) {
-          const targetTaskId = candidateRow?.dataset.candidateTaskId || candidateTarget?.taskId || "";
+        if (candidateRow || candidateTarget?.kind === "task") {
+          const targetTaskId = candidateRow?.dataset.candidateTaskId || (candidateTarget?.kind === "task" ? candidateTarget.taskId : "");
           if (targetTaskId && targetTaskId !== task.id) {
             const rect = candidateRow?.getBoundingClientRect();
             const position = rect
               ? ((pointerEvent.clientY - rect.top) < rect.height / 2 ? "before" : "after")
-              : candidateTarget?.position || "after";
+              : (candidateTarget?.kind === "task" ? candidateTarget.position : "after");
             reorderTodayCandidate(task.id, targetTaskId, position);
           }
+          cleanup();
+          return;
+        }
+        const candidateProject = source === "candidate" && options.allowCandidateReorder !== false
+          ? pointedElement?.closest<HTMLElement>("[data-candidate-project-id]")
+          : null;
+        const targetProjectId = candidateProject?.dataset.candidateProjectId
+          || (candidateTarget?.kind === "project" ? candidateTarget.projectId : "");
+        if (targetProjectId && targetProjectId !== "__events__") {
+          moveCandidateToProject(task.id, targetProjectId);
           cleanup();
           return;
         }
@@ -8320,33 +8361,51 @@ function App() {
               {visibleCandidates.length === 0 && !hasActiveHabits ? (
                 <div className="df-empty"><div className="blob-accent" /><strong>{t(lang, "candidate.emptyTitle")}</strong><span>{t(lang, "candidate.emptyDesc")}</span>{compactLayout && <img className="df-empty-add-guidance" src="/empty-add-guidance-v2.png" alt="" aria-hidden="true" />}</div>
               ) : groupByProject ? (
-                Array.from(
-                  visibleCandidates.reduce((map, task) => {
-                    const gid = isEventDisplayTask(task) ? "__events__" : task.projectId || "__unassigned__";
-                    if (!map.has(gid)) map.set(gid, []);
-                    map.get(gid)!.push(task);
-                    return map;
-                  }, new Map<string, Task[]>())
-                )
-                  .sort(([a], [b]) => a === "__events__" ? -1 : b === "__events__" ? 1 : a === "__unassigned__" ? 1 : b === "__unassigned__" ? -1 : 0)
-                  .map(([gid, tasks]) => {
+                (() => {
+                  const candidatesByProject = new Map<string, Task[]>();
+                  projects.forEach((project) => candidatesByProject.set(String(project.id), []));
+                  candidatesByProject.set("__unassigned__", []);
+                  const events: Task[] = [];
+                  visibleCandidates.forEach((task) => {
+                    if (isEventDisplayTask(task)) { events.push(task); return; }
+                    const gid = task.projectId || "__unassigned__";
+                    if (!candidatesByProject.has(gid)) candidatesByProject.set(gid, []);
+                    candidatesByProject.get(gid)!.push(task);
+                  });
+                  const showEmptyProjectTargets = drag?.source === "candidate";
+                  const groups: Array<[string, Task[]]> = [
+                    ...(events.length ? [["__events__", events] as [string, Task[]]] : []),
+                    ...Array.from(candidatesByProject.entries()).filter(([, tasks]) => tasks.length > 0 || showEmptyProjectTargets),
+                  ];
+                  return groups.map(([gid, tasks]) => {
                     const project = gid === "__unassigned__" || gid === "__events__" ? null : projects.find(p => String(p.id) === String(gid));
                     const projectColor = gid === "__events__" ? "var(--accent-active)" : project?.color || "var(--accent-active)";
                     const projectTitle = gid === "__events__" ? "EVENTS" : project?.title || t(lang, "candidate.unassigned");
+                    const isProjectDropTarget = drag?.source === "candidate"
+                      && candidateDropTarget?.kind === "project"
+                      && candidateDropTarget.projectId === gid;
                     return (
-                      <div key={gid} className="df-project-group">
+                      <div key={gid} className={`df-project-group${isProjectDropTarget ? " is-project-drop-target" : ""}`} data-candidate-project-id={gid === "__events__" ? undefined : gid}>
                         <div className="df-project-group-header">
                           <span className="df-project-group-dot" style={{ background: projectColor }} />
                           <span className="df-project-group-name">{projectTitle}</span>
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
+                        {tasks.length === 0 && drag?.source === "candidate" && (
+                          <div
+                            className={`df-candidate-empty-project-drop${isProjectDropTarget ? " is-active" : ""}`}
+                            style={{ "--reorder-preview-height": `${drag.sourceRect?.height || 64}px` } as CSSProperties}
+                            data-candidate-project-id={gid}
+                            aria-hidden="true"
+                          />
+                        )}
                         {tasks.map((task) => {
-                          const dropHere = drag?.source === "candidate" && candidateDropTarget?.taskId === task.id;
+                          const dropHere = drag?.source === "candidate" && candidateDropTarget?.kind === "task" && candidateDropTarget.taskId === task.id;
                           const isReorderSource = drag?.source === "candidate" && drag.taskId === task.id;
                           return (
                             <div
                               key={task.id}
-                              className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${dropHere ? ` is-candidate-drop is-${candidateDropTarget.position}` : ""}`}
+                              className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${dropHere ? ` is-candidate-drop is-${candidateDropTarget?.kind === "task" ? candidateDropTarget.position : "after"}` : ""}`}
                               data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
                               onClickCapture={(event) => {
                                 if (!(event.target as HTMLElement).closest(".df-block-check")) return;
@@ -8354,21 +8413,22 @@ function App() {
                                 toggleCandidateTaskDone(task);
                               }}
                             >
-                              {dropHere && candidateDropTarget.position === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
+                              {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
                               {!isReorderSource && <TaskCard task={task} onFocusSchedule={focusCandidateSchedule} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />}
-                              {dropHere && candidateDropTarget.position === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
+                              {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
                             </div>
                           );
                         })}
                       </div>
                     );
-                  })
+                  });
+                })()
               ) : visibleCandidates.map((task) => {
-                const dropHere = drag?.source === "candidate" && candidateDropTarget?.taskId === task.id;
+                const dropHere = drag?.source === "candidate" && candidateDropTarget?.kind === "task" && candidateDropTarget.taskId === task.id;
                 const isReorderSource = drag?.source === "candidate" && drag.taskId === task.id;
                 return <div
                   key={task.id}
-                  className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${dropHere ? ` is-candidate-drop is-${candidateDropTarget!.position}` : ""}`}
+                  className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${dropHere ? ` is-candidate-drop is-${candidateDropTarget?.kind === "task" ? candidateDropTarget.position : "after"}` : ""}`}
                   data-candidate-task-id={isEventDisplayTask(task) ? undefined : task.id}
                   onClickCapture={(event) => {
                     if (!(event.target as HTMLElement).closest(".df-block-check")) return;
@@ -8376,9 +8436,9 @@ function App() {
                     toggleCandidateTaskDone(task);
                   }}
                 >
-                  {dropHere && candidateDropTarget!.position === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
+                  {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
                   {!isReorderSource && <TaskCard task={task} onFocusSchedule={focusCandidateSchedule} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />}
-                  {dropHere && candidateDropTarget!.position === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
+                  {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
                 </div>
               })}
               {shouldShowHabitCandidates(settings) && (
