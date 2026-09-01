@@ -332,6 +332,12 @@
   background: #fff !important;
 }
 
+/* The pointer overlay is the actual candidate row, retained as white paper
+   even after it leaves the candidate-list selector above. */
+#root .df-app.mode-execute:not(.theme-dark) .df-task-drag-layer .df-task-card[data-task-appearance][data-drag-state="overlay"] {
+  background: #fff !important;
+}
+
 /* The add drawer is a true three-way switch, not a two-column action grid. */
 #root .df-app .df-drawer .df-segment {
   display: grid !important;

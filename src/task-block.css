@@ -3263,6 +3263,9 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 .df-reorder-preview-slot {
   position: relative;
   flex: 0 0 var(--reorder-preview-height, 56px);
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
   min-height: var(--reorder-preview-height, 56px);
   margin: 0;
   border: 1px dashed var(--drag-placeholder-border, var(--paper-rule-strong));
@@ -3453,6 +3456,59 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 #root .df-app .df-candidate-panel .df-candidate-panel-head > *,
 #root .df-app .df-candidate-panel header > * {
   flex-shrink: 0 !important;
+}
+
+/* Candidate sorting reserves a complete row at the intended destination.
+   The source is represented by the floating white TaskBlock, so no second
+   gray ghost remains in the list. */
+#root .df-app.mode-execute .df-candidate-task-row.is-candidate-drop {
+  flex-wrap: wrap !important;
+  align-items: stretch !important;
+}
+
+#root .df-app.mode-execute .df-candidate-task-row .df-reorder-preview-slot {
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  min-height: var(--reorder-preview-height, 56px) !important;
+  background: #fff !important;
+}
+
+/* Planning's alternate views use the same paper TaskBlock as the tree. */
+#root .df-app.mode-planning .df-planning :is(.df-kanban-card, .df-eisenhower-task, .df-planning-list-row)[data-task-appearance] {
+  --task-bg: var(--surface-card) !important;
+  --task-project-accent-size: 4px !important;
+  min-height: 56px !important;
+  padding: 11px 14px !important;
+  border: 1px solid var(--task-border) !important;
+  border-left-width: 4px !important;
+  border-left-color: var(--task-project-color) !important;
+  border-radius: var(--task-radius) !important;
+  background: var(--surface-card) !important;
+  box-shadow: none !important;
+}
+
+/* Tree dragging shows a real empty destination slot, never an instruction
+   label such as “Place before/after”. */
+#root .df-app.mode-planning .df-planning .df-tree-drop-preview {
+  position: relative !important;
+  z-index: 0 !important;
+  display: block !important;
+  width: min(100%, 620px) !important;
+  height: var(--tree-drop-slot-height, 54px) !important;
+  min-height: var(--tree-drop-slot-height, 54px) !important;
+  margin: 8px 0 !important;
+  flex: 0 0 var(--tree-drop-slot-height, 54px) !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  border: 1px dashed var(--paper-rule-strong) !important;
+  border-radius: var(--task-radius) !important;
+  background: var(--surface-card) !important;
+  box-shadow: none !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-tree-drop-preview::before {
+  content: none !important;
+  display: none !important;
 }
 
 @media (max-width: 760px) {

@@ -14,7 +14,7 @@ import { buildTimeAllocationMetrics, parseDayStartMinutes, type MetricCompletion
 
 type TreeNodeKind = "project" | "task" | "subtask";
 type TreeDragNode = { kind: TreeNodeKind; id: string };
-type TreeDropTarget = TreeDragNode & { position: "before" | "inside" | "after"; top: number; left: number; width: number };
+type TreeDropTarget = TreeDragNode & { position: "before" | "inside" | "after"; height: number };
 type PlanningDropContainer = string;
 
 const DEFAULT_PROJECT_COLOR = "var(--accent-active)";
@@ -1394,15 +1394,16 @@ export default function PlanningView(props: {
   // the workspace first opens and let the user dismiss it for this visit.
   const showLongRangeGuide = !guideDismissed;
 
-  const treeDropLabel = dropTarget
-    ? (() => {
-      if (dropTarget.id === "__unassigned__") return props.lang === "zh" ? "移到未归属" : "Move to Unassigned";
-      if (dragNode?.kind === "task" && dropTarget.kind === "project" && dropTarget.position !== "inside") return props.lang === "zh" ? "新建项目" : "Create project";
-      if (dropTarget.position === "inside" && dropTarget.kind === "project") return props.lang === "zh" ? "归属到该项目" : "Move into project";
-      if (dropTarget.position === "inside") return props.lang === "zh" ? "设为子任务" : "Make subtask";
-      return dropTarget.position === "before" ? (props.lang === "zh" ? "插入到前面" : "Insert before") : (props.lang === "zh" ? "插入到后面" : "Insert after");
-    })()
-    : "";
+  const treeDropSlot = (kind: TreeNodeKind, id: string, position: TreeDropTarget["position"]) => {
+    if (!dropTarget || dropTarget.kind !== kind || dropTarget.id !== id || dropTarget.position !== position) return null;
+    return (
+      <div
+        className={`df-tree-drop-preview ${position}`}
+        style={{ "--tree-drop-slot-height": `${dropTarget.height}px` } as React.CSSProperties}
+        aria-hidden="true"
+      />
+    );
+  };
 
   const projectColor = useCallback((projectId?: string) => {
     if (!projectId) return UNASSIGNED_COLOR;
@@ -1703,6 +1704,8 @@ export default function PlanningView(props: {
       }
     };
 
+    let dragPreviewHeight = 54;
+
     const detectTreeDropTarget = (clientX: number, clientY: number) => {
       const tree = treeRef.current;
       if (!tree) return;
@@ -1712,14 +1715,11 @@ export default function PlanningView(props: {
       const rect = node.getBoundingClientRect();
       const ratio = (clientY - rect.top) / Math.max(rect.height, 1);
       const position = ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
-      const treeRect = tree.getBoundingClientRect();
       setTreeDropTarget({
         kind: node.dataset.nodeType as TreeNodeKind,
         id: node.dataset.nodeId || "",
         position,
-        top: rect.top - treeRect.top + tree.scrollTop + (position === "before" ? -16 : position === "after" ? rect.height - 2 : rect.height / 2 - 16),
-        left: rect.left - treeRect.left + tree.scrollLeft + (position === "inside" ? 22 : 0),
-        width: Math.max(160, rect.width - (position === "inside" ? 22 : 0)),
+        height: dragPreviewHeight,
       });
     };
 
@@ -1745,6 +1745,7 @@ export default function PlanningView(props: {
         setTreeDragNode(sourceNode);
         const sourceCard = sourceNodeEl.querySelector<HTMLElement>("[data-planning-drag-card]") || sourceNodeEl;
         const rect = sourceCard.getBoundingClientRect();
+        dragPreviewHeight = Math.max(52, Math.round(rect.height));
         const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
         const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
         let overlayTask: Task | undefined;
@@ -2760,31 +2761,27 @@ export default function PlanningView(props: {
             }}
           >
             {svgLines}
-            {dropTarget && (
-              <div
-                className={`df-tree-drop-preview ${dropTarget.position}`}
-                style={{ position: "absolute", top: dropTarget.top, left: dropTarget.left, width: dropTarget.width }}
-              >
-                {treeDropLabel}
-              </div>
-            )}
             {visibleProjects.map(({ project, tasks }) => (
-              <div className="df-category-branch" key={project.id} data-project-id={project.id}>
-                <PlanningProjectNode
-                  lang={props.lang}
-                  project={project}
-                  taskCount={tasks.length}
-                  collapsed={Boolean(props.collapsed[project.id])}
-                  onToggleCollapse={() => props.setCollapsed((current) => ({ ...current, [project.id]: !current[project.id] }))}
-                  onOpen={() => props.onProjectEdit(project)}
-                  onAddTask={() => props.onTaskCreate(project.id)}
-                  onComplete={() => props.onProjectComplete?.(project.id)}
-                  dragging={dragNode?.kind === "project" && dragNode.id === project.id}
-                />
-                {!props.collapsed[project.id] && (
-                  <div className="df-project-tasks">
-                    {tasks.map((task) => (
-                      <div className="df-task-branch" key={task.id}>
+              <React.Fragment key={project.id}>
+                {treeDropSlot("project", project.id, "before")}
+                <div className="df-category-branch" data-project-id={project.id}>
+                  <PlanningProjectNode
+                    lang={props.lang}
+                    project={project}
+                    taskCount={tasks.length}
+                    collapsed={Boolean(props.collapsed[project.id])}
+                    onToggleCollapse={() => props.setCollapsed((current) => ({ ...current, [project.id]: !current[project.id] }))}
+                    onOpen={() => props.onProjectEdit(project)}
+                    onAddTask={() => props.onTaskCreate(project.id)}
+                    onComplete={() => props.onProjectComplete?.(project.id)}
+                    dragging={dragNode?.kind === "project" && dragNode.id === project.id}
+                  />
+                  {treeDropSlot("project", project.id, "inside")}
+                  {!props.collapsed[project.id] && (
+                    <div className="df-project-tasks">
+                      {tasks.map((task) => (
+                        <div className="df-task-branch" key={task.id}>
+                          {treeDropSlot("task", task.id, "before")}
                         <PlanningTaskNode
                           lang={props.lang}
                           task={task}
@@ -2803,35 +2800,45 @@ export default function PlanningView(props: {
                           onToggleSubtask={(subtaskId) => toggleSubtask(task.id, subtaskId)}
                           dragging={dragNode?.kind === "task" && dragNode.id === task.id}
                         />
+                        {treeDropSlot("task", task.id, "inside")}
                         {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
                           <div className="df-subtask-list" data-parent-id={task.id}>
                             {(task.subtasks || []).map((subtask) => (
-                              <PlanningSubtaskNode
-                                lang={props.lang}
-                                key={subtask.id}
-                                subtask={subtask}
-                                projectColor={project.color || DEFAULT_PROJECT_COLOR}
-                                onToggle={(subtaskId) => toggleSubtask(task.id, subtaskId)}
-                                onPromote={promoteSubtask}
-                                onRename={renameSubtask}
-                                onSetDate={setSubtaskDate}
-                                onMoveProject={moveSubtaskProject}
-                                onDelete={deleteSubtask}
-                                onAddSubtask={(parentId) => addSubtask(task, parentId)}
-                                dragging={dragNode?.kind === "subtask" && dragNode.id === subtask.id}
-                              />
+                              <React.Fragment key={subtask.id}>
+                                {treeDropSlot("subtask", subtask.id, "before")}
+                                <PlanningSubtaskNode
+                                  lang={props.lang}
+                                  subtask={subtask}
+                                  projectColor={project.color || DEFAULT_PROJECT_COLOR}
+                                  onToggle={(subtaskId) => toggleSubtask(task.id, subtaskId)}
+                                  onPromote={promoteSubtask}
+                                  onRename={renameSubtask}
+                                  onSetDate={setSubtaskDate}
+                                  onMoveProject={moveSubtaskProject}
+                                  onDelete={deleteSubtask}
+                                  onAddSubtask={(parentId) => addSubtask(task, parentId)}
+                                  dragging={dragNode?.kind === "subtask" && dragNode.id === subtask.id}
+                                />
+                                {treeDropSlot("subtask", subtask.id, "inside")}
+                                {treeDropSlot("subtask", subtask.id, "after")}
+                              </React.Fragment>
                             ))}
                           </div>
                         )}
+                        {treeDropSlot("task", task.id, "after")}
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+                </div>
+                {treeDropSlot("project", project.id, "after")}
+              </React.Fragment>
             ))}
 
             {(
-              <div className="df-category-branch" data-project-id="__unassigned__">
+              <React.Fragment>
+                {treeDropSlot("project", "__unassigned__", "before")}
+                <div className="df-category-branch" data-project-id="__unassigned__">
                 <PlanningProjectNode
                   lang={props.lang}
                   project={createProjectShell(t(props.lang, "planning.unassignedTasks"))}
@@ -2842,10 +2849,12 @@ export default function PlanningView(props: {
                   onAddTask={() => props.onTaskCreate("")}
                   dragging={dragNode?.kind === "project" && dragNode.id === "__unassigned__"}
                 />
+                {treeDropSlot("project", "__unassigned__", "inside")}
                 {!props.collapsed.unassigned && (
                   <div className="df-project-tasks">
                     {unassigned.map((task) => (
                       <div className="df-task-branch" key={task.id}>
+                        {treeDropSlot("task", task.id, "before")}
                         <PlanningTaskNode
                           lang={props.lang}
                           task={task}
@@ -2864,31 +2873,39 @@ export default function PlanningView(props: {
                           onToggleSubtask={(subtaskId) => toggleSubtask(task.id, subtaskId)}
                           dragging={dragNode?.kind === "task" && dragNode.id === task.id}
                         />
+                        {treeDropSlot("task", task.id, "inside")}
                         {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
                           <div className="df-subtask-list" data-parent-id={task.id}>
                             {(task.subtasks || []).map((subtask) => (
-                              <PlanningSubtaskNode
-                                lang={props.lang}
-                                key={subtask.id}
-                                subtask={subtask}
-                                projectColor={UNASSIGNED_COLOR}
-                                onToggle={(subtaskId) => toggleSubtask(task.id, subtaskId)}
-                                onPromote={promoteSubtask}
-                                onRename={renameSubtask}
-                                onSetDate={setSubtaskDate}
-                                onMoveProject={moveSubtaskProject}
-                                onDelete={deleteSubtask}
-                                onAddSubtask={(parentId) => addSubtask(task, parentId)}
-                                dragging={dragNode?.kind === "subtask" && dragNode.id === subtask.id}
-                              />
+                              <React.Fragment key={subtask.id}>
+                                {treeDropSlot("subtask", subtask.id, "before")}
+                                <PlanningSubtaskNode
+                                  lang={props.lang}
+                                  subtask={subtask}
+                                  projectColor={UNASSIGNED_COLOR}
+                                  onToggle={(subtaskId) => toggleSubtask(task.id, subtaskId)}
+                                  onPromote={promoteSubtask}
+                                  onRename={renameSubtask}
+                                  onSetDate={setSubtaskDate}
+                                  onMoveProject={moveSubtaskProject}
+                                  onDelete={deleteSubtask}
+                                  onAddSubtask={(parentId) => addSubtask(task, parentId)}
+                                  dragging={dragNode?.kind === "subtask" && dragNode.id === subtask.id}
+                                />
+                                {treeDropSlot("subtask", subtask.id, "inside")}
+                                {treeDropSlot("subtask", subtask.id, "after")}
+                              </React.Fragment>
                             ))}
                           </div>
                         )}
+                        {treeDropSlot("task", task.id, "after")}
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+                </div>
+                {treeDropSlot("project", "__unassigned__", "after")}
+              </React.Fragment>
             )}
           </div>
           )}

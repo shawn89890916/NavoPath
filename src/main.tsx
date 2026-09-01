@@ -6877,7 +6877,10 @@ function App() {
     const target = event.target as HTMLElement;
     const interactiveTarget = target.closest("button,input,textarea,select,a");
     if (event.button !== 0 || (interactiveTarget && !target.closest(".icon-schedule"))) return;
-    if (isEventDisplayTask(task) || hasRecurringRule(resolveOwningTask(task) || task)) return;
+    // Candidate ordering and scheduling are valid for unassigned and recurring
+    // tasks as well. Their project/recurrence metadata stays attached to the
+    // same task; dragging only changes its position or scheduled record.
+    if (isEventDisplayTask(task)) return;
     const pointerId = event.pointerId;
     const dragElement = event.currentTarget as HTMLElement;
     const startX = event.clientX;
