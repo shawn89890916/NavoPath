@@ -940,7 +940,6 @@ export default function PlanningView(props: {
   onTaskEdit: (task: Task) => void;
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onTaskCreate: (projectId: string) => void;
-  onProjectCreate: () => void;
   onTaskDelete: (taskId: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
   onDataChange: (data: PlannerData) => void;
@@ -1015,7 +1014,7 @@ export default function PlanningView(props: {
   const [listDragTaskId, setListDragTaskId] = useState<string | null>(null);
   const [listDropTargetId, setListDropTargetId] = useState<string | null>(null);
   const [listDropPosition, setListDropPosition] = useState<"before" | "after">("before");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [guideDismissed, setGuideDismissed] = useState(false);
   const [planningDragTask, setPlanningDragTask] = useState<{
     task: Task;
     variant: TaskBlockVariant;
@@ -1391,7 +1390,19 @@ export default function PlanningView(props: {
   const svgLines = useTreeLines(treeRef, safeProjects, viewFilteredTasks, props.collapsed, collapsedSubtasks);
 
   const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
-  const showLongRangeGuide = viewFilteredTasks.length <= 1;
+  // This is the Planning entry note, not an empty-state message: show it when
+  // the workspace first opens and let the user dismiss it for this visit.
+  const showLongRangeGuide = !guideDismissed;
+
+  const treeDropLabel = dropTarget
+    ? (() => {
+      if (dropTarget.id === "__unassigned__") return props.lang === "zh" ? "移到未归属" : "Move to Unassigned";
+      if (dragNode?.kind === "task" && dropTarget.kind === "project" && dropTarget.position !== "inside") return props.lang === "zh" ? "新建项目" : "Create project";
+      if (dropTarget.position === "inside" && dropTarget.kind === "project") return props.lang === "zh" ? "归属到该项目" : "Move into project";
+      if (dropTarget.position === "inside") return props.lang === "zh" ? "设为子任务" : "Make subtask";
+      return dropTarget.position === "before" ? (props.lang === "zh" ? "插入到前面" : "Insert before") : (props.lang === "zh" ? "插入到后面" : "Insert after");
+    })()
+    : "";
 
   const projectColor = useCallback((projectId?: string) => {
     if (!projectId) return UNASSIGNED_COLOR;
@@ -2154,48 +2165,30 @@ export default function PlanningView(props: {
   ].filter(Boolean) as Array<{ key: string; label: string; onClear: () => void }>;
 
   return (
-    <main className={`df-planning${props.compact ? " compact-layout" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+    <main className={`df-planning${props.compact ? " compact-layout" : ""}`}>
       {dialog.host}
       <div className="df-planning-body">
         <section className="df-mindmap no-root">
           <aside className="df-planning-sidebar" aria-label={props.lang === "zh" ? "\u89c4\u5212\u5de5\u5177" : "Planning tools"}>
-            <button
-              type="button"
-              className="df-planning-sidebar-collapse"
-              aria-label={sidebarCollapsed ? "Expand planning tools" : "Collapse planning tools"}
-              aria-pressed={sidebarCollapsed}
-              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-            >
-              <ChevronIcon open={!sidebarCollapsed} />
-            </button>
-            <div className="df-planning-quick-actions" aria-label={props.lang === "zh" ? "\u5feb\u901f\u6dfb\u52a0" : "Quick add"}>
-              <button type="button" className="df-planning-quick-add" onClick={() => props.onTaskCreate("")}>
-                <PlusIcon />
-                <span>{props.lang === "zh" ? "\u4efb\u52a1" : "Task"}</span>
-              </button>
-              <button type="button" className="df-planning-quick-add" onClick={props.onProjectCreate}>
-                <PlusIcon />
-                <span>{props.lang === "zh" ? "\u9879\u76ee" : "Project"}</span>
-              </button>
-            </div>
-              {availableModes.length > 1 && (
-                <div className="df-planning-view-switch">
-                  {availableModes.map((m) => (
-                    <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={metricViewLabel(props.lang, m)}>
+            {availableModes.length > 1 && (
+              <div className="df-planning-view-switch">
+                {availableModes.map((m) => (
+                  <button key={m} className={`df-view-btn${viewMode === m ? " active" : ""}`} onClick={() => setViewMode(m)} title={metricViewLabel(props.lang, m)}>
                       {m === "tree" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M3 5h4M3 9h6M3 13h5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
                       {m === "kanban" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="3.5" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="6.5" y="3" width="3.5" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="11" y="3" width="3.5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
                       {m === "eisenhower" && <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="2" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="2" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
                       {m === "list" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
                       {m === "metrics" && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12V8M7 12V4M11 12V6M2 13h12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>}
                       <span>{metricViewLabel(props.lang, m)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                  </button>
+                ))}
+              </div>
+            )}
           </aside>
           <div className="df-tree-wrap">
             {showLongRangeGuide && (
               <aside className="df-planning-longrange-guide" role="note">
+                <button type="button" className="df-planning-guide-close" aria-label={props.lang === "zh" ? "关闭规划说明" : "Dismiss planning note"} onClick={() => setGuideDismissed(true)}>×</button>
                 <span>{props.lang === "zh" ? "长期任务，从这里开始规划" : "Plan long-range work here"}</span>
                 <strong>{props.lang === "zh" ? "先建立项目，再拆成任务，最后排进日程。" : "Create a project, break it into tasks, then schedule it."}</strong>
                 <div aria-hidden="true"><b>01 {props.lang === "zh" ? "项目" : "Project"}</b><i>→</i><b>02 {props.lang === "zh" ? "任务" : "Tasks"}</b><i>→</i><b>03 {props.lang === "zh" ? "排程" : "Schedule"}</b></div>
@@ -2772,7 +2765,7 @@ export default function PlanningView(props: {
                 className={`df-tree-drop-preview ${dropTarget.position}`}
                 style={{ position: "absolute", top: dropTarget.top, left: dropTarget.left, width: dropTarget.width }}
               >
-                {dropTarget.position === "inside" ? "Place inside" : dropTarget.position === "before" ? "Place before" : "Place after"}
+                {treeDropLabel}
               </div>
             )}
             {visibleProjects.map(({ project, tasks }) => (
@@ -2837,7 +2830,7 @@ export default function PlanningView(props: {
               </div>
             ))}
 
-            {unassigned.length > 0 && (
+            {(
               <div className="df-category-branch" data-project-id="__unassigned__">
                 <PlanningProjectNode
                   lang={props.lang}

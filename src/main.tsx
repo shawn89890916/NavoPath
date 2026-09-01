@@ -1279,7 +1279,6 @@ function App() {
   const [compactExecuteView, setCompactExecuteView] = useState<CompactExecuteView>("schedule");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddDetailOpen, setQuickAddDetailOpen] = useState(false);
-  const [desktopAddMenuOpen, setDesktopAddMenuOpen] = useState(false);
   const [mobileQuickAddKind, setMobileQuickAddKind] = useState<MobileShortSheetKind>("task");
   const [mobileQuickHabitMinutes, setMobileQuickHabitMinutes] = useState(20);
   const [selectedDate, setSelectedDate] = useState(todayIso());
@@ -6884,6 +6883,8 @@ function App() {
     const startX = event.clientX;
     const startY = event.clientY;
     const duration = taskDuration(task);
+    let dragSourceRect: { width: number; height: number } | null = null;
+    let dragSourceOffset: { x: number; y: number } | null = null;
     let active = false;
     let holdCancelled = false;
     // Candidate rows live inside a scroll container on every touch layout.
@@ -7033,6 +7034,8 @@ function App() {
         const rect = dragElement.getBoundingClientRect();
         const offX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
         const offY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+        dragSourceRect = { width: rect.width, height: rect.height };
+        dragSourceOffset = { x: offX, y: offY };
         setDragOverlay({ taskId: task.id, sourceElement: dragElement, sourceRect: rect, pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY }, offset: { x: offX, y: offY }, data: { kind: "candidate", source } });
         setDragOverlayTask({ task, variant: source === "candidate" ? "candidate" : "allDay" });
         setActiveDragItem({
@@ -7053,17 +7056,19 @@ function App() {
       pointerEvent.preventDefault();
       setDragOverlayPointer({ x: pointerEvent.clientX, y: pointerEvent.clientY });
       const currentRect = dragElement.getBoundingClientRect();
+      const sourceRect = dragSourceRect || { width: currentRect.width, height: currentRect.height };
+      const sourceOffset = dragSourceOffset || {
+        x: Math.min(Math.max(startX - currentRect.left, 0), currentRect.width),
+        y: Math.min(Math.max(startY - currentRect.top, 0), currentRect.height),
+      };
       setDrag({
         taskId: task.id,
         kind: "candidate",
         source,
         duration,
         pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY },
-        sourceRect: { width: currentRect.width, height: currentRect.height },
-        offset: {
-          x: Math.min(Math.max(startX - currentRect.left, 0), currentRect.width),
-          y: Math.min(Math.max(startY - currentRect.top, 0), currentRect.height),
-        },
+        sourceRect,
+        offset: sourceOffset,
       });
       updateTarget(pointerEvent);
     };
@@ -9379,7 +9384,7 @@ function App() {
         </ExecutionSplitLayout>
       ) : (
         <Suspense fallback={<div className="df-loading-inline">规划加载中...</div>}>
-          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onProjectCreate={() => openAdd("project")} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} featureMetrics={settings.featureMetricsEnabled !== false} dayStartTime={settings.dayStartTime} metricsRangePreset={settings.metricsRangePreset} metricsGroupBy={settings.metricsGroupBy} metricsDisplayMetric={settings.metricsDisplayMetric} metricsIncludeHabits={settings.metricsIncludeHabits} metricsCompletionFilter={settings.metricsCompletionFilter} metricsCustomStart={settings.metricsCustomStart} metricsCustomEnd={settings.metricsCustomEnd} onMetricsSettingsChange={(patch) => void saveSettings(patch)} />
+          <PlanningViewLazy lang={lang} data={data} projects={projects} tasks={tasks} compact={compactLayout} collapsed={collapsedBranches} setCollapsed={setCollapsedBranches} onToggleTodayCandidate={togglePlanningTodayCandidate} onPromoteSubtaskToToday={promotePlanningSubtask} onProjectEdit={openProjectEdit} onProjectComplete={completeProject} onTaskEdit={openTaskEdit} onTaskUpdate={updateTask} onTaskCreate={createTaskInProject} onDataChange={(nextData) => void saveData(nextData)} onDeleteSubtask={deleteSubtaskById} onTaskDelete={(taskId) => deleteTaskById(taskId)} featureKanban={settings.featureKanbanViewEnabled !== false} featureQuadrant={settings.featureQuadrantViewEnabled !== false} featureList={settings.featureListViewEnabled !== false} featureMetrics={settings.featureMetricsEnabled !== false} dayStartTime={settings.dayStartTime} metricsRangePreset={settings.metricsRangePreset} metricsGroupBy={settings.metricsGroupBy} metricsDisplayMetric={settings.metricsDisplayMetric} metricsIncludeHabits={settings.metricsIncludeHabits} metricsCompletionFilter={settings.metricsCompletionFilter} metricsCustomStart={settings.metricsCustomStart} metricsCustomEnd={settings.metricsCustomEnd} onMetricsSettingsChange={(patch) => void saveSettings(patch)} />
         </Suspense>
       )}
 
@@ -9411,14 +9416,7 @@ function App() {
         </nav>
       )}
 
-      {!compactLayout && desktopAddMenuOpen && (
-        <div className="df-desktop-add-menu" role="menu" aria-label={lang === "zh" ? "新建内容" : "Create new"}>
-          <button type="button" role="menuitem" onClick={() => { setDesktopAddMenuOpen(false); openAdd("task"); }}>{lang === "zh" ? "新任务" : "New task"}</button>
-          <button type="button" role="menuitem" onClick={() => { setDesktopAddMenuOpen(false); openAdd("project"); }}>{lang === "zh" ? "新项目" : "New project"}</button>
-          {settings.featureHabitsEnabled !== false && <button type="button" role="menuitem" onClick={() => { setDesktopAddMenuOpen(false); openAdd("habit"); }}>{lang === "zh" ? "新习惯" : "New habit"}</button>}
-        </div>
-      )}
-      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} aria-expanded={desktopAddMenuOpen} onClick={() => setDesktopAddMenuOpen((open) => !open)} />}
+      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />}
       {!compactLayout && !settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
       {compactLayout && !drawerOpen && <button
         type="button"
