@@ -3094,3 +3094,206 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   flex: 0 0 auto;
   flex-wrap: nowrap;
 }
+
+/* Final planning workbench layer. This file loads after the legacy workspace
+   patches, so Planning and Execute keep the same floating-paper hierarchy. */
+#root .df-app.mode-planning .df-planning {
+  height: calc(100vh - 58px) !important;
+  padding: 10px !important;
+  background: transparent !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-body {
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--paper-rule) !important;
+  border-radius: var(--paper-radius) !important;
+  background: var(--surface-main) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-mindmap.no-root {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 52px minmax(0, 1fr) !important;
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-sidebar {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 / 2 !important;
+  align-self: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 52px !important;
+  padding: 0 14px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  background: color-mix(in srgb, var(--surface-main) 98%, var(--paper-note) 2%) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-sidebar-collapse {
+  width: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-quick-actions,
+#root .df-app.mode-planning .df-planning .df-planning-view-switch {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-quick-actions {
+  padding-right: 10px !important;
+  margin-right: 6px !important;
+  border-right: 1px solid var(--paper-rule) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-quick-add,
+#root .df-app.mode-planning .df-planning .df-view-btn,
+#root .df-app.mode-planning .df-planning .df-tree-icon-button {
+  min-height: 34px !important;
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-right: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-quick-add {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 0 7px !important;
+  font: 650 11px/1 var(--paper-sans) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-quick-add svg { width: 14px; height: 14px; }
+
+#root .df-app.mode-planning .df-planning .df-view-btn {
+  width: auto !important;
+  min-width: 44px !important;
+  padding: 0 8px !important;
+  flex-direction: row !important;
+  gap: 5px !important;
+  font: 650 11px/1 var(--paper-sans) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-view-btn.active,
+#root .df-app.mode-planning .df-planning .df-planning-quick-add:hover,
+#root .df-app.mode-planning .df-planning .df-planning-quick-add:focus-visible,
+#root .df-app.mode-planning .df-planning .df-view-btn:hover,
+#root .df-app.mode-planning .df-planning .df-view-btn:focus-visible,
+#root .df-app.mode-planning .df-planning .df-tree-icon-button:hover,
+#root .df-app.mode-planning .df-planning .df-tree-icon-button:focus-visible {
+  color: var(--accent-active) !important;
+  border-bottom-color: var(--accent-active) !important;
+  background: color-mix(in srgb, var(--accent-active) 5%, transparent) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-tree-wrap {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 / 3 !important;
+  padding: 20px clamp(18px, 4vw, 52px) 28px !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-filter-corner { top: 12px !important; right: 14px !important; }
+#root .df-app.mode-planning .df-planning .df-filter-trigger { width: 34px !important; min-width: 34px !important; min-height: 34px !important; }
+
+#root .df-app.mode-planning .df-planning .df-planning-longrange-guide {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: 5px 10px !important;
+  margin: 0 0 16px !important;
+  padding: 0 0 14px !important;
+  border-bottom: 1px solid var(--paper-rule) !important;
+  background: transparent !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-longrange-guide > span {
+  color: var(--text-muted) !important;
+  font: 600 11px/1.3 var(--paper-mono) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-longrange-guide > strong {
+  min-width: 0;
+  color: var(--text-main) !important;
+  font: 650 13px/1.3 var(--paper-sans) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-planning-longrange-guide > div {
+  grid-column: 1 / -1;
+  display: flex !important;
+  gap: 6px !important;
+  color: var(--text-muted) !important;
+  font: 600 10px/1 var(--paper-mono) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-task-node-inner[data-task-variant="candidate"] {
+  --task-padding-x: 16px;
+  --task-padding-y: 14px;
+  --task-min-height: 64px;
+  --task-project-accent-size: 2px;
+  min-height: 64px !important;
+  border-left-width: 2px !important;
+  border-left-color: var(--task-project-color) !important;
+}
+
+#root .df-app.mode-planning .df-planning .df-task-node-inner[data-task-variant="candidate"] > .df-task-block-accent {
+  display: block !important;
+}
+
+/* Tree reorders use the pointer overlay too, so the source leaves the document
+   flow and its neighbours can immediately close the gap. */
+#root .df-app.mode-planning .df-tree.is-tree-dragging [aria-grabbed="true"] {
+  display: none;
+}
+
+/* During sorting the dragged card is represented by the pointer overlay while
+   this in-flow slot reserves only the intended destination. */
+.df-reorder-preview-slot {
+  position: relative;
+  flex: 0 0 var(--reorder-preview-height, 56px);
+  min-height: var(--reorder-preview-height, 56px);
+  margin: 0;
+  border: 1px dashed var(--drag-placeholder-border, var(--paper-rule-strong));
+  border-radius: var(--task-radius, 6px);
+  background: var(--drag-placeholder-bg, color-mix(in srgb, var(--accent-active) 4%, transparent));
+  pointer-events: none;
+  animation: df-reorder-preview-in 120ms var(--paper-ease, ease) both;
+}
+
+.df-reorder-preview-slot::after {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  left: 14px;
+  height: 1px;
+  background: var(--accent-active);
+  content: "";
+  opacity: .72;
+}
+
+@keyframes df-reorder-preview-in {
+  from { opacity: .45; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  #root .df-app.mode-planning .df-planning { height: auto !important; min-height: calc(100vh - 58px) !important; padding: 6px !important; }
+  #root .df-app.mode-planning .df-planning .df-mindmap.no-root { grid-template-rows: auto minmax(0, 1fr) !important; }
+  #root .df-app.mode-planning .df-planning .df-planning-sidebar { flex-wrap: wrap !important; min-height: 48px !important; padding: 6px 8px !important; }
+  #root .df-app.mode-planning .df-planning .df-planning-quick-actions { display: none !important; }
+  #root .df-app.mode-planning .df-planning .df-view-btn { min-width: 38px !important; padding: 0 5px !important; }
+  #root .df-app.mode-planning .df-planning .df-view-btn span { display: none !important; }
+  #root .df-app.mode-planning .df-planning .df-tree-wrap { padding: 16px 12px 24px !important; }
+}

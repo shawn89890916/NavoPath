@@ -4,6 +4,7 @@
 
 ### 改进
 - Navo AI 主动助理现可在工作时间主动发现未补记的空档，并让你将这段实际时间关联到未完成任务，或直接新建为已完成任务；对应的历史完成块会清晰但低调地保留在时间轴中。
+- 规划工作区现与 Execute 共用悬浮纸面外框和任务块节奏；原先占满高度的侧栏收为顶部工具带，并提供一致的任务、项目快速新建入口。任务排序改为浮动副本配合目标预览槽，拖动时其余任务会自动让位；Execute 与规划树、列表、看板和矩阵视图均采用这一反馈。
 
 ## 2026-08-31 · 今日候选分组与时间轴留白
 
@@ -27,6 +28,7 @@
 
 ### Improved
 - Navo AI Proactive Assistant can now identify unlogged gaps during working hours and let you attach that actual time to an unfinished task or create it as a completed task; its completed historical block remains clear but understated on the timeline.
+- The Planning workspace now shares Execute’s floating paper frame and task-block rhythm. Its full-height rail is now a top tool strip with matching quick Task and Project actions. Sorting uses a floating copy with a target preview slot, so surrounding tasks make room while you drag; Execute and the Planning tree, list, board, and matrix views share that feedback.
 
 ## 2026-08-31 · Candidate grouping and timeline spacing
 

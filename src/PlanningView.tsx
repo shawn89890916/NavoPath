@@ -560,7 +560,7 @@ function PlanningTaskNode(props: {
       >
         <TaskBlock
           as="div"
-          variant="planning"
+          variant="candidate"
           appearance="calm"
           priority={planningTaskPriority(props.task)}
           checked={done}
@@ -940,6 +940,7 @@ export default function PlanningView(props: {
   onTaskEdit: (task: Task) => void;
   onTaskUpdate: (taskId: string, patch: Partial<Task>) => void;
   onTaskCreate: (projectId: string) => void;
+  onProjectCreate: () => void;
   onTaskDelete: (taskId: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
   onDataChange: (data: PlannerData) => void;
@@ -1762,7 +1763,7 @@ export default function PlanningView(props: {
         if (overlayTask) {
           setPlanningDragTask({
             task: overlayTask,
-            variant: "planning",
+            variant: "candidate",
             sourceRect: { width: rect.width, height: rect.height },
             offset: { x: offX, y: offY },
             pointer: { x: pointerEvent.clientX, y: pointerEvent.clientY },
@@ -2167,6 +2168,16 @@ export default function PlanningView(props: {
             >
               <ChevronIcon open={!sidebarCollapsed} />
             </button>
+            <div className="df-planning-quick-actions" aria-label={props.lang === "zh" ? "\u5feb\u901f\u6dfb\u52a0" : "Quick add"}>
+              <button type="button" className="df-planning-quick-add" onClick={() => props.onTaskCreate("")}>
+                <PlusIcon />
+                <span>{props.lang === "zh" ? "\u4efb\u52a1" : "Task"}</span>
+              </button>
+              <button type="button" className="df-planning-quick-add" onClick={props.onProjectCreate}>
+                <PlusIcon />
+                <span>{props.lang === "zh" ? "\u9879\u76ee" : "Project"}</span>
+              </button>
+            </div>
               {availableModes.length > 1 && (
                 <div className="df-planning-view-switch">
                   {availableModes.map((m) => (
@@ -2560,20 +2571,21 @@ export default function PlanningView(props: {
                     <div className="df-kanban-card-list">
                       {columnTasks.map((task) => {
                         const isDropTarget = listDropTargetId === task.id;
+                        const isReorderSource = Boolean(planningDragTask && listDropTargetId && planningDragTask.task.id === task.id);
                         return (
                         <React.Fragment key={task.id}>
-                        {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
-                        <TaskBlock
+                        {isDropTarget && listDropPosition === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
+                        {!isReorderSource && <TaskBlock
                           key={task.id}
                           as="div"
-                          variant="planning"
+                          variant="candidate"
                           appearance="calm"
                           priority={planningTaskPriority(task)}
                           checked={normalizeWorkflowStatus(task) === "done"}
                           projectColor={projectColor(task.projectId)}
                           className={`df-kanban-card${normalizeWorkflowStatus(task) === "done" ? " completed" : ""}`}
                           dataAttrs={{ "planning-task-id": task.id, "planning-container": `kanban:${status}` }}
-                          onPointerDown={(event) => beginPlanningDrag(event, task, "planning")}
+                          onPointerDown={(event) => beginPlanningDrag(event, task, "candidate")}
                           onClick={() => openTaskFromPlanning(task)}
                         >
                           <TaskBlockRow>
@@ -2593,8 +2605,8 @@ export default function PlanningView(props: {
                               </span>
                             </TaskBlockContent>
                           </TaskBlockRow>
-                        </TaskBlock>
-                        {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                        </TaskBlock>}
+                        {isDropTarget && listDropPosition === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
                         </React.Fragment>
                         );
                       })}
@@ -2641,20 +2653,21 @@ export default function PlanningView(props: {
                       {quadTasks.map((task) => {
                         const taskDone = normalizeWorkflowStatus(task) === "done";
                         const isDropTarget = listDropTargetId === task.id;
+                        const isReorderSource = Boolean(planningDragTask && listDropTargetId && planningDragTask.task.id === task.id);
                         return (
                           <React.Fragment key={task.id}>
-                          {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
-                          <TaskBlock
+                          {isDropTarget && listDropPosition === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
+                          {!isReorderSource && <TaskBlock
                             key={task.id}
                             as="div"
-                            variant="planning"
+                            variant="candidate"
                             appearance="calm"
                             priority={planningTaskPriority(task)}
                             checked={taskDone}
                             projectColor={projectColor(task.projectId)}
                             className={`df-eisenhower-task${taskDone ? " completed" : ""}`}
                             dataAttrs={{ "planning-task-id": task.id, "planning-container": `matrix:${quad.key}` }}
-                            onPointerDown={(event) => beginPlanningDrag(event, task, "planning")}
+                            onPointerDown={(event) => beginPlanningDrag(event, task, "candidate")}
                             onClick={() => openTaskFromPlanning(task)}
                           >
                             <TaskBlockRow>
@@ -2674,8 +2687,8 @@ export default function PlanningView(props: {
                                 </span>
                               </TaskBlockContent>
                             </TaskBlockRow>
-                          </TaskBlock>
-                          {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                          </TaskBlock>}
+                          {isDropTarget && listDropPosition === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
                           </React.Fragment>
                         );
                       })}
@@ -2695,23 +2708,24 @@ export default function PlanningView(props: {
               {orderPlanningTasks(viewFilteredTasks).map((task) => {
                 const uiStatus = normalizeWorkflowStatus(task);
                 const isDropTarget = listDropTargetId === task.id;
+                const isReorderSource = Boolean(planningDragTask && listDropTargetId && planningDragTask.task.id === task.id);
                 return (
                   <div
                     key={task.id}
                     className={`df-planning-list-row-wrap${isDropTarget ? ` is-list-drop is-${listDropPosition}` : ""}`}
                     data-list-task-id={task.id}
                   >
-                    {isDropTarget && listDropPosition === "before" && <div className="df-list-insertion-line" aria-hidden="true" />}
-                    <TaskBlock
+                    {isDropTarget && listDropPosition === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
+                    {!isReorderSource && <TaskBlock
                       as="div"
-                      variant="compact"
+                      variant="candidate"
                       appearance="calm"
                       priority={planningTaskPriority(task)}
                       checked={uiStatus === "done"}
                       projectColor={projectColor(task.projectId)}
                       className="df-planning-list-row"
                       dataAttrs={{ "planning-task-id": task.id, "planning-container": "list" }}
-                      onPointerDown={(event) => beginPlanningDrag(event, task, "compact")}
+                      onPointerDown={(event) => beginPlanningDrag(event, task, "candidate")}
                     >
                       <TaskBlockRow>
                         <TaskCheckbox
@@ -2731,8 +2745,8 @@ export default function PlanningView(props: {
                           {task.dueDate && <span className="df-list-tag df-tag-due" title={props.lang === "zh" ? "\u622a\u6b62\u65e5\u671f" : "Due"}>{task.dueDate.slice(5)}</span>}
                         </TaskActions>
                       </TaskBlockRow>
-                    </TaskBlock>
-                    {isDropTarget && listDropPosition === "after" && <div className="df-list-insertion-line" aria-hidden="true" />}
+                    </TaskBlock>}
+                    {isDropTarget && listDropPosition === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
                   </div>
                 );
               })}
