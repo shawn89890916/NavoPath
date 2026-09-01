@@ -1,5 +1,10 @@
 # NavoPath 更新日志
 
+## 2026-09-01 · Navo AI 主动助理
+
+### 改进
+- Navo AI 主动助理现可在工作时间主动发现未补记的空档，并让你将这段实际时间关联到未完成任务，或直接新建为已完成任务；对应的历史完成块会清晰但低调地保留在时间轴中。
+
 ## 2026-08-31 · 今日候选分组与时间轴留白
 
 ### 改进
@@ -17,6 +22,11 @@
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px；右移日期箭头与 Day / 3-Day / Week / Month 的纵向控件列对齐。
 - 修复三天和周视图的全屏模式仍继承候选栏窄列的问题；全屏现在只保留完整时间轴与退出入口，不会再出现被压缩或空白的画布。
+
+## 2026-09-01 · Navo AI Proactive Assistant
+
+### Improved
+- Navo AI Proactive Assistant can now identify unlogged gaps during working hours and let you attach that actual time to an unfinished task or create it as a completed task; its completed historical block remains clear but understated on the timeline.
 
 ## 2026-08-31 · Candidate grouping and timeline spacing
 
