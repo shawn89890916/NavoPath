@@ -12400,6 +12400,9 @@ function EditDrawer(props: {
   const [noteDraft, setNoteDraft] = useState("");
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [recurrenceDraft, setRecurrenceDraft] = useState<TaskRecurrence | null>(null);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [quickActionMenu, setQuickActionMenu] = useState<"reschedule" | "repeat" | null>(null);
   const [cancelAllConfirm, setCancelAllConfirm] = useState(false);
   const f = props.form;
   const set = (key: keyof FormState, value: FormState[keyof FormState]) => props.setForm((current) => ({ ...current, [key]: value }));
@@ -12416,6 +12419,8 @@ function EditDrawer(props: {
     setNotesEditing(false);
     setRecurrenceOpen(false);
     setRecurrenceDraft(null);
+    setRescheduleOpen(false);
+    setQuickActionMenu(null);
     setCancelAllConfirm(false);
   }, [props.task?.id, props.task?.notes, props.project?.id, props.project?.notes, props.habit?.id, props.habit?.notes, props.editingOccurrence?.scheduledDate, props.editingRecordId]);
   useLayoutEffect(() => {
@@ -12749,10 +12754,7 @@ function EditDrawer(props: {
               <span>◷ {formatMinutes(quickAddDuration)}</span>
               <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l3 3 3-3" /></svg>
             </button>
-          </section>
-
-          <section className="df-detail-meta-settings" aria-label={props.lang === "zh" ? "任务程度设置" : "Task level settings"}>
-            <div className="df-detail-meta-setting"><span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>{taskLevelSelector("importance", importanceOptions)}</div>
+            {taskLevelSelector("importance", importanceOptions)}
           </section>
 
           <section className="df-detail-time-range" aria-label={props.lang === "zh" ? "起止时间" : "Start and end time"}>
@@ -12762,7 +12764,7 @@ function EditDrawer(props: {
           </section>
           <section className="df-detail-schedule-row df-detail-due-date">
             <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
-            <button className="df-detail-pill-trevor action" onClick={() => set("dueDate", addDays(props.today, 1))}>{props.lang === "zh" ? "明天" : "Tomorrow"}</button>
+            <button className="df-detail-due-reset" type="button" onClick={() => set("dueDate", "")}>{props.lang === "zh" ? "重置" : "Reset"}</button>
           </section>
 
           {projectPickerOpen && <section className="df-detail-project-pick df-quick-add-detail-picker">
@@ -12855,6 +12857,35 @@ function EditDrawer(props: {
       durationMinutes: Math.max(Math.round((f.estimatedHours || 0.5) * 60), 30),
     };
     const recurrenceEditor = recurrenceDraft || fixedRecurrence;
+    const setCandidateReschedule = (date: string) => {
+      props.onTaskUpdate(props.task!.id, {
+        plannedForDate: date,
+        executionLane: "candidate",
+        scheduledDate: undefined,
+        scheduledStart: undefined,
+        scheduledEnd: undefined,
+        timelineRecords: (props.task!.timelineRecords || []).filter((record) => record.executionStatus !== "scheduled"),
+      });
+      setRescheduleOpen(false);
+      setQuickActionMenu(null);
+    };
+    const quickRescheduleOptions = [
+      { date: addDays(props.today, 1), zh: "明天", en: "Tomorrow" },
+      { date: addDays(props.today, 2), zh: "后天", en: "In 2 days" },
+      { date: addDays(props.today, 3), zh: "3 天后", en: "In 3 days" },
+      { date: addDays(props.today, 7), zh: "下周", en: "Next week" },
+      { date: addDays(props.today, 30), zh: "下个月", en: "Next month" },
+    ];
+    const quickRepeatOptions: Array<{ frequency: RecurrenceFrequency; zh: string; en: string }> = [
+      { frequency: "daily", zh: "每天", en: "Daily" },
+      { frequency: "weekly", zh: "每周", en: "Weekly" },
+      { frequency: "weekdays", zh: "每个工作日", en: "Weekdays" },
+      { frequency: "weekends", zh: "每个周末", en: "Weekends" },
+    ];
+    const applyQuickRepeat = (frequency: RecurrenceFrequency) => {
+      props.onSaveRecurrence(props.task!.id, { ...fixedRecurrence, mode: "scheduled", frequency });
+      setQuickActionMenu(null);
+    };
     if (props.compactSummary) {
       return (
         <>
@@ -12884,38 +12915,11 @@ function EditDrawer(props: {
             <span>◷ {formatDuration(f.estimatedHours || 0.5)}</span>
             <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l3 3 3-3" /></svg>
           </button>
+          {taskLevelSelector("importance", importanceOptions)}
           {recurrenceText ? <span className="df-detail-pill-trevor">↻ {recurrenceText}</span> : null}
         </section>
 
         {/* ── Status: COMPLETE / UNFINISHED / REMOVE ── */}
-        <section className="df-detail-meta-settings" aria-label={props.lang === "zh" ? "任务程度设置" : "Task level settings"}>
-          <div className="df-detail-meta-setting">
-            <span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>
-            <div className="df-level-selector df-level-importance" role="group" aria-label={props.lang === "zh" ? "重要程度" : "Importance"}>
-              {importanceOptions.map((option) => {
-                const selectedImportance = (f.importance ?? "unset") as TaskLevel;
-                const isSelected = selectedImportance === option.value;
-                return (
-                  <button
-                    key={`importance-${option.value}`}
-                    type="button"
-                    className={`df-level-option df-level-${option.value}`}
-                    data-selected={isSelected ? "true" : "false"}
-                    aria-pressed={isSelected}
-                    onClick={() => commitTaskMeta("importance", option.value)}
-                    title={props.lang === "zh" ? option.zh : option.en}
-                    style={{ "--option-color": levelColors[option.value] } as React.CSSProperties}
-                  >
-                    {option.value === "unset"
-                      ? <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                      : <svg viewBox="0 0 24 24" className="df-level-icon" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" fill="currentColor"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
         <section className="df-detail-status-row">
           <button className={`df-detail-pill-trevor action ${props.task.completed ? "green" : ""}`} onClick={props.onToggleDone}>
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-6"/></svg>
@@ -12937,35 +12941,54 @@ function EditDrawer(props: {
             <span>{props.lang === "zh" ? "截止日期" : "Due date"}</span>
             <input type="date" value={f.dueDate} onChange={(event) => { set("dueDate", event.target.value); props.onTaskUpdate(props.task!.id, { dueDate: event.target.value }); }} />
           </label>
-          <button className="df-detail-pill-trevor action" onClick={() => { const value = addDays(props.today, 1); set("dueDate", value); props.onTaskUpdate(props.task!.id, { dueDate: value }); }}>{props.lang === "zh" ? "明天" : "Tomorrow"}</button>
+          <button className="df-detail-due-reset" type="button" onClick={() => { set("dueDate", ""); props.onTaskUpdate(props.task!.id, { dueDate: "" }); }}>{props.lang === "zh" ? "重置" : "Reset"}</button>
         </section>
 
         {/* ── Scheduling: Reschedule / Unschedule ── */}
         <section className="df-detail-schedule-row">
-          <button className="df-detail-pill-trevor action" onClick={() => props.onTaskUpdate(props.task!.id, { plannedForDate: props.today, executionLane: "candidate", scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined, timelineRecords: (props.task!.timelineRecords || []).filter((record) => record.executionStatus !== "scheduled") })}>
-            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 2v4l2 2"/><circle cx="6" cy="6" r="5"/></svg>
-            <span>{t(props.lang, "drawer.quickReschedule")}</span>
-          </button>
+          <div className="df-detail-split-action">
+            <button className={`df-detail-pill-trevor action ${rescheduleOpen ? "active" : ""}`} onClick={() => { setQuickActionMenu(null); setRescheduleDate(props.task!.plannedForDate || props.today); setRescheduleOpen((open) => !open); }}>
+              <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 2v4l2 2"/><circle cx="6" cy="6" r="5"/></svg>
+              <span>{t(props.lang, "drawer.quickReschedule")}</span>
+            </button>
+            <button className="df-detail-split-arrow" type="button" aria-label={props.lang === "zh" ? "快速改期选项" : "Quick reschedule options"} aria-expanded={quickActionMenu === "reschedule"} onClick={() => { setRescheduleOpen(false); setQuickActionMenu((open) => open === "reschedule" ? null : "reschedule"); }}><svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M2 4l3 3 3-3" /></svg></button>
+            {quickActionMenu === "reschedule" && <div className="df-detail-quick-menu">{quickRescheduleOptions.map((option) => <button key={option.date} type="button" onClick={() => setCandidateReschedule(option.date)}>{props.lang === "zh" ? option.zh : option.en}</button>)}</div>}
+          </div>
           <button className="df-detail-pill-trevor action" onClick={() => props.onTaskUpdate(props.task!.id, { scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined, timelineRecords: (props.task!.timelineRecords || []).filter((record) => record.executionStatus !== "scheduled") })}>
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3l-6 6M3 3l6 6"/></svg>
             <span>{t(props.lang, "drawer.cancelSchedule")}</span>
           </button>
         </section>
 
+        {rescheduleOpen && (
+          <section className="df-detail-project-pick df-reschedule-editor">
+            <label><span>{props.lang === "zh" ? "改期至" : "Reschedule to"}</span><input type="date" value={rescheduleDate} onChange={(event) => setRescheduleDate(event.target.value)} /></label>
+            <div className="df-recurrence-editor-actions">
+              <button type="button" className="primary" onClick={() => setCandidateReschedule(rescheduleDate || props.today)}>{props.lang === "zh" ? "确认改期" : "Confirm"}</button>
+              <button type="button" onClick={() => setRescheduleOpen(false)}>{props.lang === "zh" ? "取消" : "Cancel"}</button>
+            </div>
+          </section>
+        )}
+
         {/* ── Recurrence + Copy ── */}
         <section className="df-detail-schedule-row">
-          <button className={`df-detail-pill-trevor action ${recurrenceOpen ? "active" : ""}`} onClick={() => {
-            if (recurrenceOpen) {
-              setRecurrenceOpen(false);
-              setRecurrenceDraft(null);
-            } else {
-              setRecurrenceDraft({ ...fixedRecurrence, mode: "scheduled" });
-              setRecurrenceOpen(true);
-            }
-          }}>
-            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8"/></svg>
-            <span>{t(props.lang, "drawer.setRepeat")}</span>
-          </button>
+          <div className="df-detail-split-action">
+            <button className={`df-detail-pill-trevor action ${recurrenceOpen ? "active" : ""}`} onClick={() => {
+              setQuickActionMenu(null);
+              if (recurrenceOpen) {
+                setRecurrenceOpen(false);
+                setRecurrenceDraft(null);
+              } else {
+                setRecurrenceDraft({ ...fixedRecurrence, mode: "scheduled" });
+                setRecurrenceOpen(true);
+              }
+            }}>
+              <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8"/></svg>
+              <span>{t(props.lang, "drawer.setRepeat")}</span>
+            </button>
+            <button className="df-detail-split-arrow" type="button" aria-label={props.lang === "zh" ? "快速重复选项" : "Quick repeat options"} aria-expanded={quickActionMenu === "repeat"} onClick={() => { setRecurrenceOpen(false); setQuickActionMenu((open) => open === "repeat" ? null : "repeat"); }}><svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M2 4l3 3 3-3" /></svg></button>
+            {quickActionMenu === "repeat" && <div className="df-detail-quick-menu">{quickRepeatOptions.map((option) => <button key={option.frequency} type="button" onClick={() => applyQuickRepeat(option.frequency)}>{props.lang === "zh" ? option.zh : option.en}</button>)}</div>}
+          </div>
           <button className="df-detail-pill-trevor action" onClick={props.onCopy}>
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="2" width="7" height="9" rx="1"/><path d="M2 5v7a1 1 0 001 1h6"/></svg>
             <span>{t(props.lang, "drawer.duplicate")}</span>
@@ -13103,7 +13126,7 @@ function EditDrawer(props: {
         </section>
         <section className="df-detail-schedule-row df-detail-due-date">
           <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
-          <button className="df-detail-pill-trevor action" onClick={() => set("dueDate", addDays(props.today, 7))}>{props.lang === "zh" ? "下周" : "Next week"}</button>
+          <button className="df-detail-due-reset" type="button" onClick={() => set("dueDate", "")}>{props.lang === "zh" ? "重置" : "Reset"}</button>
         </section>
         <section className="df-detail-status-row">
           {props.project && <button className="df-detail-pill-trevor action danger" onClick={props.onDelete}>

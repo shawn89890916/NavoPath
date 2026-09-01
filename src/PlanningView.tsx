@@ -690,6 +690,7 @@ function PlanningProjectNode(props: {
         className={`df-plan-project-node ${props.collapsed ? "collapsed" : ""}${props.dragging ? " is-dragging-source" : ""}`}
         data-node-id={props.project.id}
         data-node-type="project"
+        data-empty-project-drop={props.taskCount === 0 ? "true" : undefined}
         data-planning-drag-card={props.project.id}
         aria-grabbed={props.dragging}
         style={{
@@ -1219,17 +1220,6 @@ export default function PlanningView(props: {
     updatedAt: new Date().toISOString(),
   }), [today]);
 
-  const projectFromItem = useCallback((item: Task | Subtask): Project => ({
-    id: uid("project"),
-    title: item.title,
-    category: "project",
-    notes: "notes" in item ? item.notes : "",
-    completed: Boolean(item.completed || ("done" in item && item.done)),
-    order: Date.now(),
-    createdAt: item.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }), []);
-
   const handleTreeDrop = useCallback(async (source: TreeDragNode, target: TreeDropTarget) => {
     if (source.kind === target.kind && source.id === target.id) return;
     let projects = [...safeProjects];
@@ -1242,69 +1232,16 @@ export default function PlanningView(props: {
     if (source.kind === "project") {
       const project = projects.find((item) => item.id === source.id);
       if (!project) return;
-      if (target.kind === "project") {
-        if (target.position !== "inside") {
-          persistTree(reorderProjects(projects, source.id, target.id, target.position === "after"), tasks);
-          return;
-        }
-        // Dropping an empty project into another project turns it into a task in
-        // that project; this mirrors a task assignment instead of silently
-        // reordering the two project headers.
-        if (tasks.some((task) => task.projectId === project.id)) {
-          await dialog.alert(props.lang === "zh" ? "非空项目不能转为任务" : "A non-empty project cannot become a task", { message: props.lang === "zh" ? "请先移动其中的任务。" : "Move its tasks first." });
-          return;
-        }
-        const converted = taskFromSubtask({ id: uid("subtask"), title: project.title, completed: project.completed, createdAt: project.createdAt }, target.id === "__unassigned__" ? undefined : target.id);
-        persistTree(projects.filter((item) => item.id !== project.id), reorderTasks([...tasks, converted], converted.id, target.id === "__unassigned__" ? undefined : target.id));
-        return;
+      if (target.kind === "project" && target.position !== "inside") {
+        persistTree(reorderProjects(projects, source.id, target.id, target.position === "after"), tasks);
       }
-      if (tasks.some((task) => task.projectId === project.id)) {
-        await dialog.alert(props.lang === "zh" ? "A non-empty project cannot change level" : "A non-empty project cannot change level", { message: props.lang === "zh" ? "Move its tasks first to avoid losing data." : "Move its tasks first to avoid losing data." });
-        return;
-      }
-      projects = projects.filter((item) => item.id !== project.id);
-      if (target.position === "inside") {
-        const subtask: Subtask = { id: uid("subtask"), title: project.title, completed: project.completed, order: Date.now(), createdAt: project.createdAt, subtasks: [] };
-        const owner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
-        if (!owner) return;
-        tasks = tasks.map((task) => task.id === owner.id ? { ...task, subtasks: addSubtaskToTree(task.subtasks || [], subtask, target.kind === "subtask" ? target.id : undefined) } : task);
-      } else {
-        const converted = taskFromSubtask({ id: uid("subtask"), title: project.title, completed: project.completed, createdAt: project.createdAt }, targetProjectId);
-        tasks = reorderTasks([...tasks, converted], converted.id, targetProjectId, targetTask?.id, target.position === "after");
-      }
-      persistTree(projects, tasks);
       return;
     }
 
     if (source.kind === "task") {
       const task = tasks.find((item) => item.id === source.id);
       if (!task) return;
-      if (target.kind === "project" && target.position !== "inside") {
-        if ((task.subtasks || []).length || task.timelineRecords?.length || task.scheduledDate || task.recurrence) {
-          await dialog.alert(props.lang === "zh" ? "This task cannot become a project" : "This task cannot become a project", { message: props.lang === "zh" ? "Remove subtasks, schedules, or recurrence first." : "Remove subtasks, schedules, or recurrence first." });
-          return;
-        }
-        persistTree([...projects, projectFromItem(task)], tasks.filter((item) => item.id !== task.id));
-        return;
-      }
-      if ((target.kind === "task" || target.kind === "subtask") && target.position === "inside") {
-        if (task.timelineRecords?.length || task.scheduledDate || task.recurrence) {
-          await dialog.alert(props.lang === "zh" ? "A scheduled task cannot become a subtask" : "A scheduled task cannot become a subtask");
-          return;
-        }
-        const owner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
-        if (!owner || owner.id === task.id) return;
-        const subtask: Subtask = { id: uid("subtask"), title: task.title, completed: task.completed, order: Date.now(), createdAt: task.createdAt, subtasks: task.subtasks || [] };
-        tasks = tasks.filter((item) => item.id !== task.id).map((item) => item.id === owner.id ? { ...item, subtasks: addSubtaskToTree(item.subtasks || [], subtask, target.kind === "subtask" ? target.id : undefined) } : item);
-        persistTree(projects, tasks);
-        return;
-      }
-      if (target.kind === "subtask") {
-        const owner = subtaskOwner(target.id);
-        if (!owner) return;
-        persistTree(projects, reorderTasks(tasks, task.id, owner.projectId, owner.id, target.position === "after"));
-        return;
-      }
+      if (target.kind === "subtask" || (target.kind === "task" && target.position === "inside")) return;
       persistTree(projects, reorderTasks(tasks, task.id, targetProjectId, targetTask?.id, target.position === "after"));
       return;
     }
@@ -1322,19 +1259,7 @@ export default function PlanningView(props: {
       return;
     }
     tasks = tasks.map((task) => task.id === owner.id ? { ...task, subtasks: removeSubtaskFromTree(task.subtasks || [], source.id) } : task);
-    if (target.kind === "project" && target.position !== "inside") {
-      if (subtask.subtasks?.length) {
-        await dialog.alert(props.lang === "zh" ? "A subtask with children cannot become a project" : "A subtask with children cannot become a project");
-        return;
-      }
-      persistTree([...projects, projectFromItem(subtask)], tasks);
-      return;
-    }
-    if (target.kind === "project" || (target.kind === "task" && target.position !== "inside")) {
-      const converted = taskFromSubtask(subtask, targetProjectId);
-      persistTree(projects, reorderTasks([...tasks, converted], converted.id, targetProjectId, targetTask?.id, target.position === "after"));
-      return;
-    }
+    if (target.kind === "project" || (target.kind === "task" && target.position !== "inside")) return;
     const nextOwner = target.kind === "task" ? targetTask : subtaskOwner(target.id);
     if (!nextOwner) return;
     const targetTree = tasks.find((task) => task.id === nextOwner.id)?.subtasks || [];
@@ -1344,7 +1269,7 @@ export default function PlanningView(props: {
     if (target.kind === "subtask" && nextSubtasks === targetTree) return;
     tasks = tasks.map((task) => task.id === nextOwner.id ? { ...task, subtasks: nextSubtasks } : task);
     persistTree(projects, tasks);
-  }, [dialog, persistTree, projectFromItem, props.lang, safeProjects, safeTasks, subtaskOwner, taskFromSubtask]);
+  }, [persistTree, safeProjects, safeTasks, subtaskOwner]);
 
 
   const viewFilteredTasks = useMemo(() => {
@@ -1773,7 +1698,7 @@ export default function PlanningView(props: {
           const hasTasks = id === "__unassigned__"
             ? safeTasks.some((task) => !task.projectId)
             : safeTasks.some((task) => String(task.projectId || "") === id);
-          if (hasTasks) continue;
+          if (hasTasks || sourceNode.kind !== "task") continue;
           const rect = header.getBoundingClientRect();
           const nextTop = headers[index + 1]?.getBoundingClientRect().top ?? treeRect.bottom;
           const targetBottom = Math.max(rect.bottom + 44, nextTop - 4);
@@ -1785,13 +1710,37 @@ export default function PlanningView(props: {
         setTreeDropTarget(null);
         return;
       }
+      const nodeKind = node.dataset.nodeType as TreeNodeKind;
       const rect = node.getBoundingClientRect();
       const ratio = (clientY - rect.top) / Math.max(rect.height, 1);
-      const position = node.dataset.emptyProjectDrop === "true"
-        ? "inside"
-        : ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
+      let position: TreeDropTarget["position"];
+
+      // Dragging never changes an item's type. Tasks can only be assigned to a
+      // project or reordered beside another task; projects can only reorder with
+      // projects. This also makes a project header an unambiguous assignment
+      // target, including a project whose task list is empty.
+      if (sourceNode.kind === "project") {
+        if (nodeKind !== "project") {
+          setTreeDropTarget(null);
+          return;
+        }
+        position = ratio < 0.5 ? "before" : "after";
+      } else if (sourceNode.kind === "task") {
+        if (nodeKind === "project") position = "inside";
+        else if (nodeKind === "task") position = ratio < 0.5 ? "before" : "after";
+        else {
+          setTreeDropTarget(null);
+          return;
+        }
+      } else {
+        if (nodeKind === "project") {
+          setTreeDropTarget(null);
+          return;
+        }
+        position = nodeKind === "task" ? "inside" : ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
+      }
       setTreeDropTarget({
-        kind: node.dataset.nodeType as TreeNodeKind,
+        kind: nodeKind,
         id: node.dataset.nodeId || "",
         position,
         height: dragPreviewHeight,
