@@ -75,6 +75,7 @@ import {
   startOfWeekIso,
 } from "./utils/recurrence";
 import { appendAiSubtasks } from "./utils/aiSubtasks";
+import { autoScrollAtDragEdge } from "./utils/dragAutoScroll";
 import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
 import { useInAppDialog } from "./InAppDialog";
@@ -3824,11 +3825,21 @@ function App() {
     if (!dragId || !targetId || dragId === targetId) return;
     const current = dataRef.current;
     if (!current) return;
-    const rendered = visibleCandidates.filter((task) => !isEventDisplayTask(task));
-    const dragged = rendered.find((task) => task.id === dragId);
-    if (!dragged) return;
-    const without = rendered.filter((task) => task.id !== dragId);
-    const targetIndex = without.findIndex((task) => task.id === targetId);
+    const sourceId = resolveOwningTask(dragId)?.id || dragId;
+    const destinationId = resolveOwningTask(targetId)?.id || targetId;
+    const dragged = current.tasks.find((task) => task.id === sourceId);
+    const target = current.tasks.find((task) => task.id === destinationId);
+    if (!dragged || !target || dragged.id === target.id) return;
+    const renderedIds = new Set(
+      visibleCandidates
+        .filter((task) => !isEventDisplayTask(task))
+        .map((task) => resolveOwningTask(task)?.id || task.id),
+    );
+    const destinationProjectId = target.projectId;
+    const without = current.tasks
+      .filter((task) => renderedIds.has(task.id) && task.id !== dragged.id && task.projectId === destinationProjectId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    const targetIndex = without.findIndex((task) => task.id === target.id);
     if (targetIndex < 0) return;
     without.splice(position === "before" ? targetIndex : targetIndex + 1, 0, dragged);
     const nextOrder = new Map(without.map((task, index) => [task.id, index * 10]));
@@ -3836,15 +3847,17 @@ function App() {
     void saveData({
       ...current,
       tasks: current.tasks.map((task) => (
-        nextOrder.has(task.id)
-          ? { ...task, order: nextOrder.get(task.id), updatedAt: now }
+        task.id === dragged.id
+          ? { ...task, projectId: destinationProjectId, order: nextOrder.get(task.id), updatedAt: now }
+          : nextOrder.has(task.id)
+            ? { ...task, order: nextOrder.get(task.id), updatedAt: now }
           : task
       )),
     });
   }
 
   function moveCandidateToProject(dragId: string, targetProjectId: string) {
-    const task = dataRef.current?.tasks.find((item) => item.id === dragId);
+    const task = resolveOwningTask(dragId) || dataRef.current?.tasks.find((item) => item.id === dragId);
     if (!task || isEventDisplayTask(task)) return;
     const projectId = targetProjectId === "__unassigned__" ? undefined : targetProjectId;
     if ((task.projectId || "__unassigned__") === (projectId || "__unassigned__")) return;
@@ -6185,7 +6198,53 @@ function App() {
       updatedAt: now,
     });
     if (editingId) {
-      if (addType === "task") {
+      const editingTask = data.tasks.find((task) => task.id === editingId);
+      const editingProject = data.projects.find((project) => project.id === editingId);
+      if (editingProject && addType === "task") {
+        const converted: Task = {
+          id: uid("task"),
+          title: form.title.trim(),
+          dueDate: form.dueDate || today,
+          category: form.category,
+          priority: form.priority || "medium",
+          notes: form.details,
+          goalId: "",
+          completed: editingProject.completed,
+          projectId: form.projectId || undefined,
+          estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
+          importance: form.importance,
+          urgency: form.urgency,
+          order: editingProject.order,
+          subtasks: [],
+          timelineRecords: [],
+          createdAt: editingProject.createdAt,
+          updatedAt: now,
+        };
+        void saveData({
+          ...data,
+          projects: data.projects.filter((project) => project.id !== editingProject.id),
+          tasks: [...data.tasks, converted],
+        });
+      } else if (editingTask && addType === "project") {
+        const converted: Project = {
+          id: uid("project"),
+          title: form.title.trim(),
+          category: form.category,
+          color: form.projectColor || categories[form.category].color,
+          notes: form.details,
+          completed: editingTask.completed,
+          importance: form.importance,
+          urgency: form.urgency,
+          order: editingTask.order,
+          createdAt: editingTask.createdAt,
+          updatedAt: now,
+        };
+        void saveData({
+          ...data,
+          projects: [...data.projects, converted],
+          tasks: data.tasks.filter((task) => task.id !== editingTask.id),
+        });
+      } else if (addType === "task") {
         void saveData({
           ...data,
           tasks: data.tasks.map((task) => task.id === editingId ? buildUpdatedTask(task) : task)
@@ -7091,6 +7150,11 @@ function App() {
       }
       pointerEvent.preventDefault();
       setDragOverlayPointer({ x: pointerEvent.clientX, y: pointerEvent.clientY });
+      autoScrollAtDragEdge(pointerEvent.clientX, pointerEvent.clientY, [
+        document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest<HTMLElement>(".df-candidate-list"),
+        document.querySelector<HTMLElement>(".df-candidate-panel"),
+        timelineRef.current,
+      ]);
       const currentRect = dragElement.getBoundingClientRect();
       const sourceRect = dragSourceRect || { width: currentRect.width, height: currentRect.height };
       const sourceOffset = dragSourceOffset || {
@@ -7117,24 +7181,25 @@ function App() {
           return;
         }
         const pointedElement = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY);
-        const candidateRow = source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
-        if (candidateRow || candidateTarget?.kind === "task") {
-          const targetTaskId = candidateRow?.dataset.candidateTaskId || (candidateTarget?.kind === "task" ? candidateTarget.taskId : "");
+        const stableTaskTarget = candidateTarget?.kind === "task" ? candidateTarget : null;
+        const candidateRow = !stableTaskTarget && source === "candidate" && options.allowCandidateReorder !== false ? pointedElement?.closest<HTMLElement>("[data-candidate-task-id]") : null;
+        if (candidateRow || stableTaskTarget) {
+          const targetTaskId = stableTaskTarget?.taskId || candidateRow?.dataset.candidateTaskId || "";
           if (targetTaskId && targetTaskId !== task.id) {
             const rect = candidateRow?.getBoundingClientRect();
-            const position = rect
+            const position = stableTaskTarget?.position || (rect
               ? ((pointerEvent.clientY - rect.top) < rect.height / 2 ? "before" : "after")
-              : (candidateTarget?.kind === "task" ? candidateTarget.position : "after");
+              : "after");
             reorderTodayCandidate(task.id, targetTaskId, position);
           }
           cleanup();
           return;
         }
-        const candidateProject = source === "candidate" && options.allowCandidateReorder !== false
+        const stableProjectTarget = candidateTarget?.kind === "project" ? candidateTarget : null;
+        const candidateProject = !stableProjectTarget && source === "candidate" && options.allowCandidateReorder !== false
           ? pointedElement?.closest<HTMLElement>("[data-candidate-project-id]")
           : null;
-        const targetProjectId = candidateProject?.dataset.candidateProjectId
-          || (candidateTarget?.kind === "project" ? candidateTarget.projectId : "");
+        const targetProjectId = stableProjectTarget?.projectId || candidateProject?.dataset.candidateProjectId || "";
         if (targetProjectId && targetProjectId !== "__events__") {
           moveCandidateToProject(task.id, targetProjectId);
           cleanup();
@@ -8391,11 +8456,10 @@ function App() {
                           <span className="df-project-group-name">{projectTitle}</span>
                           <span className="df-project-group-count">{tasks.length}</span>
                         </div>
-                        {tasks.length === 0 && drag?.source === "candidate" && (
+                        {isProjectDropTarget && (
                           <div
-                            className={`df-candidate-empty-project-drop${isProjectDropTarget ? " is-active" : ""}`}
-                            style={{ "--reorder-preview-height": `${drag.sourceRect?.height || 64}px` } as CSSProperties}
-                            data-candidate-project-id={gid}
+                            className="df-reorder-preview-slot df-candidate-project-drop"
+                            style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties}
                             aria-hidden="true"
                           />
                         )}

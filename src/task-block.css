@@ -3547,34 +3547,6 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   display: none !important;
 }
 
-/* Empty project branches keep a fixed hit area while a task is in motion.
-   Activating the same element as the preview avoids shifting it out from under
-   the pointer, so the project can be targeted even before it has any tasks. */
-#root .df-app.mode-planning .df-planning .df-empty-project-drop-zone,
-#root .df-app.mode-execute .df-candidate-empty-project-drop {
-  box-sizing: border-box !important;
-  width: min(100%, 620px) !important;
-  min-height: var(--tree-drop-slot-height, var(--reorder-preview-height, 54px)) !important;
-  height: var(--tree-drop-slot-height, var(--reorder-preview-height, 54px)) !important;
-  margin: 8px 0 !important;
-  border: 1px dashed transparent !important;
-  border-radius: var(--task-radius) !important;
-  background: transparent !important;
-  transition: border-color 100ms var(--paper-ease, ease), background 100ms var(--paper-ease, ease) !important;
-}
-
-#root .df-app.mode-planning .df-planning .df-empty-project-drop-zone.is-active,
-#root .df-app.mode-execute .df-candidate-empty-project-drop.is-active {
-  border-color: var(--paper-rule-strong) !important;
-  background: var(--surface-card) !important;
-}
-
-#root .df-app.mode-execute .df-candidate-empty-project-drop {
-  width: 100% !important;
-  min-height: var(--reorder-preview-height, 64px) !important;
-  height: var(--reorder-preview-height, 64px) !important;
-}
-
 @media (max-width: 760px) {
   #root .df-app.mode-planning .df-planning .df-mindmap.no-root { grid-template-columns: 76px minmax(0, 1fr) !important; }
   #root .df-app.mode-planning .df-planning .df-planning-sidebar { width: 76px !important; min-width: 76px !important; padding-inline: 6px !important; }
