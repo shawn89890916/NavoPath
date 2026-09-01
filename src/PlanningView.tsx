@@ -1014,6 +1014,7 @@ export default function PlanningView(props: {
   const [listDragTaskId, setListDragTaskId] = useState<string | null>(null);
   const [listDropTargetId, setListDropTargetId] = useState<string | null>(null);
   const [listDropPosition, setListDropPosition] = useState<"before" | "after">("before");
+  const [listDropAtEnd, setListDropAtEnd] = useState(false);
   const [guideDismissed, setGuideDismissed] = useState(false);
   const [planningDragTask, setPlanningDragTask] = useState<{
     task: Task;
@@ -1044,6 +1045,13 @@ export default function PlanningView(props: {
   }, []);
 
   const setTreeDropTarget = useCallback((target: TreeDropTarget | null) => {
+    const current = dropTargetRef.current;
+    if (
+      current?.kind === target?.kind
+      && current?.id === target?.id
+      && current?.position === target?.position
+      && current?.height === target?.height
+    ) return;
     dropTargetRef.current = target;
     setDropTarget(target);
   }, []);
@@ -1057,6 +1065,7 @@ export default function PlanningView(props: {
     setKanbanDropStatus(null);
     setListDragTaskId(null);
     setListDropTargetId(null);
+    setListDropAtEnd(false);
     setPlanningDragTask(null);
   }
 
@@ -1511,8 +1520,11 @@ export default function PlanningView(props: {
       document.body.classList.remove("df-unified-dragging");
       dragElement.classList.remove("is-dragging-source");
       setPlanningDragTask(null);
+      setKanbanDragTaskId(null);
       setKanbanDropStatus(null);
+      setListDragTaskId(null);
       setListDropTargetId(null);
+      setListDropAtEnd(false);
       planningDropTargetRef.current = null;
       if (dragElement.hasPointerCapture(pointerId)) {
         try { dragElement.releasePointerCapture(pointerId); } catch { /* ignore */ }
@@ -1529,6 +1541,7 @@ export default function PlanningView(props: {
           const isBefore = (clientY - rect.top) < rect.height / 2;
           setListDropTargetId(targetTaskId);
           setListDropPosition(isBefore ? "before" : "after");
+          setListDropAtEnd(false);
           planningDropTargetRef.current = {
             taskId: targetTaskId,
             position: isBefore ? "before" : "after",
@@ -1536,6 +1549,7 @@ export default function PlanningView(props: {
           };
         } else {
           setListDropTargetId(null);
+          setListDropAtEnd(false);
           planningDropTargetRef.current = null;
         }
         setKanbanDropStatus(null);
@@ -1545,6 +1559,7 @@ export default function PlanningView(props: {
       if (kanbanColumn) {
         setKanbanDropStatus(kanbanColumn.dataset.kanbanStatus as UiWorkflowStatus);
         setListDropTargetId(null);
+        setListDropAtEnd(false);
         planningDropTargetRef.current = null;
         return;
       }
@@ -1552,6 +1567,7 @@ export default function PlanningView(props: {
       if (quadrant) {
         setKanbanDropStatus(("q-" + quadrant.dataset.quadrant) as unknown as UiWorkflowStatus);
         setListDropTargetId(null);
+        setListDropAtEnd(false);
         planningDropTargetRef.current = null;
         return;
       }
@@ -1563,6 +1579,7 @@ export default function PlanningView(props: {
           const isBefore = (clientY - rect.top) < rect.height / 2;
           setListDropTargetId(targetTaskId);
           setListDropPosition(isBefore ? "before" : "after");
+          setListDropAtEnd(false);
           planningDropTargetRef.current = {
             taskId: targetTaskId,
             position: isBefore ? "before" : "after",
@@ -1570,13 +1587,23 @@ export default function PlanningView(props: {
           };
         } else {
           setListDropTargetId(null);
+          setListDropAtEnd(false);
           planningDropTargetRef.current = null;
         }
         setKanbanDropStatus(null);
         return;
       }
+      const listContainer = pointedElement?.closest<HTMLElement>(".df-planning-list");
+      if (listContainer) {
+        setKanbanDropStatus(null);
+        setListDropTargetId(null);
+        setListDropAtEnd(true);
+        planningDropTargetRef.current = null;
+        return;
+      }
       setKanbanDropStatus(null);
       setListDropTargetId(null);
+      setListDropAtEnd(false);
       planningDropTargetRef.current = null;
     };
 
@@ -1646,6 +1673,9 @@ export default function PlanningView(props: {
             const isBefore = (pointerEvent.clientY - rect.top) < rect.height / 2;
             handleListDrop(targetTaskId, isBefore ? "before" : "after", task.id);
           }
+        } else if (pointedElement?.closest(".df-planning-list")) {
+          const lastTask = orderPlanningTasks(viewFilteredTasks).filter((item) => item.id !== task.id).at(-1);
+          if (lastTask) reorderPlanningTasks(task.id, lastTask.id, "after", viewFilteredTasks);
         }
       }
       cleanup();
@@ -1658,7 +1688,7 @@ export default function PlanningView(props: {
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", keydown);
-  }, [handleKanbanDrop, handleQuadrantDrop, handleListDrop, planningContainerTasks, reorderPlanningTasks, suppressPostDragClick]);
+  }, [handleKanbanDrop, handleQuadrantDrop, handleListDrop, orderPlanningTasks, planningContainerTasks, reorderPlanningTasks, suppressPostDragClick, viewFilteredTasks]);
 
   /**
    * Shared pointer-event drag for Tree view.
@@ -2565,7 +2595,7 @@ export default function PlanningView(props: {
                     <div className="df-kanban-card-list">
                       {columnTasks.map((task) => {
                         const isDropTarget = listDropTargetId === task.id;
-                        const isReorderSource = Boolean(planningDragTask && listDropTargetId && planningDragTask.task.id === task.id);
+                        const isReorderSource = planningDragTask?.task.id === task.id;
                         return (
                         <React.Fragment key={task.id}>
                         {isDropTarget && listDropPosition === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
@@ -2604,8 +2634,8 @@ export default function PlanningView(props: {
                         </React.Fragment>
                         );
                       })}
-                      {planningDragTask && kanbanDropStatus === status && (
-                        <div className="df-kanban-drop-placeholder" aria-hidden="true" />
+                      {planningDragTask && !listDropTargetId && kanbanDropStatus === status && (
+                        <div className="df-reorder-preview-slot df-kanban-drop-placeholder" style={{ "--reorder-preview-height": `${planningDragTask.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />
                       )}
                       {columnTasks.length === 0 && !planningDragTask && <div className="df-kanban-empty">{props.lang === "zh" ? "Drop tasks here" : "Drop tasks here"}</div>}
                     </div>
@@ -2647,7 +2677,7 @@ export default function PlanningView(props: {
                       {quadTasks.map((task) => {
                         const taskDone = normalizeWorkflowStatus(task) === "done";
                         const isDropTarget = listDropTargetId === task.id;
-                        const isReorderSource = Boolean(planningDragTask && listDropTargetId && planningDragTask.task.id === task.id);
+                        const isReorderSource = planningDragTask?.task.id === task.id;
                         return (
                           <React.Fragment key={task.id}>
                           {isDropTarget && listDropPosition === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask?.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
@@ -2686,8 +2716,8 @@ export default function PlanningView(props: {
                           </React.Fragment>
                         );
                       })}
-                      {planningDragTask && kanbanDropStatus === (("q-" + quad.key) as unknown as UiWorkflowStatus) && (
-                        <div className="df-kanban-drop-placeholder" aria-hidden="true" />
+                      {planningDragTask && !listDropTargetId && kanbanDropStatus === (("q-" + quad.key) as unknown as UiWorkflowStatus) && (
+                        <div className="df-reorder-preview-slot df-kanban-drop-placeholder" style={{ "--reorder-preview-height": `${planningDragTask.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />
                       )}
                       {quadTasks.length === 0 && !planningDragTask && <div className="df-eisenhower-empty">Drop tasks here</div>}
                     </div>
@@ -2702,7 +2732,7 @@ export default function PlanningView(props: {
               {orderPlanningTasks(viewFilteredTasks).map((task) => {
                 const uiStatus = normalizeWorkflowStatus(task);
                 const isDropTarget = listDropTargetId === task.id;
-                const isReorderSource = Boolean(planningDragTask && listDropTargetId && planningDragTask.task.id === task.id);
+                const isReorderSource = planningDragTask?.task.id === task.id;
                 return (
                   <div
                     key={task.id}
@@ -2744,6 +2774,7 @@ export default function PlanningView(props: {
                   </div>
                 );
               })}
+              {planningDragTask && listDropAtEnd && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${planningDragTask.sourceRect.height || 52}px` } as React.CSSProperties} aria-hidden="true" />}
             </div>
           )}
 

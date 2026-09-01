@@ -5700,7 +5700,6 @@ function App() {
       return;
     }
     const isEvent = isEventDisplayTask(task);
-    if (!isEvent && hasRecurringRule(resolveOwningTask(task) || task)) return;
     const target = event.currentTarget as HTMLElement;
     const startX = event.clientX;
     const startY = event.clientY;
@@ -6905,6 +6904,13 @@ function App() {
     };
     let dropTime = "";
     let candidateTarget: CandidateDropTarget = null;
+    const setCandidateReorderTarget = (nextTarget: CandidateDropTarget) => {
+      const unchanged = candidateTarget?.taskId === nextTarget?.taskId
+        && candidateTarget?.position === nextTarget?.position
+        && candidateTarget?.intent === nextTarget?.intent;
+      candidateTarget = nextTarget;
+      if (!unchanged) setCandidateDropTarget(nextTarget);
+    };
     const jumpDate = (tap: PointerEvent) => {
       if (!active || tap.pointerId === pointerId) return;
       const control = document.elementFromPoint(tap.clientX, tap.clientY)?.closest<HTMLElement>("[data-date],.df-compact-date-picker-trigger");
@@ -6939,8 +6945,7 @@ function App() {
       const returnToPlanning = compactLayout && source === "candidate" && pointerEvent.clientX <= 58;
       setCandidatePlanningReturnActive(returnToPlanning);
       if (returnToPlanning) {
-        candidateTarget = null;
-        setCandidateDropTarget(null);
+        setCandidateReorderTarget(null);
         setCandidateDropActive(false);
         setAllDayDragOver(false);
         setAllDayDragDate("");
@@ -6956,15 +6961,13 @@ function App() {
         if (targetTaskId && targetTaskId !== task.id) {
           const rect = candidateRow.getBoundingClientRect();
           const position = (pointerEvent.clientY - rect.top) < rect.height / 2 ? "before" : "after";
-          candidateTarget = {
+          setCandidateReorderTarget({
             taskId: targetTaskId,
             position,
             intent: position === "before" ? "reorder-before" : "reorder-after",
-          };
-          setCandidateDropTarget(candidateTarget);
+          });
         } else {
-          candidateTarget = null;
-          setCandidateDropTarget(null);
+          setCandidateReorderTarget(null);
         }
         setCandidateDropActive(false);
         setAllDayDragOver(false);
@@ -6974,8 +6977,7 @@ function App() {
         dragTargetDateRef.current = "";
         return;
       }
-      candidateTarget = null;
-      setCandidateDropTarget(null);
+      setCandidateReorderTarget(null);
       const candidatePanel = source === "allDay" ? pointedElement?.closest<HTMLElement>(".df-candidate-panel") : null;
       setCandidateDropActive(Boolean(candidatePanel));
       if (candidatePanel) {
@@ -8340,7 +8342,7 @@ function App() {
                         </div>
                         {tasks.map((task) => {
                           const dropHere = drag?.source === "candidate" && candidateDropTarget?.taskId === task.id;
-                          const isReorderSource = Boolean(drag?.source === "candidate" && candidateDropTarget && drag.taskId === task.id);
+                          const isReorderSource = drag?.source === "candidate" && drag.taskId === task.id;
                           return (
                             <div
                               key={task.id}
@@ -8363,7 +8365,7 @@ function App() {
                   })
               ) : visibleCandidates.map((task) => {
                 const dropHere = drag?.source === "candidate" && candidateDropTarget?.taskId === task.id;
-                const isReorderSource = Boolean(drag?.source === "candidate" && candidateDropTarget && drag.taskId === task.id);
+                const isReorderSource = drag?.source === "candidate" && drag.taskId === task.id;
                 return <div
                   key={task.id}
                   className={`df-candidate-task-row${completingTaskIds.has(task.id) ? " is-completing" : ""}${dropHere ? ` is-candidate-drop is-${candidateDropTarget!.position}` : ""}`}
@@ -9030,11 +9032,11 @@ function App() {
                                         }).map((task) => (
                                           <button key={task.id} className={`df-month-task${!isEventDisplayTask(task) && task.completed ? " completed" : ""}${isEventDisplayTask(task) ? " is-event" : ""}`}
                                             data-kind={isEventDisplayTask(task) ? "event" : "task"}
-                                            draggable={!isEventDisplayTask(task) && !hasRecurringRule(task)}
+                                            draggable={!isEventDisplayTask(task)}
                                             style={{ "--cat": projects.find((p) => String(p.id) === String(task.projectId || ""))?.color || categories[task.category].color } as CSSProperties}
                                             onClick={(e) => { e.stopPropagation(); openTaskEdit(task); }}
                                             onDragStart={(e) => {
-                                              if (isEventDisplayTask(task) || hasRecurringRule(task)) return;
+                                              if (isEventDisplayTask(task)) return;
                                               e.dataTransfer.setData("taskId", task.id);
                                               e.dataTransfer.effectAllowed = "move";
                                               setDragCreate(null);
@@ -11218,7 +11220,6 @@ function TaskCard({
   const cardAccentColor = isEvent
     ? categories[task.category]?.color || "var(--accent-active)"
     : projects.find((p) => String(p.id) === String(task.projectId || ""))?.color || "var(--accent-active)";
-  const recurringLocked = hasRecurringRule(task);
   const isPlacementArmed = placementPreview?.taskId === task.id;
   const scheduleSummary = candidateScheduleSummary(task, focusDate);
   const showScheduleSummary = task.completed || Boolean(scheduleSummary);
@@ -11258,9 +11259,9 @@ function TaskCard({
         selected={Boolean(openPanel || isPlacementArmed)}
         dragState={dragState}
         projectColor={cardAccentColor}
-        className={`df-task-card ${overdue > 0 && !isEvent ? "overdue" : ""} ${task.completed && !isEvent ? "completed" : ""} ${openPanel ? "expanded" : ""} ${isMoreOpen ? "more-open" : ""} ${isPlacementArmed ? "placement-armed" : ""} ${recurringLocked && !isEvent ? "recurring-locked" : ""} ${isEvent ? "is-event" : ""}`}
+        className={`df-task-card ${overdue > 0 && !isEvent ? "overdue" : ""} ${task.completed && !isEvent ? "completed" : ""} ${openPanel ? "expanded" : ""} ${isMoreOpen ? "more-open" : ""} ${isPlacementArmed ? "placement-armed" : ""} ${isEvent ? "is-event" : ""}`}
         dataAttrs={{ "placement-card": task.id, kind: isEvent ? "event" : "task" }}
-        onPointerDown={!isEvent && recurringLocked ? undefined : onPointerDragStart}
+        onPointerDown={isEvent ? undefined : onPointerDragStart}
         onClick={onClick}
         title={compact
           ? (lang === "zh" ? "长按后拖到时间轴排程" : "Long press, then drag to schedule")
@@ -11919,9 +11920,8 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
     !isReturnedUnfinished &&
     !isPreview
   );
-  const recurringLocked = hasRecurringRule(task);
   const recurringTextColor = isLightColor(stripeColor) ? "#10212F" : "#F8FBFF";
-  const canResize = !isExternalEvent && (isEvent || !recurringLocked);
+  const canResize = !isExternalEvent && (isEvent || !hasRecurringRule(task));
   const eventId = task.id;
   const sizeClass = height < 56 ? "short" : height >= 120 ? "tall" : "normal";
   const originalStart = task.scheduledStart || "09:00";
@@ -11934,7 +11934,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
   return (
     <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id, readonly: isExternalEvent ? "true" : undefined }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
-    }} onPointerDown={isExternalEvent || isReturnedUnfinished || (!isEvent && recurringLocked) ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : !isEvent && recurringLocked ? t(lang, "timeBlock.recurringHint") : undefined}>
+    }} onPointerDown={isExternalEvent || isReturnedUnfinished ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
       <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
       {canResize && (hovered || showResizeHint || preview) && resizeEdges?.start !== false && <button type="button" className="df-resize-dot top" aria-label={t(lang, "timeBlock.adjustStart")} onPointerDown={(event) => onResizeStart(event, "start")} onClick={(event) => event.stopPropagation()} />}
@@ -12136,7 +12136,6 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
   const isExternalEvent = isExternalCalendarDisplayTask(task);
   const isShortName = task.title.length <= 6;
   const isReturnedUnfinished = task.executionStatus === "returned_unfinished";
-  const recurringLocked = hasRecurringRule(task);
   const [badgeWidth, setBadgeWidth] = useState(0);
   useLayoutEffect(() => {
     if (hovered && projectBtnRef.current) {
@@ -12146,7 +12145,7 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
     }
   }, [hovered]);
   return (
-    <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", readonly: isExternalEvent ? "true" : undefined }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished || recurringLocked ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+    <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", readonly: isExternalEvent ? "true" : undefined }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
       <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
       <TaskBlockRow className="df-all-day-row">
         {!isEvent && <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} returned={isReturnedUnfinished} onClick={(event) => {

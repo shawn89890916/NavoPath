@@ -3276,14 +3276,7 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
 }
 
 .df-reorder-preview-slot::after {
-  position: absolute;
-  top: 50%;
-  right: 14px;
-  left: 14px;
-  height: 1px;
-  background: var(--accent-active);
-  content: "";
-  opacity: .72;
+  content: none;
 }
 
 @keyframes df-reorder-preview-in {
@@ -3471,6 +3464,49 @@ body.df-planning-native-dragging .df-unified-drag-overlay {
   width: 100% !important;
   min-height: var(--reorder-preview-height, 56px) !important;
   background: #fff !important;
+}
+
+/* Every reordering surface uses one quiet, four-sided empty slot.  It is a
+   destination marker, never a second task preview or an insertion line. */
+#root .df-app :is(.df-reorder-preview-slot, .df-kanban-drop-placeholder, .df-tree-drop-preview) {
+  box-sizing: border-box !important;
+  border: 1px dashed var(--paper-rule-strong) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+#root .df-app .df-kanban-drop-placeholder {
+  flex: 0 0 var(--reorder-preview-height, 52px) !important;
+  width: 100% !important;
+  min-height: var(--reorder-preview-height, 52px) !important;
+}
+
+/* A source never competes with the dragged overlay. Keep timeline geometry
+   stable if a source remains mounted, but make its old contents disappear. */
+#root .df-app .df-task-block[data-drag-state="source-placeholder"],
+#root .df-app .df-task-block.is-dragging-source {
+  visibility: hidden !important;
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+/* The card under the pointer is the original TaskBlock, given only the small
+   physical cue requested for a direct-manipulation drag. */
+#root .df-app .df-task-drag-layer > .df-task-block[data-drag-state="overlay"] {
+  transform: rotate(-1.1deg) !important;
+  transform-origin: center !important;
+  box-shadow: 0 10px 24px rgb(39 35 30 / 18%) !important;
+}
+
+/* Project branches leave the tree completely while their card is in the
+   pointer layer, avoiding an empty source frame and the resulting jump. */
+#root .df-app.mode-planning .df-tree.is-tree-dragging [aria-grabbed="true"] {
+  display: none !important;
+}
+
+#root .df-app.mode-planning .df-tree.is-tree-dragging .df-category-branch:has(> .df-plan-project-node[aria-grabbed="true"]) {
+  display: none !important;
 }
 
 /* Planning's alternate views use the same paper TaskBlock as the tree. */

@@ -4,7 +4,7 @@
 
 ### 改进
 - Navo AI 主动助理现可在工作时间主动发现未补记的空档，并让你将这段实际时间关联到未完成任务，或直接新建为已完成任务；对应的历史完成块会清晰但低调地保留在时间轴中。
-- 规划工作区现在以与 Execute 一致的暖纸层级呈现：左侧栏专用于树、看板、矩阵、列表和指标切换，所有视图的项目与任务块使用纯白纸面、加粗且不透明的项目色条与清晰项目标记，并可关闭规划说明。右下角添加直接打开同一行、选中态明确的任务、项目、习惯切换抽屉。候选任务以纯白副本拖动并在目标处让出整行空槽，未归属与循环任务也可排序或排程；规划树以真正参与布局的空槽取代文字提示，跨项目、未归属与新项目落点会自动让位。
+- 规划工作区现在以与 Execute 一致的暖纸层级呈现：左侧栏专用于树、看板、矩阵、列表和指标切换，所有视图的项目与任务块使用纯白纸面、加粗且不透明的项目色条与清晰项目标记，并可关闭规划说明。右下角添加直接打开同一行、选中态明确的任务、项目、习惯切换抽屉。候选、看板、矩阵、列表与规划树共用四边空槽的拖放反馈：源卡一经拖起便离开原位，带轻斜和中性阴影的原样卡片跟随指针，目标及后续项目稳定让位。未归属和循环任务现在同样可拖动、排序与排程。
 
 ## 2026-08-31 · 今日候选分组与时间轴留白
 
@@ -28,7 +28,7 @@
 
 ### Improved
 - Navo AI Proactive Assistant can now identify unlogged gaps during working hours and let you attach that actual time to an unfinished task or create it as a completed task; its completed historical block remains clear but understated on the timeline.
-- The Planning workspace now uses the same warm-paper hierarchy as Execute: its left rail is dedicated to Tree, Board, Matrix, List, and Metrics, and all views use clean white project and task blocks with thicker opaque project-color bars, clear project marks, and a dismissible planning note. The lower-right Add action opens a side drawer with Task, Project, and Habit on one row and a clear selected state. Candidate tasks drag as a pure-white copy and reserve a full-row target slot; Unassigned and recurring tasks can also be reordered or scheduled. The Planning tree replaces text instructions with layout-participating empty slots, so cross-project, Unassigned, and new-project targets automatically make room.
+- The Planning workspace now uses the same warm-paper hierarchy as Execute: its left rail is dedicated to Tree, Board, Matrix, List, and Metrics, and all views use clean white project and task blocks with thicker opaque project-color bars, clear project marks, and a dismissible planning note. The lower-right Add action opens a side drawer with Task, Project, and Habit on one row and a clear selected state. Candidates, Board, Matrix, List, and the Planning tree now share one four-sided empty-slot drag treatment: the source leaves its old position immediately, while an unchanged task card with a slight tilt and neutral shadow follows the pointer and destination items make stable room. Unassigned and recurring tasks can now also be dragged, reordered, and scheduled.
 
 ## 2026-08-31 · Candidate grouping and timeline spacing
 
