@@ -1243,7 +1243,19 @@ export default function PlanningView(props: {
       const project = projects.find((item) => item.id === source.id);
       if (!project) return;
       if (target.kind === "project") {
-        persistTree(reorderProjects(projects, source.id, target.id, target.position === "after"), tasks);
+        if (target.position !== "inside") {
+          persistTree(reorderProjects(projects, source.id, target.id, target.position === "after"), tasks);
+          return;
+        }
+        // Dropping an empty project into another project turns it into a task in
+        // that project; this mirrors a task assignment instead of silently
+        // reordering the two project headers.
+        if (tasks.some((task) => task.projectId === project.id)) {
+          await dialog.alert(props.lang === "zh" ? "非空项目不能转为任务" : "A non-empty project cannot become a task", { message: props.lang === "zh" ? "请先移动其中的任务。" : "Move its tasks first." });
+          return;
+        }
+        const converted = taskFromSubtask({ id: uid("subtask"), title: project.title, completed: project.completed, createdAt: project.createdAt }, target.id === "__unassigned__" ? undefined : target.id);
+        persistTree(projects.filter((item) => item.id !== project.id), reorderTasks([...tasks, converted], converted.id, target.id === "__unassigned__" ? undefined : target.id));
         return;
       }
       if (tasks.some((task) => task.projectId === project.id)) {
@@ -1746,7 +1758,33 @@ export default function PlanningView(props: {
       if (!tree) return;
       const pointedElement = document.elementFromPoint(clientX, clientY);
       const node = pointedElement?.closest<HTMLElement>("[data-node-type][data-node-id]");
-      if (!node) { setTreeDropTarget(null); return; }
+      if (!node) {
+        // An empty project's expanded body has no child node to hit-test. Treat the
+        // vertical space below its header as an explicit `inside` target so the
+        // target remains stable while the preview slot changes the layout.
+        const treeRect = tree.getBoundingClientRect();
+        const projectIds = [...safeProjects.map((project) => project.id), "__unassigned__"];
+        const headers = projectIds
+          .map((id) => tree.querySelector<HTMLElement>(`[data-node-type="project"][data-node-id="${CSS.escape(id)}"]`))
+          .filter((header): header is HTMLElement => Boolean(header));
+        for (let index = 0; index < headers.length; index += 1) {
+          const header = headers[index];
+          const id = header.dataset.nodeId || "";
+          const hasTasks = id === "__unassigned__"
+            ? safeTasks.some((task) => !task.projectId)
+            : safeTasks.some((task) => String(task.projectId || "") === id);
+          if (hasTasks) continue;
+          const rect = header.getBoundingClientRect();
+          const nextTop = headers[index + 1]?.getBoundingClientRect().top ?? treeRect.bottom;
+          const targetBottom = Math.max(rect.bottom + 44, nextTop - 4);
+          if (clientX >= rect.left && clientX <= treeRect.right && clientY >= rect.bottom - 8 && clientY <= targetBottom) {
+            setTreeDropTarget({ kind: "project", id, position: "inside", height: dragPreviewHeight });
+            return;
+          }
+        }
+        setTreeDropTarget(null);
+        return;
+      }
       const rect = node.getBoundingClientRect();
       const ratio = (clientY - rect.top) / Math.max(rect.height, 1);
       const position = node.dataset.emptyProjectDrop === "true"

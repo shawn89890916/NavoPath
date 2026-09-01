@@ -15,9 +15,10 @@ type HabitDetailBodyProps = {
   onSave: (patch: Partial<Habit>) => void;
   onArchive: (archived: boolean) => void;
   onBack: () => void;
+  onConvertTo: (targetType: "task" | "project") => void;
 };
 
-export default function HabitDetailBody({ habit, dailyStates, today, zh, weekdays, onSave, onArchive, onBack }: HabitDetailBodyProps) {
+export default function HabitDetailBody({ habit, dailyStates, today, zh, weekdays, onSave, onArchive, onBack, onConvertTo }: HabitDetailBodyProps) {
   const [title, setTitle] = useState(habit.title);
   const [notes, setNotes] = useState(habit.notes || "");
   const [duration, setDuration] = useState(String(habit.defaultDurationMinutes || 20));
@@ -80,5 +81,6 @@ export default function HabitDetailBody({ habit, dailyStates, today, zh, weekday
       <label className="df-habit-setting-field"><span>{zh ? "备注" : "Notes"}</span><textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
     </section>
     <section className="df-settings-group df-habit-detail-actions"><button type="button" className="df-habit-back-btn" onClick={onBack}>{zh ? "返回总览" : "Back to overview"}</button><button type="button" className="df-habit-save-btn" onClick={saveChanges}>{zh ? "保存" : "Save"}</button><button type="button" className="df-habit-archive-btn" onClick={() => onArchive(!habit.archived)}>{habit.archived ? (zh ? "恢复习惯" : "Restore Habit") : (zh ? "归档习惯" : "Archive Habit")}</button></section>
+    <section className="df-habit-settings-form df-habit-convert-section"><label className="df-habit-setting-field df-habit-convert-field"><span>{zh ? "转换为" : "Convert to"}</span><select value="" onChange={(event) => { const target = event.target.value as "task" | "project" | ""; if (target) onConvertTo(target); }}><option value="">{zh ? "选择类型…" : "Choose a type…"}</option><option value="task">{zh ? "任务" : "Task"}</option><option value="project">{zh ? "项目" : "Project"}</option></select></label></section>
   </>;
 }

@@ -41408,6 +41408,39 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 }
 
+.df-detail-convert,
+.df-detail-project-color {
+  margin: 12px 4px 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--paper-rule);
+}
+
+.df-detail-convert label,
+.df-detail-project-color {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font: 600 11px/1.2 var(--paper-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.df-detail-convert select {
+  min-width: 146px;
+  padding: 7px 24px 7px 9px;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-main);
+  color: var(--text-main);
+  font: 600 12px/1.2 var(--paper-sans);
+}
+
+.df-project-detail .df-detail-project-color {
+  margin-top: 4px;
+}
+
 /* Resize controls must remain visible outside the task border. Content owns
    clipping instead of the task shell so the 44px touch targets are not cut. */
 .df-app .df-time-block {
@@ -41467,3 +41500,4 @@ body:has(:active)::-webkit-scrollbar-thumb {
 
 
 
+.df-detail-due-date .df-detail-pill-trevor{display:flex;align-items:center;gap:7px;min-width:0}.df-detail-due-date input[type="date"]{width:128px;min-width:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}.df-detail-due-date input[type="date"]:focus{outline:0}.df-detail-type-segment{margin:0 52px 16px 0}

@@ -4,6 +4,7 @@
 
 ### 改进
 - Navo AI 主动助理现可在工作时间主动发现未补记的空档，并让你将这段实际时间关联到未完成任务，或直接新建为已完成任务；对应的历史完成块会清晰但低调地保留在时间轴中。
+- 任务、项目和习惯现在可在详情末尾互相转换；空项目获得稳定的树形拖放命中区，任务可直接归属到其中。任务详情改为更清晰的项目、时长、重要度、状态、截止日、排程与子任务层级，移除紧急度。任务和项目都支持截止日；新建时间轴任务默认把截止日设为明天，过期未完成任务会自动回到今日候选，主动助理也会在开工简报中引导处理临近截止的任务。
 - 规划工作区现在以与 Execute 一致的暖纸层级呈现：左侧栏专用于树、看板、矩阵、列表和指标切换，所有视图的项目与任务块使用纯白纸面、加粗且不透明的项目色条与清晰项目标记，并可关闭规划说明。右下角添加直接打开同一行、选中态明确的任务、项目、习惯切换抽屉。候选、看板、矩阵、列表与规划树共用四边空槽的拖放反馈：源卡一经拖起便离开原位，带轻斜和中性阴影的原样卡片跟随指针，目标及后续项目稳定让位。拖动规划树会临时展开全部项目，候选与规划树都只在当前命中的项目或任务位置显示一个完整空槽；排序会持久化到原任务（包括重复任务），跨项目时同步更新归属。编辑抽屉内的项目与任务现在可相互转换并正常保存，拖动到可滚动区域边缘会自动滚动。未归属和循环任务现在同样可拖动、排序与排程。
 
 ## 2026-08-31 · 今日候选分组与时间轴留白
@@ -28,6 +29,7 @@
 
 ### Improved
 - Navo AI Proactive Assistant can now identify unlogged gaps during working hours and let you attach that actual time to an unfinished task or create it as a completed task; its completed historical block remains clear but understated on the timeline.
+- Tasks, projects, and habits can now convert to each other from the bottom of their detail view. Empty projects have a stable tree drop target so tasks can be assigned directly into them. Task detail now follows a clearer project, duration, importance, status, due-date, scheduling, and subtask rhythm, with urgency removed. Both tasks and projects support due dates; newly created timeline tasks default their due date to tomorrow, overdue unfinished tasks return to Today’s Candidates, and the proactive assistant guides work on approaching deadlines in the start brief.
 - The Planning workspace now uses the same warm-paper hierarchy as Execute: its left rail is dedicated to Tree, Board, Matrix, List, and Metrics, and all views use clean white project and task blocks with thicker opaque project-color bars, clear project marks, and a dismissible planning note. The lower-right Add action opens a side drawer with Task, Project, and Habit on one row and a clear selected state. Candidates, Board, Matrix, List, and the Planning tree now share one four-sided empty-slot drag treatment: the source leaves its old position immediately, while an unchanged task card with a slight tilt and neutral shadow follows the pointer and destination items make stable room. Dragging in the Planning tree temporarily expands every project, while Candidates and the tree show one full empty slot only at the currently hit project or task. Ordering now persists to the underlying task, including recurring tasks, and crossing projects also updates ownership. Projects and tasks can now be converted between each other and saved from the edit drawer, and dragging near a scrollable edge scrolls it automatically. Unassigned and recurring tasks can now also be dragged, reordered, and scheduled.
 
 ## 2026-08-31 · Candidate grouping and timeline spacing

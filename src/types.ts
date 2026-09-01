@@ -19,6 +19,8 @@ export interface Project {
   notes: string;
   completed: boolean;
   color?: string;
+  /** Optional project-level deadline for long-range planning. */
+  dueDate?: string;
   importance?: NullablePriority;
   urgency?: NullablePriority;
   order?: number;

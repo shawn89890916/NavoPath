@@ -161,10 +161,9 @@ const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
 
 /** Map a task's importance/urgency to the shared TaskBlock priority vocabulary. */
-function taskBlockPriorityFor(importance: NullablePriority | undefined, urgency: NullablePriority | undefined): TaskBlockPriority {
-  if (urgency === "high") return "urgent";
+function taskBlockPriorityFor(importance: NullablePriority | undefined, _urgency: NullablePriority | undefined): TaskBlockPriority {
   if (importance === "high") return "high";
-  if (importance === "low" && (urgency === "low" || urgency == null)) return "low";
+  if (importance === "low") return "low";
   return "normal";
 }
 
@@ -773,7 +772,7 @@ function defaultForm(type: AddType = "task"): FormState {
     title: "",
     projectId: "",
     projectColor: DEFAULT_PROJECT_COLOR,
-    dueDate: today,
+    dueDate: type === "project" ? "" : today,
     dueTime: "",
     endDate: today,
     endTime: "",
@@ -838,8 +837,8 @@ function makeProject(form: FormState): Project {
     notes: form.details,
     completed: false,
     color: form.projectColor || categories[form.category].color,
+    dueDate: form.dueDate || undefined,
     importance: form.importance,
-    urgency: form.urgency,
     createdAt: now,
     updatedAt: now
   };
@@ -2901,6 +2900,21 @@ function App() {
     scheduleDataFlush();
   }
 
+  useEffect(() => {
+    if (!data) return;
+    const currentDay = todayIso();
+    const overdue = data.tasks.filter((task) => !task.completed && Boolean(task.dueDate) && task.dueDate < currentDay && task.plannedForDate !== currentDay);
+    if (overdue.length === 0) return;
+    const overdueIds = new Set(overdue.map((task) => task.id));
+    void saveData({
+      ...data,
+      tasks: data.tasks.map((task) => overdueIds.has(task.id)
+        ? { ...task, plannedForDate: currentDay, executionLane: "candidate", scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined, timelineRecords: [], updatedAt: new Date().toISOString() }
+        : task),
+    });
+    showToast(lang === "zh" ? `${overdue.length} 个逾期任务已回到今日候选` : `${overdue.length} overdue task${overdue.length === 1 ? "" : "s"} returned to Today’s Candidates`);
+  }, [data]);
+
   function makeSmartTask(nextForm: FormState) {
     const current = dataRef.current;
     const currentSettings = settingsRef.current;
@@ -4067,7 +4081,7 @@ function App() {
       const task = makeSmartTask({
         ...defaultForm("task"),
         title: slot.title,
-        dueDate: timelineDate,
+        dueDate: addDays(today, 1),
         estimatedHours: durationMinutes / 60,
       });
 
@@ -4710,7 +4724,7 @@ function App() {
         ...defaultForm("task"),
         title: cleanTitle,
         projectId,
-        dueDate: timelineDate,
+        dueDate: addDays(today, 1),
         estimatedHours: durationMinutes / 60
       });
       void saveData({
@@ -4747,7 +4761,7 @@ function App() {
       ...defaultForm("task"),
       title: cleanTitle,
       projectId,
-      dueDate: timelineDate,
+      dueDate: addDays(today, 1),
       estimatedHours: durationMinutes / 60
     });
     const scheduledRecord = createScheduledRecord(task, timelineDate, quickSchedule.startTime, durationMinutes);
@@ -5165,7 +5179,7 @@ function App() {
     const { date, startMinutes, endMinutes } = state;
     const startTime = minutesToTime(startMinutes);
     const durationMinutes = endMinutes - startMinutes;
-    const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: date, estimatedHours: durationMinutes / 60 });
+    const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: addDays(today, 1), estimatedHours: durationMinutes / 60 });
     const scheduledRecord = createScheduledRecord(task, date, startTime, durationMinutes);
     void saveData({ ...current, tasks: [...current.tasks, { ...task, subtasks, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }] });
     requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
@@ -6166,7 +6180,26 @@ function App() {
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
     setMobileTaskSummary(false);
-    setForm({ ...defaultForm("project"), title: project.title, category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance !== undefined ? project.importance : null, urgency: project.urgency !== undefined ? project.urgency : null });
+    setForm({ ...defaultForm("project"), title: project.title, dueDate: project.dueDate || "", category: project.category, projectColor: project.color || categories[project.category].color, details: project.notes, importance: project.importance !== undefined ? project.importance : null });
+    setDrawerOpen(true);
+  }
+
+  function openHabitConvert(habit: Habit, targetType: "task" | "project") {
+    setHabitPanel(null);
+    setEditingHabitId(null);
+    rememberLayerTrigger("drawer");
+    setAddType(targetType);
+    setEditingId(habit.id);
+    setEditingRecordId(undefined);
+    setEditingOccurrence(null);
+    setMobileTaskSummary(false);
+    setForm({
+      ...defaultForm(targetType),
+      title: habit.title,
+      category: "personal",
+      details: habit.notes || "",
+      estimatedHours: Math.max((habit.defaultDurationMinutes || 30) / 60, 0.25),
+    });
     setDrawerOpen(true);
   }
 
@@ -6200,6 +6233,18 @@ function App() {
     if (editingId) {
       const editingTask = data.tasks.find((task) => task.id === editingId);
       const editingProject = data.projects.find((project) => project.id === editingId);
+      const editingHabit = (data.habits || []).find((habit) => habit.id === editingId);
+      const buildHabit = (source: { title: string; createdAt: string; order?: number }): Habit => ({
+        id: uid("habit"),
+        title: form.title.trim(),
+        notes: form.details,
+        defaultDurationMinutes: Math.max(Math.round((form.estimatedHours || 0.5) * 60), SLOT_MINUTES),
+        frequencyRule: "daily",
+        activeWeekdays: [1, 2, 3, 4, 5],
+        order: source.order ?? Date.now(),
+        createdAt: source.createdAt,
+        updatedAt: now,
+      });
       if (editingProject && addType === "task") {
         const converted: Task = {
           id: uid("task"),
@@ -6244,13 +6289,35 @@ function App() {
           projects: [...data.projects, converted],
           tasks: data.tasks.filter((task) => task.id !== editingTask.id),
         });
+      } else if (editingTask && addType === "habit") {
+        void saveData({ ...data, habits: [...(data.habits || []), buildHabit(editingTask)], tasks: data.tasks.filter((task) => task.id !== editingTask.id) });
+      } else if (editingProject && addType === "habit") {
+        void saveData({ ...data, habits: [...(data.habits || []), buildHabit(editingProject)], projects: data.projects.filter((project) => project.id !== editingProject.id) });
+      } else if (editingHabit && addType === "task") {
+        const converted: Task = {
+          id: uid("task"), title: form.title.trim(), dueDate: form.dueDate || today, category: form.category,
+          priority: form.priority || "medium", notes: form.details, goalId: "", completed: false,
+          projectId: form.projectId || undefined, estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
+          importance: form.importance, urgency: form.urgency, order: editingHabit.order, subtasks: [], timelineRecords: [],
+          createdAt: editingHabit.createdAt, updatedAt: now,
+        };
+        void saveData({ ...data, tasks: [...data.tasks, converted], habits: (data.habits || []).filter((habit) => habit.id !== editingHabit.id) });
+      } else if (editingHabit && addType === "project") {
+        const converted: Project = {
+          id: uid("project"), title: form.title.trim(), category: form.category, color: form.projectColor || categories[form.category].color,
+          notes: form.details, completed: false, dueDate: form.dueDate || undefined, importance: form.importance, order: editingHabit.order,
+          createdAt: editingHabit.createdAt, updatedAt: now,
+        };
+        void saveData({ ...data, projects: [...data.projects, converted], habits: (data.habits || []).filter((habit) => habit.id !== editingHabit.id) });
       } else if (addType === "task") {
         void saveData({
           ...data,
           tasks: data.tasks.map((task) => task.id === editingId ? buildUpdatedTask(task) : task)
         });
       } else if (addType === "project") {
-        void saveData({ ...data, projects: data.projects.map((project) => project.id === editingId ? { ...project, title: form.title.trim(), category: form.category, color: form.projectColor || categories[form.category].color, notes: form.details, importance: form.importance, urgency: form.urgency, updatedAt: now } : project) });
+        void saveData({ ...data, projects: data.projects.map((project) => project.id === editingId ? { ...project, title: form.title.trim(), dueDate: form.dueDate || undefined, category: form.category, color: form.projectColor || categories[form.category].color, notes: form.details, importance: form.importance, updatedAt: now } : project) });
+      } else if (addType === "habit") {
+        void saveData({ ...data, habits: (data.habits || []).map((habit) => habit.id === editingId ? { ...habit, title: form.title.trim(), notes: form.details, defaultDurationMinutes: Math.max(Math.round((form.estimatedHours || 0.5) * 60), SLOT_MINUTES), updatedAt: now } : habit) });
       } else {
         void saveData({ ...data, events: data.events.map((event) => event.id === editingId ? { ...event, title: form.title.trim(), date: form.dueDate, startDate: form.dueDate, endDate: form.endDate || form.dueDate, startTime: form.dueTime, endTime: form.endTime, category: form.category, details: form.details, recurrence: form.recurrence } : event) });
       }
@@ -6342,6 +6409,7 @@ function App() {
     const current = dataRef.current;
     if (addType === "task") void saveData({ ...current, tasks: current.tasks.filter((task) => task.id !== editingId) });
     if (addType === "project") void saveData({ ...current, projects: current.projects.filter((project) => project.id !== editingId) });
+    if (addType === "habit") void saveData({ ...current, habits: (current.habits || []).filter((habit) => habit.id !== editingId) });
     if (addType === "event") void saveData({ ...current, events: current.events.filter((event) => event.id !== editingId) });
     closeTaskDrawer();
   }
@@ -6668,7 +6736,7 @@ function App() {
       try {
         setAiOpen(true);
         const prompt = kind === "start"
-          ? (lang === "zh" ? "请生成今天的开工简报：结合完整工作区、截止日期、已排程内容和外部日历忙碌时间，总结三项重点、首个行动和一项风险。简报只读，不执行任何操作。" : "Generate today's start brief using the full workspace, deadlines, schedule, and external calendar busy time. Give three priorities, the first action, and one risk. This brief is read-only; execute no actions.")
+          ? (lang === "zh" ? "请生成今天的开工简报：结合完整工作区、截止日期、已排程内容和外部日历忙碌时间，总结三项重点、首个行动和一项风险；优先指出已逾期或未来七天内到期的未完成任务，并给出下一步。简报只读，不执行任何操作。" : "Generate today's start brief using the full workspace, deadlines, schedule, and external calendar busy time. Give three priorities, the first action, and one risk; call out unfinished overdue work or work due within seven days first, with a next step. This brief is read-only; execute no actions.")
           : (lang === "zh" ? "请生成今天的收工复盘：结合完整工作区、完成情况、计时记录和排程偏差，总结进展并给出明天的一项调整建议。复盘只读，不执行任何操作。" : "Generate today's end-of-day review using the full workspace, completion state, timer records, and schedule variance. Summarize progress and suggest one adjustment for tomorrow. This review is read-only; execute no actions.");
         const success = await sendAi(prompt, kind === "start" ? "start_brief" : "end_review");
         if (success) await saveSettings(kind === "start" ? { aiLastStartBriefDate: date } : { aiLastEndReviewDate: date });
@@ -9545,7 +9613,7 @@ function App() {
         </nav>
       )}
 
-      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task")} />}
+      {!compactLayout && <button className="df-add-fab df-icon-action i-plus" data-tip={t(lang, "fab.add")} aria-label={t(lang, "fab.add")} onClick={() => openAdd("task", { quickAddDetail: true })} />}
       {!compactLayout && !settings.hideAi && <button className="df-ai-fab df-icon-action i-ai" data-tip={t(lang, "fab.askNavo")} aria-label={t(lang, "fab.askNavo")} onClick={() => setAiOpen((open) => !open)} />}
       {compactLayout && !drawerOpen && <button
         type="button"
@@ -9556,11 +9624,11 @@ function App() {
       ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>}
 
       {drawerOpen && !(compactLayout && mobileTaskSummary) && <div className="df-drawer-backdrop" onMouseDown={() => editingId && addType === "task" ? closeTaskDrawer({ autoSave: true }) : closeTaskDrawer()} />}
-      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); setQuickAddDetailOpen(false); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} quickAddDetail={quickAddDetailOpen} />}
+      {drawerOpen && <EditDrawer type={addType} setType={(type) => { setAddType(type); setQuickAddDetailOpen(!editingId && type === "task"); if (!editingId) setForm(defaultForm(type)); }} form={form} setForm={setForm} projects={projects} editing={Boolean(editingId)} task={tasks.find((task) => task.id === editingId)} project={projects.find((project) => project.id === editingId)} habit={(data.habits || []).find((habit) => habit.id === editingId)} event={events.find((event) => event.id === editingId)} today={today} onClose={() => closeTaskDrawer(editingId && addType === "task" ? { autoSave: true } : undefined)} onSave={saveForm} onDelete={deleteEditingItem} onCopy={copyEditingTask} onConvertToEvent={() => convertTaskToEvent(editingId)} onConvertToTask={() => convertEventToTask(editingId)} onTaskUpdate={updateTask} onProjectColorChange={(projectId, color) => updateProject(projectId, { color })} onToggleDone={() => updateTask(editingId, { completed: !tasks.find((task) => task.id === editingId)?.completed })} onCreateProject={quickCreateProject} editingRecordId={editingRecordId} setEditingRecordId={setEditingRecordId} editingOccurrence={editingOccurrence} data={data} saveData={saveData} onSaveRecurrence={saveTaskRecurrence} onCancelOccurrence={cancelRecurringOccurrence} onReplanOccurrence={replanRecurringOccurrence} onCancelAllRecurrence={cancelAllRecurringFuture} aiEnabled={!settings.hideAi} subtaskAiLoading={subtaskAiBusyId === editingId} onGenerateSubtasks={(taskId) => void generateTaskSubtasks(taskId)} lang={lang} compactSummary={compactLayout && mobileTaskSummary} onShowMore={() => setMobileTaskSummary(false)} quickAddDetail={quickAddDetailOpen} />}
       {aiOpen && <><button className="df-ai-backdrop" type="button" aria-label={lang === "zh" ? "关闭 AI 对话" : "Close AI dialog"} onClick={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} /><AiPanel model={settings.model} models={FALLBACK_AI_MODELS} onModelChange={(model) => void saveSettings({ model, reasoningMode: "instant" })} safetyLevel={settings.aiSafetyLevel || "standard"} onSafetyLevelChange={(aiSafetyLevel) => void saveSettings({ aiSafetyLevel })} input={aiInput} setInput={setAiInput} busy={aiBusy} onSend={() => void sendAi()} onCancel={cancelAi} onPlanToday={() => void planMyDay()} planState={autoScheduleState} onClose={() => { cancelAi(); setAiOpen(false); clearAiAttachment(); }} messages={aiMessages} conversations={data.aiConversations || []} activeConversationId={activeAiConversationId || data.activeAiConversationId || ""} conversationListOpen={aiConversationListOpen} onToggleConversationList={() => { setAiAuditOpen(false); setAiConversationListOpen((open) => !open); }} auditOpen={aiAuditOpen} auditRuns={aiAuditRuns} auditLoading={aiAuditLoading} auditError={aiAuditError} onToggleAudit={() => void toggleAiAuditHistory()} onNewConversation={() => void startNewAiConversation()} onSelectConversation={selectAiConversation} onRenameConversation={(conversationId, title) => void renameAiConversation(conversationId, title)} onToggleConversationPinned={(conversationId) => void toggleAiConversationPinned(conversationId)} onDeleteConversation={(conversationId) => void deleteAiConversation(conversationId)} memoryNotice={aiMemoryNotice} onOpenMemorySettings={() => openSettingsSection({ category: "advanced", detail: "ai", anchor: "ai-memory" })} actionPatches={aiActionPatches} onPatchAction={(messageId, index, patch) => setAiActionPatches((current) => ({ ...current, [messageId]: { ...(current[messageId] || {}), [index]: { ...(current[messageId]?.[index] || {}), ...patch } } }))} onConfirmAction={(messageId, action, index) => void confirmAiAction(action, messageId, index)} onDismissAction={(messageId, action, index) => dismissAiAction(action, messageId, index)} onToggleAction={(messageId, index) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: { ...message.selectedActions, [index]: message.selectedActions?.[index] === false } } : message))} onSetAllActions={(messageId, checked) => setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, selectedActions: Object.fromEntries((message.actions || []).map((_, index) => [index, checked])) } : message))} onAdoptSelected={(messageId) => void adoptSelectedAiActions(messageId)} onRejectSelected={rejectSelectedAiActions} onViewImport={viewAiImport} onUndoImport={(messageId) => void undoAiImport(messageId)} onApproveAgent={(messageId) => void handleAgentDecision(messageId, "approve")} onRejectAgent={(messageId) => void handleAgentDecision(messageId, "reject")} onUndoAgent={(messageId) => void handleAgentDecision(messageId, "undo")} globalAgentAvailable={authState?.mode === "cloud" && Boolean(authState.user)} projectList={projects.map((p) => ({ id: p.id, title: p.title, color: p.color }))} taskList={tasks.map((task) => ({ id: task.id, title: task.title }))} lang={lang} attachment={aiAttachment} attachmentStatus={aiAttachmentStatus} onAttachment={(file) => void handleAiAttachment(file)} onClearAttachment={clearAiAttachment} /></>}
       <CommandPalette open={commandOpen} query={commandQuery} results={commandResults} lang={lang} onQuery={setCommandQuery} onClose={() => setCommandOpen(false)} onChoose={chooseCommand} />
       {utilityPanel && settings && <UtilityPanel kind={utilityPanel} settings={settings} initialSection={settingsSectionTarget} data={data} authEmail={authState?.user?.email || ""} onClose={() => closeUtilityPanel()} onSave={(patch) => void saveSettings(patch)} onWidgetAction={handleWidgetAction} onSaveData={(next) => void saveData(next)} onClearChatHistory={() => { void saveData({ ...data, chat: [], aiConversations: [], activeAiConversationId: undefined }); setAiMessages([]); setActiveAiConversationId(""); setAiConversationListOpen(false); setAiMemoryNotice(""); }} onShowAbout={() => window.open(`https://navopath.com/changelog?lang=${lang}`, "_blank", "noopener,noreferrer")} onSignOut={authState?.mode === "cloud" && authState.user ? (() => void handleSignOut()) : undefined} onDeleteAccount={authState?.mode === "cloud" && authState.user ? (() => void handleDeleteAccount()) : undefined} onSyncNow={(direction) => handleSyncNow({ direction })} isManualSyncing={isManualSyncing} cloudReady={authState?.mode === "cloud" && Boolean(authState?.user)} lang={lang} onOpenScheduleTemplates={() => closeUtilityPanel(() => setScheduleTemplateOpen(true))} />}
-      {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} />}
+      {habitPanel && data && settings.featureHabitsEnabled !== false && <HabitPanel mode={habitPanel} habitId={editingHabitId} data={data} today={today} lang={lang} onClose={() => { setHabitPanel(null); setEditingHabitId(null); }} onEditHabit={openHabitDetail} onBack={openHabitOverview} onSave={saveHabitEdit} onArchive={toggleHabitArchive} onToggleDay={toggleHabitForDate} onCreateHabit={createHabit} onConvertTo={openHabitConvert} />}
       {focusOverlayMode && (
         <div className="df-focus-overlay" style={focusProject?.color ? { ["--focus-accent" as string]: focusProject.color } as React.CSSProperties : undefined}>
           <div className="df-focus-topbar">
@@ -10753,6 +10821,7 @@ function HabitPanel(props: {
   onArchive: (habitId: string, archived: boolean) => void;
   onToggleDay: (habitId: string, date: string, completed: boolean) => void;
   onCreateHabit: () => void;
+  onConvertTo: (habit: Habit, targetType: "task" | "project") => void;
 }) {
   const metrics = buildHabitMetrics(props.data, props.today);
   const zh = props.lang === "zh";
@@ -10776,7 +10845,7 @@ function HabitPanel(props: {
           {props.mode === "overview" ? (
             <HabitOverviewBody metrics={metrics} archivedHabits={archivedHabits} dailyStates={props.data.habitDailyStates || []} zh={zh} today={props.today} onEditHabit={props.onEditHabit} onArchive={props.onArchive} onToggleDay={props.onToggleDay} onCreateHabit={props.onCreateHabit} />
           ) : detailHabit ? (
-            <Suspense fallback={<p className="df-habit-empty">{zh ? "正在打开习惯…" : "Opening habit…"}</p>}><HabitDetailBodyLazy habit={detailHabit} dailyStates={props.data.habitDailyStates || []} today={props.today} zh={zh} weekdays={weekdays} onSave={(patch) => props.onSave(detailHabit.id, patch)} onArchive={(archived) => props.onArchive(detailHabit.id, archived)} onBack={props.onBack} /></Suspense>
+            <Suspense fallback={<p className="df-habit-empty">{zh ? "正在打开习惯…" : "Opening habit…"}</p>}><HabitDetailBodyLazy habit={detailHabit} dailyStates={props.data.habitDailyStates || []} today={props.today} zh={zh} weekdays={weekdays} onSave={(patch) => props.onSave(detailHabit.id, patch)} onArchive={(archived) => props.onArchive(detailHabit.id, archived)} onBack={props.onBack} onConvertTo={(targetType) => props.onConvertTo(detailHabit, targetType)} /></Suspense>
           ) : (
             <p className="df-habit-empty">{zh ? "未找到该习惯。" : "Habit not found."}</p>
           )}
@@ -11116,7 +11185,7 @@ function TaskRecurrenceIndicator({ recurrence, lang }: { recurrence?: TaskRecurr
 }
 
 function TaskMetaIconBar({ task, lang, onUpdate }: { task: Task; lang: Language; onUpdate?: (patch: Partial<Task>) => void }) {
-  const [open, setOpen] = useState<"status" | "importance" | "urgency" | null>(null);
+  const [open, setOpen] = useState<"status" | "importance" | null>(null);
   const state = normalizeTaskState(task);
   const labels = buildTaskMetaBadges(task, lang).reduce((map, badge) => ({ ...map, [badge.key]: badge.label }), {} as Record<"status" | "importance" | "urgency", string>);
   const zh = lang === "zh";
@@ -11127,10 +11196,6 @@ function TaskMetaIconBar({ task, lang, onUpdate }: { task: Task; lang: Language;
   };
   const chooseImportance = (importance: NullablePriority) => {
     onUpdate?.({ importance });
-    close();
-  };
-  const chooseUrgency = (urgency: NullablePriority) => {
-    onUpdate?.({ urgency });
     close();
   };
   return (
@@ -11157,18 +11222,6 @@ function TaskMetaIconBar({ task, lang, onUpdate }: { task: Task; lang: Language;
             <button className={state.importance === "high" ? "active" : ""} onClick={() => chooseImportance("high")}>{zh ? "重要" : "Important"}</button>
             <button className={state.importance === "medium" ? "active" : ""} onClick={() => chooseImportance("medium")}>{zh ? "一般" : "Normal"}</button>
             <button className={state.importance === "low" ? "active" : ""} onClick={() => chooseImportance("low")}>{zh ? "不重要" : "Low"}</button>
-          </span>
-        )}
-      </span>
-      <span className="df-meta-icon-wrap">
-        <button type="button" className={`df-meta-icon urgency-${state.urgency}`} title={labels.urgency} aria-label={labels.urgency} onClick={() => setOpen(open === "urgency" ? null : "urgency")}>
-          <span className="df-meta-symbol urgency" aria-hidden="true" />
-        </button>
-        {open === "urgency" && (
-          <span className="df-meta-menu">
-            <button className={state.urgency === "high" ? "active" : ""} onClick={() => chooseUrgency("high")}>{zh ? "紧急" : "Urgent"}</button>
-            <button className={state.urgency === "medium" ? "active" : ""} onClick={() => chooseUrgency("medium")}>{zh ? "一般" : "Normal"}</button>
-            <button className={state.urgency === "low" ? "active" : ""} onClick={() => chooseUrgency("low")}>{zh ? "不紧急" : "Low"}</button>
           </span>
         )}
       </span>
@@ -12331,7 +12384,7 @@ function NowLine({ extraStyle, dayStartHour = 0, hourHeight = HOUR_HEIGHT }: { e
 }
 
 function EditDrawer(props: {
-  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; event?: CalendarEvent; today: string; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onCreateProject: (title: string) => string;
+  type: AddType; setType: (type: AddType) => void; form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>; projects: Project[]; editing: boolean; task?: Task; project?: Project; habit?: Habit; event?: CalendarEvent; today: string; onClose: () => void; onSave: () => void; onDelete: () => void; onCopy: () => void; onConvertToEvent: () => void; onConvertToTask: () => void; onTaskUpdate: (taskId: string, patch: Partial<Task>) => void; onProjectColorChange: (projectId: string, color: string) => void; onToggleDone: () => void; onCreateProject: (title: string) => string;
   editingRecordId?: string; setEditingRecordId?: (id: string | undefined) => void; editingOccurrence?: EditingOccurrence; data?: PlannerData | null; saveData?: (next: PlannerData) => Promise<void>; onSaveRecurrence: (taskId: string, recurrence?: TaskRecurrence) => void; onCancelOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onReplanOccurrence: (taskId: string, occurrence: EditingOccurrence) => void; onCancelAllRecurrence: (taskId: string, cutoffDate: string) => void; aiEnabled: boolean; subtaskAiLoading: boolean; onGenerateSubtasks: (taskId: string) => void; lang: Language; compactSummary?: boolean; onShowMore?: () => void; quickAddDetail?: boolean;
 }) {
   const dialog = useInAppDialog(props.lang);
@@ -12358,13 +12411,13 @@ function EditDrawer(props: {
     habit: props.lang === "zh" ? "习惯：每天或每周重复的固定练习。" : "Habit: a recurring practice you want to keep on the day.",
   };
   useEffect(() => {
-    setNoteDraft(props.task?.notes || "");
+    setNoteDraft(props.task?.notes || props.project?.notes || props.habit?.notes || "");
     setNotesOpen(true);
     setNotesEditing(false);
     setRecurrenceOpen(false);
     setRecurrenceDraft(null);
     setCancelAllConfirm(false);
-  }, [props.task?.id, props.task?.notes, props.editingOccurrence?.scheduledDate, props.editingRecordId]);
+  }, [props.task?.id, props.task?.notes, props.project?.id, props.project?.notes, props.habit?.id, props.habit?.notes, props.editingOccurrence?.scheduledDate, props.editingRecordId]);
   useLayoutEffect(() => {
     const textarea = titleRef.current;
     if (!textarea) return;
@@ -12565,6 +12618,25 @@ function EditDrawer(props: {
     durationMinutes: f.dueTime ? eventDurationMinutes || 60 : undefined,
     endDate: f.endDate || undefined,
   };
+  const convertChoices: Record<"task" | "project" | "habit", Array<"task" | "project" | "habit">> = {
+    task: ["project", "habit"],
+    project: ["task", "habit"],
+    habit: ["task", "project"],
+  };
+  const convertControl = (sourceType: "task" | "project" | "habit") => (
+    <section className="df-detail-convert">
+      <label>
+        <span>{props.lang === "zh" ? "转换为" : "Convert to"}</span>
+        <select value="" aria-label={props.lang === "zh" ? "转换为" : "Convert to"} onChange={(event) => {
+          const next = event.target.value as "task" | "project" | "habit" | "";
+          if (next) props.setType(next);
+        }}>
+          <option value="">{props.lang === "zh" ? "选择类型…" : "Choose a type…"}</option>
+          {convertChoices[sourceType].map((type) => <option key={type} value={type}>{type === "task" ? (props.lang === "zh" ? "任务" : "Task") : type === "project" ? (props.lang === "zh" ? "项目" : "Project") : (props.lang === "zh" ? "习惯" : "Habit")}</option>)}
+        </select>
+      </label>
+    </section>
+  );
   if (props.editing && props.type === "event" && props.event) {
     const eventSchedule = f.dueTime
       ? `${f.dueDate} ${f.dueTime} - ${f.endTime || addMinutes(f.dueTime, eventDurationMinutes || 60)}`
@@ -12662,6 +12734,7 @@ function EditDrawer(props: {
       <>
         <aside className="df-drawer df-task-detail df-quick-add-detail" onMouseDown={(event) => event.stopPropagation()}>
           <button className="df-detail-close df-icon-action i-close" type="button" aria-label={t(props.lang, "form.close")} onClick={props.onClose} />
+          <div className="df-segment df-detail-type-segment">{(["task", "project", "habit"] as AddType[]).map((type) => <button key={type} className={props.type === type ? "active" : ""} onClick={() => props.setType(type)}>{type === "task" ? t(props.lang, "form.task") : type === "project" ? t(props.lang, "form.project") : (props.lang === "zh" ? "习惯" : "Habit")}</button>)}</div>
           <section className="df-detail-hero-trevor">
             <textarea ref={titleRef} className="df-detail-title-trevor" autoFocus value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={t(props.lang, "drawer.titlePlaceholder")} spellCheck={false} />
           </section>
@@ -12680,13 +12753,16 @@ function EditDrawer(props: {
 
           <section className="df-detail-meta-settings" aria-label={props.lang === "zh" ? "任务程度设置" : "Task level settings"}>
             <div className="df-detail-meta-setting"><span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>{taskLevelSelector("importance", importanceOptions)}</div>
-            <div className="df-detail-meta-setting"><span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>{taskLevelSelector("urgency", urgencyOptions)}</div>
           </section>
 
           <section className="df-detail-time-range" aria-label={props.lang === "zh" ? "起止时间" : "Start and end time"}>
             <label><span>{t(props.lang, "drawer.startTime")}</span><input type="time" step={SLOT_MINUTES * 60} value={f.dueTime} onChange={(event) => setQuickAddStart(event.target.value)} /></label>
             <span className="df-detail-time-arrow" aria-hidden="true">→</span>
             <label><span>{t(props.lang, "drawer.endTime")}</span><input type="time" step={SLOT_MINUTES * 60} value={f.endTime} disabled={!f.dueTime} onChange={(event) => setQuickAddEnd(event.target.value)} /></label>
+          </section>
+          <section className="df-detail-schedule-row df-detail-due-date">
+            <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
+            <button className="df-detail-pill-trevor action" onClick={() => set("dueDate", addDays(props.today, 1))}>{props.lang === "zh" ? "明天" : "Tomorrow"}</button>
           </section>
 
           {projectPickerOpen && <section className="df-detail-project-pick df-quick-add-detail-picker">
@@ -12838,32 +12914,6 @@ function EditDrawer(props: {
               })}
             </div>
           </div>
-          <div className="df-detail-meta-setting">
-            <span>{props.lang === "zh" ? "紧急程度" : "Urgency"}</span>
-            <div className="df-level-selector df-level-urgency" role="group" aria-label={props.lang === "zh" ? "紧急程度" : "Urgency"}>
-              {urgencyOptions.map((option) => {
-                const selectedUrgency = (f.urgency ?? "unset") as TaskLevel;
-                const isSelected = selectedUrgency === option.value;
-                return (
-                  <button
-                    key={`urgency-${option.value}`}
-                    type="button"
-                    className={`df-level-option df-level-${option.value}`}
-                    data-selected={isSelected ? "true" : "false"}
-                    aria-pressed={isSelected}
-                    onClick={() => commitTaskMeta("urgency", option.value)}
-                    title={props.lang === "zh" ? option.zh : option.en}
-                    style={{ "--option-color": levelColors[option.value] } as React.CSSProperties}
-                  >
-                    {option.value === "high" && <span className="df-urgency-mark">!!!</span>}
-                    {option.value === "medium" && <span className="df-urgency-mark">!!</span>}
-                    {option.value === "low" && <span className="df-urgency-mark">!</span>}
-                    {option.value === "unset" && <span className="df-urgency-mark df-urgency-dash">—</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </section>
 
         <section className="df-detail-status-row">
@@ -12879,6 +12929,15 @@ function EditDrawer(props: {
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h8M4 3V2h4v1M3 3v6.5a1 1 0 001 1h4a1 1 0 001-1V3"/></svg>
             <span>{t(props.lang, "drawer.remove")}</span>
           </button>
+        </section>
+
+        <section className="df-detail-schedule-row df-detail-due-date">
+          <label className="df-detail-pill-trevor action">
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg>
+            <span>{props.lang === "zh" ? "截止日期" : "Due date"}</span>
+            <input type="date" value={f.dueDate} onChange={(event) => { set("dueDate", event.target.value); props.onTaskUpdate(props.task!.id, { dueDate: event.target.value }); }} />
+          </label>
+          <button className="df-detail-pill-trevor action" onClick={() => { const value = addDays(props.today, 1); set("dueDate", value); props.onTaskUpdate(props.task!.id, { dueDate: value }); }}>{props.lang === "zh" ? "明天" : "Tomorrow"}</button>
         </section>
 
         {/* ── Scheduling: Reschedule / Unschedule ── */}
@@ -13019,8 +13078,49 @@ function EditDrawer(props: {
             </div>
           )}
         </section>
+        {convertControl("task")}
       </aside>
       </>
+    );
+  }
+  if (props.editing && props.type === "project") {
+    return (
+      <aside className="df-drawer df-task-detail df-project-detail" onMouseDown={(event) => event.stopPropagation()}>
+        <button className="df-detail-close df-icon-action i-close" type="button" aria-label={t(props.lang, "form.close")} onClick={props.onClose} />
+        <section className="df-detail-hero-trevor">
+          <textarea className="df-detail-title-trevor" autoFocus value={f.title} onChange={(event) => set("title", event.target.value)} rows={1} placeholder={props.lang === "zh" ? "项目名称" : "Project name"} spellCheck={false} />
+        </section>
+        <section className="df-detail-tag-row">
+          <span className="df-detail-pill-trevor project-kind">{props.lang === "zh" ? "项目" : "Project"}</span>
+          <span className="df-detail-pill-trevor"><i className="df-detail-project-dot" style={{ background: f.projectColor || props.project?.color || DEFAULT_PROJECT_COLOR }} />{props.lang === "zh" ? "项目颜色" : "Project color"}</span>
+        </section>
+        <section className="df-detail-meta-settings" aria-label={props.lang === "zh" ? "项目优先级" : "Project priority"}>
+          <div className="df-detail-meta-setting"><span>{props.lang === "zh" ? "重要程度" : "Importance"}</span>{taskLevelSelector("importance", importanceOptions)}</div>
+        </section>
+        <section className="df-detail-project-color">
+          <span>{t(props.lang, "form.color")}</span>
+          <ProjectColorPicker value={f.projectColor || props.project?.color || DEFAULT_PROJECT_COLOR} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} />
+        </section>
+        <section className="df-detail-schedule-row df-detail-due-date">
+          <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
+          <button className="df-detail-pill-trevor action" onClick={() => set("dueDate", addDays(props.today, 7))}>{props.lang === "zh" ? "下周" : "Next week"}</button>
+        </section>
+        <section className="df-detail-status-row">
+          {props.project && <button className="df-detail-pill-trevor action danger" onClick={props.onDelete}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h8M4 3V2h4v1M3 3v6.5a1 1 0 001 1h4a1 1 0 001-1V3"/></svg>
+            <span>{t(props.lang, "drawer.remove")}</span>
+          </button>}
+          <button className="df-detail-pill-trevor action" onClick={props.onSave}>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 7l2.5 2.5L10 3"/></svg>
+            <span>{t(props.lang, "drawer.save")}</span>
+          </button>
+        </section>
+        <section className="df-detail-notes-new">
+          <div className="df-detail-section-head"><h3>{t(props.lang, "drawer.notes")}</h3><button className="df-detail-add-btn" onClick={() => setNotesEditing((open) => !open)}><span>{notesEditing ? t(props.lang, "drawer.cancel") : t(props.lang, "drawer.edit")}</span></button></div>
+          {notesEditing ? <div className="df-notes-editor"><textarea rows={4} value={f.details} onChange={(event) => { set("details", event.target.value); setNoteDraft(event.target.value); }} placeholder={t(props.lang, "drawer.addNotePlaceholder")} /><div className="df-notes-editor-actions"><button className="df-detail-pill-trevor action" onClick={() => { setNoteDraft(f.details); setNotesEditing(false); }}>{t(props.lang, "drawer.save")}</button></div></div> : <div className="df-notes-preview" onClick={() => setNotesEditing(true)}>{f.details ? <p>{f.details}</p> : <p className="placeholder">{t(props.lang, "drawer.noNotes")}</p>}</div>}
+        </section>
+        {convertControl("project")}
+      </aside>
     );
   }
   return (
@@ -13031,6 +13131,7 @@ function EditDrawer(props: {
       <label>{t(props.lang, "form.name")}<input autoFocus={!props.editing} value={f.title} onChange={(event) => set("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); props.onSave(); } }} /></label>
       {props.type === "task" && <><label>{t(props.lang, "form.projectLabel")}<div className="df-drawer-project-picker"><button type="button" onClick={() => setProjectPickerOpen((open) => !open)}># {selectedProjectTitle}</button>{projectPickerOpen && <div className="df-drawer-project-list"><button onClick={() => { set("projectId", ""); setProjectPickerOpen(false); }}>{t(props.lang, "form.unassigned")}</button>{props.projects.map((project) => <ProjectChoice key={project.id} project={project} onChoose={() => { set("projectId", project.id); setProjectPickerOpen(false); }} onColorChange={(color) => props.onProjectColorChange(project.id, color)} />)}<div className="df-project-create-line compact"><input value={newProjectTitle} placeholder={t(props.lang, "form.newProjectPlaceholder")} onChange={(event) => setNewProjectTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createAndSelectProject(); } }} /><button onClick={createAndSelectProject}>✓</button></div></div>}</div></label></>}
       {props.type === "project" && <div className="df-form-color-row"><label>{t(props.lang, "form.color")}</label><ProjectColorPicker value={f.projectColor} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} /></div>}
+      {props.type === "project" && <label>{props.lang === "zh" ? "截止日期" : "Due date"}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>}
       {props.type === "event" && <div className="df-grid2"><label>{t(props.lang, "form.startDate")}<input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label><label>{t(props.lang, "form.startTime")}<input type="time" value={f.dueTime} onChange={(event) => set("dueTime", event.target.value)} /></label><label>{t(props.lang, "form.endDate")}<input type="date" value={f.endDate} onChange={(event) => set("endDate", event.target.value)} /></label><label>{t(props.lang, "form.endTime")}<input type="time" value={f.endTime} onChange={(event) => set("endTime", event.target.value)} /></label><label>重复<select value={f.recurrence?.frequency || "none"} onChange={(event) => {
         const frequency = event.target.value as RecurrenceFrequency;
         set("recurrence", frequency === "none" ? undefined : { mode: f.dueTime ? "scheduled" : "flexible", frequency, startDate: f.dueDate, startTime: f.dueTime || undefined, durationMinutes: f.dueTime ? Math.max(clockTimeSpanMinutes(f.dueTime, f.endTime || addMinutes(f.dueTime, 60)), 15) : undefined, endDate: f.endDate || undefined });
