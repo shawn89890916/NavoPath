@@ -255,6 +255,14 @@ function planningTaskPriority(task: Pick<Task, "importance" | "urgency">) {
   return "normal";
 }
 
+function isIncompletePlanningTask(task: Task) {
+  return normalizeWorkflowStatus(task) !== "done";
+}
+
+function isIncompletePlanningSubtask(subtask: Subtask) {
+  return !subtask.completed && !subtask.done;
+}
+
 function createProjectShell(title: string): Project {
   return {
     id: "__unassigned__",
@@ -398,7 +406,7 @@ function PlanningSubtaskNode(props: {
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
   const done = Boolean(props.subtask.completed || props.subtask.done);
-  const childSubtasks = props.subtask.subtasks || [];
+  const childSubtasks = (props.subtask.subtasks || []).filter(isIncompletePlanningSubtask);
   const hasChildren = childSubtasks.length > 0;
 
   return (
@@ -544,7 +552,11 @@ function PlanningTaskNode(props: {
   const { tooltipEl, showTip, hideTip } = useTooltip();
   const titleRef = useRef<HTMLSpanElement>(null);
   const done = normalizeWorkflowStatus(props.task) === "done" || Boolean(props.task.completed);
-  const hasSubtasks = (props.task.subtasks || []).length > 0;
+  const hasSubtasks = (props.task.subtasks || []).some(isIncompletePlanningSubtask);
+  const isPlanned = Boolean(
+    props.task.plannedForDate
+    || (props.task.timelineRecords || []).some((record) => record.executionStatus === "scheduled"),
+  );
   const doneCount = countDoneSubtasks(props.task.subtasks);
   const totalCount = countSubtasks(props.task.subtasks);
   const metaBadges = buildTaskMetaBadges(props.task, props.lang);
@@ -603,13 +615,13 @@ function PlanningTaskNode(props: {
                 </span>
               )}
             >
-              {(metaBadges.length > 0 || hasSubtasks || props.addedToToday) && (
+              {(metaBadges.length > 0 || hasSubtasks || isPlanned) && (
                 <span className="df-task-meta-badges" aria-label={props.lang === "zh" ? "Task status" : "Task status"}>
                   {metaBadges.map((badge) => (
                     <span key={badge.key} className={badge.className}>{badge.label}</span>
                   ))}
                   {hasSubtasks && <span className="df-subtask-progress">{doneCount}/{totalCount}</span>}
-                  {props.addedToToday && <span className="df-added-today-label">{props.lang === "zh" ? "Today" : "Today"}</span>}
+                  {isPlanned && <span className="df-added-today-label">{t(props.lang, "planning.planned")}</span>}
                 </span>
               )}
             </TaskBlockContent>
@@ -630,12 +642,12 @@ function PlanningTaskNode(props: {
                 className="df-tree-icon-button"
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (isPlanned) return;
                   props.onToggleTodayCandidate();
                 }}
-                aria-label={props.addedToToday
-                  ? (props.lang === "zh" ? "Return to Planning" : "Return to Planning")
-                  : t(props.lang, "planning.addToCandidate")}
-                aria-pressed={props.addedToToday}
+                aria-label={isPlanned ? t(props.lang, "planning.planned") : t(props.lang, "planning.addToCandidate")}
+                title={isPlanned ? t(props.lang, "planning.planned") : t(props.lang, "planning.addToCandidate")}
+                aria-disabled={isPlanned}
               >
                 <ArrowRightIcon />
               </button>
@@ -963,7 +975,6 @@ export default function PlanningView(props: {
   const safeProjects = Array.isArray(props.projects) ? props.projects : [];
   const safeTasks = Array.isArray(props.tasks) ? props.tasks : [];
   const [collapsedSubtasks, setCollapsedSubtasks] = useState<Record<string, boolean>>({});
-  const [showAddedTasks, setShowAddedTasks] = useState(false);
   const [dragNode, setDragNode] = useState<TreeDragNode | null>(null);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
@@ -1002,7 +1013,6 @@ export default function PlanningView(props: {
   const [metricsFilterCategory, setMetricsFilterCategory] = useState<"range" | "group" | "habit" | "completion" | "metric" | "project">("range");
   const [metricsProjectFilter, setMetricsProjectFilter] = useState<string[]>([]);
   const [hoveredMetricGroupId, setHoveredMetricGroupId] = useState<string | null>(null);
-  const [showCompleted, setShowCompleted] = useState(false);
   const [filterProjects, setFilterProjects] = useState<string[]>([]);
   const [filterWorkflows, setFilterWorkflows] = useState<UiWorkflowStatus[]>([]);
   const [filterImportances, setFilterImportances] = useState<StateFilterValue[]>([]);
@@ -1274,8 +1284,7 @@ export default function PlanningView(props: {
 
   const viewFilteredTasks = useMemo(() => {
     return safeTasks.filter((task) => {
-      if (!showCompleted && task.completed) return false;
-      if (!showAddedTasks && task.plannedForDate === today) return false;
+      if (!isIncompletePlanningTask(task)) return false;
       if (filterProjects.length > 0 && !filterProjects.includes(String(task.projectId || ""))) return false;
       const uiStatus = normalizeWorkflowStatus(task);
       if (filterWorkflows.length > 0 && !filterWorkflows.includes(uiStatus)) return false;
@@ -1307,7 +1316,7 @@ export default function PlanningView(props: {
       }
       return true;
     });
-  }, [safeTasks, showCompleted, showAddedTasks, today, filterProjects, filterWorkflows, filterImportances, filterUrgencies, filterDueDate, filterScheduled]);
+  }, [safeTasks, filterProjects, filterWorkflows, filterImportances, filterUrgencies, filterDueDate, filterScheduled]);
   const orderPlanningTasks = useCallback((items: Task[]) => {
     return [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt.localeCompare(b.createdAt));
   }, []);
@@ -1317,9 +1326,7 @@ export default function PlanningView(props: {
     || filterImportances.length > 0
     || filterUrgencies.length > 0
     || !!filterDueDate
-    || !!filterScheduled
-    || showCompleted
-    || showAddedTasks;
+    || !!filterScheduled;
   const visibleProjects = useMemo(
     () => safeProjects
       .map((project) => ({
@@ -1336,7 +1343,7 @@ export default function PlanningView(props: {
 
   const svgLines = useTreeLines(treeRef, safeProjects, viewFilteredTasks, props.collapsed, collapsedSubtasks);
 
-  const kanbanTasks = useMemo(() => viewFilteredTasks.filter((task) => !task.completed || showCompleted), [viewFilteredTasks, showCompleted]);
+  const kanbanTasks = viewFilteredTasks;
   // This is the Planning entry note, not an empty-state message: show it when
   // the workspace first opens and let the user dismiss it for this visit.
   const showLongRangeGuide = !guideDismissed;
@@ -1832,7 +1839,7 @@ export default function PlanningView(props: {
     window.addEventListener("keydown", keydown);
   }, [props.compact, props.lang, handleTreeDrop, safeProjects, safeTasks, setTreeDragNode, setTreeDropTarget, subtaskOwner, suppressPostDragClick, taskFromSubtask]);
 
-  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0 || !!filterDueDate || !!filterScheduled || showCompleted || showAddedTasks;
+  const hasActiveFilters = filterProjects.length > 0 || filterWorkflows.length > 0 || filterImportances.length > 0 || filterUrgencies.length > 0 || !!filterDueDate || !!filterScheduled;
 
   const toggleArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, value: T) => {
     setter((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]);
@@ -1856,22 +1863,10 @@ export default function PlanningView(props: {
       })),
     },
     {
-      key: "display",
-      label: props.lang === "zh" ? "Display" : "Display",
-      selected: [
-        ...(showCompleted ? [props.lang === "zh" ? "Done" : "Done"] : []),
-        ...(showAddedTasks ? [props.lang === "zh" ? "Added" : "Added"] : []),
-      ],
-      options: [
-        { value: "completed", label: props.lang === "zh" ? "Show done" : "Show done", checked: showCompleted, onToggle: () => setShowCompleted((v) => !v) },
-        { value: "added", label: props.lang === "zh" ? "Show added" : "Show added", checked: showAddedTasks, onToggle: () => setShowAddedTasks((v) => !v) },
-      ],
-    },
-    {
       key: "status",
       label: props.lang === "zh" ? "Status" : "Status",
       selected: filterWorkflows.map((s) => s === "backlog" ? (props.lang === "zh" ? "To do" : "To do") : s === "doing" ? (props.lang === "zh" ? "Doing" : "Doing") : (props.lang === "zh" ? "Done" : "Done")),
-      options: (["backlog", "done"] as UiWorkflowStatus[]).map((s) => ({
+      options: (["backlog"] as UiWorkflowStatus[]).map((s) => ({
         value: s,
         label: s === "backlog" ? (props.lang === "zh" ? "To do" : "To do") : s === "doing" ? (props.lang === "zh" ? "Doing" : "Doing") : (props.lang === "zh" ? "Done" : "Done"),
         checked: filterWorkflows.includes(s),
@@ -1988,7 +1983,7 @@ export default function PlanningView(props: {
     return dueTime >= now && dueTime <= now + 6 * 86400000;
   };
   const filterOptionsByCategory: Record<string, FilterOption[]> = {
-    status: (["backlog", "done"] as UiWorkflowStatus[])
+    status: (["backlog"] as UiWorkflowStatus[])
       .filter((s) => filterWorkflows.includes(s) || safeTasks.some((task) => normalizeWorkflowStatus(task) === s))
       .map((s) => ({
         value: s,
@@ -2039,20 +2034,6 @@ export default function PlanningView(props: {
         inputType: "radio" as const,
         onToggle: () => setFilterScheduled(filterScheduled === s ? null : s),
       })),
-    completed: [
-      ...(showCompleted || safeTasks.some((task) => task.completed) ? [{
-        value: "completed",
-        label: props.lang === "zh" ? "Show done" : "Show done",
-        checked: showCompleted,
-        onToggle: () => setShowCompleted((v) => !v),
-      }] : []),
-      ...(showAddedTasks || safeTasks.some((task) => task.plannedForDate === today) ? [{
-        value: "added",
-        label: props.lang === "zh" ? "Show added" : "Show added",
-        checked: showAddedTasks,
-        onToggle: () => setShowAddedTasks((v) => !v),
-      }] : []),
-    ],
   };
   const filterCategories: FilterCategory[] = [
     { key: "status", label: props.lang === "zh" ? "Status" : "Status", icon: "circle", activeCount: filterWorkflows.length, summary: filterWorkflows.length > 0 ? filterWorkflows.map(workflowLabel).join(", ") : "" },
@@ -2061,7 +2042,6 @@ export default function PlanningView(props: {
     { key: "project", label: props.lang === "zh" ? "Project" : "Project", icon: "folder", activeCount: filterProjects.length, summary: filterProjects.length > 0 ? filterProjects.map((id) => safeProjects.find((p) => String(p.id) === id)?.title || id).join(", ") : "" },
     { key: "due", label: props.lang === "zh" ? "Due date" : "Due date", icon: "calendar", activeCount: filterDueDate ? 1 : 0, summary: filterDueDate ? dueDateLabel(filterDueDate) : "" },
     { key: "scheduled", label: props.lang === "zh" ? "Scheduled" : "Scheduled", icon: "layers", activeCount: filterScheduled ? 1 : 0, summary: filterScheduled ? (filterScheduled === "scheduled" ? (props.lang === "zh" ? "Scheduled" : "Scheduled") : (props.lang === "zh" ? "Unscheduled" : "Unscheduled")) : "" },
-    { key: "completed", label: props.lang === "zh" ? "Completed" : "Completed", icon: "check", activeCount: (showCompleted ? 1 : 0) + (showAddedTasks ? 1 : 0), summary: [showCompleted ? (props.lang === "zh" ? "Show done" : "Show done") : "", showAddedTasks ? (props.lang === "zh" ? "Show added" : "Show added") : ""].filter(Boolean).join(", ") },
   ];
   const effectiveFilterCategories = filterCategories.filter((cat) => (filterOptionsByCategory[cat.key] || []).length > 0);
   const activeFilterCategory = filterExpandedCategory && effectiveFilterCategories.some((cat) => cat.key === filterExpandedCategory)
@@ -2572,7 +2552,7 @@ export default function PlanningView(props: {
 
           {viewMode === "kanban" && (
             <div className="df-kanban-board">
-              {(["backlog", "done"] as UiWorkflowStatus[]).map((status) => {
+              {(["backlog"] as UiWorkflowStatus[]).map((status) => {
                 const columnTasks = orderPlanningTasks(kanbanTasks.filter((task) => status === "done" ? normalizeWorkflowStatus(task) === "done" : normalizeWorkflowStatus(task) !== "done"));
                 return (
                   <div
@@ -2827,9 +2807,9 @@ export default function PlanningView(props: {
                           dragging={dragNode?.kind === "task" && dragNode.id === task.id}
                         />
                         {treeDropSlot("task", task.id, "inside")}
-                        {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
+                        {!collapsedSubtasks[task.id] && (task.subtasks || []).some(isIncompletePlanningSubtask) && (
                           <div className="df-subtask-list" data-parent-id={task.id}>
-                            {(task.subtasks || []).map((subtask) => (
+                            {(task.subtasks || []).filter(isIncompletePlanningSubtask).map((subtask) => (
                               <React.Fragment key={subtask.id}>
                                 {treeDropSlot("subtask", subtask.id, "before")}
                                 <PlanningSubtaskNode
@@ -2900,9 +2880,9 @@ export default function PlanningView(props: {
                           dragging={dragNode?.kind === "task" && dragNode.id === task.id}
                         />
                         {treeDropSlot("task", task.id, "inside")}
-                        {!collapsedSubtasks[task.id] && (task.subtasks || []).length > 0 && (
+                        {!collapsedSubtasks[task.id] && (task.subtasks || []).some(isIncompletePlanningSubtask) && (
                           <div className="df-subtask-list" data-parent-id={task.id}>
-                            {(task.subtasks || []).map((subtask) => (
+                            {(task.subtasks || []).filter(isIncompletePlanningSubtask).map((subtask) => (
                               <React.Fragment key={subtask.id}>
                                 {treeDropSlot("subtask", subtask.id, "before")}
                                 <PlanningSubtaskNode
