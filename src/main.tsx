@@ -85,6 +85,7 @@ import { SettingSection, SettingRow, SettingToggle, SettingSelect, SettingNumber
 import { SETTINGS_CATEGORIES, normalizeSettingsTarget, searchSettings, settingsDetailLabel, settingsSearchPath, settingsTargetForSearchId, type SettingsCategory, type SettingsTarget, type SettingsTargetInput } from "./settingsNavigation";
 import { getDefaultSettings } from "./defaultSettings";
 import { nextDueAiBrief } from "./aiBriefs";
+import { listProactiveNotifications, showProactiveSystemNotification, subscribeToProactiveNotifications } from "./proactiveAssistant";
 import { usePointerReorder } from "./usePointerReorder";
 import { DESKTOP_DOWNLOAD_URL, DESKTOP_RELEASES_URL } from "./downloads";
 import { readAutoLaunchState, toggleAutoLaunchState } from "./desktopAutoLaunch";
@@ -1408,6 +1409,8 @@ function App() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [toast, setToast] = useState("");
+  const [unreadProactiveNotifications, setUnreadProactiveNotifications] = useState(0);
+  const seenProactiveNotificationIdsRef = useRef(new Set<string>());
   // Enhanced toast with optional undo action (5-second window)
   const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -6751,6 +6754,36 @@ function App() {
   }, [authState?.user?.id, aiBusy, lang, settings?.aiBriefsEnabled, settings?.aiStartBriefTime, settings?.aiEndBriefTime, settings?.aiLastStartBriefDate, settings?.aiLastEndReviewDate]);
 
   useEffect(() => {
+    if (authState?.mode !== "cloud" || !authState.user) {
+      setUnreadProactiveNotifications(0);
+      seenProactiveNotificationIdsRef.current.clear();
+      return;
+    }
+    let active = true;
+    const refresh = async () => {
+      const items = await listProactiveNotifications().catch(() => []);
+      if (!active) return;
+      items.forEach((item) => seenProactiveNotificationIdsRef.current.add(item.id));
+      setUnreadProactiveNotifications(items.length);
+    };
+    const receive = (notification: { id: string; title: string; body: string }) => {
+      if (!active || seenProactiveNotificationIdsRef.current.has(notification.id)) return;
+      seenProactiveNotificationIdsRef.current.add(notification.id);
+      setUnreadProactiveNotifications((count) => count + 1);
+      showToast(lang === "zh" ? `Navo AI：${notification.title}` : `Navo AI: ${notification.title}`);
+      showProactiveSystemNotification(notification);
+    };
+    void refresh();
+    const unsubscribe = subscribeToProactiveNotifications(receive);
+    const interval = window.setInterval(() => void refresh(), 60_000);
+    return () => {
+      active = false;
+      unsubscribe();
+      window.clearInterval(interval);
+    };
+  }, [authState?.mode, authState?.user?.id, lang]);
+
+  useEffect(() => {
     if (proactiveIntroShownRef.current || authState?.mode !== "cloud" || !authState.user || !settings || settings.proactiveAssistantIntroSeen) return;
     proactiveIntroShownRef.current = true;
     showToast(lang === "zh"
@@ -8206,6 +8239,16 @@ function App() {
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           </button>
+          {authState?.mode === "cloud" && <button
+            className={`df-user-avatar df-proactive-notification-button${unreadProactiveNotifications ? " has-unread" : ""}`}
+            type="button"
+            onClick={() => { rememberLayerTrigger("utility"); openSettingsSection({ category: "advanced", detail: "ai", anchor: "proactive-assistant" }); }}
+            aria-label={lang === "zh" ? `主动助理提醒${unreadProactiveNotifications ? `，${unreadProactiveNotifications} 条未读` : ""}` : `Proactive assistant messages${unreadProactiveNotifications ? `, ${unreadProactiveNotifications} unread` : ""}`}
+            title={lang === "zh" ? "主动助理提醒" : "Proactive assistant messages"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+            {unreadProactiveNotifications > 0 && <span className="df-proactive-notification-count" aria-hidden="true">{unreadProactiveNotifications > 9 ? "9+" : unreadProactiveNotifications}</span>}
+          </button>}
           <button className="df-user-avatar" onClick={() => { rememberLayerTrigger("utility"); setUtilityPanel("settings"); }} aria-label={t(lang, "header.settings")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>

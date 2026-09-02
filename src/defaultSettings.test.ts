@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { normalizeSettings } from "./defaultSettings";
 
 describe("plugin settings normalization", () => {
-  it("keeps proactive AI briefs opt-in with bounded daily defaults", () => {
+  it("enables proactive AI briefs with bounded daily defaults", () => {
     const defaults = normalizeSettings({});
-    expect(defaults.aiBriefsEnabled).toBe(false);
+    expect(defaults.aiBriefsEnabled).toBe(true);
     expect(defaults.aiStartBriefTime).toBe("08:00");
     expect(defaults.aiEndBriefTime).toBe("21:30");
     const normalized = normalizeSettings({ aiBriefsEnabled: true, aiStartBriefTime: "99:99", aiEndBriefTime: "18:45", aiLastStartBriefDate: "not-a-date", aiLastEndReviewDate: "2026-08-20" });

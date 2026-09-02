@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Language, PlannerData, Settings } from "../types";
 import { SettingActionButton, SettingDivider, SettingRow, SettingSelect, SettingToggle } from "./SettingsControls";
 import { ProactiveAssistantInbox } from "./ProactiveAssistantInbox";
-import { readProactiveEmailEnabled, setProactiveEmailEnabled } from "../proactiveAssistant";
+import { readProactiveEmailEnabled, requestProactiveNotificationPermission, setProactiveEmailEnabled } from "../proactiveAssistant";
 
 export function ProactiveAssistantSettings({ settings, data, lang, cloudReady, onSave, onSaveData, onRequestLocation }: {
   settings: Settings;
@@ -15,6 +15,7 @@ export function ProactiveAssistantSettings({ settings, data, lang, cloudReady, o
 }) {
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   useEffect(() => {
     if (!cloudReady) return;
     void readProactiveEmailEnabled().then(setEmailEnabled).catch(() => undefined);
@@ -26,6 +27,7 @@ export function ProactiveAssistantSettings({ settings, data, lang, cloudReady, o
     catch { setEmailEnabled(!enabled); }
     finally { setEmailBusy(false); }
   };
+  const enableSystemNotifications = async () => setNotificationPermission(await requestProactiveNotificationPermission());
   return <>
     {cloudReady && <ProactiveAssistantInbox data={data} lang={lang} onSaveData={onSaveData} />}
     <SettingDivider />
@@ -63,6 +65,13 @@ export function ProactiveAssistantSettings({ settings, data, lang, cloudReady, o
       title={lang === "zh" ? "邮件通知" : "Email notifications"}
       description={lang === "zh" ? "仅在已连接邮件服务且当前账户地址可用时发送；应用内通知始终保留。" : "Sent only when email delivery is connected and this account has an address; in-app notifications remain available."}
       control={<SettingToggle checked={emailEnabled} disabled={!cloudReady || emailBusy} ariaLabel={lang === "zh" ? "邮件通知" : "Email notifications"} onChange={(next) => void changeEmail(next)} />}
+    />
+    <SettingRow
+      title={lang === "zh" ? "系统通知" : "System notifications"}
+      description={lang === "zh"
+        ? (notificationPermission === "granted" ? "新的主动提醒会显示为系统通知。" : notificationPermission === "denied" ? "系统通知已被浏览器或系统阻止；请在系统权限中重新允许。" : "允许后，新的主动提醒会在应用外显示。")
+        : (notificationPermission === "granted" ? "New proactive messages appear as system notifications." : notificationPermission === "denied" ? "System notifications are blocked. Re-enable them in your browser or system settings." : "Allow notifications to see new proactive messages outside the app.")}
+      control={<SettingActionButton disabled={!cloudReady || notificationPermission === "granted" || notificationPermission === "denied" || notificationPermission === "unsupported"} onClick={() => void enableSystemNotifications()}>{notificationPermission === "granted" ? (lang === "zh" ? "已开启" : "Enabled") : (lang === "zh" ? "开启" : "Enable")}</SettingActionButton>}
     />
   </>;
 }

@@ -34,6 +34,35 @@ export async function listProactiveNotifications() {
   return (data || []) as ProactiveNotification[];
 }
 
+/** Keep the workspace aware of new cloud-assistant messages outside Settings. */
+export function subscribeToProactiveNotifications(onNotification: (notification: ProactiveNotification) => void) {
+  const api = cloudClient();
+  if (!api) return () => undefined;
+  const channel = api
+    .channel("navopath-proactive-notifications")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "navopath_notifications" }, (payload) => {
+      const notification = payload.new as ProactiveNotification;
+      if (notification?.id) onNotification(notification);
+    })
+    .subscribe();
+  return () => { void api.removeChannel(channel); };
+}
+
+export async function requestProactiveNotificationPermission() {
+  if (typeof Notification === "undefined") return "unsupported" as const;
+  return Notification.permission === "default" ? Notification.requestPermission() : Notification.permission;
+}
+
+export function showProactiveSystemNotification(notification: Pick<ProactiveNotification, "title" | "body">) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+  try {
+    new Notification(notification.title, { body: notification.body });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function markProactiveNotificationRead(id: string) {
   const api = cloudClient();
   if (!api) return;

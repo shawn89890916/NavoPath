@@ -5685,6 +5685,22 @@ body:not(.df-timeline-pointer-drag) .df-candidate-list .df-list-insertion-line {
 .df-app .df-header-right { margin-right: 0 !important; }
 .df-header-right .df-tabs-right { order: 0; }
 .df-header-right .df-user-avatar { order: 1; }
+.df-app .df-proactive-notification-button { position: relative; }
+.df-app .df-proactive-notification-button.has-unread { color: var(--accent-active); }
+.df-app .df-proactive-notification-count {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border: 1px solid var(--bg-app);
+  border-radius: 8px;
+  color: var(--bg-app);
+  background: var(--accent-active);
+  font: 700 9px/12px var(--paper-mono);
+  text-align: center;
+}
 .df-month-title {
   display: flex !important;
   justify-content: center;

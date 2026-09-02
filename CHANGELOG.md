@@ -1,5 +1,10 @@
 # NavoPath 更新日志
 
+## 2026-09-02 · Navo AI 提醒
+
+### 改进
+- Navo AI 的主动提醒现在会实时出现在工作区顶栏：未读数量清晰可见，点击即可打开提醒；允许系统通知后，新提醒也会在应用外显示。每日开工与收工简报对新账户默认开启。
+
 ## 2026-09-01 · Navo AI 主动助理
 
 ### 改进
@@ -24,6 +29,11 @@
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px；右移日期箭头与 Day / 3-Day / Week / Month 的纵向控件列对齐。
 - 修复三天和周视图的全屏模式仍继承候选栏窄列的问题；全屏现在只保留完整时间轴与退出入口，不会再出现被压缩或空白的画布。
+
+## 2026-09-02 · Navo AI notifications
+
+### Improved
+- Navo AI proactive messages now arrive live in the workspace header with a clear unread count and one-click access. Once system notifications are allowed, new messages also appear outside the app. Daily start and end briefs are enabled by default for new accounts.
 
 ## 2026-09-01 · Navo AI Proactive Assistant
 

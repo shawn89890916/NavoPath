@@ -57,7 +57,7 @@ export const defaultSettings: Settings = {
   chatMessageMaxHeight: 220,
   aiMemoryEnabled: true,
   hideAi: false,
-  aiBriefsEnabled: false,
+  aiBriefsEnabled: true,
   aiStartBriefTime: "08:00",
   aiEndBriefTime: "21:30",
   proactiveAssistantEnabled: true,
