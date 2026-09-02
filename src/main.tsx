@@ -773,7 +773,7 @@ function defaultForm(type: AddType = "task"): FormState {
     title: "",
     projectId: "",
     projectColor: DEFAULT_PROJECT_COLOR,
-    dueDate: type === "project" ? "" : today,
+    dueDate: type === "event" ? today : "",
     dueTime: "",
     endDate: today,
     endTime: "",
@@ -801,7 +801,7 @@ function makeTask(form: FormState, intelligence?: { data: PlannerData; projects:
   return {
     id: uid("task"),
     title: form.title.trim(),
-    dueDate: form.dueDate || todayIso(),
+    dueDate: form.dueDate,
     category: form.category,
     priority: form.priority,
     notes: form.details,
@@ -815,8 +815,8 @@ function makeTask(form: FormState, intelligence?: { data: PlannerData; projects:
       ...(inferDuration ? { duration: { minutes: prediction.duration.minutes, confidence: prediction.duration.confidence, source: prediction.duration.source, inferredAt: now, modelVersion: AI_INFERENCE_MODEL_VERSION } } : {}),
       ...(inferredProject ? { project: { projectId: inferredProject.projectId, confidence: inferredProject.confidence, source: inferredProject.source, inferredAt: now, modelVersion: AI_INFERENCE_MODEL_VERSION } } : {}),
     } : undefined,
-    plannedForDate: form.dueDate === todayIso() ? todayIso() : undefined,
-    executionLane: form.dueDate === todayIso() ? "candidate" : undefined,
+    plannedForDate: form.dueDate && form.dueDate === todayIso() ? todayIso() : undefined,
+    executionLane: form.dueDate && form.dueDate === todayIso() ? "candidate" : undefined,
     order: Date.now(),
     subtasks: [],
     createdAt: now,
@@ -4084,7 +4084,7 @@ function App() {
       const task = makeSmartTask({
         ...defaultForm("task"),
         title: slot.title,
-        dueDate: addDays(today, 1),
+        dueDate: addDays(timelineDate, 1),
         estimatedHours: durationMinutes / 60,
       });
 
@@ -4235,7 +4235,6 @@ function App() {
       ...defaultForm("task"),
       title,
       projectId: quickProjectId,
-      dueDate: targetDate,
     });
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
     void enrichTaskInBackground(task);
@@ -4291,7 +4290,6 @@ function App() {
       ...defaultForm("task"),
       title,
       projectId: "",
-      dueDate: targetDate,
     });
     void saveData({ ...data, tasks: [...data.tasks, { ...task, plannedForDate: targetDate, executionLane: "candidate", order: Date.now() }] });
     void enrichTaskInBackground(task);
@@ -4703,7 +4701,7 @@ function App() {
     setEditingId("");
     setEditingRecordId(undefined);
     setEditingOccurrence(null);
-    setForm({ ...defaultForm("task"), projectId, dueDate: today });
+    setForm({ ...defaultForm("task"), projectId });
     setDrawerOpen(true);
   }
 
@@ -4727,7 +4725,7 @@ function App() {
         ...defaultForm("task"),
         title: cleanTitle,
         projectId,
-        dueDate: addDays(today, 1),
+        dueDate: addDays(timelineDate, 1),
         estimatedHours: durationMinutes / 60
       });
       void saveData({
@@ -4764,7 +4762,7 @@ function App() {
       ...defaultForm("task"),
       title: cleanTitle,
       projectId,
-      dueDate: addDays(today, 1),
+      dueDate: addDays(timelineDate, 1),
       estimatedHours: durationMinutes / 60
     });
     const scheduledRecord = createScheduledRecord(task, timelineDate, quickSchedule.startTime, durationMinutes);
@@ -4792,7 +4790,7 @@ function App() {
     }
     const cleanTitle = title.trim();
     const estimatedMinutes = learnedTaskDurationMinutes(cleanTitle, data.tasks, pid || undefined);
-    const task = makeSmartTask({ ...defaultForm("task"), title: cleanTitle, projectId: pid, dueDate: targetDate, estimatedHours: estimatedMinutes / 60 });
+    const task = makeSmartTask({ ...defaultForm("task"), title: cleanTitle, projectId: pid, dueDate: addDays(targetDate, 1), estimatedHours: estimatedMinutes / 60 });
     void saveData({
       ...data,
       projects: nextProjects,
@@ -4814,6 +4812,7 @@ function App() {
           t.id === realTask.id
             ? {
                 ...t,
+                dueDate: t.dueDate || addDays(targetDate, 1),
                 plannedForDate: targetDate,
                 executionLane: undefined,
                 timelineRecords: (t.timelineRecords || []).map((r) =>
@@ -4828,7 +4827,8 @@ function App() {
       });
     } else {
       // Legacy: direct task ID
-      updateTask(taskId, { plannedForDate: targetDate, executionLane: undefined, scheduledDate: targetDate, scheduledStart: undefined, scheduledEnd: undefined });
+      const task = data?.tasks.find((item) => item.id === taskId);
+      updateTask(taskId, { dueDate: task?.dueDate || addDays(targetDate, 1), plannedForDate: targetDate, executionLane: undefined, scheduledDate: targetDate, scheduledStart: undefined, scheduledEnd: undefined });
     }
     showToast(t(lang, "toast.setToAllDay"));
     setDrag(null);
@@ -5182,7 +5182,7 @@ function App() {
     const { date, startMinutes, endMinutes } = state;
     const startTime = minutesToTime(startMinutes);
     const durationMinutes = endMinutes - startMinutes;
-    const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: addDays(today, 1), estimatedHours: durationMinutes / 60 });
+    const task = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: addDays(date, 1), estimatedHours: durationMinutes / 60 });
     const scheduledRecord = createScheduledRecord(task, date, startTime, durationMinutes);
     void saveData({ ...current, tasks: [...current.tasks, { ...task, subtasks, plannedForDate: date, executionLane: undefined, timelineRecords: [scheduledRecord] }] });
     requestTimelineFocus({ date, startTime, taskId: scheduledRecord.id, source: "schedule" });
@@ -5198,7 +5198,7 @@ function App() {
         ...defaultForm("task"),
         title: task.title,
         projectId: task.projectId || "",
-        dueDate: date,
+        dueDate: addDays(date, 1),
         dueTime: startTime,
         endDate: date,
         endTime: scheduledRecord.scheduledEnd,
@@ -5371,6 +5371,7 @@ function App() {
     const updatedTask: Task = settings.clearSchedule || settings.allDay
       ? {
           ...task,
+          dueDate: task.dueDate || addDays(settings.date, 1),
           plannedForDate: settings.date,
           executionLane: settings.clearSchedule ? "candidate" : undefined,
           scheduledDate: settings.allDay ? settings.date : undefined,
@@ -5382,6 +5383,7 @@ function App() {
         }
       : {
           ...task,
+          dueDate: task.dueDate || addDays(settings.date, 1),
           plannedForDate: settings.date,
           executionLane: undefined,
           scheduledDate: undefined,
@@ -6141,7 +6143,7 @@ function App() {
       title: realTask.title,
       projectId: realTask.projectId || "",
       projectColor: DEFAULT_PROJECT_COLOR,
-      dueDate: task.scheduledDate || realTask.dueDate || today,
+      dueDate: realTask.dueDate || addDays(task.scheduledDate || today, 1),
       dueTime: task.scheduledStart || "",
       endDate: task.scheduledDate || realTask.dueDate || today,
       endTime: task.scheduledEnd || "",
@@ -6252,7 +6254,7 @@ function App() {
         const converted: Task = {
           id: uid("task"),
           title: form.title.trim(),
-          dueDate: form.dueDate || today,
+          dueDate: form.dueDate,
           category: form.category,
           priority: form.priority || "medium",
           notes: form.details,
@@ -6298,7 +6300,7 @@ function App() {
         void saveData({ ...data, habits: [...(data.habits || []), buildHabit(editingProject)], projects: data.projects.filter((project) => project.id !== editingProject.id) });
       } else if (editingHabit && addType === "task") {
         const converted: Task = {
-          id: uid("task"), title: form.title.trim(), dueDate: form.dueDate || today, category: form.category,
+          id: uid("task"), title: form.title.trim(), dueDate: form.dueDate, category: form.category,
           priority: form.priority || "medium", notes: form.details, goalId: "", completed: false,
           projectId: form.projectId || undefined, estimatedHours: Math.max(form.estimatedHours || 0.25, 0.25),
           importance: form.importance, urgency: form.urgency, order: editingHabit.order, subtasks: [], timelineRecords: [],
@@ -6438,7 +6440,7 @@ function App() {
         scheduledDate: undefined,
         scheduledStart: undefined,
         scheduledEnd: undefined,
-        dueDate: today,
+        dueDate: "",
         projectId: form.projectId || undefined,
         category: form.category,
         priority: form.priority,
@@ -9285,7 +9287,7 @@ function App() {
                                             onSave={(title, projectId) => {
                                               if (!data || !title.trim()) return;
                                               const estimatedMinutes = learnedTaskDurationMinutes(title, data.tasks, projectId || undefined);
-                                              const newTask = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: day, estimatedHours: estimatedMinutes / 60 });
+                                              const newTask = makeSmartTask({ ...defaultForm("task"), title, projectId: projectId || "", dueDate: addDays(day, 1), estimatedHours: estimatedMinutes / 60 });
                                               void saveData({ ...data, tasks: [...data.tasks, { ...newTask, plannedForDate: day, scheduledDate: day, order: Date.now() }] });
                                               setMonthQuickAdd(null);
                                               showToast(t(lang, "timeline.taskAdded"));
@@ -12797,8 +12799,8 @@ function EditDrawer(props: {
               <span>◷ {formatMinutes(quickAddDuration)}</span>
               <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l3 3 3-3" /></svg>
             </button>
-            {taskLevelSelector("importance", importanceOptions)}
           </section>
+          <section className="df-detail-importance-row" aria-label={props.lang === "zh" ? "任务标记" : "Task flags"}>{taskLevelSelector("importance", importanceOptions)}</section>
 
           <section className="df-detail-time-range" aria-label={props.lang === "zh" ? "起止时间" : "Start and end time"}>
             <label><span>{t(props.lang, "drawer.startTime")}</span><input type="time" step={SLOT_MINUTES * 60} value={f.dueTime} onChange={(event) => setQuickAddStart(event.target.value)} /></label>
@@ -12806,7 +12808,7 @@ function EditDrawer(props: {
             <label><span>{t(props.lang, "drawer.endTime")}</span><input type="time" step={SLOT_MINUTES * 60} value={f.endTime} disabled={!f.dueTime} onChange={(event) => setQuickAddEnd(event.target.value)} /></label>
           </section>
           <section className="df-detail-schedule-row df-detail-due-date">
-            <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
+            <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" lang={props.lang === "zh" ? "zh-CN" : "en-US"} value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
             <button className="df-detail-due-reset" type="button" onClick={() => set("dueDate", "")}>{props.lang === "zh" ? "重置" : "Reset"}</button>
           </section>
 
@@ -12844,7 +12846,7 @@ function EditDrawer(props: {
     const isCandidate = props.task.plannedForDate === props.today && getExecutionLane(props.task) === "candidate" && !activeRecord && !(props.task.timelineRecords || []).some((r) => r.executionStatus === "scheduled");
     const isScheduled = activeRecord
       ? (activeRecord.scheduledDate === props.today || Boolean(activeRecord.scheduledDate && activeRecord.scheduledStart))
-      : Boolean((props.task.scheduledDate && props.task.scheduledStart) || activeOccurrence || isRecurringScheduledTask(props.task));
+      : Boolean(props.task.scheduledDate || activeOccurrence || (props.task.timelineRecords || []).some((record) => record.executionStatus === "scheduled") || isRecurringScheduledTask(props.task));
     const recordStatus = activeRecord?.executionStatus;
     const recurrenceText = recurrenceLabel(props.task.recurrence);
     const showUncomplete = (
@@ -12958,9 +12960,9 @@ function EditDrawer(props: {
             <span>◷ {formatDuration(f.estimatedHours || 0.5)}</span>
             <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l3 3 3-3" /></svg>
           </button>
-          {taskLevelSelector("importance", importanceOptions)}
           {recurrenceText ? <span className="df-detail-pill-trevor">↻ {recurrenceText}</span> : null}
         </section>
+        <section className="df-detail-importance-row" aria-label={props.lang === "zh" ? "任务标记" : "Task flags"}>{taskLevelSelector("importance", importanceOptions)}</section>
 
         {/* ── Status: COMPLETE / UNFINISHED / REMOVE ── */}
         <section className="df-detail-status-row">
@@ -12982,13 +12984,13 @@ function EditDrawer(props: {
           <label className="df-detail-pill-trevor action">
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg>
             <span>{props.lang === "zh" ? "截止日期" : "Due date"}</span>
-            <input type="date" value={f.dueDate} onChange={(event) => { set("dueDate", event.target.value); props.onTaskUpdate(props.task!.id, { dueDate: event.target.value }); }} />
+            <input type="date" lang={props.lang === "zh" ? "zh-CN" : "en-US"} value={f.dueDate} onChange={(event) => { set("dueDate", event.target.value); props.onTaskUpdate(props.task!.id, { dueDate: event.target.value }); }} />
           </label>
           <button className="df-detail-due-reset" type="button" onClick={() => { set("dueDate", ""); props.onTaskUpdate(props.task!.id, { dueDate: "" }); }}>{props.lang === "zh" ? "重置" : "Reset"}</button>
         </section>
 
-        {/* ── Scheduling: Reschedule / Unschedule ── */}
-        <section className="df-detail-schedule-row">
+        {/* ── Scheduling: shown only for a task currently on the timeline ── */}
+        {isScheduled && <section className="df-detail-schedule-row">
           <div className="df-detail-split-action">
             <button className={`df-detail-pill-trevor action ${rescheduleOpen ? "active" : ""}`} onClick={() => { setQuickActionMenu(null); setRescheduleDate(props.task!.plannedForDate || props.today); setRescheduleOpen((open) => !open); }}>
               <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 2v4l2 2"/><circle cx="6" cy="6" r="5"/></svg>
@@ -13001,9 +13003,9 @@ function EditDrawer(props: {
             <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3l-6 6M3 3l6 6"/></svg>
             <span>{t(props.lang, "drawer.cancelSchedule")}</span>
           </button>
-        </section>
+        </section>}
 
-        {rescheduleOpen && (
+        {isScheduled && rescheduleOpen && (
           <section className="df-detail-project-pick df-reschedule-editor">
             <label><span>{props.lang === "zh" ? "改期至" : "Reschedule to"}</span><input type="date" value={rescheduleDate} onChange={(event) => setRescheduleDate(event.target.value)} /></label>
             <div className="df-recurrence-editor-actions">
@@ -13168,7 +13170,7 @@ function EditDrawer(props: {
           <ProjectColorPicker value={f.projectColor || props.project?.color || DEFAULT_PROJECT_COLOR} onChange={(color) => set("projectColor", color)} presets={COMMON_COLOR_PRESETS} />
         </section>
         <section className="df-detail-schedule-row df-detail-due-date">
-          <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
+          <label className="df-detail-pill-trevor action"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="8" height="7" rx="1"/><path d="M2 5h8M4 2v2M8 2v2"/></svg><span>{props.lang === "zh" ? "截止日期" : "Due date"}</span><input type="date" lang={props.lang === "zh" ? "zh-CN" : "en-US"} value={f.dueDate} onChange={(event) => set("dueDate", event.target.value)} /></label>
           <button className="df-detail-due-reset" type="button" onClick={() => set("dueDate", "")}>{props.lang === "zh" ? "重置" : "Reset"}</button>
         </section>
         <section className="df-detail-status-row">
