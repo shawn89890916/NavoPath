@@ -519,6 +519,7 @@ type AiSessionMessage = {
   createdAt: string;
   saved?: boolean;
   status?: "thinking" | "done" | "error";
+  streaming?: boolean;
   attachment?: AiAttachmentSnapshot;
   steps?: AiStep[];
   actions?: AiAction[];
@@ -6596,10 +6597,10 @@ function App() {
     const chunkSize = 12;
     for (let end = chunkSize; end < reply.length; end += chunkSize) {
       const visible = reply.slice(0, end);
-      setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, content: visible } : message));
+      setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, streaming: true, content: visible } : message));
       await new Promise((resolve) => window.setTimeout(resolve, 16));
     }
-    setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, content: reply } : message));
+    setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, streaming: false, content: reply } : message));
   }
 
   async function sendAi(messageOverride?: string, trigger: "manual" | "start_brief" | "end_review" = "manual") {
@@ -6686,6 +6687,7 @@ function App() {
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
         status: "done",
+        streaming: true,
         content: "",
         steps: result.steps && result.steps.length > 0 ? result.steps : [{ label: "已生成安排", status: "done" }],
         actions: validActions,
@@ -13632,7 +13634,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         </> : <>
           <div className="df-ai-assistant-label"><span>N</span><small>NavoPath AI</small></div>
           {message.steps && message.steps.length > 0 && message.status === "thinking" && <div className="df-ai-progress thinking"><span className="df-ai-progress-icon" aria-hidden="true">●</span><span>{text.thinking}</span></div>}
-          {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}><Suspense fallback={<p>{lang === "zh" ? "正在排版答案…" : "Formatting answer…"}</p>}><AiMarkdownLazy>{message.content}</AiMarkdownLazy></Suspense></div>}
+          {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.streaming ? <p className="df-ai-streaming-text">{message.content}</p> : <Suspense fallback={<p>{lang === "zh" ? "正在排版答案…" : "Formatting answer…"}</p>}><AiMarkdownLazy>{message.content}</AiMarkdownLazy></Suspense>}</div>}
           {message.agent && <div className="df-agent-run-card">
             {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied">
               <strong>{lang === "zh" ? `已自动执行 ${message.agent.applied.length} 项` : `${message.agent.applied.length} action(s) applied`}</strong>
