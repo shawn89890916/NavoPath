@@ -322,6 +322,14 @@
   gap: 8px;
   margin: 0 0 12px !important;
 }
+.df-ai-assistant-label.active {
+  position: sticky;
+  top: -1px;
+  z-index: 4;
+  margin-top: -10px !important;
+  padding: 10px 0 8px;
+  background: var(--surface-main);
+}
 .df-ai-assistant-label > span {
   width: 22px !important;
   height: 22px !important;

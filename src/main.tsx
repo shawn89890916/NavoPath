@@ -13474,7 +13474,8 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !followLatestRef.current) return;
-    body.scrollTo({ top: body.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    const streaming = messages.some((message) => message.streaming);
+    body.scrollTo({ top: body.scrollHeight, behavior: streaming || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, attachmentStatus]);
   const sortedConversations = sortAiConversations(conversations);
   const activeConversationTitle = conversations.find((conversation) => conversation.id === activeConversationId)?.title;
@@ -13663,7 +13664,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           <div className="df-ai-msg-bubble user"><span>{message.content}</span></div>
           {message.attachment && <AttachmentCard attachment={message.attachment} referenced />}
         </> : <>
-          <div className="df-ai-assistant-label"><span>N</span><small>NavoPath AI</small></div>
+          <div className={`df-ai-assistant-label ${message.status === "thinking" ? "active" : ""}`}><span>N</span><small>NavoPath AI</small></div>
           {message.steps && message.steps.length > 0 && <details className={`df-ai-progress ${message.status === "thinking" ? "thinking" : ""}`} open={message.status === "thinking"}>
             <summary>
               <span className="df-ai-progress-icon" aria-hidden="true">{message.status === "error" ? "!" : message.status === "thinking" ? "●" : "✓"}</span>
