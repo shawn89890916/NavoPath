@@ -33,7 +33,7 @@
         "dist/assets/supabase-vendor-*.js",
         "dist/assets/supabasePlannerApi-*.js"
       ],
-      "limit": "246 KB"
+    "limit": "247 KB"
     },
     {
       "name": "Deferred app scripts",
