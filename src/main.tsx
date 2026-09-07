@@ -1325,6 +1325,7 @@ function App() {
   const [editingRecordId, setEditingRecordId] = useState<string | undefined>(undefined);
   const [form, setForm] = useState<FormState>(defaultForm());
   const [aiOpen, setAiOpen] = useState(false);
+  const freshAiConversationRef = useRef(true);
   const [referencedTaskId, setReferencedTaskId] = useState("");
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -2037,6 +2038,12 @@ function App() {
       if (restored.length > 0) setAiMessages(restored);
     }
   }, [data?.generatedAt]);
+
+  useEffect(() => {
+    if (!aiOpen || !freshAiConversationRef.current || !data) return;
+    freshAiConversationRef.current = false;
+    void startNewAiConversation();
+  }, [aiOpen, data]);
 
   // Daily view resets range-only panel controls.
   useEffect(() => {
@@ -13725,7 +13732,6 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         <span>{lang === "zh" ? "计划建议" : "Plan Suggestions"}</span>
         <small>{planState === "generating" ? (lang === "zh" ? "分析中" : "Analyzing") : planState === "committing" ? (lang === "zh" ? "采用中" : "Adopting") : planState === "preview" ? (lang === "zh" ? "重新生成" : "Regenerate") : (lang === "zh" ? "为今天生成时间安排" : "Build today's schedule")}</small>
       </button>
-      {messages.length === 0 && sortedConversations.length > 0 && <button className="df-ai-continue-chat" onClick={() => onSelectConversation(sortedConversations[0].id)}>↻ <span>{lang === "zh" ? "继续上次对话" : "Continue last conversation"}</span></button>}
       {memoryNotice && <button className="df-ai-memory-notice" onClick={onOpenMemorySettings}>{memoryNotice} · {text.viewMemory}</button>}
       {(attachment || attachmentStatus) && <AttachmentCard attachment={attachment ? { name: attachment.name, size: attachment.size, pageCount: attachment.pageCount, truncated: attachment.truncated, status: "ready", statusText: attachmentStatus || "文本已提取", summary: attachment.text.slice(0, 120).replace(/\s+/g, " ") } : { name: "正在解析附件", size: 0, status: "error", statusText: attachmentStatus || "正在解析", summary: "" }} onRemove={onClearAttachment} />}
       <div className="df-ai-composer-row">
