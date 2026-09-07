@@ -6600,7 +6600,7 @@ function App() {
       setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, streaming: true, content: visible } : message));
       await new Promise((resolve) => window.setTimeout(resolve, 16));
     }
-    setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, streaming: false, content: reply } : message));
+    setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, status: "done", streaming: false, content: reply, steps: message.steps?.map((step) => step.status === "running" ? { ...step, status: "done" as const } : step) } : message));
   }
 
   async function sendAi(messageOverride?: string, trigger: "manual" | "start_brief" | "end_review" = "manual") {
@@ -6638,6 +6638,16 @@ function App() {
     if (!activeAiConversationId) setActiveAiConversationId(conversationId);
 
     const requestController = new AbortController();
+    const progressPhases = aiAttachment
+      ? (lang === "zh" ? ["正在读取附件", "正在读取工作区", "正在分析请求", "正在准备执行", "正在整理答案"] : ["Reading attachment", "Reading workspace", "Analyzing request", "Preparing actions", "Organizing answer"])
+      : (lang === "zh" ? ["正在连接 AI", "正在读取工作区", "正在分析请求", "正在准备执行", "正在整理答案"] : ["Connecting to AI", "Reading workspace", "Analyzing request", "Preparing actions", "Organizing answer"]);
+    let progressIndex = 0;
+    const progressTimer = window.setInterval(() => {
+      progressIndex = (progressIndex + 1) % progressPhases.length;
+      setAiMessages((current) => current.map((message) => message.id === assistantId && message.status === "thinking" && !message.streaming
+        ? { ...message, steps: [{ label: progressPhases[progressIndex], status: "running" }] }
+        : message));
+    }, 1600);
     aiAbortRef.current?.abort();
     aiAbortRef.current = requestController;
     try {
@@ -6686,10 +6696,10 @@ function App() {
       const displayReply = normalizeAiReply(result.reply);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
-        status: "done",
+        status: "thinking",
         streaming: true,
         content: "",
-        steps: result.steps && result.steps.length > 0 ? result.steps : [{ label: "已生成安排", status: "done" }],
+        steps: [...(result.steps && result.steps.length > 0 ? result.steps : [{ label: lang === "zh" ? "已读取工作区" : "Workspace read", status: "done" as const }]), { label: lang === "zh" ? "正在生成答案" : "Generating answer", status: "running" as const }],
         actions: validActions,
         selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
         actionState: validActions.length ? "pending" : undefined,
@@ -6758,6 +6768,7 @@ function App() {
       } : message));
       return false;
     } finally {
+      window.clearInterval(progressTimer);
       if (aiAbortRef.current === requestController) aiAbortRef.current = null;
       setAiBusy(false);
     }
@@ -13301,6 +13312,26 @@ function MobileSheetDismissHandle({ onDismiss, onCollapse, onExpand, collapsed =
   />;
 }
 
+function aiStepLabel(step: AiStep, lang: Language) {
+  const labels: Record<string, [string, string]> = {
+    workspace_overview: ["读取工作区概览", "Reading workspace overview"],
+    search_workspace: ["搜索工作区", "Searching workspace"],
+    list_tasks: ["读取任务", "Reading tasks"],
+    list_projects: ["读取项目", "Reading projects"],
+    list_habits: ["读取习惯", "Reading habits"],
+    list_notes: ["读取笔记", "Reading notes"],
+    list_templates: ["读取模板", "Reading templates"],
+    list_memories: ["读取记忆", "Reading memories"],
+    get_settings: ["读取设置", "Reading settings"],
+    list_calendar: ["检查日历", "Checking calendar"],
+    get_metrics: ["读取统计", "Reading metrics"],
+    get_timer_status: ["读取计时器", "Reading timer"],
+    list_integrations: ["检查外部日历", "Checking integrations"],
+  };
+  const pair = labels[step.label];
+  return pair ? pair[lang === "zh" ? 0 : 1] : step.label;
+}
+
 function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planState, onClose, messages, conversations, activeConversationId, conversationListOpen, onToggleConversationList, auditOpen, auditRuns, auditLoading, auditError, onToggleAudit, onNewConversation, onSelectConversation, onRenameConversation, onToggleConversationPinned, onDeleteConversation, memoryNotice, onOpenMemorySettings, actionPatches, onPatchAction, onConfirmAction, onDismissAction, onToggleAction, onSetAllActions, onAdoptSelected, onRejectSelected, onViewImport, onUndoImport, projectList, taskList, lang, attachment, attachmentStatus, onAttachment, onClearAttachment, model, models, onModelChange, safetyLevel, onSafetyLevelChange, onApproveAgent, onRejectAgent, onUndoAgent, globalAgentAvailable }: { input: string; setInput: (v: string) => void; busy: boolean; onSend: () => void; onCancel: () => void; onPlanToday: () => void; planState: AutoScheduleState; onClose: () => void; messages: AiSessionMessage[]; conversations: AiConversation[]; activeConversationId: string; conversationListOpen: boolean; onToggleConversationList: () => void; auditOpen: boolean; auditRuns: AgentAuditEntry[]; auditLoading: boolean; auditError: string; onToggleAudit: () => void; onNewConversation: () => void; onSelectConversation: (conversationId: string) => void; onRenameConversation: (conversationId: string, title: string) => void; onToggleConversationPinned: (conversationId: string) => void; onDeleteConversation: (conversationId: string) => void; memoryNotice: string; onOpenMemorySettings: () => void; actionPatches: Record<string, Record<number, Record<string, unknown>>>; onPatchAction: (messageId: string, index: number, patch: Record<string, unknown>) => void; onConfirmAction: (messageId: string, action: AiAction, index: number) => void; onDismissAction: (messageId: string, action: AiAction, index: number) => void; onToggleAction: (messageId: string, index: number) => void; onSetAllActions: (messageId: string, checked: boolean) => void; onAdoptSelected: (messageId: string) => void; onRejectSelected: (messageId: string) => void; onViewImport: (messageId: string) => void; onUndoImport: (messageId: string) => void; projectList?: { id: string; title: string; color?: string }[]; taskList?: { id: string; title: string }[]; lang: Language; attachment?: ParsedAttachment | null; attachmentStatus?: string; onAttachment: (file: File) => void; onClearAttachment: () => void; model: string; models: readonly string[]; onModelChange: (model: string) => void; safetyLevel: Settings["aiSafetyLevel"]; onSafetyLevelChange: (level: Settings["aiSafetyLevel"]) => void; onApproveAgent: (messageId: string) => void; onRejectAgent: (messageId: string) => void; onUndoAgent: (messageId: string) => void; globalAgentAvailable: boolean }) {
   const projects = projectList || [];
   const tasks = taskList || [];
@@ -13633,7 +13664,16 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           {message.attachment && <AttachmentCard attachment={message.attachment} referenced />}
         </> : <>
           <div className="df-ai-assistant-label"><span>N</span><small>NavoPath AI</small></div>
-          {message.steps && message.steps.length > 0 && message.status === "thinking" && <div className="df-ai-progress thinking"><span className="df-ai-progress-icon" aria-hidden="true">●</span><span>{text.thinking}</span></div>}
+          {message.steps && message.steps.length > 0 && <details className={`df-ai-progress ${message.status === "thinking" ? "thinking" : ""}`} open={message.status === "thinking"}>
+            <summary>
+              <span className="df-ai-progress-icon" aria-hidden="true">{message.status === "error" ? "!" : message.status === "thinking" ? "●" : "✓"}</span>
+              <span>{message.status === "thinking" ? aiStepLabel(message.steps.find((step) => step.status === "running") || message.steps[message.steps.length - 1]!, lang) : message.status === "error" ? (lang === "zh" ? "处理失败" : "Processing failed") : (lang === "zh" ? "处理完成" : "Completed")}</span>
+              <small>{message.steps.filter((step) => step.status === "done").length}/{message.steps.length}</small>
+            </summary>
+            <div className="df-ai-progress-detail">
+              {message.steps.map((step, index) => <div className={`df-ai-step ${step.status}`} key={`${step.label}-${index}`}><span className="df-ai-step-status" aria-hidden="true">{step.status === "done" ? "✓" : step.status === "error" ? "!" : step.status === "running" ? "●" : "·"}</span><span>{aiStepLabel(step, lang)}</span></div>)}
+            </div>
+          </details>}
           {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.streaming ? <p className="df-ai-streaming-text">{message.content}</p> : <Suspense fallback={<p>{lang === "zh" ? "正在排版答案…" : "Formatting answer…"}</p>}><AiMarkdownLazy>{message.content}</AiMarkdownLazy></Suspense>}</div>}
           {message.agent && <div className="df-agent-run-card">
             {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied">
