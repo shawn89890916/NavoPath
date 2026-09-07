@@ -1,6 +1,7 @@
 import { isValidElement, useState, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { normalizeAiReply } from "../utils/aiReply";
 
 const SAFE_PROTOCOL = /^(https?:|mailto:|tel:)/i;
 
@@ -54,7 +55,7 @@ export default function AiMarkdown({ children }: { children: string }) {
       urlTransform={safeMarkdownUrl}
       skipHtml
     >
-      {children}
+      {normalizeAiReply(children)}
     </ReactMarkdown>
   </div>;
 }

@@ -44,6 +44,7 @@ import {
 import { t, detectSystemLanguage, catLabels, priLabels, viewLabel, monthTitle, weekdayName } from "./i18n";
 import { migrateLegacyHabitTracker, scheduleHabitRecord, toggleHabitCompletion, unscheduleHabitRecord, updateHabit, archiveHabit, buildHabitMetrics, isHabitDueOnDate, weekdayLabels, type HabitMetrics } from "./utils/habits";
 import { shouldShowHabitCandidates } from "./utils/habitCandidateVisibility";
+import { normalizeAiReply } from "./utils/aiReply";
 import { candidateScheduleSummary, type CandidateScheduleSummary } from "./utils/candidateSchedule";
 import { localIsoDate } from "./utils/localDate";
 import { buildWeekWindow } from "./utils/monthWindow";
@@ -6651,7 +6652,7 @@ function App() {
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
         status: "done",
-        content: result.reply,
+        content: normalizeAiReply(result.reply),
         steps: result.steps && result.steps.length > 0 ? result.steps : [{ label: "已生成安排", status: "done" }],
         actions: validActions,
         selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
@@ -6666,7 +6667,7 @@ function App() {
         const assistantChat = {
           id: assistantId,
           role: "assistant" as const,
-          content: result.reply,
+          content: normalizeAiReply(result.reply),
           createdAt: new Date().toISOString(),
           saved: true,
           status: "done" as const,

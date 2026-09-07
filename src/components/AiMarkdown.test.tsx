@@ -38,4 +38,11 @@ describe("AiMarkdown", () => {
     expect(safeMarkdownUrl("javascript:alert(1)")).toBe("");
     expect(safeMarkdownUrl("data:text/html,hello")).toBe("");
   });
+
+  it("renders escaped agent Markdown without its trailing protocol envelope", () => {
+    const tree = render("## 今日重点\\n1. 完成练习\\n\\n{\"format\":\"markdown\",\"steps\":[],\"commands\":[],\"memories\":[]}");
+    expect(tree.root.findAllByType("h2")).toHaveLength(1);
+    expect(tree.root.findAllByType("li")).toHaveLength(1);
+    expect(JSON.stringify(tree.toJSON())).not.toContain("commands");
+  });
 });

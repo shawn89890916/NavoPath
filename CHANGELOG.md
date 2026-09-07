@@ -1,5 +1,10 @@
 # NavoPath 更新日志
 
+## 2026-09-07 · AI 回复与习惯
+
+### 修复
+- AI 回复现会正确显示 Markdown 换行与层级，并隐藏意外附带的内部协议内容。习惯详情中的“启用”开关会即时生效，无需再点击保存。
+
 ## 2026-09-02 · Navo AI 提醒
 
 ### 改进
@@ -30,6 +35,11 @@
 ### 修复
 - 恢复 Execute 时间轴底卡的四角圆角，收窄左右下外边距；保持今日候选宽度与横向位置不变，略微上移，使其相对底卡的上、左、下留白统一为 6px；右移日期箭头与 Day / 3-Day / Week / Month 的纵向控件列对齐。
 - 修复三天和周视图的全屏模式仍继承候选栏窄列的问题；全屏现在只保留完整时间轴与退出入口，不会再出现被压缩或空白的画布。
+
+## 2026-09-07 · AI Replies and Habits
+
+### Fixed
+- AI replies now render Markdown line breaks and hierarchy correctly while hiding accidentally leaked internal protocol content. The Enabled switch in habit details now takes effect immediately without requiring Save.
 
 ## 2026-09-02 · Navo AI notifications
 

@@ -37,7 +37,7 @@ export default function HabitDetailBody({ habit, dailyStates, today, zh, weekday
     setTrackingType(habit.trackingType || "click-counter");
     setEnabled(!habit.archived);
     setWeekOffset(0);
-  }, [habit.id, habit.updatedAt]);
+  }, [habit.id]);
 
   const toggleWeekday = (day: number) => setActiveWeekdays((days) => days.includes(day) ? days.filter((item) => item !== day) : [...days, day].sort());
   const saveChanges = () => {
@@ -74,7 +74,7 @@ export default function HabitDetailBody({ habit, dailyStates, today, zh, weekday
     </section>
     <section className="df-habit-settings-form">
       <label className="df-habit-setting-field df-habit-setting-field-title"><span>{zh ? "标题" : "Title"}</span><input type="text" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-      <div className="df-habit-setting-field df-habit-setting-toggle"><span>{zh ? "启用" : "Enabled"}</span><button type="button" className={`df-habit-enabled-switch${enabled ? " is-on" : ""}`} role="switch" aria-checked={enabled} aria-label={zh ? "启用习惯" : "Enable habit"} onClick={() => setEnabled((value) => !value)}><i aria-hidden="true" /></button></div>
+      <div className="df-habit-setting-field df-habit-setting-toggle"><span>{zh ? "启用" : "Enabled"}</span><button type="button" className={`df-habit-enabled-switch${enabled ? " is-on" : ""}`} role="switch" aria-checked={enabled} aria-label={zh ? "启用习惯" : "Enable habit"} onClick={() => setEnabled((value) => { const next = !value; onSave({ archived: !next }); return next; })}><i aria-hidden="true" /></button></div>
       <div className="df-habit-setting-field df-habit-type-field"><span>{zh ? "类型" : "Type"}</span><div className="df-habit-type-options" role="group" aria-label={zh ? "习惯类型" : "Habit type"}><button type="button" className={trackingType === "click-counter" ? "is-selected" : ""} aria-pressed={trackingType === "click-counter"} onClick={() => setTrackingType("click-counter")}>{zh ? "点击计数" : "Click Counter"}</button><button type="button" className={trackingType === "duration" ? "is-selected" : ""} aria-pressed={trackingType === "duration"} onClick={() => setTrackingType("duration")}>{zh ? "累积时长" : "Duration"}</button></div></div>
       {trackingType === "click-counter" ? <label className="df-habit-setting-field"><span>{zh ? "目标次数" : "Target Count"}</span><input type="number" min={0} value={targetCount} onChange={(event) => setTargetCount(event.target.value)} /></label> : <label className="df-habit-setting-field"><span>{zh ? "时长" : "Duration"}</span><input type="number" min={STEP_MINUTES} max={480} step={STEP_MINUTES} value={duration} onChange={(event) => setDuration(event.target.value)} /><small>{zh ? "以 15 分钟为单位" : "Set in 15-minute increments"}</small></label>}
       <div className="df-habit-setting-field df-habit-weekday-field"><span>{zh ? "检查连续的星期几 *" : "Weekdays to check *"}</span><div className="df-habit-weekday-checks">{weekOrder.map((day) => <button key={day} type="button" className={`df-habit-weekday-check${activeWeekdays.includes(day) ? " is-selected" : ""}`} onClick={() => toggleWeekday(day)} aria-pressed={activeWeekdays.includes(day)}><i aria-hidden="true">{activeWeekdays.includes(day) && <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l2.5 2.5L10 3" /></svg>}</i><strong>{zh ? `星期${weekdays[day]}` : weekdays[day]}</strong></button>)}</div></div>
