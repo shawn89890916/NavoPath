@@ -6603,6 +6603,14 @@ function App() {
     setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, status: "done", streaming: false, content: reply, steps: message.steps?.map((step) => step.status === "running" ? { ...step, status: "done" as const } : step) } : message));
   }
 
+  function explicitAgentDecision(message: string): "approve" | "reject" | null {
+    const compact = message.trim().toLowerCase().replace(/[\s。.!！,，、]+$/g, "");
+    if (!compact || compact.length > 24) return null;
+    if (/^(确认|确定|批准|执行|继续|好|好的|可以|同意|确认执行|确认并执行|yes|y|approve|confirm|do it|go ahead)$/.test(compact)) return "approve";
+    if (/^(取消|拒绝|否决|不要|别执行|停止|no|n|reject|cancel|stop)$/.test(compact)) return "reject";
+    return null;
+  }
+
   async function sendAi(messageOverride?: string, trigger: "manual" | "start_brief" | "end_review" = "manual") {
     if (!(messageOverride ?? aiInput).trim() && !aiAttachment) return false;
     if (!data) return false;
@@ -6611,6 +6619,13 @@ function App() {
       return false;
     }
     const msg = (messageOverride ?? aiInput).trim() || "解析附件中的任务和事件";
+    const pendingAgentMessage = [...aiMessages].reverse().find((message) => message.role === "assistant" && message.agent?.decisionState === "pending" && message.agent.pending.length > 0);
+    const requestedDecision = trigger === "manual" ? explicitAgentDecision(msg) : null;
+    if (pendingAgentMessage && requestedDecision) {
+      setAiInput("");
+      await handleAgentDecision(pendingAgentMessage.id, requestedDecision === "approve" ? "approve" : "reject");
+      return true;
+    }
     const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
       name: aiAttachment.name,
       size: aiAttachment.size,
@@ -13663,6 +13678,10 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         {message.role === "user" ? <>
           <div className="df-ai-msg-bubble user"><span>{message.content}</span></div>
           {message.attachment && <AttachmentCard attachment={message.attachment} referenced />}
+          {message.content && <div className="df-ai-message-actions" aria-label={lang === "zh" ? "消息操作" : "Message actions"}>
+            <button type="button" onClick={() => setInput(message.content)}>{lang === "zh" ? "修改" : "Edit"}</button>
+            <button type="button" onClick={() => { if (navigator.clipboard) void navigator.clipboard.writeText(message.content); }}>{lang === "zh" ? "复制" : "Copy"}</button>
+          </div>}
         </> : <>
           <div className={`df-ai-assistant-label ${message.status === "thinking" ? "active" : ""}`}><span>N</span><small>NavoPath AI</small></div>
           {message.steps && message.steps.length > 0 && <details className={`df-ai-progress ${message.status === "thinking" ? "thinking" : ""}`} open={message.status === "thinking"}>
@@ -13677,7 +13696,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
           </details>}
           {message.content && <div className={`df-ai-reply ${message.status === "error" ? "error" : ""}`}>{message.streaming ? <p className="df-ai-streaming-text">{message.content}</p> : <Suspense fallback={<p>{lang === "zh" ? "正在排版答案…" : "Formatting answer…"}</p>}><AiMarkdownLazy>{message.content}</AiMarkdownLazy></Suspense>}</div>}
           {message.agent && <div className="df-agent-run-card">
-            {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied">
+            {message.agent.applied.length > 0 && message.agent.decisionState !== "undone" && <div className="df-agent-applied executed">
               <strong>{lang === "zh" ? `已自动执行 ${message.agent.applied.length} 项` : `${message.agent.applied.length} action(s) applied`}</strong>
               {message.agent.applied.map((action) => <span key={action.commandId}>{action.title} · {action.operation}</span>)}
               <button type="button" className="df-ai-undo-action" disabled={busy} onClick={() => onUndoAgent(message.id)} aria-label={lang === "zh" ? "撤回本轮 AI 执行" : "Undo this AI run"}>{lang === "zh" ? "撤回本轮操作" : "Undo this run"}</button>
@@ -13772,13 +13791,17 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
             <button className="primary" disabled={!message.actions.some((_, index) => message.selectedActions?.[index] !== false)} onClick={() => onAdoptSelected(message.id)}>{text.addSelected}</button>
           </div>}
         </div>}
-        {message.actionState && message.actionState !== "pending" && <div className={`df-ai-action-outcome ${message.actionState}`}>
+          {message.actionState && message.actionState !== "pending" && <div className={`df-ai-action-outcome ${message.actionState}`}>
           <span>{message.actionState === "adopted" ? `已添加 ${message.importCommit?.addedCount || 0} 项` : message.actionState === "undone" ? "已撤回本次添加" : "已否决本轮建议"}</span>
           {message.actionState === "adopted" && <div>
             {message.importCommit?.focus && <button onClick={() => onViewImport(message.id)}>查看时间轴</button>}
             <button onClick={() => onUndoImport(message.id)}>撤回本次操作</button>
           </div>}
-        </div>}
+          </div>}
+          {message.content && <div className="df-ai-message-actions" aria-label={lang === "zh" ? "消息操作" : "Message actions"}>
+            <button type="button" onClick={() => setInput(message.content)}>{lang === "zh" ? "修改" : "Edit"}</button>
+            <button type="button" onClick={() => { if (navigator.clipboard) void navigator.clipboard.writeText(message.content); }}>{lang === "zh" ? "复制" : "Copy"}</button>
+          </div>}
         </>}
       </section>)}
     </div>
