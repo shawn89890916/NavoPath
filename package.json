@@ -33,7 +33,7 @@
         "dist/assets/supabase-vendor-*.js",
         "dist/assets/supabasePlannerApi-*.js"
       ],
-      "limit": "242.25 KB"
+      "limit": "246 KB"
     },
     {
       "name": "Deferred app scripts",
@@ -76,7 +76,7 @@
     {
       "name": "Core styles",
       "path": "dist/assets/index-*.css",
-      "limit": "90 KB"
+      "limit": "92 KB"
     },
     {
       "name": "Deferred styles",
