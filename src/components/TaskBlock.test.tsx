@@ -114,16 +114,15 @@ describe("TaskBlock shared component contract", () => {
     expect(actionsRule).toContain("flex-shrink: 0;");
   });
 
-  it("keeps Planning task-like surfaces on TaskBlock instead of CSS-only legacy card systems", () => {
+  it("keeps Planning task-like surfaces on the current TaskBlock variants", () => {
     const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
-    const css = readFileSync(resolve(__dirname, "../app-redesign.css"), "utf8");
+    const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
 
-    expect(planning).toContain('variant="planning"');
-    expect(planning).toContain('variant="compact"');
+    expect(planning).toContain('variant="candidate"');
     expect(planning).toContain('variant="habit-child"');
     expect(planning).not.toContain("<article");
-    expect(css).not.toContain("Canonical Planning task blocks: Today Candidate style wins over legacy Planning cards.");
-    expect(css).not.toMatch(/\.df-app\.mode-planning[\s\S]*?\.df-kanban-card[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto auto;/);
+    expect(css).toContain('.df-app .df-task-block[data-task-appearance][data-task-variant="candidate"]');
+    expect(css).toContain('#root .df-app.mode-planning .df-planning .df-task-node-inner[data-task-variant="candidate"]');
   });
 
   it("keeps completed task blocks free of full-card opacity and overlay masks", () => {
@@ -240,12 +239,11 @@ describe("TaskBlock shared component contract", () => {
     expect(planning).toContain("aria-grabbed");
   });
 
-  it("keeps Planning tree drag UX stable and removes tree row color strips", () => {
+  it("keeps Planning tree drag UX stable with the always-visible tools sidebar", () => {
     const planning = readFileSync(resolve(__dirname, "../PlanningView.tsx"), "utf8");
     const css = readFileSync(resolve(__dirname, "../task-block.css"), "utf8");
 
-    expect(planning).toContain("df-planning-sidebar-collapse");
-    expect(planning).toContain("sidebarCollapsed");
+    expect(planning).toContain('className="df-planning-sidebar"');
     expect(planning).toContain("clearPlanningDragState");
     expect(css).toContain("background: var(--bg-app-soft, var(--surface-main)) !important;");
     expect(css).toContain(".df-app.mode-planning .df-planning .df-task-node-inner > .df-task-block-accent");

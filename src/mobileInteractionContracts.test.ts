@@ -14,8 +14,8 @@ describe("portrait interaction contracts", () => {
     expect(main).toContain("onSelect={() => selectTimelineTask(task)}");
   });
 
-  it("keeps returned-unfinished timeline records resizable", () => {
-    expect(main).toContain("const canResize = !isExternalEvent && (isEvent || !recurringLocked);");
+  it("does not use returned-unfinished status as a resize lock", () => {
+    expect(main).toContain("const canResize = !isExternalEvent && (isEvent || !hasRecurringRule(task));");
     expect(main).not.toContain("const canResize = !isExternalEvent && !isReturnedUnfinished");
   });
 
