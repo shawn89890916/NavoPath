@@ -27,18 +27,18 @@ test("uses deterministic confirmation thresholds", () => {
   assert.ok(classifyAgentCommands(Array.from({ length: 6 }, (_, index) => ({ id: `c${index}`, entity: "task" as const, operation: "create" as const, values: { title: `New ${index}` } }))).every((decision) => decision.risk === "confirm"));
 });
 
-test("safety levels can only tighten deterministic permissions", () => {
+test("permission levels map to approval behavior", () => {
   const write = classifyAgentCommands([{ id: "one", entity: "task", operation: "complete", targetId: "t1", values: { completed: true } }]);
-  assert.equal(applyAgentSafetyLevel(write, "standard")[0].risk, "auto");
-  assert.equal(applyAgentSafetyLevel(write, "strict")[0].risk, "confirm");
-  assert.equal(applyAgentSafetyLevel(write, "readonly")[0].risk, "forbidden");
+  assert.equal(applyAgentSafetyLevel(write, "approve")[0].risk, "auto");
+  assert.equal(applyAgentSafetyLevel(write, "ask")[0].risk, "confirm");
+  assert.equal(applyAgentSafetyLevel(write, "full")[0].risk, "auto");
   const navigation = classifyAgentCommands([{ id: "open", entity: "app", operation: "navigate", values: { page: "tasks" } }]);
-  assert.equal(applyAgentSafetyLevel(navigation, "readonly")[0].risk, "auto");
+  assert.equal(applyAgentSafetyLevel(navigation, "ask")[0].risk, "auto");
   const timer = classifyAgentCommands([{ id: "timer", entity: "timer", operation: "start", values: { taskId: "t1" } }]);
-  assert.equal(applyAgentSafetyLevel(timer, "strict")[0].risk, "auto");
-  assert.equal(applyAgentSafetyLevel(timer, "readonly")[0].risk, "forbidden");
+  assert.equal(applyAgentSafetyLevel(timer, "ask")[0].risk, "confirm");
+  assert.equal(applyAgentSafetyLevel(timer, "approve")[0].risk, "auto");
   const secret = classifyAgentCommands([{ id: "secret", entity: "settings", operation: "update_settings", values: { apiKey: "x" } }]);
-  assert.equal(applyAgentSafetyLevel(secret, "standard")[0].risk, "forbidden");
+  assert.equal(applyAgentSafetyLevel(secret, "full")[0].risk, "forbidden");
 });
 
 test("executes a low-risk command and restores it with its inverse", () => {

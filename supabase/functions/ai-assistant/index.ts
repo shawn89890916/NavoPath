@@ -35,8 +35,8 @@ const corsHeaders = {
 
 const STABLE_MODEL = "deepseek-ai/DeepSeek-V4-Flash";
 const AI_GATEWAY_VERSION = "2026-08-20.1";
-const AGENT_MAX_ROUNDS = 6;
-const AGENT_MAX_TOOL_CALLS = 20;
+const AGENT_MAX_ROUNDS = 10;
+const AGENT_MAX_TOOL_CALLS = 64;
 const FALLBACK_MODELS = [
   STABLE_MODEL,
   "deepseek-ai/DeepSeek-V4-Pro",

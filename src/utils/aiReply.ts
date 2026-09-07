@@ -26,10 +26,17 @@ function removeTrailingAgentEnvelope(value: string) {
   return value;
 }
 
+function removeLeakedProtocol(value: string) {
+  const protocol = value.search(/\{\s*["']kind["']\s*:\s*["'](?:tool_calls|final)["']/);
+  if (protocol < 0) return value;
+  const prefix = value.slice(0, protocol).trim();
+  return prefix || (value.includes('"tool_calls"') ? "正在整理工作区信息。" : value);
+}
+
 /** Makes provider replies safe to display when a model leaks its final protocol envelope. */
 export function normalizeAiReply(value: string) {
   const decoded = isEscapedMarkdown(value)
     ? value.replace(/(?<!\\)\\(?:r\\)?n/g, "\n")
     : value;
-  return removeTrailingAgentEnvelope(decoded).trim();
+  return removeLeakedProtocol(removeTrailingAgentEnvelope(decoded)).trim();
 }

@@ -6592,6 +6592,16 @@ function App() {
     }
   }
 
+  async function streamAiReply(messageId: string, reply: string) {
+    const chunkSize = 12;
+    for (let end = chunkSize; end < reply.length; end += chunkSize) {
+      const visible = reply.slice(0, end);
+      setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, content: visible } : message));
+      await new Promise((resolve) => window.setTimeout(resolve, 16));
+    }
+    setAiMessages((current) => current.map((message) => message.id === messageId ? { ...message, content: reply } : message));
+  }
+
   async function sendAi(messageOverride?: string, trigger: "manual" | "start_brief" | "end_review" = "manual") {
     if (!(messageOverride ?? aiInput).trim() && !aiAttachment) return false;
     if (!data) return false;
@@ -6672,10 +6682,11 @@ function App() {
         await refreshQueuedRemote();
       }
       applyAgentClientActions(agent);
+      const displayReply = normalizeAiReply(result.reply);
       setAiMessages((current) => current.map((message) => message.id === assistantId ? {
         ...message,
         status: "done",
-        content: normalizeAiReply(result.reply),
+        content: "",
         steps: result.steps && result.steps.length > 0 ? result.steps : [{ label: "已生成安排", status: "done" }],
         actions: validActions,
         selectedActions: Object.fromEntries(validActions.map((_, index) => [index, true])),
@@ -6685,6 +6696,7 @@ function App() {
         format: result.format || "markdown",
         agent,
       } : message));
+      await streamAiReply(assistantId, displayReply);
       const currentData = dataRef.current;
       if (currentData) {
         const assistantChat = {
@@ -13743,7 +13755,7 @@ function AiPanel({ input, setInput, busy, onSend, onCancel, onPlanToday, planSta
         </label>
         {composerMenuOpen && <div ref={composerMenuRef} className="df-ai-attach-menu df-ai-composer-menu">
           <label className="df-ai-composer-setting df-ai-composer-menu-model"><span>{lang === "zh" ? "模型" : "Model"}</span><select aria-label={lang === "zh" ? "选择模型" : "Choose model"} value={model} onChange={(event) => onModelChange(event.target.value)}>{models.map((option) => <option key={option} value={option}>{option.split("/").pop() || option}</option>)}</select></label>
-          <label className="df-ai-composer-setting"><span>{lang === "zh" ? "安全等级" : "Safety level"}</span><select aria-label={lang === "zh" ? "选择安全等级" : "Choose safety level"} value={safetyLevel} onChange={(event) => onSafetyLevelChange(event.target.value as Settings["aiSafetyLevel"])}><option value="standard">{lang === "zh" ? "标准 · 低风险自动执行" : "Standard · Auto low-risk"}</option><option value="strict">{lang === "zh" ? "严格 · 所有写入确认" : "Strict · Confirm all writes"}</option><option value="readonly">{lang === "zh" ? "只读 · 禁止写入" : "Read only · Block writes"}</option></select></label>
+          <label className="df-ai-composer-setting"><span>{lang === "zh" ? "权限等级" : "Permission level"}</span><select aria-label={lang === "zh" ? "选择权限等级" : "Choose permission level"} value={safetyLevel} onChange={(event) => onSafetyLevelChange(event.target.value as Settings["aiSafetyLevel"])}><option value="ask">{lang === "zh" ? "请求批准 · 编辑外部文件和使用互联网时始终询问" : "Ask for approval · Always ask for external files and internet"}</option><option value="approve">{lang === "zh" ? "帮我批准 · 仅检测到风险的操作询问" : "Help me approve · Ask only for risky operations"}</option><option value="full">{lang === "zh" ? "完全访问权限 · 自动执行普通工作区操作" : "Full access · Auto-run ordinary workspace actions"}</option></select></label>
           <div className="df-ai-composer-menu-rule" />
           {[
           [lang === "zh" ? "相机" : "Camera", "image/*", "environment"],

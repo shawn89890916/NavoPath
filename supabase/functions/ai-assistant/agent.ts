@@ -17,7 +17,7 @@ export type AgentOperation =
   | "restore_entity";
 
 export type AgentRisk = "auto" | "confirm" | "forbidden";
-export type AgentSafetyLevel = "standard" | "strict" | "readonly";
+export type AgentSafetyLevel = "ask" | "approve" | "full";
 
 export interface AgentCommand {
   id: string;
@@ -211,15 +211,12 @@ export function classifyAgentCommands(input: AgentCommand[]): AgentCommandDecisi
 }
 
 export function applyAgentSafetyLevel(decisions: AgentCommandDecision[], level: unknown): AgentCommandDecision[] {
-  const safetyLevel: AgentSafetyLevel = level === "strict" || level === "readonly" ? level : "standard";
-  if (safetyLevel === "standard") return decisions;
+  const safetyLevel: AgentSafetyLevel = level === "ask" || level === "full" ? level : "approve";
+  if (safetyLevel === "full") return decisions.map((decision) => decision.risk === "forbidden" ? decision : { ...decision, risk: "auto" });
   return decisions.map((decision) => {
     if (decision.risk === "forbidden" || decision.command.entity === "app") return decision;
-    if (safetyLevel === "readonly") {
-      return { ...decision, risk: "forbidden", reason: "Read-only safety level blocks AI writes and timer controls." };
-    }
-    if (decision.risk === "auto" && decision.command.entity !== "timer") {
-      return { ...decision, risk: "confirm", reason: "Strict safety level requires confirmation for every workspace write." };
+    if (safetyLevel === "ask" && decision.risk === "auto") {
+      return { ...decision, risk: "confirm", reason: "Approval is required for workspace changes." };
     }
     return decision;
   });

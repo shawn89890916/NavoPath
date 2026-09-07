@@ -504,7 +504,7 @@ export interface Settings {
   appTitle: string;
   model: string;
   reasoningMode: "instant" | "high" | "xhigh";
-  aiSafetyLevel: "standard" | "strict" | "readonly";
+  aiSafetyLevel: "ask" | "approve" | "full";
   baseUrl: string;
   hasApiKey: boolean;
   apiKeyPreview: string;

@@ -27,7 +27,7 @@ export const defaultSettings: Settings = {
   appTitle: "NavoPath",
   model: "deepseek-ai/DeepSeek-V4-Flash",
   reasoningMode: "instant",
-  aiSafetyLevel: "standard",
+  aiSafetyLevel: "approve",
   baseUrl: "https://api.siliconflow.cn/v1/chat/completions",
   hasApiKey: false,
   apiKeyPreview: "",
@@ -288,7 +288,8 @@ export function normalizeSettings(value: unknown): Settings {
   normalized.metricsIncludeHabits = allowedValue(normalized.metricsIncludeHabits, ["include", "exclude", "only"], defaults.metricsIncludeHabits!);
   normalized.metricsCompletionFilter = allowedValue(normalized.metricsCompletionFilter, ["all", "completed", "incomplete"], defaults.metricsCompletionFilter!);
   normalized.reasoningMode = allowedValue(normalized.reasoningMode, ["instant", "high", "xhigh"], defaults.reasoningMode);
-  normalized.aiSafetyLevel = allowedValue(normalized.aiSafetyLevel, ["standard", "strict", "readonly"], defaults.aiSafetyLevel);
+  const legacySafetyLevel = normalized.aiSafetyLevel === "strict" ? "ask" : normalized.aiSafetyLevel === "standard" || normalized.aiSafetyLevel === "readonly" ? "approve" : normalized.aiSafetyLevel;
+  normalized.aiSafetyLevel = allowedValue(legacySafetyLevel, ["ask", "approve", "full"], defaults.aiSafetyLevel);
   normalized.onboardingStep = allowedValue(normalized.onboardingStep, ["add", "drag", "candidates", "schedule", "calendar", "planning", "ai", "done"], defaults.onboardingStep!);
   normalized.weekStartsOn = allowedValue(normalized.weekStartsOn, [0, 1], defaults.weekStartsOn);
   normalized.theme = allowedValue(normalized.theme, ["light", "dark"], defaults.theme);

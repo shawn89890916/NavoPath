@@ -11,4 +11,8 @@ describe("normalizeAiReply", () => {
   it("keeps ordinary single escaped sequences unchanged", () => {
     expect(normalizeAiReply("Use \\n in this code example.")).toBe("Use \\n in this code example.");
   });
+
+  it("removes leaked tool-call protocol from a user-facing reply", () => {
+    expect(normalizeAiReply("我会先检查任务。\n{\"kind\":\"tool_calls\",\"calls\":[]}")).toBe("我会先检查任务。");
+  });
 });
