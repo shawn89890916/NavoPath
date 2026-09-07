@@ -555,7 +555,17 @@ type FormState = {
 
 const PlanningViewLazy = lazy(() => import("./PlanningView"));
 const LandingPageLazy = lazy(() => import("./LandingPage"));
-const AiMarkdownLazy = lazy(() => import("./components/AiMarkdown"));
+function AiMarkdownLoadFallback({ children }: { children: string }) {
+  return <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{children}</p>;
+}
+
+const AiMarkdownLazy = lazy(() => {
+  const modulePromise = import("./components/AiMarkdown");
+  const timeoutPromise = new Promise<{ default: typeof AiMarkdownLoadFallback }>((resolve) => {
+    window.setTimeout(() => resolve({ default: AiMarkdownLoadFallback }), 2500);
+  });
+  return Promise.race([modulePromise, timeoutPromise]);
+});
 const HabitDetailBodyLazy = lazy(() => import("./components/HabitDetailBody"));
 const LOCAL_BOOTSTRAP_PREFIX = "navopath-bootstrap";
 
