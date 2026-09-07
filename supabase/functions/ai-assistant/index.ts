@@ -545,7 +545,9 @@ async function handleAgentDecision(req: Request, mode: string, body: Record<stri
   }
 
   if (mode === "agent_undo") {
-    if (!run.undo_expires_at || new Date(run.undo_expires_at).getTime() < Date.now()) throw new Error("UNDO_EXPIRED");
+    // Keep the undo action available from the original AI message. The run's
+    // revision check below still prevents applying a stale inverse after the
+    // workspace has changed.
     const inverseCommands = normalizeAgentCommands(run.inverse_commands, { allowInternalRestore: true });
     if (!inverseCommands.length) throw new Error("Nothing to undo");
     const externalSources = await loadExternalSources(workspace.admin, workspace.userId);
