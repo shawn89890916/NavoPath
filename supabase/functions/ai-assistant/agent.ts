@@ -459,6 +459,20 @@ function filtered(items: Array<Record<string, any>>, args: Record<string, unknow
     && (!to || (item.dueDate || item.date || item.createdAt || "") <= to));
 }
 
+function readRecord(item: Record<string, any>) {
+  // Keep tool results compact so an ordinary delete/update request does not
+  // force the model to re-read a large workspace snapshot.
+  const record: Record<string, unknown> = { id: item.id, title: item.title, content: item.content };
+  for (const key of ["projectId", "completed", "archived", "dueDate", "date", "scheduledDate", "scheduledStart", "scheduledEnd", "plannedForDate", "workflowStatus", "executionLane", "category", "priority", "order"]) {
+    if (item[key] !== undefined) record[key] = item[key];
+  }
+  if (Array.isArray(item.timelineRecords)) {
+    record.timelineRecords = item.timelineRecords.slice(-20).map((entry: Record<string, any>) => ({ id: entry.id, scheduledDate: entry.scheduledDate, scheduledStart: entry.scheduledStart, scheduledEnd: entry.scheduledEnd, executionStatus: entry.executionStatus }));
+  }
+  if (typeof item.notes === "string") record.notes = item.notes.slice(0, 800);
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
+}
+
 export function executeReadTool(
   call: AgentToolCall,
   data: Record<string, any>,
@@ -481,14 +495,14 @@ export function executeReadTool(
   if (call.name === "search_workspace") {
     const types = Array.isArray(call.arguments.types) ? call.arguments.types.map(String) : ["tasks", "projects", "habits", "notes", "memories", "templates"];
     const map: Record<string, Array<Record<string, any>>> = { tasks: data.tasks || [], projects: data.projects || [], habits: data.habits || [], notes: data.notes || [], memories: data.aiMemories || [], templates: data.scheduleTemplates || [] };
-    return types.flatMap((type) => filtered(map[type] || [], call.arguments).map((item) => ({ type, ...item }))).slice(0, limit);
+    return types.flatMap((type) => filtered(map[type] || [], call.arguments).map((item) => ({ type, ...readRecord(item) }))).slice(0, limit);
   }
-  if (call.name === "list_tasks") return filtered(data.tasks || [], call.arguments).slice(0, limit);
-  if (call.name === "list_projects") return filtered(data.projects || [], call.arguments).slice(0, limit);
-  if (call.name === "list_habits") return filtered(data.habits || [], call.arguments).slice(0, limit);
-  if (call.name === "list_notes") return filtered(data.notes || [], call.arguments).slice(0, limit);
-  if (call.name === "list_templates") return filtered(data.scheduleTemplates || [], call.arguments).slice(0, limit);
-  if (call.name === "list_memories") return filtered(data.aiMemories || [], call.arguments).filter((memory) => !memory.archived).slice(0, limit);
+  if (call.name === "list_tasks") return filtered(data.tasks || [], call.arguments).slice(0, limit).map(readRecord);
+  if (call.name === "list_projects") return filtered(data.projects || [], call.arguments).slice(0, limit).map(readRecord);
+  if (call.name === "list_habits") return filtered(data.habits || [], call.arguments).slice(0, limit).map(readRecord);
+  if (call.name === "list_notes") return filtered(data.notes || [], call.arguments).slice(0, limit).map(readRecord);
+  if (call.name === "list_templates") return filtered(data.scheduleTemplates || [], call.arguments).slice(0, limit).map(readRecord);
+  if (call.name === "list_memories") return filtered(data.aiMemories || [], call.arguments).filter((memory) => !memory.archived).slice(0, limit).map(readRecord);
   if (call.name === "get_settings") {
     const safeKeys = Object.keys(settings).filter((key) => !SENSITIVE_SETTING_RE.test(key));
     return Object.fromEntries(safeKeys.map((key) => [key, settings[key]]));

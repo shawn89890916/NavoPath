@@ -296,10 +296,21 @@ async function applyAgentExecution(params: {
   return { data: row?.data, settings: row?.settings, revision: Number(row?.revision || params.expectedRevision + 1) };
 }
 
-function agentPromptContext(profile: { data: Record<string, any>; settings: Record<string, any> }, bodyContext: Record<string, unknown> | undefined): PromptContext {
+function detectLanguage(message: string, fallback: "en" | "zh" = "en"): "en" | "zh" {
+  const text = message.trim();
+  if (/(?:用英文|英文回答|in English|reply in English)/i.test(text)) return "en";
+  if (/(?:用中文|中文回答|用汉语|in Chinese|reply in Chinese)/i.test(text)) return "zh";
+  const chinese = (text.match(/[\u3400-\u9fff]/g) || []).length;
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  if (chinese >= 2 || chinese > latin / 8) return "zh";
+  if (latin >= 3 && chinese === 0) return "en";
+  return fallback;
+}
+
+function agentPromptContext(profile: { data: Record<string, any>; settings: Record<string, any> }, bodyContext: Record<string, unknown> | undefined, message = ""): PromptContext {
   const timezone = typeof bodyContext?.timezone === "string" ? bodyContext.timezone : "Asia/Shanghai";
   const currentDate = validIsoDate(bodyContext?.currentDate) ? bodyContext.currentDate : localDateForTimeZone(timezone);
-  const language = profile.settings.language === "zh" ? "zh" : "en";
+  const language = detectLanguage(message, profile.settings.language === "zh" ? "zh" : "en");
   const memories = (profile.data.aiMemories || []).filter((memory: Record<string, any>) => !memory.archived).slice(-20).map((memory: Record<string, any>) => ({ content: memory.content, tags: memory.tags || [] }));
   return {
     language,
@@ -351,7 +362,7 @@ async function runGlobalAgent(req: Request, params: {
   attachmentName?: string;
 }) {
   const workspace = await authenticatedWorkspace(req);
-  const ctx = agentPromptContext(workspace.profile, params.context);
+  const ctx = agentPromptContext(workspace.profile, params.context, params.message);
   const [externalOccurrences, externalSources] = await Promise.all([
     loadExternalOccurrences(workspace.admin, workspace.userId, ctx.currentDate),
     loadExternalSources(workspace.admin, workspace.userId),
@@ -378,6 +389,7 @@ async function runGlobalAgent(req: Request, params: {
   ];
   const trace: Array<{ id: string; name: string; status: "done" | "error" }> = [];
   let toolCallCount = 0;
+  const readResultCache = new Map<string, { ok: boolean; data?: unknown; error?: string }>();
   let recordedRunId = "";
   const runController = new AbortController();
   const runTimeout = setTimeout(() => runController.abort(), 60_000);
@@ -418,20 +430,36 @@ async function runGlobalAgent(req: Request, params: {
 
     if (parsed.kind === "tool_calls") {
       const calls = normalizeToolCalls(parsed.calls);
-      if (!calls.length || (!unrestricted && toolCallCount + calls.length > AGENT_MAX_TOOL_CALLS)) {
+      if (!calls.length) {
         const reply = ctx.language === "zh" ? "本次查询已达到安全上限，请缩小范围后重试。" : "This request reached the safe tool limit. Narrow the scope and try again.";
         const runId = await recordReadOnlyFailure(reply);
         return { reply, format: "markdown" as const, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
       }
-      toolCallCount += calls.length;
+      const uniqueCalls = calls.filter((call) => !readResultCache.has(`${call.name}:${JSON.stringify(call.arguments)}`));
+      if (!uniqueCalls.length) {
+        messages.push({ role: "user", content: "You already received these exact read results. Do not repeat the same read calls; return the final JSON now with the requested commands." });
+        continue;
+      }
+      if (!unrestricted && toolCallCount + uniqueCalls.length > AGENT_MAX_TOOL_CALLS) {
+        const reply = ctx.language === "zh" ? "本次查询已达到安全上限，请缩小范围后重试。" : "This request reached the safe tool limit. Narrow the scope and try again.";
+        const runId = await recordReadOnlyFailure(reply);
+        return { reply, format: "markdown" as const, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
+      }
+      toolCallCount += uniqueCalls.length;
       const results = calls.map((call: AgentToolCall) => {
+        const cacheKey = `${call.name}:${JSON.stringify(call.arguments)}`;
+        const cached = readResultCache.get(cacheKey);
+        if (cached) return { id: call.id, name: call.name, ...cached };
         try {
           const result = executeReadTool(call, workspace.profile.data, workspace.profile.settings, externalOccurrences, { timerStatus, integrations: externalSources });
+          readResultCache.set(cacheKey, { ok: true, data: result });
           trace.push({ id: call.id, name: call.name, status: "done" });
           return { id: call.id, name: call.name, ok: true, data: result };
         } catch (error) {
+          const message = error instanceof Error ? error.message : "Tool failed";
+          readResultCache.set(cacheKey, { ok: false, error: message });
           trace.push({ id: call.id, name: call.name, status: "error" });
-          return { id: call.id, name: call.name, ok: false, error: error instanceof Error ? error.message : "Tool failed" };
+          return { id: call.id, name: call.name, ok: false, error: message };
         }
       });
       messages.push({ role: "assistant", content: JSON.stringify({ kind: "tool_calls", calls }) });
@@ -712,7 +740,7 @@ serve(async (req: Request) => {
     }
 
     const timezone = (context?.timezone as string) || "Asia/Shanghai";
-    const language = context?.language === "zh" ? "zh" : "en";
+    const language = detectLanguage(message, context?.language === "zh" ? "zh" : "en");
     const currentDate = validIsoDate(context?.currentDate) ? context.currentDate : localDateForTimeZone(timezone);
     const projectsInfo = context?.projects ? `Available projects: ${JSON.stringify(context.projects)}` : "";
     const scheduledTodayInfo = context?.scheduledToday
