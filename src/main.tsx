@@ -6619,6 +6619,7 @@ function App() {
       showToast(lang === "zh" ? "全局 AI 需要先登录云端账号" : "Sign in to use the global AI agent");
       return false;
     }
+    const submittedInput = messageOverride === undefined ? aiInput : null;
     const msg = (messageOverride ?? aiInput).trim() || "解析附件中的任务和事件";
     const latestAssistantMessage = [...aiMessages].reverse().find((message) => message.role === "assistant");
     const pendingAgentMessage = latestAssistantMessage?.agent?.decisionState === "pending" && latestAssistantMessage.agent.pending.length > 0
@@ -6627,7 +6628,7 @@ function App() {
     const requestedDecision = trigger === "manual" ? explicitAgentDecision(msg) : null;
     if (pendingAgentMessage && requestedDecision) {
       const handled = await handleAgentDecision(pendingAgentMessage.id, requestedDecision === "approve" ? "approve" : "reject");
-      if (handled) setAiInput((current) => current === msg ? "" : current);
+      if (handled && submittedInput !== null) setAiInput((current) => current === submittedInput ? "" : current);
       return handled;
     }
     const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
