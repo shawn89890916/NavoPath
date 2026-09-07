@@ -157,6 +157,8 @@ export interface Task {
   id: string;
   title: string;
   dueDate: string;
+  /** Whether the due date was explicitly set by the user or supplied by scheduling. */
+  dueDateSource?: "manual" | "automatic";
   category: Category;
   priority: NullablePriority;
   notes: string;

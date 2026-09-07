@@ -248,11 +248,8 @@ function metricViewLabel(lang: Language, mode: PlanningViewMode) {
   return lang === "zh" ? "列表" : "List";
 }
 
-function planningTaskPriority(task: Pick<Task, "importance" | "urgency">) {
-  if (task.urgency === "high" && task.importance === "high") return "urgent";
-  if (task.importance === "high") return "high";
-  if (task.urgency === "low" && task.importance === "low") return "low";
-  return "normal";
+function planningTaskPriority(task: Pick<Task, "priority">) {
+  return task.priority || "normal";
 }
 
 function isIncompletePlanningTask(task: Task) {
@@ -589,8 +586,7 @@ function PlanningTaskNode(props: {
             <TaskCheckbox
               checked={done}
               tone={normalizeTaskCheckTone(props.task)}
-              importance={props.task.importance}
-              urgency={props.task.urgency}
+              priority={props.task.priority}
               className="df-list-status-toggle df-planning-task-check"
               ariaLabel={done ? "Mark open" : "Mark done"}
               onClick={(event) => {
@@ -2591,8 +2587,7 @@ export default function PlanningView(props: {
                             <TaskCheckbox
                               checked={normalizeWorkflowStatus(task) === "done"}
                               tone={normalizeTaskCheckTone(task)}
-                              importance={task.importance}
-                              urgency={task.urgency}
+                              priority={task.priority}
                               className="df-list-status-toggle"
                               ariaLabel={normalizeWorkflowStatus(task) === "done" ? "Mark open" : "Mark done"}
                               onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(normalizeWorkflowStatus(task) === "done" ? "backlog" : "done")); }}
@@ -2673,8 +2668,7 @@ export default function PlanningView(props: {
                               <TaskCheckbox
                                 checked={taskDone}
                                 tone={normalizeTaskCheckTone(task)}
-                                importance={task.importance}
-                                urgency={task.urgency}
+                                priority={task.priority}
                                 className="df-list-status-toggle"
                                 ariaLabel={taskDone ? "Mark open" : "Mark done"}
                                 onClick={(e) => { e.stopPropagation(); props.onTaskUpdate(task.id, workflowStatusForPatch(taskDone ? "backlog" : "done")); }}
@@ -2730,8 +2724,7 @@ export default function PlanningView(props: {
                         <TaskCheckbox
                           checked={uiStatus === "done"}
                           tone={normalizeTaskCheckTone(task)}
-                          importance={task.importance}
-                          urgency={task.urgency}
+                          priority={task.priority}
                           className="df-list-status-toggle"
                           ariaLabel={uiStatus === "done" ? "Mark open" : "Mark done"}
                           onClick={() => props.onTaskUpdate(task.id, workflowStatusForPatch(uiStatus === "done" ? "backlog" : "done"))}

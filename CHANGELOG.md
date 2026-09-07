@@ -4,6 +4,7 @@
 
 ### 修复
 - AI 回复现会正确显示 Markdown 换行与层级，并隐藏意外附带的内部协议内容。习惯详情中的“启用”开关会即时生效，圆点在桌面与手机端均会保持在轨道内，无需再点击保存。
+- 仅用户明确设置的截止日会触发逾期回收；前一天未完成的时间块会保留在时间轴上并标记为未完成，同时继续出现在今日候选中。优先级现在通过勾选框的红、黄、蓝、灰描边与浅色填充呈现，紧急度感叹号已移除。
 
 ## 2026-09-02 · Navo AI 提醒
 
@@ -40,6 +41,7 @@
 
 ### Fixed
 - AI replies now render Markdown line breaks and hierarchy correctly while hiding accidentally leaked internal protocol content. The Enabled switch in habit details now takes effect immediately, with its thumb aligned inside the track on desktop and mobile without requiring Save.
+- Only user-set due dates now trigger overdue returns. Yesterday's unfinished timeline blocks remain in place with an unfinished state and stay in Today's Candidates. Priority now uses red, yellow, blue, or gray checkbox outlines with restrained fills, and the urgency exclamation mark is gone.
 
 ## 2026-09-02 · Navo AI notifications
 

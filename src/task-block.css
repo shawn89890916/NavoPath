@@ -44,10 +44,10 @@
   --task-selected-border: color-mix(in srgb, var(--task-project-color) 48%, var(--task-border));
 
   /* Priority → checkbox color palette (muted, editorial) */
-  --task-priority-low: #8A7B6A;
-  --task-priority-normal: #6F8A86;
-  --task-priority-high: #C2853E;
-  --task-priority-urgent: #B6423C;
+  --task-priority-low: #4D7FA8;
+  --task-priority-normal: var(--text-muted, #6B6358);
+  --task-priority-medium: #B88A1B;
+  --task-priority-high: #B6423C;
 }
 
 /* Timeline resize handles use 44px touch targets that intentionally extend
@@ -471,10 +471,11 @@
   --task-checkbox-color: var(--task-priority-low);
   border-color: var(--task-priority-low) !important;
   color: var(--task-priority-low) !important;
+  background: color-mix(in srgb, var(--task-priority-low) 14%, transparent) !important;
 }
 .df-app .df-task-block[data-task-appearance][data-task-priority="low"] .df-task-block-check.completed,
 .df-app .df-task-block[data-task-appearance][data-task-priority="low"] .df-block-check.completed {
-  background: var(--task-priority-low) !important;
+  background: color-mix(in srgb, var(--task-priority-low) 14%, transparent) !important;
   border-color: var(--task-priority-low) !important;
 }
 
@@ -486,8 +487,22 @@
 }
 .df-app .df-task-block[data-task-appearance][data-task-priority="normal"] .df-task-block-check.completed,
 .df-app .df-task-block[data-task-appearance][data-task-priority="normal"] .df-block-check.completed {
-  background: var(--task-priority-normal) !important;
+  background: transparent !important;
   border-color: var(--task-priority-normal) !important;
+}
+
+.df-app .df-task-block[data-task-appearance][data-task-priority="medium"] .df-task-block-check,
+.df-app .df-task-block[data-task-appearance][data-task-priority="medium"] .df-block-check {
+  --task-checkbox-color: var(--task-priority-medium);
+  border-color: var(--task-priority-medium) !important;
+  color: var(--task-priority-medium) !important;
+  background: color-mix(in srgb, var(--task-priority-medium) 18%, transparent) !important;
+}
+.df-app .df-task-block[data-task-appearance][data-task-priority="medium"] .df-task-block-check.completed,
+.df-app .df-task-block[data-task-appearance][data-task-priority="medium"] .df-block-check.completed {
+  background: color-mix(in srgb, var(--task-priority-medium) 18%, transparent) !important;
+  border-color: var(--task-priority-medium) !important;
+  color: var(--task-priority-medium) !important;
 }
 
 .df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-task-block-check,
@@ -495,24 +510,14 @@
   --task-checkbox-color: var(--task-priority-high);
   border-color: var(--task-priority-high) !important;
   color: var(--task-priority-high) !important;
+  background: color-mix(in srgb, var(--task-priority-high) 16%, transparent) !important;
 }
 .df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-task-block-check.completed,
 .df-app .df-task-block[data-task-appearance][data-task-priority="high"] .df-block-check.completed {
-  background: var(--task-priority-high) !important;
+  background: color-mix(in srgb, var(--task-priority-high) 16%, transparent) !important;
   border-color: var(--task-priority-high) !important;
 }
 
-.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-task-block-check,
-.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-block-check {
-  --task-checkbox-color: var(--task-priority-urgent);
-  border-color: var(--task-priority-urgent) !important;
-  color: var(--task-priority-urgent) !important;
-}
-.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-task-block-check.completed,
-.df-app .df-task-block[data-task-appearance][data-task-priority="urgent"] .df-block-check.completed {
-  background: var(--task-priority-urgent) !important;
-  border-color: var(--task-priority-urgent) !important;
-}
 
 /* ============================================================
  * Variant adjustments — layout anatomy stays the same,

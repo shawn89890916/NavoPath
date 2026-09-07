@@ -3,7 +3,7 @@ import React, { type CSSProperties, type ReactNode } from "react";
 export type TaskBlockVariant = "candidate" | "planning" | "scheduled" | "allDay" | "compact" | "habit-child";
 export type TaskBlockDensity = "normal" | "compact" | "dense";
 export type TaskBlockAppearance = "calm" | "medium" | "custom";
-export type TaskBlockPriority = "low" | "normal" | "high" | "urgent";
+export type TaskBlockPriority = "low" | "normal" | "medium" | "high";
 export type TaskBlockDragState = "overlay" | "source-placeholder";
 
 export type TaskBlockClassOptions = {
@@ -255,8 +255,7 @@ export function TaskCheckbox({
   checked,
   tone = "muted",
   returned,
-  importance,
-  urgency,
+  priority,
   children,
   className,
   title,
@@ -268,8 +267,7 @@ export function TaskCheckbox({
   checked?: boolean;
   tone?: string;
   returned?: boolean;
-  importance?: "high" | "medium" | "low" | null;
-  urgency?: "high" | "medium" | "low" | null;
+  priority?: "high" | "medium" | "low" | null;
   children?: ReactNode;
   className?: string;
   title?: string;
@@ -278,10 +276,8 @@ export function TaskCheckbox({
   onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
   onPointerDown?: React.PointerEventHandler<HTMLButtonElement>;
 }) {
-  const imp = importance || "unset";
-  const urg = urgency || "unset";
   return (
-    <span className="df-task-checkbox-wrap" data-importance={imp} data-urgency={urg}>
+    <span className="df-task-checkbox-wrap" data-priority={priority || "normal"}>
       <button
         type="button"
         className={[
@@ -301,9 +297,6 @@ export function TaskCheckbox({
       >
         {children}
       </button>
-      {urg !== "unset" && !checked && (
-        <span className="df-task-urgency-mark" data-urgency={urg} aria-hidden="true">!</span>
-      )}
     </span>
   );
 }

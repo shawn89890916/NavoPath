@@ -79,6 +79,7 @@ import { appendAiSubtasks } from "./utils/aiSubtasks";
 import { autoScrollAtDragEdge } from "./utils/dragAutoScroll";
 import { countSubtasks, countDoneSubtasks, addSubtaskToTree, findSubtaskInTree, removeSubtaskFromTree, toggleSubtaskInTree } from "./utils/treeOrder";
 import { promoteSubtaskToToday, returnScheduledTaskToToday, toggleTodayCandidate } from "./utils/todayCandidates";
+import { reconcileOverdueTasks } from "./utils/overdueTasks";
 import { useInAppDialog } from "./InAppDialog";
 import { TaskActions, TaskBlock, TaskBlockAccent, TaskBlockContent, TaskBlockDuration, TaskBlockPriority, TaskBlockRow, TaskCheckbox, TaskGroup, type TaskBlockDragState } from "./components/TaskBlock";
 import { ExecutionSplitLayout, CandidatePanelShell, CandidatePanelHeader, CandidateBlock, TimelineCanvas, TimelineEventBlock } from "./components/ExecutionSharedLayout";
@@ -162,10 +163,11 @@ const REMOTE_REVISION_POLL_MS = 5_000;
 const SYNC_RETRY_DELAYS = [1000, 3000, 8000, 20000, 30000];
 const SYNC_FAILURE_NOTICE_AFTER = 3;
 
-/** Map a task's importance/urgency to the shared TaskBlock priority vocabulary. */
-function taskBlockPriorityFor(importance: NullablePriority | undefined, _urgency: NullablePriority | undefined): TaskBlockPriority {
-  if (importance === "high") return "high";
-  if (importance === "low") return "low";
+/** Map a task priority to the shared TaskBlock priority vocabulary. */
+function taskBlockPriorityFor(priority: NullablePriority | undefined): TaskBlockPriority {
+  if (priority === "high") return "high";
+  if (priority === "medium") return "medium";
+  if (priority === "low") return "low";
   return "normal";
 }
 
@@ -803,6 +805,7 @@ function makeTask(form: FormState, intelligence?: { data: PlannerData; projects:
     id: uid("task"),
     title: form.title.trim(),
     dueDate: form.dueDate,
+    dueDateSource: form.dueDate ? "manual" : undefined,
     category: form.category,
     priority: form.priority,
     notes: form.details,
@@ -2906,17 +2909,12 @@ function App() {
 
   useEffect(() => {
     if (!data) return;
-    const currentDay = todayIso();
-    const overdue = data.tasks.filter((task) => !task.completed && Boolean(task.dueDate) && task.dueDate < currentDay && task.plannedForDate !== currentDay);
-    if (overdue.length === 0) return;
-    const overdueIds = new Set(overdue.map((task) => task.id));
-    void saveData({
-      ...data,
-      tasks: data.tasks.map((task) => overdueIds.has(task.id)
-        ? { ...task, plannedForDate: currentDay, executionLane: "candidate", scheduledDate: undefined, scheduledStart: undefined, scheduledEnd: undefined, timelineRecords: [], updatedAt: new Date().toISOString() }
-        : task),
-    });
-    showToast(lang === "zh" ? `${overdue.length} 个逾期任务已回到今日候选` : `${overdue.length} overdue task${overdue.length === 1 ? "" : "s"} returned to Today’s Candidates`);
+    const result = reconcileOverdueTasks(data, todayIso());
+    if (!result.changed) return;
+    void saveData(result.data);
+    if (result.overdueReturnedCount > 0) {
+      showToast(lang === "zh" ? `${result.overdueReturnedCount} 个逾期任务已回到今日候选` : `${result.overdueReturnedCount} overdue task${result.overdueReturnedCount === 1 ? "" : "s"} returned to Today’s Candidates`);
+    }
   }, [data]);
 
   function makeSmartTask(nextForm: FormState) {
@@ -4067,6 +4065,7 @@ function App() {
     updateTask(taskId, {
       plannedForDate: undefined,
       executionLane: undefined,
+      ...(task.dueDateSource === "automatic" ? { dueDate: "", dueDateSource: undefined } : {}),
       scheduledDate: undefined,
       scheduledStart: undefined,
       scheduledEnd: undefined,
@@ -5373,6 +5372,7 @@ function App() {
       ? {
           ...task,
           dueDate: task.dueDate || addDays(settings.date, 1),
+          dueDateSource: task.dueDate ? task.dueDateSource : "automatic",
           plannedForDate: settings.date,
           executionLane: settings.clearSchedule ? "candidate" : undefined,
           scheduledDate: settings.allDay ? settings.date : undefined,
@@ -5385,6 +5385,7 @@ function App() {
       : {
           ...task,
           dueDate: task.dueDate || addDays(settings.date, 1),
+          dueDateSource: task.dueDate ? task.dueDateSource : "automatic",
           plannedForDate: settings.date,
           executionLane: undefined,
           scheduledDate: undefined,
@@ -6223,10 +6224,11 @@ function App() {
   function saveForm() {
     if (!data || !form.title.trim()) return;
     const now = new Date().toISOString();
-    const buildUpdatedTask = (task: Task) => ({
+    const buildUpdatedTask = (task: Task): Task => ({
       ...task,
       title: form.title.trim(),
       dueDate: form.dueDate,
+      dueDateSource: form.dueDate ? "manual" : undefined,
       category: form.category,
       priority: form.priority,
       projectId: form.projectId || undefined,
@@ -6385,6 +6387,7 @@ function App() {
             ...task,
             title: safeTitle,
             dueDate: form.dueDate,
+            dueDateSource: form.dueDate ? "manual" : undefined,
             category: form.category,
             priority: form.priority,
             projectId: form.projectId || undefined,
@@ -8592,7 +8595,7 @@ function App() {
                               }}
                             >
                               {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
-                              {!isReorderSource && <TaskCard task={task} onFocusSchedule={focusCandidateSchedule} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />}
+                              {!isReorderSource && <TaskCard task={task} onFocusSchedule={focusCandidateSchedule} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date, dueDateSource: date ? "manual" : undefined })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />}
                               {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
                             </div>
                           );
@@ -8615,7 +8618,7 @@ function App() {
                   }}
                 >
                   {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "before" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
-                  {!isReorderSource && <TaskCard task={task} onFocusSchedule={focusCandidateSchedule} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />}
+                  {!isReorderSource && <TaskCard task={task} onFocusSchedule={focusCandidateSchedule} projects={projects} focusDate={today} placementPreview={placementPreview} onQuickDuration={(minutes) => updateTask(task.id, { estimatedHours: minutes / 60 })} onProjectChange={(projectId) => updateTask(task.id, { projectId: projectId || undefined })} onSaveNote={(note) => updateTask(task.id, { notes: note })} onDelete={() => deleteTaskById(task.id)} onStartPlacementPreview={() => startPlacementPreview(task.id)} onCancelPlacementPreview={cancelPlacementPreview} onConfirmPlacementPreview={() => confirmPlacementPreview(task.id)} onApplyTimeSettings={(settings) => applyCandidateTimeSettings(task.id, settings)} onSaveDueDate={(date) => updateTask(task.id, { dueDate: date, dueDateSource: date ? "manual" : undefined })} onSaveRecurrence={(recurrence) => saveTaskRecurrence(task.id, recurrence)} onClick={() => openTaskEdit(task)} onPointerDragStart={(event) => beginShelfDrag(event, task, "candidate")} onToggleDone={() => toggleTaskDone(task.id)} onToggleSubtask={(subtaskId) => updateTask(task.id, { subtasks: toggleSubtaskInTree(task.subtasks || [], subtaskId) })} onSubtaskDragStart={(event, subtaskId) => beginCandidateSubtaskDrag(event, task, subtaskId)} onMoveToPlanning={isEventDisplayTask(task) ? undefined : () => moveCandidateToPlanning(task.id)} onMetaUpdate={(patch) => updateTask(task.id, patch)} dragState={drag?.source === "candidate" && drag.taskId === task.id ? "source-placeholder" : undefined} lang={lang} />}
                   {dropHere && candidateDropTarget?.kind === "task" && candidateDropTarget.position === "after" && <div className="df-reorder-preview-slot" style={{ "--reorder-preview-height": `${drag?.sourceRect?.height || 64}px` } as CSSProperties} aria-hidden="true" />}
                 </div>
               })}
@@ -11477,7 +11480,7 @@ function TaskCard({
         as="article"
         variant="candidate"
         appearance="calm"
-        priority={taskBlockPriorityFor(task.importance, task.urgency)}
+        priority={taskBlockPriorityFor(task.priority)}
         checked={task.completed && !isEvent}
         selected={Boolean(openPanel || isPlacementArmed)}
         dragState={dragState}
@@ -11495,8 +11498,7 @@ function TaskCard({
           {!isEvent && <TaskCheckbox
             checked={task.completed}
             tone={normalizeTaskCheckTone(task)}
-            importance={task.importance}
-            urgency={task.urgency}
+            priority={task.priority}
             title={task.completed ? t(lang, "taskCard.markIncomplete") : t(lang, "taskCard.markComplete")}
             onClick={(event) => {
               event.stopPropagation();
@@ -12155,7 +12157,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
     : suppliedTop ?? top;
 
   return (
-    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id, readonly: isExternalEvent ? "true" : undefined }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
+    <TaskBlock as="div" variant="scheduled" appearance="calm" priority={taskBlockPriorityFor(task.priority)} density={height < 56 ? "compact" : "normal"} checked={!isEvent && task.completed} selected={Boolean(showResizeHint || projectOpen || preview)} dragState={dragState} projectColor={stripeColor} className={`df-time-block priority-${task.priority} ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${preview ? "resizing" : ""} ${showResizeHint ? "show-resize-hint" : ""} ${projectOpen ? "project-open" : ""} ${isPreview ? "df-time-block-preview" : ""} ${isWeekView ? "df-time-block-week" : ""} ${isRecurring ? "recurring" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", preview: isPreview ? "true" : undefined, "view-mode": viewMode, "schedule-size": sizeClass, "timeline-event-id": eventId, "task-id": task.id, readonly: isExternalEvent ? "true" : undefined }} style={{ ...extraStyle, top: resolvedTop, height, bottom: "auto", "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px", "--recurring-text": recurringTextColor } as CSSProperties} onMouseEnter={() => onHover(task.id)} onMouseLeave={() => {
       onHover("");
     }} onPointerDown={isExternalEvent || isReturnedUnfinished ? undefined : onDragStart} onClick={(event) => { event.stopPropagation(); onSelect(); }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? t(lang, "timeBlock.returnedHint") : undefined}>
       {isPreview && <span className="df-preview-badge">{t(lang, "timeBlock.pending")}</span>}
@@ -12166,7 +12168,7 @@ function TimeBlock({ task, preview, projectName, projects, hovered, showResizeHi
         {isEvent ? (
           <span className="df-task-block-check df-time-card-event-mark" title={t(lang, "timeBlock.eventTooltip")} aria-label={t(lang, "timeBlock.eventTooltip")} />
         ) : (
-          <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} returned={isReturnedUnfinished} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => {
+          <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} priority={task.priority} returned={isReturnedUnfinished} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => {
             event.stopPropagation();
             onToggleDone();
           }} ariaLabel={task.completed ? t(lang, "timeBlock.markIncomplete") : t(lang, "timeBlock.markComplete")}>
@@ -12368,10 +12370,10 @@ function AllDayBlock({ task, dragging, projectName, projects, onEdit, onToggleDo
     }
   }, [hovered]);
   return (
-    <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.importance, task.urgency)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", readonly: isExternalEvent ? "true" : undefined }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
+    <TaskBlock as="article" variant="allDay" appearance="calm" priority={taskBlockPriorityFor(task.priority)} checked={!isEvent && task.completed} selected={projectOpen} dragging={dragging} projectColor={stripeColor} className={`df-all-day-block ${!isEvent && task.completed ? "completed" : ""} ${isEvent ? "is-event" : ""} ${isExternalEvent ? "is-external-calendar" : ""} ${isReturnedUnfinished ? "returned-unfinished" : ""} ${projectOpen ? "project-open" : ""} ${isShortName ? "short-name" : ""}${dragging ? " is-dragging" : ""}`} dataAttrs={{ kind: isEvent ? "event" : "task", readonly: isExternalEvent ? "true" : undefined }} style={{ "--badge-width": badgeWidth ? `${badgeWidth}px` : "0px" } as CSSProperties} onPointerDown={isEvent || isReturnedUnfinished ? undefined : onPointerDragStart} onClick={onEdit} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setProjectOpen(false); setHovered(false); }} title={isExternalEvent ? (lang === "zh" ? "外部日历（只读）" : "External calendar (read-only)") : isReturnedUnfinished ? "已回到规划，可重新安排" : undefined}>
       <TaskRecurrenceIndicator recurrence={task.recurrence} lang={lang} />
       <TaskBlockRow className="df-all-day-row">
-        {!isEvent && <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} returned={isReturnedUnfinished} onClick={(event) => {
+        {!isEvent && <TaskCheckbox checked={task.completed} tone={normalizeTaskCheckTone(task)} priority={task.priority} returned={isReturnedUnfinished} onClick={(event) => {
           event.stopPropagation();
           onToggleDone();
         }}>{task.completed ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-6" /></svg> : isReturnedUnfinished ? <ReturnedToPlanIcon /> : ""}</TaskCheckbox>}

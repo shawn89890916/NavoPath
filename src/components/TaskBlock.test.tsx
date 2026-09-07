@@ -49,13 +49,13 @@ describe("TaskBlock shared component contract", () => {
     const attrs = taskBlockDataAttrs({
       variant: "candidate",
       appearance: "medium",
-      priority: "urgent",
+      priority: "medium",
       checked: true,
       selected: false,
     });
     expect(attrs["data-task-appearance"]).toBe("medium");
     expect(attrs["data-task-variant"]).toBe("candidate");
-    expect(attrs["data-task-priority"]).toBe("urgent");
+    expect(attrs["data-task-priority"]).toBe("medium");
     expect(attrs["data-task-checked"]).toBe("true");
     expect(attrs["data-task-selected"]).toBeUndefined();
   });
@@ -65,8 +65,8 @@ describe("TaskBlock shared component contract", () => {
     expect(values).toHaveLength(3);
   });
 
-  it("keeps the priority type vocabulary closed to low | normal | high | urgent", () => {
-    const values: TaskBlockPriority[] = ["low", "normal", "high", "urgent"];
+  it("keeps the priority type vocabulary closed to low | normal | medium | high", () => {
+    const values: TaskBlockPriority[] = ["low", "normal", "medium", "high"];
     expect(values).toHaveLength(4);
   });
 

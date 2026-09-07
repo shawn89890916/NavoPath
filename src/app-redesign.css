@@ -1753,13 +1753,7 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 18%, transparent) !important;
 }
 
-/* ============================================================
- * Task checkbox importance / urgency visual mapping.
- * Wrapper .df-task-checkbox-wrap carries data-importance and
- * data-urgency attributes; the inner .df-block-check keeps its
- * click behavior. Importance controls border color, urgency
- * controls a small "!" marker at the top-right corner.
- * ============================================================ */
+/* Keep the checkbox's inner control aligned inside the shared wrapper. */
 .df-task-checkbox-wrap {
   position: relative;
   display: inline-flex;
@@ -1774,51 +1768,6 @@ html[data-motion-fallback][data-motion-scope="timeline"] .df-app .df-timeline-pa
 }
 .df-app .df-task-checkbox-wrap .df-block-check:active:not(:disabled) {
   transform: translateY(1px) !important;
-}
-.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check {
-  border-color: #C96F5B !important;
-  border-width: 1.5px !important;
-}
-.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check {
-  border-color: #C49A32 !important;
-}
-.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check {
-  border-color: #6E8DA6 !important;
-}
-.df-app .df-task-checkbox-wrap[data-importance='unset'] .df-block-check {
-  border-color: var(--paper-ink-muted, #8E8478) !important;
-}
-/* Keep importance color when checked so the signal is not lost. */
-.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check.completed,
-.df-app .df-task-checkbox-wrap[data-importance='high'] .df-block-check[aria-pressed='true'] {
-  border-color: #C96F5B !important;
-}
-.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check.completed,
-.df-app .df-task-checkbox-wrap[data-importance='medium'] .df-block-check[aria-pressed='true'] {
-  border-color: #C49A32 !important;
-}
-.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check.completed,
-.df-app .df-task-checkbox-wrap[data-importance='low'] .df-block-check[aria-pressed='true'] {
-  border-color: #6E8DA6 !important;
-}
-
-/* Urgency marker — small "!" at the checkbox top-right. */
-.df-task-urgency-mark {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  pointer-events: none;
-  letter-spacing: -0.04em;
-  text-shadow: 0 0 2px var(--paper-bg, #FBF9FF);
-}
-.df-task-urgency-mark[data-urgency='high'] { color: #C96F5B; }
-.df-task-urgency-mark[data-urgency='medium'] { color: #C49A32; }
-.df-task-urgency-mark[data-urgency='low'] { color: #6E8DA6; }
-.theme-dark .df-task-urgency-mark {
-  text-shadow: 0 0 2px var(--paper-bg, #1a1a1a);
 }
 .df-app .df-date-arrow,
 .df-app .df-date-arrow:hover {
