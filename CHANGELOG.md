@@ -4,6 +4,7 @@
 
 ### 改进
 - Navo AI 的主动提醒现在会实时出现在工作区顶栏：未读数量清晰可见，点击即可打开提醒；允许系统通知后，新提醒也会在应用外显示。每日开工与收工简报对新账户默认开启。
+- 规划页现只显示未完成任务，树状图中的已完成子任务也会同步隐藏；已安排任务保留在规划中，并以“已安排”状态标记替代“加入候选”操作。
 
 ## 2026-09-01 · Navo AI 主动助理
 
@@ -34,6 +35,7 @@
 
 ### Improved
 - Navo AI proactive messages now arrive live in the workspace header with a clear unread count and one-click access. Once system notifications are allowed, new messages also appear outside the app. Daily start and end briefs are enabled by default for new accounts.
+- Planning now shows only unfinished tasks, including its tree’s subtasks. Scheduled tasks remain visible with a Planned status instead of an Add to Candidate action.
 
 ## 2026-09-01 · Navo AI Proactive Assistant
 
