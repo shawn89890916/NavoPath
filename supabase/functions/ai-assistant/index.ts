@@ -399,7 +399,8 @@ async function runGlobalAgent(req: Request, params: {
   };
 
   try {
-  for (let round = 0; round < AGENT_MAX_ROUNDS; round += 1) {
+  const unrestricted = workspace.profile.settings.aiSafetyLevel === "full";
+  for (let round = 0; round < (unrestricted ? 24 : AGENT_MAX_ROUNDS); round += 1) {
     const content = await callDeepSeek(params.apiKey, params.model, messages, 2_400, params.reasoningMode, runController.signal);
     let parsed: Record<string, any>;
     try {
@@ -417,7 +418,7 @@ async function runGlobalAgent(req: Request, params: {
 
     if (parsed.kind === "tool_calls") {
       const calls = normalizeToolCalls(parsed.calls);
-      if (!calls.length || toolCallCount + calls.length > AGENT_MAX_TOOL_CALLS) {
+      if (!calls.length || (!unrestricted && toolCallCount + calls.length > AGENT_MAX_TOOL_CALLS)) {
         const reply = ctx.language === "zh" ? "本次查询已达到安全上限，请缩小范围后重试。" : "This request reached the safe tool limit. Narrow the scope and try again.";
         const runId = await recordReadOnlyFailure(reply);
         return { reply, format: "markdown" as const, steps: trace.map((item) => ({ label: item.name, status: item.status })), actions: [], agent: { runId, trace, applied: [], pending: [] } };
