@@ -6612,6 +6612,7 @@ function App() {
   }
 
   async function sendAi(messageOverride?: string, trigger: "manual" | "start_brief" | "end_review" = "manual") {
+    if (aiBusy) return false;
     if (!(messageOverride ?? aiInput).trim() && !aiAttachment) return false;
     if (!data) return false;
     if (!authStateRef.current?.user || authStateRef.current.mode !== "cloud") {
@@ -6619,12 +6620,15 @@ function App() {
       return false;
     }
     const msg = (messageOverride ?? aiInput).trim() || "解析附件中的任务和事件";
-    const pendingAgentMessage = [...aiMessages].reverse().find((message) => message.role === "assistant" && message.agent?.decisionState === "pending" && message.agent.pending.length > 0);
+    const latestAssistantMessage = [...aiMessages].reverse().find((message) => message.role === "assistant");
+    const pendingAgentMessage = latestAssistantMessage?.agent?.decisionState === "pending" && latestAssistantMessage.agent.pending.length > 0
+      ? latestAssistantMessage
+      : undefined;
     const requestedDecision = trigger === "manual" ? explicitAgentDecision(msg) : null;
     if (pendingAgentMessage && requestedDecision) {
-      setAiInput("");
-      await handleAgentDecision(pendingAgentMessage.id, requestedDecision === "approve" ? "approve" : "reject");
-      return true;
+      const handled = await handleAgentDecision(pendingAgentMessage.id, requestedDecision === "approve" ? "approve" : "reject");
+      if (handled) setAiInput((current) => current === msg ? "" : current);
+      return handled;
     }
     const attachmentSnapshot: AiAttachmentSnapshot | undefined = aiAttachment ? {
       name: aiAttachment.name,
@@ -7472,16 +7476,16 @@ function App() {
     });
   }
 
-  async function handleAgentDecision(messageId: string, decision: "approve" | "reject" | "undo") {
+  async function handleAgentDecision(messageId: string, decision: "approve" | "reject" | "undo"): Promise<boolean> {
     const existing = aiMessages.find((message) => message.id === messageId)?.agent;
-    if (!existing?.runId || aiBusy) return;
+    if (!existing?.runId || aiBusy) return false;
     setAiBusy(true);
     try {
       const mode = decision === "approve" ? "agent_confirm" : decision === "reject" ? "agent_reject" : "agent_undo";
       const result = await decideAgentRun(mode, existing.runId);
       if (!result.ok) {
         showToast(result.error.message);
-        return;
+        return false;
       }
       if (decision !== "reject") {
         queuedRemoteRefreshRef.current = true;
@@ -7501,6 +7505,7 @@ function App() {
       persistAiMessage(messageId, { agent: nextAgent });
       if (aiAuditOpen) void listAgentAuditRuns().then(setAiAuditRuns).catch(() => undefined);
       showToast(result.reply);
+      return true;
     } finally {
       setAiBusy(false);
     }
