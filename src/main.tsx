@@ -865,11 +865,14 @@ function makeEvent(form: FormState): CalendarEvent {
   };
 }
 
+const MAX_RENDERED_AI_MESSAGES = 80;
+const MAX_RENDERED_AI_MESSAGE_LENGTH = 30_000;
+
 function chatToSessionMessages(chat: PlannerData["chat"] = []): AiSessionMessage[] {
-  return chat.map((message) => ({
+  return chat.slice(-MAX_RENDERED_AI_MESSAGES).map((message) => ({
     id: message.id || uid(`ai_${message.role}`),
     role: message.role,
-    content: message.content,
+    content: message.content.slice(0, MAX_RENDERED_AI_MESSAGE_LENGTH),
     createdAt: message.createdAt,
     saved: Boolean(message.saved),
     status: message.status || "done",
